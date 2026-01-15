@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة الأسئلة - HTML مباشر</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3a0ca3;
+            --success: #4cc9f0;
+            --danger: #f72585;
+            --warning: #f8961e;
+            --dark: #1a1a2e;
+            --light: #f8f9fa;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Cairo', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        /* الهيدر */
+        .header {
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            color: white;
+            padding: 25px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        
+        /* التبويبات */
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #ddd;
+        }
+        
+        .tab {
+            padding: 20px 30px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .tab.active {
+            background: white;
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 40px;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* الإحصائيات */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            border-top: 5px solid var(--primary);
+        }
+        
+        .stat-card:nth-child(2) { border-color: var(--success); }
+        .stat-card:nth-child(3) { border-color: var(--warning); }
+        
+        .stat-card i {
+            font-size: 40px;
+            margin-bottom: 15px;
+        }
+        
+        .stat-card.total i { color: var(--primary); }
+        .stat-card.published i { color: var(--success); }
+        .stat-card.draft i { color: var(--warning); }
+        
+        .stat-card h3 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        /* النموذج */
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--dark);
+        }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus, textarea:focus, select:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+        
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        
+        .options-container {
+            margin: 25px 0;
+        }
+        
+        .option-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .option-number {
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-left: 15px;
+        }
+        
+        .correct-option-container {
+            background: #e8f4fc;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-right: 5px solid var(--primary);
+        }
+        
+        /* الأزرار */
+        .buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--secondary);
+            transform: translateY(-3px);
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        /* جدول الأسئلة */
+        .table-container {
+            overflow-x: auto;
+            margin-top: 30px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        th {
+            background: var(--primary);
+            color: white;
+            padding: 15px;
+            text-align: right;
+        }
+        
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .action-btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .edit-btn { background: var(--warning); color: white; }
+        .delete-btn { background: var(--danger); color: white; }
+        .view-btn { background: var(--primary); color: white; }
+        
+        /* معاينة السؤال */
+        .preview-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .preview-content {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        /* الفوتر */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            color: #666;
+            border-top: 1px solid #eee;
+        }
+        
+        /* وسائط متعددة */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                text-align: center;
+                gap: 20px;
+            }
+            
+            .stats {
+                grid-template-columns: 1fr;
+            }
+            
+            .tabs {
+                flex-direction: column;
+            }
+            
+            .buttons {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- الهيدر -->
+        <div class="header">
+            <div class="logo">
+                <h1><i class="fas fa-question-circle"></i> نظام إدارة الأسئلة</h1>
+                <p>إصدار HTML/JavaScript - يعمل مباشرة في المتصفح</p>
+            </div>
+            <div class="user-info">
+                <p><i class="fas fa-user"></i> <strong id="username">المستخدم</strong></p>
+            </div>
+        </div>
+        
+        <!-- التبويبات -->
+        <div class="tabs">
+            <div class="tab active" data-tab="home">
+                <i class="fas fa-home"></i> الرئيسية
+            </div>
+            <div class="tab" data-tab="add">
+                <i class="fas fa-plus-circle"></i> إضافة سؤال
+            </div>
+            <div class="tab" data-tab="questions">
+                <i class="fas fa-list"></i> قائمة الأسئلة
+            </div>
+            <div class="tab" data-tab="export">
+                <i class="fas fa-download"></i> تصدير
+            </div>
+        </div>
+        
+        <!-- المحتوى الرئيسي -->
+        <div class="tab-content active" id="home-tab">
+            <h2><i class="fas fa-chart-line"></i> نظرة عامة</h2>
+            
+            <!-- الإحصائيات -->
+            <div class="stats">
+                <div class="stat-card total">
+                    <i class="fas fa-question-circle"></i>
+                    <h3 id="totalCount">0</h3>
+                    <p>إجمالي الأسئلة</p>
+                </div>
+                <div class="stat-card published">
+                    <i class="fas fa-check-circle"></i>
+                    <h3 id="publishedCount">0</h3>
+                    <p>أسئلة منشورة</p>
+                </div>
+                <div class="stat-card draft">
+                    <i class="fas fa-edit"></i>
+                    <h3 id="draftCount">0</h3>
+                    <p>أسئلة مسودة</p>
+                </div>
+            </div>
+            
+            <!-- تعليمات سريعة -->
+            <div style="background: #f8f9fa; padding: 30px; border-radius: 10px; margin-top: 30px;">
+                <h3><i class="fas fa-info-circle"></i> كيفية الاستخدام:</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 20px;">
+                    <div style="background: white; padding: 20px; border-radius: 8px; border-right: 4px solid var(--primary);">
+                        <h4><i class="fas fa-plus text-primary"></i> إضافة سؤال</h4>
+                        <p>انتقل إلى تبويب "إضافة سؤال" واملأ البيانات</p>
+                    </div>
+                    <div style="background: white; padding: 20px; border-radius: 8px; border-right: 4px solid var(--success);">
+                        <h4><i class="fas fa-save text-success"></i> حفظ التغييرات</h4>
+                        <p>يتم حفظ الأسئلة تلقائياً في متصفحك</p>
+                    </div>
+                    <div style="background: white; padding: 20px; border-radius: 8px; border-right: 4px solid var(--warning);">
+                        <h4><i class="fas fa-download text-warning"></i> تصدير البيانات</h4>
+                        <p>يمكنك تصدير الأسئلة كملف JSON أو Excel</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- تبويب إضافة سؤال -->
+        <div class="tab-content" id="add-tab">
+            <h2><i class="fas fa-plus-circle"></i> إضافة سؤال جديد</h2>
+            
+            <form id="questionForm">
+                <input type="hidden" id="editId" value="">
+                
+                <div class="form-group">
+                    <label><i class="fas fa-question"></i> نص السؤال:</label>
+                    <textarea id="questionText" placeholder="اكتب نص السؤال هنا..." required></textarea>
+                </div>
+                
+                <!-- خيارات الإجابة -->
+                <div class="options-container">
+                    <label><i class="fas fa-list-ol"></i> خيارات الإجابة:</label>
+                    
+                    <div class="option-row">
+                        <div class="option-number">1</div>
+                        <input type="text" id="option1" placeholder="الخيار الأول..." required>
+                    </div>
+                    
+                    <div class="option-row">
+                        <div class="option-number">2</div>
+                        <input type="text" id="option2" placeholder="الخيار الثاني..." required>
+                    </div>
+                    
+                    <div class="option-row">
+                        <div class="option-number">3</div>
+                        <input type="text" id="option3" placeholder="الخيار الثالث...">
+                    </div>
+                    
+                    <div class="option-row">
+                        <div class="option-number">4</div>
+                        <input type="text" id="option4" placeholder="الخيار الرابع...">
+                    </div>
+                </div>
+                
+                <!-- الإجابة الصحيحة -->
+                <div class="correct-option-container">
+                    <label><i class="fas fa-check-circle"></i> الإجابة الصحيحة:</label>
+                    <select id="correctOption" required>
+                        <option value="1">الخيار الأول</option>
+                        <option value="2">الخيار الثاني</option>
+                        <option value="3">الخيار الثالث</option>
+                        <option value="4">الخيار الرابع</option>
+                    </select>
+                </div>
+                
+                <!-- إعدادات إضافية -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 30px 0;">
+                    <div class="form-group">
+                        <label>التصنيف:</label>
+                        <input type="text" id="category" placeholder="مثل: الجغرافيا">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>مستوى الصعوبة:</label>
+                        <select id="difficulty">
+                            <option value="easy">سهل</option>
+                            <option value="medium" selected>متوسط</option>
+                            <option value="hard">صعب</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>الدرجة:</label>
+                        <input type="number" id="points" value="5" min="1" max="20">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>الحالة:</label>
+                        <select id="status">
+                            <option value="draft">مسودة</option>
+                            <option value="published">منشور</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- أزرار التحكم -->
+                <div class="buttons">
+                    <button type="button" class="btn btn-danger" onclick="clearForm()">
+                        <i class="fas fa-trash-alt"></i> حذف الكل
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="saveAsDraft()">
+                        <i class="fas fa-save"></i> حفظ كمسودة
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="previewQuestion()">
+                        <i class="fas fa-eye"></i> معاينة
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-check-circle"></i> حفظ السؤال
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <!-- تبويب قائمة الأسئلة -->
+        <div class="tab-content" id="questions-tab">
+            <h2><i class="fas fa-list"></i> قائمة الأسئلة</h2>
+            
+            <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+                <input type="text" id="searchInput" placeholder="ابحث في الأسئلة..." style="flex: 1; min-width: 250px;">
+                <select id="filterCategory" style="padding: 12px; border-radius: 8px;">
+                    <option value="">جميع التصنيفات</option>
+                </select>
+                <select id="filterStatus" style="padding: 12px; border-radius: 8px;">
+                    <option value="">جميع الحالات</option>
+                    <option value="published">منشور</option>
+                    <option value="draft">مسودة</option>
+                </select>
+            </div>
+            
+            <div class="table-container">
+                <table id="questionsTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>السؤال</th>
+                            <th>التصنيف</th>
+                            <th>الصعوبة</th>
+                            <th>الحالة</th>
+                            <th>التاريخ</th>
+                            <th>الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody id="questionsBody">
+                        <!-- سيتم تعبئة الجدول بواسطة JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- تبويب التصدير -->
+        <div class="tab-content" id="export-tab">
+            <h2><i class="fas fa-download"></i> تصدير البيانات</h2>
+            
+            <div style="background: #f8f9fa; padding: 30px; border-radius: 10px;">
+                <h3><i class="fas fa-database"></i> خيارات التصدير</h3>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-top: 30px;">
+                    <div style="background: white; padding: 30px; border-radius: 10px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+                        <i class="fas fa-file-code" style="font-size: 50px; color: var(--primary); margin-bottom: 20px;"></i>
+                        <h4>تصدير كملف JSON</h4>
+                        <p>تصدير جميع الأسئلة بصيغة JSON يمكن استخدامها في أنظمة أخرى</p>
+                        <button onclick="exportToJSON()" class="btn btn-primary" style="margin-top: 20px;">
+                            <i class="fas fa-download"></i> تصدير JSON
+                        </button>
+                    </div>
+                    
+                    <div style="background: white; padding: 30px; border-radius: 10px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+                        <i class="fas fa-file-excel" style="font-size: 50px; color: var(--success); margin-bottom: 20px;"></i>
+                        <h4>تصدير كملف Excel</h4>
+                        <p>تصدير الأسئلة بصيغة Excel يمكن فتحها في Microsoft Excel</p>
+                        <button onclick="exportToExcel()" class="btn btn-success" style="margin-top: 20px;">
+                            <i class="fas fa-download"></i> تصدير Excel
+                        </button>
+                    </div>
+                    
+                    <div style="background: white; padding: 30px; border-radius: 10px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+                        <i class="fas fa-file-alt" style="font-size: 50px; color: var(--warning); margin-bottom: 20px;"></i>
+                        <h4>نسخة احتياطية</h4>
+                        <p>حفظ نسخة احتياطية من جميع الأسئلة في متصفحك</p>
+                        <button onclick="createBackup()" class="btn btn-warning" style="margin-top: 20px;">
+                            <i class="fas fa-save"></i> إنشاء نسخة احتياطية
+                        </button>
+                        <button onclick="restoreBackup()" class="btn btn-secondary" style="margin-top: 10px;">
+                            <i class="fas fa-upload"></i> استعادة نسخة
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- استيراد -->
+                <div style="background: white; padding: 30px; border-radius: 10px; margin-top: 40px;">
+                    <h4><i class="fas fa-upload"></i> استيراد الأسئلة</h4>
+                    <p>يمكنك استيراد أسئلة من ملف JSON سابق</p>
+                    <div style="display: flex; gap: 15px; margin-top: 20px; flex-wrap: wrap;">
+                        <input type="file" id="importFile" accept=".json" style="flex: 1; padding: 15px; border: 2px dashed #ddd; border-radius: 8px;">
+                        <button onclick="importFromFile()" class="btn btn-primary">
+                            <i class="fas fa-upload"></i> استيراد من ملف
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- نافذة المعاينة -->
+        <div class="preview-modal" id="previewModal">
+            <div class="preview-content">
+                <h2 style="color: var(--primary); margin-bottom: 20px;">
+                    <i class="fas fa-eye"></i> معاينة السؤال
+                </h2>
+                <div id="previewContent"></div>
+                <div style="text-align: center; margin-top: 30px;">
+                    <button onclick="closePreview()" class="btn btn-primary">
+                        <i class="fas fa-times"></i> إغلاق
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- الفوتر -->
+        <div class="footer">
+            <p>نظام إدارة الأسئلة - إصدار HTML/JavaScript | يعمل مباشرة في المتصفح بدون خادم</p>
+            <p style="margin-top: 10px; font-size: 14px; color: #888;">
+                يتم حفظ البيانات في متصفحك باستخدام LocalStorage
+            </p>
+        </div>
+    </div>
+    
+    <!-- JavaScript -->
+    <script>
+        // بيانات التطبيق
+        let questions = JSON.parse(localStorage.getItem('questions')) || [];
+        let categories = JSON.parse(localStorage.getItem('categories')) || ['الجغرافيا', 'التاريخ', 'العلوم'];
+        let currentEditId = null;
+        
+        // تهيئة التطبيق
+        document.addEventListener('DOMContentLoaded', function() {
+            initApp();
+        });
+        
+        // تهيئة التطبيق
+        function initApp() {
+            setupEventListeners();
+            loadQuestions();
+            updateStats();
+            loadCategories();
+            updateTable();
+            
+            // تعيين اسم المستخدم
+            let username = localStorage.getItem('username') || 'المستخدم';
+            document.getElementById('username').textContent = username;
+            
+            // إضافة بعض الأسئلة التجريبية إذا لم يكن هناك أسئلة
+            if (questions.length === 0) {
+                addSampleQuestions();
+            }
+        }
+        
+        // إعداد المستمعين للأحداث
+        function setupEventListeners() {
+            // التبويبات
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    switchTab(tabId);
+                });
+            });
+            
+            // نموذج السؤال
+            document.getElementById('questionForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                saveQuestion();
+            });
+            
+            // البحث
+            document.getElementById('searchInput').addEventListener('input', function() {
+                updateTable();
+            });
+            
+            // الفلترة
+            document.getElementById('filterCategory').addEventListener('change', updateTable);
+            document.getElementById('filterStatus').addEventListener('change', updateTable);
+            
+            // استيراد الملف
+            document.getElementById('importFile').addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    importFromFile();
+                }
+            });
+        }
+        
+        // تبديل التبويبات
+        function switchTab(tabId) {
+            // تحديث التبويبات النشطة
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // تفعيل التبويب المحدد
+            document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
+            document.getElementById(`${tabId}-tab`).classList.add('active');
+            
+            // إذا كان تبويب الأسئلة، قم بتحديث الجدول
+            if (tabId === 'questions') {
+                updateTable();
+            }
+        }
+        
+        // حفظ السؤال
+        function saveQuestion() {
+            // جمع البيانات من النموذج
+            const questionData = {
+                id: currentEditId || Date.now(),
+                text: document.getElementById('questionText').value.trim(),
+                options: [
+                    document.getElementById('option1').value.trim(),
+                    document.getElementById('option2').value.trim(),
+                    document.getElementById('option3').value.trim(),
+                    document.getElementById('option4').value.trim()
+                ],
+                correctOption: parseInt(document.getElementById('correctOption').value),
+                category: document.getElementById('category').value.trim(),
+                difficulty: document.getElementById('difficulty').value,
+                points: parseInt(document.getElementById('points').value) || 5,
+                status: document.getElementById('status').value,
+                createdAt: currentEditId ? getQuestionById(currentEditId)?.createdAt || new Date() : new Date(),
+                updatedAt: new Date()
+            };
+            
+            // التحقق من البيانات
+            if (!questionData.text || !questionData.options[0] || !questionData.options[1]) {
+                alert('يرجى ملء الحقول المطلوبة: السؤال والخيارين الأولين');
+                return;
+            }
+            
+            // إضافة أو تحديث السؤال
+            if (currentEditId) {
+                // تحديث سؤال موجود
+                const index = questions.findIndex(q => q.id === currentEditId);
+                if (index !== -1) {
+                    questions[index] = questionData;
+                }
+            } else {
+                // إضافة سؤال جديد
+                questions.push(questionData);
+            }
+            
+            // حفظ في LocalStorage
+            saveToLocalStorage();
+            
+            // تحديث التصنيفات
+            if (questionData.category && !categories.includes(questionData.category)) {
+                categories.push(questionData.category);
+                saveCategories();
+                loadCategories();
+            }
+            
+            // تحديث الواجهة
+            updateStats();
+            updateTable();
+            clearForm();
+            
+            // إظهار رسالة نجاح
+            alert(currentEditId ? 'تم تحديث السؤال بنجاح!' : 'تم إضافة السؤال بنجاح!');
+            
+            // الرجوع إلى تبويب الأسئلة
+            switchTab('questions');
+        }
+        
+        // حفظ كمسودة
+        function saveAsDraft() {
+            document.getElementById('status').value = 'draft';
+            saveQuestion();
+        }
+        
+        // مسح النموذج
+        function clearForm() {
+            document.getElementById('questionForm').reset();
+            document.getElementById('editId').value = '';
+            document.getElementById('status').value = 'draft';
+            document.getElementById('points').value = '5';
+            document.getElementById('difficulty').value = 'medium';
+            currentEditId = null;
+        }
+        
+        // معاينة السؤال
+        function previewQuestion() {
+            const questionText = document.getElementById('questionText').value;
+            const options = [
+                document.getElementById('option1').value,
+                document.getElementById('option2').value,
+                document.getElementById('option3').value,
+                document.getElementById('option4').value
+            ];
+            const correctOption = parseInt(document.getElementById('correctOption').value);
+            const category = document.getElementById('category').value;
+            const difficulty = document.getElementById('difficulty').value;
+            
+            if (!questionText || !options[0] || !options[1]) {
+                alert('يرجى ملء السؤال والخيارين الأولين على الأقل');
+                return;
+            }
+            
+            let previewHTML = `
+                <div style="margin-bottom: 30px;">
+                    <h3 style="color: var(--dark); margin-bottom: 15px;">السؤال:</h3>
+                    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-size: 18px;">
+                        ${questionText}
+                    </div>
+                </div>
+                
+                <h3 style="color: var(--dark); margin-bottom: 15px;">الخيارات:</h3>
+            `;
+            
+            options.forEach((option, index) => {
+                if (option.trim()) {
+                    const isCorrect = (index + 1) === correctOption;
+                    previewHTML += `
+                        <div style="padding: 15px; margin-bottom: 10px; border-radius: 8px; 
+                              border: 2px solid ${isCorrect ? '#28a745' : '#ddd'}; 
+                              background: ${isCorrect ? '#d4edda' : 'white'};">
+                            <strong>${index + 1}.</strong> ${option}
+                            ${isCorrect ? ' <span style="color: #28a745;">✓ (الإجابة الصحيحة)</span>' : ''}
+                        </div>
+                    `;
+                }
+            });
+            
+            previewHTML += `
+                <div style="margin-top: 30px; padding: 20px; background: #e8f4fc; border-radius: 8px;">
+                    <h3 style="color: var(--dark); margin-bottom: 15px;">معلومات إضافية:</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                        <div>
+                            <strong>التصنيف:</strong><br>
+                            ${category || 'غير محدد'}
+                        </div>
+                        <div>
+                            <strong>مستوى الصعوبة:</strong><br>
+                            ${getDifficultyText(difficulty)}
+                        </div>
+                        <div>
+                            <strong>الحالة:</strong><br>
+                            ${document.getElementById('status').value === 'published' ? 'منشور' : 'مسودة'}
+                        </div>
+                        <div>
+                            <strong>الدرجة:</strong><br>
+                            ${document.getElementById('points').value} نقطة
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('previewContent').innerHTML = previewHTML;
+            document.getElementById('previewModal').style.display = 'flex';
+        }
+        
+        // إغلاق المعاينة
+        function closePreview() {
+            document.getElementById('previewModal').style.display = 'none';
+        }
+        
+        // تحميل الأسئلة
+        function loadQuestions() {
+            const saved = localStorage.getItem('questions');
+            if (saved) {
+                try {
+                    questions = JSON.parse(saved);
+                } catch (e) {
+                    console.error('Error loading questions:', e);
+                    questions = [];
+                }
+            }
+        }
+        
+        // حفظ في LocalStorage
+        function saveToLocalStorage() {
+            localStorage.setItem('questions', JSON.stringify(questions));
+        }
+        
+        // تحديث الإحصائيات
+        function updateStats() {
+            const total = questions.length;
+            const published = questions.filter(q => q.status === 'published').length;
+            const draft = questions.filter(q => q.status === 'draft').length;
+            
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('publishedCount').textContent = published;
+            document.getElementById('draftCount').textContent = draft;
+        }
+        
+        // تحديث الجدول
+        function updateTable() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const filterCategory = document.getElementById('filterCategory').value;
+            const filterStatus = document.getElementById('filterStatus').value;
+            
+            let filteredQuestions = questions;
+            
+            // تطبيق البحث
+            if (searchTerm) {
+                filteredQuestions = filteredQuestions.filter(q => 
+                    q.text.toLowerCase().includes(searchTerm) ||
+                    q.category.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            // تطبيق الفلترة
+            if (filterCategory) {
+                filteredQuestions = filteredQuestions.filter(q => q.category === filterCategory);
+            }
+            
+            if (filterStatus) {
+                filteredQuestions = filteredQuestions.filter(q => q.status === filterStatus);
+            }
+            
+            // تحديث الجدول
+            const tbody = document.getElementById('questionsBody');
+            tbody.innerHTML = '';
+            
+            if (filteredQuestions.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 40px;">
+                            <i class="fas fa-inbox" style="font-size: 40px; color: #ccc; margin-bottom: 15px; display: block;"></i>
+                            <h3 style="color: #666;">لا توجد أسئلة</h3>
+                            <p>ابدأ بإضافة سؤال جديد من تبويب "إضافة سؤال"</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            filteredQuestions.forEach((question, index) => {
+                const row = document.createElement('tr');
+                
+                // تنسيق التاريخ
+                const date = new Date(question.createdAt);
+                const dateStr = date.toLocaleDateString('ar-SA');
+                
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td style="max-width: 300px;">${question.text.substring(0, 60)}${question.text.length > 60 ? '...' : ''}</td>
+                    <td>${question.category || 'غير محدد'}</td>
+                    <td>${getDifficultyText(question.difficulty)}</td>
+                    <td>
+                        <span style="padding: 5px 10px; border-radius: 20px; font-size: 12px; 
+                              background: ${question.status === 'published' ? '#d4edda' : '#fff3cd'}; 
+                              color: ${question.status === 'published' ? '#155724' : '#856404'}">
+                            ${question.status === 'published' ? 'منشور' : 'مسودة'}
+                        </span>
+                    </td>
+                    <td>${dateStr}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="action-btn view-btn" onclick="viewQuestion(${question.id})">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="action-btn edit-btn" onclick="editQuestion(${question.id})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="action-btn delete-btn" onclick="deleteQuestion(${question.id})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+        
+        // عرض تفاصيل السؤال
+        function viewQuestion(id) {
+            const question = getQuestionById(id);
+            if (!question) return;
+            
+            let previewHTML = `
+                <div style="margin-bottom: 30px;">
+                    <h3 style="color: var(--dark); margin-bottom: 15px;">السؤال:</h3>
+                    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-size: 18px;">
+                        ${question.text}
+                    </div>
+                </div>
+                
+                <h3 style="color: var(--dark); margin-bottom: 15px;">الخيارات:</h3>
+            `;
+            
+            question.options.forEach((option, index) => {
+                if (option && option.trim()) {
+                    const isCorrect = (index + 1) === question.correctOption;
+                    previewHTML += `
+                        <div style="padding: 15px; margin-bottom: 10px; border-radius: 8px; 
+                              border: 2px solid ${isCorrect ? '#28a745' : '#ddd'}; 
+                              background: ${isCorrect ? '#d4edda' : 'white'};">
+                            <strong>${index + 1}.</strong> ${option}
+                            ${isCorrect ? ' <span style="color: #28a745;">✓ (الإجابة الصحيحة)</span>' : ''}
+                        </div>
+                    `;
+                }
+            });
+            
+            previewHTML += `
+                <div style="margin-top: 30px; padding: 20px; background: #e8f4fc; border-radius: 8px;">
+                    <h3 style="color: var(--dark); margin-bottom: 15px;">معلومات السؤال:</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                        <div>
+                            <strong>التصنيف:</strong><br>
+                            ${question.category || 'غير محدد'}
+                        </div>
+                        <div>
+                            <strong>مستوى الصعوبة:</strong><br>
+                            ${getDifficultyText(question.difficulty)}
+                        </div>
+                        <div>
+                            <strong>الحالة:</strong><br>
+                            ${question.status === 'published' ? 'منشور' : 'مسودة'}
+                        </div>
+                        <div>
+                            <strong>الدرجة:</strong><br>
+                            ${question.points || 5} نقطة
+                        </div>
+                        <div>
+                            <strong>تاريخ الإنشاء:</strong><br>
+                            ${new Date(question.createdAt).toLocaleDateString('ar-SA')}
+                        </div>
+                        <div>
+                            <strong>آخر تحديث:</strong><br>
+                            ${new Date(question.updatedAt).toLocaleDateString('ar-SA')}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('previewContent').innerHTML = previewHTML;
+            document.getElementById('previewModal').style.display = 'flex';
+        }
+        
+        // تعديل السؤال
+        function editQuestion(id) {
+            const question = getQuestionById(id);
+            if (!question) return;
+            
+            // تعبئة النموذج
+            document.getElementById('questionText').value = question.text;
+            document.getElementById('option1').value = question.options[0] || '';
+            document.getElementById('option2').value = question.options[1] || '';
+            document.getElementById('option3').value = question.options[2] || '';
+            document.getElementById('option4').value = question.options[3] || '';
+            document.getElementById('correctOption').value = question.correctOption;
+            document.getElementById('category').value = question.category || '';
+            document.getElementById('difficulty').value = question.difficulty || 'medium';
+            document.getElementById('points').value = question.points || 5;
+            document.getElementById('status').value = question.status || 'draft';
+            document.getElementById('editId').value = question.id;
+            
+            currentEditId = question.id;
+            
+            // الانتقال إلى تبويب إضافة/تعديل السؤال
+            switchTab('add');
+            
+            // إظهار رسالة
+            setTimeout(() => {
+                alert('يمكنك الآن تعديل السؤال. بعد الانتهاء اضغط على "حفظ السؤال"');
+            }, 300);
+        }
+        
+        // حذف السؤال
+        function deleteQuestion(id) {
+            if (!confirm('هل أنت متأكد من حذف هذا السؤال؟')) return;
+            
+            questions = questions.filter(q => q.id !== id);
+            saveToLocalStorage();
+            updateStats();
+            updateTable();
+            
+            alert('تم حذف السؤال بنجاح');
+        }
+        
+        // تحميل التصنيفات
+        function loadCategories() {
+            const select = document.getElementById('filterCategory');
+            select.innerHTML = '<option value="">جميع التصنيفات</option>';
+            
+            categories.forEach(category => {
+                if (category) {
+                    const option = document.createElement('option');
+                    option.value = category;
+                    option.textContent = category;
+                    select.appendChild(option);
+                }
+            });
+        }
+        
+        // حفظ التصنيفات
+        function saveCategories() {
+            localStorage.setItem('categories', JSON.stringify(categories));
+        }
+        
+        // الحصول على نص مستوى الصعوبة
+        function getDifficultyText(difficulty) {
+            switch(difficulty) {
+                case 'easy': return 'سهل';
+                case 'medium': return 'متوسط';
+                case 'hard': return 'صعب';
+                default: return 'متوسط';
+            }
+        }
+        
+        // الحصول على سؤال بواسطة ID
+        function getQuestionById(id) {
+            return questions.find(q => q.id === id);
+        }
+        
+        // إضافة أسئلة تجريبية
+        function addSampleQuestions() {
+            const sampleQuestions = [
+                {
+                    id: 1,
+                    text: 'ما هي عاصمة المملكة العربية السعودية؟',
+                    options: ['الرياض', 'جدة', 'مكة المكرمة', 'الدمام'],
+                    correctOption: 1,
+                    category: 'الجغرافيا',
+                    difficulty: 'easy',
+                    points: 5,
+                    status: 'published',
+                    createdAt: new Date('2023-01-15'),
+                    updatedAt: new Date('2023-01-15')
+                },
+                {
+                    id: 2,
+                    text: 'أين تقع مدينة نيوم؟',
+                    options: ['المنطقة الشرقية', 'المنطقة الشمالية', 'المنطقة الجنوبية', 'المنطقة الغربية'],
+                    correctOption: 2,
+                    category: 'الجغرافيا',
+                    difficulty: 'medium',
+                    points: 10,
+                    status: 'published',
+                    createdAt: new Date('2023-02-20'),
+                    updatedAt: new Date('2023-02-20')
+                },
+                {
+                    id: 3,
+                    text: 'متى تأسست المملكة العربية السعودية؟',
+                    options: ['1932', '1950', '1902', '1927'],
+                    correctOption: 1,
+                    category: 'التاريخ',
+                    difficulty: 'medium',
+                    points: 8,
+                    status: 'draft',
+                    createdAt: new Date('2023-03-10'),
+                    updatedAt: new Date('2023-03-10')
+                }
+            ];
+            
+            questions.push(...sampleQuestions);
+            saveToLocalStorage();
+            updateStats();
+            updateTable();
+        }
+        
+        // تصدير إلى JSON
+        function exportToJSON() {
+            const dataStr = JSON.stringify(questions, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = `questions_${new Date().toISOString().split('T')[0]}.json`;
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+            
+            alert('تم تصدير الأسئلة بنجاح!');
+        }
+        
+        // تصدير إلى Excel
+        function exportToExcel() {
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            
+            // العنوان
+            csvContent += "رقم,السؤال,الخيار 1,الخيار 2,الخيار 3,الخيار 4,الإجابة الصحيحة,التصنيف,الصعوبة,الدرجة,الحالة,تاريخ الإنشاء\n";
+            
+            // البيانات
+            questions.forEach((question, index) => {
+                const row = [
+                    index + 1,
+                    `"${question.text.replace(/"/g, '""')}"`,
+                    `"${question.options[0] || ''}"`,
+                    `"${question.options[1] || ''}"`,
+                    `"${question.options[2] || ''}"`,
+                    `"${question.options[3] || ''}"`,
+                    question.correctOption,
+                    question.category || '',
+                    getDifficultyText(question.difficulty),
+                    question.points || 5,
+                    question.status === 'published' ? 'منشور' : 'مسودة',
+                    new Date(question.createdAt).toLocaleDateString('ar-SA')
+                ];
+                
+                csvContent += row.join(',') + '\n';
+            });
+            
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement('a');
+            link.setAttribute('href', encodedUri);
+            link.setAttribute('download', `questions_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            alert('تم تصدير الأسئلة كملف CSV يمكن فتحه في Excel');
+        }
+        
+        // إنشاء نسخة احتياطية
+        function createBackup() {
+            const backupData = {
+                questions: questions,
+                categories: categories,
+                backupDate: new Date().toISOString(),
+                backupVersion: '1.0'
+            };
+            
+            const dataStr = JSON.stringify(backupData, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', `backup_${new Date().toISOString().split('T')[0]}.json`);
+            linkElement.click();
+            
+            alert('تم إنشاء نسخة احتياطية بنجاح!');
+        }
+        
+        // استعادة نسخة احتياطية
+        function restoreBackup() {
+            const fileInput = document.getElementById('importFile');
+            if (!fileInput.files.length) {
+                alert('يرجى اختيار ملف النسخة الاحتياطية أولاً');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const backupData = JSON.parse(e.target.result);
+                    
+                    if (confirm('سيتم استبدال جميع البيانات الحالية بالبيانات المستوردة. هل تريد المتابعة؟')) {
+                        questions = backupData.questions || [];
+                        categories = backupData.categories || [];
+                        
+                        saveToLocalStorage();
+                        saveCategories();
+                        
+                        updateStats();
+                        updateTable();
+                        loadCategories();
+                        
+                        alert('تم استعادة النسخة الاحتياطية بنجاح!');
+                        
+                        // مسح حقل الملف
+                        fileInput.value = '';
+                    }
+                } catch (error) {
+                    alert('خطأ في قراءة الملف. تأكد من أن الملف صالح.');
+                    console.error(error);
+                }
+            };
+            
+            reader.readAsText(file);
+        }
+        
+        // استيراد من ملف
+        function importFromFile() {
+            restoreBackup(); // تستخدم نفس الوظيفة
+        }
+        
+        // دالة مساعدة للتعامل مع التواريخ
+        function formatDate(date) {
+            return new Date(date).toLocaleDateString('ar-SA', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+        
+        // إضافة سؤال جديد عند الضغط على Enter في الحقول
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type === 'text') {
+                if (!e.target.matches('#searchInput')) {
+                    e.preventDefault();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
