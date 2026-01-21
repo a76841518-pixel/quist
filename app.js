@@ -778,60 +778,87 @@ async function loadSystemData() {
             });
         }
 
-        function createSemesterElement(semester, index) {
-            const element = document.createElement('div');
-            element.className = 'semester-card';
-            element.innerHTML = `
-                <div class="semester-header">
-                    <div class="semester-title">
-                        <i class="fas fa-calendar"></i>
-                        <span>${semester.name}</span>
-                        <span style="color: var(--gray-medium); font-size: 0.9rem; margin-right: 10px;">
-                            (${semester.year})
-                        </span>
-                    </div>
-                    <div class="semester-actions">
-                        <button class="btn btn-primary btn-sm" onclick="calculateSemesterGPA(${index})">
-                            <i class="fas fa-calculator"></i> حساب المعدل
-                        </button>
-                        <button class="btn btn-info btn-sm" onclick="showCalculationDetails(${index})">
-                            <i class="fas fa-info-circle"></i> تفاصيل
-                        </button>
-                        <button class="btn btn-success btn-sm" onclick="setSelectedSemester(${index})">
-                            <i class="fas fa-book"></i> إضافة مواد
-                        </button>
-                        <button class="btn btn-light btn-sm" onclick="editSemester(${index})">
-                            <i class="fas fa-edit"></i> تعديل
-                        </button>
-                        <button class="btn btn-danger btn-sm" onclick="deleteSemester(${index})">
-                            <i class="fas fa-trash"></i> حذف
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="semester-gpa" style="margin-bottom: 20px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-weight: 600;">المعدل الفصلي:</span>
-                        <span style="font-size: 1.5rem; font-weight: 700; color: var(--primary-color);">
-                            ${semester.gpa?.toFixed(2) || '0.00'}%
-                        </span>
-                        <span style="background: #f0f9ff; padding: 2px 10px; border-radius: 12px; font-size: 0.9rem;">
-                            ${getGradeLetter(semester.gpa || 0)}
-                        </span>
-                    </div>
-                    <div style="margin-top: 10px; color: var(--gray-medium); font-size: 0.9rem;">
-                        الساعات: ${semester.totalCredits || 0} ساعة | المواد: ${semester.courses?.length || 0} مادة
-                    </div>
-                </div>
-                
-                <div id="courses-${index}">
-                    ${renderCourses(semester.courses || [], index)}
-                </div>
-            `;
-            
-            return element;
-        }
-
+function createSemesterElement(semester, index) {
+    const element = document.createElement('div');
+    element.className = 'semester-card';
+    element.innerHTML = `
+        <div class="semester-header">
+            <div class="semester-title">
+                <i class="fas fa-calendar"></i>
+                <span>${semester.name}</span>
+                <span style="color: var(--gray-medium); font-size: 0.9rem; margin-right: 10px;">
+                    (${semester.year})
+                </span>
+            </div>
+            <div class="semester-actions">
+                <button class="btn btn-primary btn-sm calculate-gpa-btn" data-index="${index}">
+                    <i class="fas fa-calculator"></i> حساب المعدل
+                </button>
+                <button class="btn btn-info btn-sm details-btn" data-index="${index}">
+                    <i class="fas fa-info-circle"></i> تفاصيل
+                </button>
+                <button class="btn btn-success btn-sm add-course-btn" data-index="${index}">
+                    <i class="fas fa-book"></i> إضافة مواد
+                </button>
+                <button class="btn btn-light btn-sm edit-semester-btn" data-index="${index}">
+                    <i class="fas fa-edit"></i> تعديل
+                </button>
+                <button class="btn btn-danger btn-sm delete-semester-btn" data-index="${index}">
+                    <i class="fas fa-trash"></i> حذف
+                </button>
+            </div>
+        </div>
+        
+        <div class="semester-gpa" style="margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-weight: 600;">المعدل الفصلي:</span>
+                <span style="font-size: 1.5rem; font-weight: 700; color: var(--primary-color);">
+                    ${semester.gpa?.toFixed(2) || '0.00'}%
+                </span>
+                <span style="background: #f0f9ff; padding: 2px 10px; border-radius: 12px; font-size: 0.9rem;">
+                    ${getGradeLetter(semester.gpa || 0)}
+                </span>
+            </div>
+            <div style="margin-top: 10px; color: var(--gray-medium); font-size: 0.9rem;">
+                الساعات: ${semester.totalCredits || 0} ساعة | المواد: ${semester.courses?.length || 0} مادة
+            </div>
+        </div>
+        
+        <div id="courses-${index}">
+            ${renderCourses(semester.courses || [], index)}
+        </div>
+    `;
+    
+    // ربط الأحداث بعد إنشاء العنصر
+    setTimeout(() => {
+        element.querySelector('.add-course-btn')?.addEventListener('click', function() {
+            const idx = this.getAttribute('data-index');
+            setSelectedSemester(parseInt(idx));
+        });
+        
+        element.querySelector('.calculate-gpa-btn')?.addEventListener('click', function() {
+            const idx = this.getAttribute('data-index');
+            calculateSemesterGPA(parseInt(idx));
+        });
+        
+        element.querySelector('.details-btn')?.addEventListener('click', function() {
+            const idx = this.getAttribute('data-index');
+            showCalculationDetails(parseInt(idx));
+        });
+        
+        element.querySelector('.edit-semester-btn')?.addEventListener('click', function() {
+            const idx = this.getAttribute('data-index');
+            editSemester(parseInt(idx));
+        });
+        
+        element.querySelector('.delete-semester-btn')?.addEventListener('click', function() {
+            const idx = this.getAttribute('data-index');
+            deleteSemester(parseInt(idx));
+        });
+    }, 100);
+    
+    return element;
+}
         function renderCourses(courses, semesterIndex) {
             if (!courses || courses.length === 0) {
                 return `
@@ -2299,6 +2326,63 @@ window.deleteCourse = function(semesterIndex, courseIndex) {
         updateDashboard();
         showNotification('تم حذف المادة بنجاح', 'success');
     }
+};
+
+window.setSelectedSemester = function(semesterIndex) {
+    console.log('🎯 تحديد الفصل الدراسي:', semesterIndex);
+    
+    if (semesterIndex < 0 || semesterIndex >= userData.semesters.length) {
+        console.error('❌ فهرس الفصل غير صحيح:', semesterIndex);
+        showNotification('الفصل الدراسي غير موجود', 'error');
+        return;
+    }
+    
+    selectedSemesterIndex = semesterIndex;
+    
+    // التبديل إلى تبويب إضافة المواد
+    switchTab('courses');
+    
+    // تأخير بسيط ثم تحديث النموذج
+    setTimeout(() => {
+        // تبديل إلى تبويب إضافة مادة
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.style.display = 'none';
+        });
+        
+        const addCourseTabBtn = document.querySelector('.tab-btn[data-tab="addCourse"]');
+        if (addCourseTabBtn) {
+            addCourseTabBtn.classList.add('active');
+        }
+        
+        const addCourseTab = document.getElementById('addCourseTab');
+        if (addCourseTab) {
+            addCourseTab.style.display = 'block';
+        }
+        
+        // تحديث نموذج إضافة المادة
+        updateCourseForm();
+        
+        // تحديد الفصل الدراسي في القائمة المنسدلة
+        const semesterSelect = document.getElementById('courseSemester');
+        if (semesterSelect) {
+            semesterSelect.value = semesterIndex;
+        }
+        
+        // عرض رسالة تأكيد
+        const semester = userData.semesters[semesterIndex];
+        showNotification(`تم تحديد الفصل الدراسي: ${semester.name} (${semester.year})`, 'success');
+        
+        // تمرير التركيز إلى حقل اسم المادة
+        setTimeout(() => {
+            const courseNameSelect = document.getElementById('courseName');
+            if (courseNameSelect) {
+                courseNameSelect.focus();
+            }
+        }, 300);
+    }, 200);
 };
 
 window.deleteSemester = function(semesterIndex) {
