@@ -440,19 +440,29 @@
                     </section>
 
                     <!-- لوحة الإشراف -->
-<section class="content-section" id="adminPanelSection">
-                        <h2 style="margin-bottom: 25px; color: var(--dark-color);">
-                            <i class="fas fa-user-shield"></i> لوحة الإشراف
-                        </h2>
+<section class="content-section" id="adminPanelSection" style="display: none;">
+    <!-- تأكد من أن الـ ID هو adminPanelSection -->
+    <h2 style="margin-bottom: 25px; color: var(--dark-color);">
+        <i class="fas fa-user-shield"></i> لوحة الإشراف
+    </h2>
                         
-                        <div class="admin-tabs">
-                            <button class="admin-tab active" data-admin-tab="colleges">الكليات</button>
-                            <button class="admin-tab" data-admin-tab="majors">التخصصات</button>
-                            <button class="admin-tab" data-admin-tab="courses">المواد</button>
-                            <button class="admin-tab" data-admin-tab="assign">توزيع المواد</button>
-                            <button class="admin-tab" data-admin-tab="users">المستخدمين</button>
-                        </div>
-                        
+<div class="admin-tabs">
+    <button class="admin-tab active" data-admin-tab="colleges">
+        <i class="fas fa-university"></i> الكليات
+    </button>
+    <button class="admin-tab" data-admin-tab="majors">
+        <i class="fas fa-graduation-cap"></i> التخصصات
+    </button>
+    <button class="admin-tab" data-admin-tab="coursesAdmin">
+        <i class="fas fa-book"></i> المواد
+    </button>
+    <button class="admin-tab" data-admin-tab="assign">
+        <i class="fas fa-link"></i> توزيع المواد
+    </button>
+    <button class="admin-tab" data-admin-tab="users">
+        <i class="fas fa-users"></i> المستخدمين
+    </button>
+</div>                        
                         <!-- إدارة الكليات -->
                         <div class="admin-panel admin-tab-content active" id="collegesTab">
                             <h3 style="margin-bottom: 20px;">إدارة الكليات</h3>
@@ -525,9 +535,11 @@
                                 <i class="fas fa-plus"></i> إضافة مادة
                             </button>
                             
-                            <div id="coursesAdminList" style="margin-top: 30px;">
-                                <!-- قائمة المواد -->
-                            </div>
+<!-- إدارة المواد - تأكد من أن الـ ID هو coursesAdminList -->
+<div id="coursesAdminList" style="margin-top: 30px;">
+    <!-- سيتم ملؤها ديناميكياً -->
+</div>
+
                         </div>
                         
                         <!-- توزيع المواد -->
