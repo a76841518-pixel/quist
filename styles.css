@@ -970,3 +970,110 @@
             background: #fef3c7;
             color: #78350f;
         }
+/* تحسين زر القائمة الجانبية */
+.sidebar-toggle {
+    position: fixed;
+    top: 90px;
+    left: 20px; /* موقعه على اليسار */
+    width: 50px;
+    height: 50px;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--box-shadow);
+    cursor: pointer;
+    z-index: 9999; /* زيادة قيمة z-index */
+    transition: var(--transition);
+}
+
+.sidebar-toggle:hover {
+    background: #f8fafc;
+    transform: scale(1.05);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* إضافة تلميح عند التحويم */
+.sidebar-toggle::after {
+    content: 'القائمة الجانبية';
+    position: absolute;
+    left: 60px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--dark-color);
+    color: white;
+    padding: 8px 12px;
+    border-radius: var(--border-radius);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar-toggle:hover::after {
+    opacity: 1;
+}
+
+/* زيادة z-index للقائمة الجانبية */
+.sidebar {
+    width: 280px;
+    background: white;
+    border-left: 1px solid var(--gray-light);
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.05);
+    position: fixed;
+    top: 80px;
+    right: 0;
+    bottom: 0;
+    overflow-y: auto;
+    z-index: 9998; /* أقل من زر التبديل */
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+}
+
+.sidebar.active {
+    transform: translateX(0);
+}
+
+/* تحديث التوافق مع الجوال */
+@media (max-width: 768px) {
+    .sidebar-toggle {
+        top: 85px;
+        left: 15px;
+        width: 45px;
+        height: 45px;
+    }
+    
+    .sidebar {
+        width: 100%;
+        transform: translateX(100%);
+        z-index: 9998; /* التأكد من أنها أقل من الزر */
+    }
+    
+    /* إخفاء التلميح على الجوال */
+    .sidebar-toggle::after {
+        display: none;
+    }
+}
+
+/* إضافة تأثير زر عند النقر */
+.sidebar-toggle:active {
+    transform: scale(0.95);
+}
+
+/* تغيير الأيقونة عندما تكون القائمة مفتوحة */
+.sidebar-toggle.active .fa-bars::before {
+    content: "\f00d"; /* أيقونة X */
+}
+
+/* تحسين الوضوح عندما تكون القائمة مفتوحة */
+.sidebar.active ~ .sidebar-toggle {
+    background: var(--primary-color);
+    color: white;
+}
+
+.sidebar.active ~ .sidebar-toggle:hover {
+    background: var(--primary-dark);
+}
+
