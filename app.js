@@ -269,6 +269,9 @@ function switchTab(tabId) {
         targetSection.style.position = 'relative';
         
         console.log('✅ تم إظهار القسم:', tabId);
+    } else {
+        console.error('❌ القسم غير موجود:', `${tabId}Section`);
+        return; // الخروج إذا لم يوجد القسم
     }
     
     // معالجة خاصة لكل تبويب
@@ -308,8 +311,7 @@ function switchTab(tabId) {
             }
             break;
     }
-}
-        // تبديل تبويبات إدارة المواد
+}        // تبديل تبويبات إدارة المواد
         function switchCourseTab(tab) {
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.classList.remove('active');
@@ -339,18 +341,32 @@ function switchTab(tabId) {
         }
 
         // تبديل تبويبات لوحة الإشراف
-        function switchAdminTab(tabId) {
-            document.querySelectorAll('.admin-tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.querySelectorAll('.admin-tab-content').forEach(content => {
-                content.style.display = 'none';
-            });
-            
-            document.querySelector(`.admin-tab[data-admin-tab="${tabId}"]`).classList.add('active');
-            document.getElementById(`${tabId}Tab`).style.display = 'block';
-        }
-
+function switchAdminTab(tabId) {
+    console.log('🔄 تبديل تبويب الإشراف إلى:', tabId);
+    
+    document.querySelectorAll('.admin-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelectorAll('.admin-tab-content').forEach(content => {
+        content.style.display = 'none';
+    });
+    
+    // تنشيط التبويب المحدد
+    const activeTab = document.querySelector(`.admin-tab[data-admin-tab="${tabId}"]`);
+    if (activeTab) {
+        activeTab.classList.add('active');
+    } else {
+        console.error('❌ تبويب غير موجود:', tabId);
+    }
+    
+    // إظهار المحتوى
+    const targetContent = document.getElementById(`${tabId}Tab`);
+    if (targetContent) {
+        targetContent.style.display = 'block';
+    } else {
+        console.error('❌ محتوى التبويب غير موجود:', `${tabId}Tab`);
+    }
+}
         // ============ دوال المصادقة ============
         function checkAuthState() {
             console.log('🔐 التحقق من حالة المصادقة...');
@@ -1699,39 +1715,6 @@ function handleLogin() {
             updateProfileUI();
         }
 
-function updateUIForLoggedInUser() {
-    document.getElementById('userInfo').style.display = 'flex';
-    document.getElementById('authButtons').style.display = 'none';
-    
-    const userName = userData.name || currentUser.displayName || 
-                    currentUser.email.split('@')[0] || 'مستخدم';
-    
-    document.getElementById('userName').textContent = userName;
-    document.getElementById('userAvatar').textContent = getInitials(userName);
-    
-    // إظهار/إخفاء عناصر لوحة الإشراف
-    const adminDivider = document.getElementById('adminDivider');
-    const adminNavItem = document.getElementById('adminNavItem');
-    const userBadge = document.getElementById('userBadge');
-    const adminPanelSection = document.getElementById('adminPanelSection'); // أضف هذا السطر
-    
-    if (userData.userType === 'admin') {
-        adminDivider.style.display = 'block';
-        adminNavItem.style.display = 'block';
-        userBadge.innerHTML = '<span class="user-badge badge-admin">مشرف</span>';
-        userBadge.style.display = 'inline';
-        adminPanelSection.style.display = 'block'; // أضف هذا السطر - إظهار قسم لوحة الإشراف
-    } else {
-        adminDivider.style.display = 'none';
-        adminNavItem.style.display = 'none';
-        adminPanelSection.style.display = 'none'; // أضف هذا السطر - إخفاء قسم لوحة الإشراف للطلاب
-        userBadge.innerHTML = '<span class="user-badge badge-student">طالب</span>';
-        userBadge.style.display = 'inline';
-    }
-    
-    updateDashboard();
-    updateProfileUI();
-}
 
         function updateProfileUI() {
             const profileName = document.getElementById('profileName');
