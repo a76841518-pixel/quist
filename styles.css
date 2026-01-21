@@ -1077,3 +1077,19 @@
     background: var(--primary-dark);
 }
 
+/* في ملف styles.css، أضف هذه القاعدة */
+.content-section {
+    display: none;
+    animation: fadeIn 0.5s ease;
+}
+
+.content-section.active {
+    display: block;
+}
+
+/* تأكد من أن هذه القاعدة موجودة */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
