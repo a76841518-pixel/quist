@@ -1093,3 +1093,98 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* أنماط خاصة بلوحة الإشراف */
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.admin-table th {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    padding: 16px;
+    text-align: right;
+    border-bottom: 2px solid var(--gray-light);
+    color: var(--dark-color);
+    font-weight: 600;
+    font-size: 0.9rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.admin-table td {
+    padding: 16px;
+    text-align: right;
+    border-bottom: 1px solid var(--gray-light);
+    vertical-align: middle;
+}
+
+.admin-table tr:hover {
+    background-color: #f0f9ff !important;
+}
+
+.table-container {
+    overflow-x: auto;
+    border: 1px solid var(--gray-light);
+    border-radius: var(--border-radius);
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* زر إجراءات الجدول */
+.table-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+/* تصميم البطاقات في لوحة الإشراف */
+.admin-panel {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 30px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border: 1px solid var(--gray-light);
+}
+
+/* تصميم التبويبات */
+.admin-tabs {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 25px;
+    background: #f8fafc;
+    padding: 8px;
+    border-radius: var(--border-radius);
+    flex-wrap: wrap;
+}
+
+.admin-tab {
+    flex: 1;
+    min-width: 120px;
+    padding: 12px 20px;
+    background: white;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    color: var(--dark-color);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.admin-tab:hover {
+    border-color: var(--primary-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(37, 99, 235, 0.1);
+}
+
+.admin-tab.active {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    color: white;
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
