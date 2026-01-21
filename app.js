@@ -3107,6 +3107,49 @@ function updateUIForGuest() {
     }
 }
 
+async function loadSystemDataForUser() {
+    if (!db) {
+        console.log('⚠️ Firestore غير متاح للمستخدم العادي');
+        return;
+    }
+    
+    try {
+        console.log('📥 جاري تحميل بيانات النظام للمستخدم العادي...');
+        
+        // تحميل الكليات فقط إذا لم تكن محملة مسبقاً
+        if (!colleges || colleges.length === 0) {
+            console.log('🏛️ جاري تحميل الكليات للمستخدم...');
+            const collegesSnapshot = await db.collection('colleges').get();
+            colleges = [];
+            collegesSnapshot.forEach(doc => {
+                colleges.push({ id: doc.id, ...doc.data() });
+            });
+            console.log(`✅ تم تحميل ${colleges.length} كلية للمستخدم`);
+        }
+        
+        // تحميل التخصصات فقط إذا لم تكن محملة مسبقاً
+        if (!majors || majors.length === 0) {
+            console.log('🎓 جاري تحميل التخصصات للمستخدم...');
+            const majorsSnapshot = await db.collection('majors').get();
+            majors = [];
+            majorsSnapshot.forEach(doc => {
+                majors.push({ id: doc.id, ...doc.data() });
+            });
+            console.log(`✅ تم تحميل ${majors.length} تخصص للمستخدم`);
+        }
+        
+        // للمستخدم العادي، لا نحتاج لتحميل جميع المواد والتوزيعات إلا عند الحاجة
+        console.log('✅ تم تحميل بيانات النظام للمستخدم العادي بنجاح');
+        return true;
+        
+    } catch (error) {
+        console.error('❌ خطأ في تحميل بيانات النظام للمستخدم:', error);
+        // عدم عرض إشعار خطأ للمستخدم حتى لا يقلقه
+        return false;
+    }
+}
+
+
 // تهيئة الأحداث عند تحميل الصفحة
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 بدء تحميل التطبيق...');
