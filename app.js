@@ -238,51 +238,77 @@ const firebaseConfig = {
             mainContentWrapper.classList.toggle('sidebar-active');
         }
 
-        // تبديل التبويبات الرئيسية
-        function switchTab(tabId) {
-            // تحديث القائمة الجانبية
-            document.querySelectorAll('.nav-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            const navItem = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
-            if (navItem) navItem.classList.add('active');
+function switchTab(tabId) {
+    console.log('🔄 تبديل التبويب إلى:', tabId);
+    
+    // إخفاء جميع الأقسام أولاً
+    document.querySelectorAll('.content-section').forEach(section => {
+        section.classList.remove('active');
+        // إعادة تعيين الأنماط
+        section.style.display = 'none';
+        section.style.opacity = '0';
+        section.style.visibility = 'hidden';
+        section.style.position = 'absolute';
+    });
+    
+    // تحديث القائمة الجانبية
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    const navItem = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
+    if (navItem) navItem.classList.add('active');
+    
+    // إظهار القسم المطلوب
+    const targetSection = document.getElementById(`${tabId}Section`);
+    if (targetSection) {
+        targetSection.classList.add('active');
+        targetSection.style.display = 'block';
+        targetSection.style.opacity = '1';
+        targetSection.style.visibility = 'visible';
+        targetSection.style.position = 'relative';
+        
+        console.log('✅ تم إظهار القسم:', tabId);
+    }
+    
+    // معالجة خاصة لكل تبويب
+    switch (tabId) {
+        case 'statistics':
+            setTimeout(updateCharts, 100);
+            break;
             
-            // تبديل المحتوى
-            document.querySelectorAll('.content-section').forEach(section => {
-                section.classList.remove('active');
-            });
-            document.getElementById(`${tabId}Section`).classList.add('active');
-            
-            // تحديث الرسوم البيانية عند التبديل إلى قسم الإحصائيات
-            if (tabId === 'statistics') {
-                setTimeout(updateCharts, 100);
-            }
-            
-            // تحديث قائمة المواد عند التبديل إلى قسم المواد
-            if (tabId === 'courses') {
+        case 'courses':
+            setTimeout(() => {
                 updateAllCoursesView();
                 updateCourseForm();
-            }
+            }, 50);
+            break;
             
-            // تحديث صفحة حساب العلامات
-            if (tabId === 'gradeCalc') {
+        case 'gradeCalc':
+            setTimeout(() => {
                 updateGradeCalcForm();
                 updateGradeCalcHistory();
-            }
+            }, 50);
+            break;
             
-            // تحديث صفحة البحث
-            if (tabId === 'search') {
+        case 'search':
+            setTimeout(() => {
                 loadAllCoursesForSearch();
-            }
+            }, 50);
+            break;
             
-            // تحديث لوحة الإشراف
-            if (tabId === 'adminPanel') {
-                if (userData.userType === 'admin') {
+        case 'adminPanel':
+            if (userData.userType === 'admin') {
+                setTimeout(() => {
                     loadAdminData();
-                }
+                }, 100);
+            } else {
+                showNotification('ليس لديك صلاحية للوصول إلى لوحة الإشراف', 'warning');
+                setTimeout(() => switchTab('dashboard'), 300);
             }
-        }
-
+            break;
+    }
+}
         // تبديل تبويبات إدارة المواد
         function switchCourseTab(tab) {
             document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1673,6 +1699,40 @@ function handleLogin() {
             updateProfileUI();
         }
 
+function updateUIForLoggedInUser() {
+    document.getElementById('userInfo').style.display = 'flex';
+    document.getElementById('authButtons').style.display = 'none';
+    
+    const userName = userData.name || currentUser.displayName || 
+                    currentUser.email.split('@')[0] || 'مستخدم';
+    
+    document.getElementById('userName').textContent = userName;
+    document.getElementById('userAvatar').textContent = getInitials(userName);
+    
+    // إظهار/إخفاء عناصر لوحة الإشراف
+    const adminDivider = document.getElementById('adminDivider');
+    const adminNavItem = document.getElementById('adminNavItem');
+    const userBadge = document.getElementById('userBadge');
+    const adminPanelSection = document.getElementById('adminPanelSection'); // أضف هذا السطر
+    
+    if (userData.userType === 'admin') {
+        adminDivider.style.display = 'block';
+        adminNavItem.style.display = 'block';
+        userBadge.innerHTML = '<span class="user-badge badge-admin">مشرف</span>';
+        userBadge.style.display = 'inline';
+        adminPanelSection.style.display = 'block'; // أضف هذا السطر - إظهار قسم لوحة الإشراف
+    } else {
+        adminDivider.style.display = 'none';
+        adminNavItem.style.display = 'none';
+        adminPanelSection.style.display = 'none'; // أضف هذا السطر - إخفاء قسم لوحة الإشراف للطلاب
+        userBadge.innerHTML = '<span class="user-badge badge-student">طالب</span>';
+        userBadge.style.display = 'inline';
+    }
+    
+    updateDashboard();
+    updateProfileUI();
+}
+
         function updateProfileUI() {
             const profileName = document.getElementById('profileName');
             const profileEmail = document.getElementById('profileEmail');
@@ -2789,4 +2849,3 @@ document.addEventListener('DOMContentLoaded', function() {
     // تهيئة الرسوم البيانية
     initCharts();
 });
-
