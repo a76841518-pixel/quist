@@ -120,32 +120,22 @@ const firebaseConfig = {
             sidebarToggle.addEventListener('click', toggleSidebar);
             
             // عناصر القائمة الجانبية
-            document.querySelectorAll('.nav-item[data-tab]').forEach(item => {
-                item.addEventListener('click', () => {
-                    const tabId = item.getAttribute('data-tab');
-                    switchTab(tabId);
-                    if (window.innerWidth <= 768) {
-                        sidebar.classList.remove('active');
-                        mainContentWrapper.classList.remove('sidebar-active');
-                    }
-                });
-// إغلاق القائمة الجانبية بالنقر على أيقونة الإغلاق
-document.querySelector('.close-sidebar')?.addEventListener('click', () => {
-    sidebar.classList.remove('active');
-    mainContentWrapper.classList.remove('sidebar-active');
-});
-
-// أو إغلاق القائمة الجانبية عند الضغط على أي عنصر في القائمة
 document.querySelectorAll('.nav-item[data-tab]').forEach(item => {
     item.addEventListener('click', () => {
+        const tabId = item.getAttribute('data-tab');
+        switchTab(tabId);
         if (window.innerWidth <= 768) {
             sidebar.classList.remove('active');
             mainContentWrapper.classList.remove('sidebar-active');
         }
     });
 });
-            });
-            
+
+// إغلاق القائمة الجانبية بالنقر على أيقونة الإغلاق
+document.querySelector('.close-sidebar')?.addEventListener('click', () => {
+    sidebar.classList.remove('active');
+    mainContentWrapper.classList.remove('sidebar-active');
+});            
             // أحداث تسجيل الدخول
             document.getElementById('loginBtn').addEventListener('click', showAuthModal);
             
@@ -849,7 +839,7 @@ function createSemesterElement(semester, index) {
     
     // إضافة حدث التبديل
     element.querySelector('.toggle-courses-btn')?.addEventListener('click', function() {
-        const container = document.getElementById(`courses-container-${index}`);
+        const container = document.getElementById(`courses-${index}`);
         if (container.style.display === 'none') {
             container.style.display = 'block';
             this.innerHTML = '<i class="fas fa-eye-slash"></i> إخفاء المواد';
