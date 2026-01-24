@@ -120,22 +120,32 @@ const firebaseConfig = {
             sidebarToggle.addEventListener('click', toggleSidebar);
             
             // عناصر القائمة الجانبية
+            document.querySelectorAll('.nav-item[data-tab]').forEach(item => {
+                item.addEventListener('click', () => {
+                    const tabId = item.getAttribute('data-tab');
+                    switchTab(tabId);
+                    if (window.innerWidth <= 768) {
+                        sidebar.classList.remove('active');
+                        mainContentWrapper.classList.remove('sidebar-active');
+                    }
+                });
+// إغلاق القائمة الجانبية بالنقر على أيقونة الإغلاق
+document.querySelector('.close-sidebar')?.addEventListener('click', () => {
+    sidebar.classList.remove('active');
+    mainContentWrapper.classList.remove('sidebar-active');
+});
+
+// أو إغلاق القائمة الجانبية عند الضغط على أي عنصر في القائمة
 document.querySelectorAll('.nav-item[data-tab]').forEach(item => {
     item.addEventListener('click', () => {
-        const tabId = item.getAttribute('data-tab');
-        switchTab(tabId);
         if (window.innerWidth <= 768) {
             sidebar.classList.remove('active');
             mainContentWrapper.classList.remove('sidebar-active');
         }
     });
 });
-
-// إغلاق القائمة الجانبية بالنقر على أيقونة الإغلاق
-document.querySelector('.close-sidebar')?.addEventListener('click', () => {
-    sidebar.classList.remove('active');
-    mainContentWrapper.classList.remove('sidebar-active');
-});            
+            });
+            
             // أحداث تسجيل الدخول
             document.getElementById('loginBtn').addEventListener('click', showAuthModal);
             
@@ -839,7 +849,7 @@ function createSemesterElement(semester, index) {
     
     // إضافة حدث التبديل
     element.querySelector('.toggle-courses-btn')?.addEventListener('click', function() {
-        const container = document.getElementById(`courses-${index}`);
+        const container = document.getElementById(`courses-container-${index}`);
         if (container.style.display === 'none') {
             container.style.display = 'block';
             this.innerHTML = '<i class="fas fa-eye-slash"></i> إخفاء المواد';
@@ -1650,115 +1660,78 @@ function loadAllCoursesForSearch() {
 
         // تقييم المادة
 // دالة لتحديث تقييم المادة
-window.rateCourse = function(courseId, rating) {
-    console.log(`🎯 تقييم المادة: ${courseId} بدرجة: ${rating}`);
-    
+window.rateCourse = async function(courseId, rating) {
     if (!currentUser) {
         showNotification('يجب تسجيل الدخول لتقييم المواد', 'warning');
         return;
     }
     
-    // 1. تحديث البيانات المحلية أولاً
-    if (!userData.courseRatings) {
-        userData.courseRatings = {};
-    }
-    
-    // حفظ تقييم المستخدم
-    userData.courseRatings[courseId] = rating;
-    
-    // 2. تحديث الواجهة فوراً
-    updateCourseRatingDisplay(courseId, rating);
-    
-    // 3. حفظ البيانات
-    autoSave();
-    
-    // 4. إرسال إلى Firestore إذا كان هناك اتصال
-    if (db && currentUser) {
-        sendRatingToFirestore(courseId, rating);
-    }
-    
-    showNotification(`تم تقييم المادة بـ "${getRatingText(rating)}"`, 'success');
-};
-
-// دالة مساعدة للحصول على نص التقييم
-function getRatingText(rating) {
-    switch(rating) {
-        case 'easy': return 'سهلة';
-        case 'medium': return 'متوسطة';
-        case 'hard': return 'صعبة';
-        default: return rating;
-    }
-}
-
-// دالة لتحديث عرض التقييم
-function updateCourseRatingDisplay(courseId, rating) {
-    const courseElements = document.querySelectorAll(`[data-course-id="${courseId}"]`);
-    
-    courseElements.forEach(element => {
-        // تحديث شارة التقييم
-        const ratingBadge = element.querySelector('.current-rating');
-        if (ratingBadge) {
-            ratingBadge.textContent = getRatingText(rating);
-            ratingBadge.className = `current-rating rating-${rating}`;
-        }
-        
-        // تحديث ألوان الأزرار المختارة
-        const buttons = element.querySelectorAll('.rating-btn');
-        buttons.forEach(btn => {
-            btn.classList.remove('selected');
-            if (btn.getAttribute('data-rating') === rating) {
-                btn.classList.add('selected');
-            }
-        });
-    });
-}
-
-// دالة لإرسال التقييم إلى Firestore
-async function sendRatingToFirestore(courseId, rating) {
     try {
+        // تحديث في Firestore
         const courseRef = db.collection('courses').doc(courseId);
-        const userRatingRef = db.collection('userRatings').doc(`${currentUser.uid}_${courseId}`);
-        
-        // 1. حفظ تقييم المستخدم
-        await userRatingRef.set({
-            userId: currentUser.uid,
-            courseId: courseId,
-            rating: rating,
-            ratedAt: new Date()
-        }, { merge: true });
-        
-        // 2. تحديث إحصائيات المادة
         const courseDoc = await courseRef.get();
+        
         if (courseDoc.exists) {
             const courseData = courseDoc.data();
             const ratings = courseData.ratings || {};
             const totalRatings = courseData.totalRatings || 0;
-            const ratingSum = courseData.ratingSum || 0;
+            const averageRating = courseData.averageRating || 0;
             
-            // تحديث الإحصائيات
-            const ratingValue = rating === 'easy' ? 1 : rating === 'medium' ? 2 : 3;
-            const newTotal = totalRatings + 1;
-            const newSum = ratingSum + ratingValue;
-            const newAvg = newSum / newTotal;
+            // احسب المعدل الجديد
+            const newTotalRatings = totalRatings + 1;
+            const newAverage = ((averageRating * totalRatings) + 
+                (rating === 'easy' ? 1 : rating === 'medium' ? 2 : 3)) / newTotalRatings;
             
             await courseRef.update({
                 ratings: {
                     ...ratings,
                     [currentUser.uid]: rating
                 },
-                totalRatings: newTotal,
-                ratingSum: newSum,
-                averageRating: newAvg,
-                lastRated: new Date()
+                totalRatings: newTotalRatings,
+                averageRating: newAverage
             });
             
-            console.log(`✅ تم تحديث تقييم المادة في Firestore`);
+            // تحديث البيانات المحلية
+            const courseIndex = allCourses.findIndex(c => c.id === courseId);
+            if (courseIndex !== -1) {
+                allCourses[courseIndex].totalRatings = newTotalRatings;
+                allCourses[courseIndex].averageRating = newAverage;
+            }
+            
+            showNotification('تم تسجيل تقييمك للمادة', 'success');
+            searchCourses(); // تحديث العرض
         }
     } catch (error) {
-        console.error('❌ خطأ في إرسال التقييم:', error);
-        showNotification('تم حفظ التقييم محلياً فقط', 'info');
+        console.error('خطأ في تقييم المادة:', error);
+        showNotification('حدث خطأ أثناء التقييم', 'error');
     }
-}        // ============ لوحة الإشراف ============
+};
+
+// في دالة عرض المواد في البحث، عدل العرض ليشمل التقييمات
+function updateCourseDisplayInSearch(course) {
+    const average = course.averageRating || 0;
+    const total = course.totalRatings || 0;
+    
+    let ratingHTML = '';
+    if (total > 0) {
+        const stars = Math.round(average);
+        ratingHTML = `
+            <div style="margin-top: 10px;">
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <span style="color: #f59e0b;">
+                        ${'★'.repeat(stars)}${'☆'.repeat(3-stars)}
+                    </span>
+                    <span style="font-size: 0.9rem; color: var(--gray-medium);">
+                        (${average.toFixed(1)} من ${total} تقييم)
+                    </span>
+                </div>
+            </div>
+        `;
+    }
+    
+    return ratingHTML;
+}
+        // ============ لوحة الإشراف ============
   async function loadAdminData() {
     if (userData.userType !== 'admin') {
         console.log('❌ ليس مشرفاً - لا يمكن تحميل لوحة الإشراف');
