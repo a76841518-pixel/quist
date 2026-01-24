@@ -1290,3 +1290,104 @@ input:focus, select:focus {
         font-size: 0.9rem;
     }
 }
+
+/* أنماط جديدة للتحسينات */
+.courses-container {
+    transition: all 0.3s ease;
+}
+
+.course-actions {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.btn-sm {
+    padding: 5px 10px;
+    font-size: 0.8rem;
+}
+
+.admin-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.search-box {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.search-box input {
+    flex: 1;
+}
+
+.star-rating {
+    color: #f59e0b;
+    font-size: 1.2rem;
+}
+
+.rating-info {
+    font-size: 0.9rem;
+    color: var(--gray-medium);
+    margin-top: 5px;
+}
+
+/* تحسين عرض الجداول */
+.table-responsive {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 12px;
+    text-align: right;
+    border-bottom: 1px solid var(--gray-light);
+}
+
+th {
+    background-color: #f8fafc;
+    font-weight: 600;
+    color: var(--dark-color);
+}
+
+tr:hover {
+    background-color: #f0f9ff;
+}
+
+/* أنماط للأزرار الجديدة */
+.btn-warning {
+    background-color: var(--warning-color);
+    color: white;
+}
+
+.btn-warning:hover {
+    background-color: #d97706;
+}
+
+/* تحسين التجاوب */
+@media (max-width: 768px) {
+    .course-actions {
+        flex-direction: column;
+        gap: 3px;
+    }
+    
+    .admin-controls {
+        flex-direction: column;
+    }
+    
+    .search-box {
+        flex-direction: column;
+    }
+    
+    th, td {
+        padding: 8px;
+        font-size: 0.9rem;
+    }
+}
