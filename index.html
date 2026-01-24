@@ -531,17 +531,46 @@
                                     <option value="elective-major">اختياري تخصص</option>
                                 </select>
                             </div>
+<div class="form-group">
+    <label for="newCourseYear">السنة الدراسية</label>
+    <select id="newCourseYear" class="form-control">
+        <option value="">اختر السنة</option>
+        <option value="1">الأولى</option>
+        <option value="2">الثانية</option>
+        <option value="3">الثالثة</option>
+        <option value="4">الرابعة</option>
+        <option value="5">الخامسة</option>
+    </select>
+</div>
+
+<div class="form-group">
+    <label for="newCourseSemester">يطرح في الفصل الدراسي</label>
+    <select id="newCourseSemester" class="form-control">
+        <option value="1">الفصل الأول والثاني والصيفي</option>
+        <option value="2">الفصل الأول والثاني</option>
+        <option value="3">الفصل الأول والصيفي</option>
+        <option value="4">الفصل الثاني والصيفي</option>
+        <option value="5">الفصل الأول</option>
+        <option value="6">الفصل الثاني</option>
+
+    </select>
+</div>
+
+<div class="form-group">
+    <label for="newCourseHasPractical">
+        <input type="checkbox" id="newCourseHasPractical">
+        تحتوي على عملي
+    </label>
+</div>
                             <button class="btn btn-success" id="addCourseAdminBtn">
                                 <i class="fas fa-plus"></i> إضافة مادة
                             </button>
+
                             
 <!-- إدارة المواد - تأكد من أن الـ ID هو coursesAdminList -->
 <div id="coursesAdminList" style="margin-top: 30px;">
     <!-- سيتم ملؤها ديناميكياً -->
-</div>
-
-                        </div>
-                        
+</div>                        
                         <!-- توزيع المواد -->
                         <div class="admin-panel admin-tab-content" id="assignTab" style="display: none;">
                             <h3 style="margin-bottom: 20px;">توزيع المواد على التخصصات</h3>
@@ -551,6 +580,16 @@
                                     <option value="">اختر المادة</option>
                                 </select>
                             </div>
+    <div class="form-group">
+        <label for="assignCourseType">نوع المادة</label>
+        <select id="assignCourseType" class="form-control">
+            <option value="required-university">إجباري جامعة</option>
+            <option value="elective-university">اختياري جامعة</option>
+            <option value="required-college">إجباري كلية</option>
+            <option value="required-major">إجباري تخصص</option>
+            <option value="elective-major">اختياري تخصص</option>
+        </select>
+    </div>
                             <div class="form-group">
                                 <label for="assignCollege">الكليات المستهدفة</label>
                                 <select id="assignCollege" multiple style="height: 150px;">
@@ -573,11 +612,17 @@
                                 <!-- قائمة المواد الموزعة -->
                             </div>
                         </div>
-                        
+                        <div class="search-box" style="margin-bottom: 20px;">
+    <input type="text" id="userSearchInput" placeholder="ابحث عن مستخدم بالاسم أو البريد..." class="form-control">
+    <button class="btn btn-primary" id="userSearchBtn">
+        <i class="fas fa-search"></i> بحث
+    </button>
+</div>
                         <!-- إدارة المستخدمين -->
                         <div class="admin-panel admin-tab-content" id="usersTab" style="display: none;">
                             <h3 style="margin-bottom: 20px;">إدارة المستخدمين</h3>
                             <div id="usersList">
+
                                 <!-- قائمة المستخدمين -->
                             </div>
                         </div>
