@@ -129,6 +129,21 @@ const firebaseConfig = {
                         mainContentWrapper.classList.remove('sidebar-active');
                     }
                 });
+// إغلاق القائمة الجانبية بالنقر على أيقونة الإغلاق
+document.querySelector('.close-sidebar')?.addEventListener('click', () => {
+    sidebar.classList.remove('active');
+    mainContentWrapper.classList.remove('sidebar-active');
+});
+
+// أو إغلاق القائمة الجانبية عند الضغط على أي عنصر في القائمة
+document.querySelectorAll('.nav-item[data-tab]').forEach(item => {
+    item.addEventListener('click', () => {
+        if (window.innerWidth <= 768) {
+            sidebar.classList.remove('active');
+            mainContentWrapper.classList.remove('sidebar-active');
+        }
+    });
+});
             });
             
             // أحداث تسجيل الدخول
@@ -791,6 +806,9 @@ function createSemesterElement(semester, index) {
                 </span>
             </div>
             <div class="semester-actions">
+                <button class="btn btn-light btn-sm toggle-courses-btn" data-index="${index}">
+                    <i class="fas fa-eye"></i> إظهار/إخفاء المواد
+                </button>
                 <button class="btn btn-primary btn-sm calculate-gpa-btn" data-index="${index}">
                     <i class="fas fa-calculator"></i> حساب المعدل
                 </button>
@@ -829,6 +847,18 @@ function createSemesterElement(semester, index) {
         </div>
     `;
     
+    // إضافة حدث التبديل
+    element.querySelector('.toggle-courses-btn')?.addEventListener('click', function() {
+        const container = document.getElementById(`courses-container-${index}`);
+        if (container.style.display === 'none') {
+            container.style.display = 'block';
+            this.innerHTML = '<i class="fas fa-eye-slash"></i> إخفاء المواد';
+        } else {
+            container.style.display = 'none';
+            this.innerHTML = '<i class="fas fa-eye"></i> إظهار المواد';
+        }
+    });
+
     // ربط الأحداث بعد إنشاء العنصر
     setTimeout(() => {
         element.querySelector('.add-course-btn')?.addEventListener('click', function() {
@@ -900,7 +930,9 @@ function createSemesterElement(semester, index) {
                             <label>العلامة × الساعات</label>
                             <input type="number" value="${(course.finalGrade || 0) * (course.credits || 3)}" disabled style="background: #f0f9ff;">
                         </div>
-                        
+                                            <button class="btn btn-info btn-sm" onclick="editCourseGrade(${semesterIndex}, ${courseIndex})">
+                        <i class="fas fa-edit"></i> تعديل
+                    </button>
                         <button class="btn btn-danger btn-sm" onclick="deleteCourse(${semesterIndex}, ${courseIndex})">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -910,6 +942,26 @@ function createSemesterElement(semester, index) {
             
             return html;
         }
+
+// دالة تعديل العلامة
+window.editCourseGrade = function(semesterIndex, courseIndex) {
+    const course = userData.semesters[semesterIndex].courses[courseIndex];
+    const newGrade = prompt(`أدخل العلامة الجديدة للمادة "${course.name}" (0-100):`, course.finalGrade || '');
+    
+    if (newGrade !== null && newGrade !== '') {
+        const gradeValue = parseFloat(newGrade);
+        if (!isNaN(gradeValue) && gradeValue >= 0 && gradeValue <= 100) {
+            course.finalGrade = gradeValue;
+            autoSave();
+            renderSemesters();
+            updateDashboard();
+            updateCharts();
+            showNotification('تم تعديل العلامة بنجاح', 'success');
+        } else {
+            showNotification('العلامة يجب أن تكون بين 0 و 100', 'warning');
+        }
+    }
+};
 
         // ============ إضافة المواد مع الخيارات الجديدة ============
 function updateCourseForm() {
@@ -1115,9 +1167,11 @@ function getStudentAvailableCourses() {
 }
 
 function addCourse() {
+    // 1. الحصول على القيم من النموذج
     const courseSelect = document.getElementById('courseName');
     const courseId = courseSelect.value;
     
+    // 2. التحقق من اختيار المادة
     if (!courseId) {
         showNotification('يرجى اختيار المادة', 'warning');
         return;
@@ -1125,100 +1179,517 @@ function addCourse() {
     
     const selectedOption = courseSelect.options[courseSelect.selectedIndex];
     const courseName = selectedOption.text;
-    const finalGrade = parseFloat(document.getElementById('courseFinalGrade')?.value) || 0;
-    const credits = parseInt(document.getElementById('courseCredits')?.value) || 3;
-    const semesterSelect = document.getElementById('courseSemester');
-    const semesterIndex = semesterSelect ? parseInt(semesterSelect.value) : -1;
     
+    // 3. الحصول على العلامة (تسمح بالقيمة الفارغة - التعديل 4)
+    const finalGradeInput = document.getElementById('courseFinalGrade');
+    let finalGrade = null;
+    
+    if (finalGradeInput && finalGradeInput.value && finalGradeInput.value.trim() !== '') {
+        const gradeValue = parseFloat(finalGradeInput.value);
+        
+        // التحقق من صحة العلامة
+        if (isNaN(gradeValue) || gradeValue < 0 || gradeValue > 100) {
+            showNotification('علامة المادة يجب أن تكون بين 0 و 100 أو فارغة', 'warning');
+            return;
+        }
+        
+        finalGrade = gradeValue;
+    }
+    
+    // 4. الحصول على الساعات
+    const creditsSelect = document.getElementById('courseCredits');
+    const credits = creditsSelect ? parseInt(creditsSelect.value) || 3 : 3;
+    
+    // 5. الحصول على الفصل الدراسي
+    const semesterSelect = document.getElementById('courseSemester');
+    let semesterIndex = -1;
+    
+    if (semesterSelect) {
+        semesterIndex = parseInt(semesterSelect.value);
+    } else {
+        // استخدام الفصل المختار حالياً
+        semesterIndex = selectedSemesterIndex;
+    }
+    
+    // 6. التحقق من صحة الفصل الدراسي
     if (semesterIndex === -1) {
         showNotification('يرجى اختيار الفصل الدراسي', 'warning');
         return;
     }
-    
-    if (finalGrade < 0 || finalGrade > 100) {
-        showNotification('علامة المادة يجب أن تكون بين 0 و 100', 'warning');
-        return;
-    }
-    
-    // البحث عن معلومات المادة
-    const courseInfo = allCourses.find(c => c.id === courseId);
-    
-    // إنشاء كائن المادة للطالب
-    const newCourse = {
-        id: courseId,
-        name: courseName,
-        finalGrade: finalGrade,
-        credits: credits,
-        markType: userData.currentMarkType,
-        type: courseInfo?.type || 'required-university',
-        code: courseInfo?.code || '',
-        // معلومات إضافية للمشرفين
-        courseInfo: userData.userType === 'admin' ? {
-            originalName: courseInfo?.name || '',
-            originalCode: courseInfo?.code || '',
-            originalCredits: courseInfo?.credits || credits,
-            originalType: courseInfo?.type || 'required-university'
-        } : undefined
-    };
     
     if (!userData.semesters[semesterIndex]) {
         showNotification('الفصل الدراسي غير موجود', 'error');
         return;
     }
     
+    // 7. البحث عن معلومات المادة من قاعدة البيانات
+    const courseInfo = allCourses.find(c => c.id === courseId);
+    
+    // 8. إنشاء كائن المادة
+    const newCourse = {
+        id: courseId,
+        name: courseName,
+        finalGrade: finalGrade, // يمكن أن تكون null (تعديل 4)
+        credits: credits,
+        markType: userData.currentMarkType || 1,
+        type: courseInfo?.type || 'required-university',
+        code: courseInfo?.code || '',
+        addedAt: new Date().toISOString()
+    };
+    
+    // 9. إضافة معلومات إضافية للمشرفين
+    if (userData.userType === 'admin') {
+        newCourse.courseInfo = {
+            originalName: courseInfo?.name || '',
+            originalCode: courseInfo?.code || '',
+            originalCredits: courseInfo?.credits || credits,
+            originalType: courseInfo?.type || 'required-university'
+        };
+    }
+    
+    // 10. التحقق من عدم تكرار المادة في نفس الفصل
     if (!userData.semesters[semesterIndex].courses) {
         userData.semesters[semesterIndex].courses = [];
     }
     
-    // التحقق من عدم تكرار المادة في نفس الفصل
-    const isDuplicate = userData.semesters[semesterIndex].courses.some(
+    const existingCourseIndex = userData.semesters[semesterIndex].courses.findIndex(
         course => course.id === courseId
     );
     
-    if (isDuplicate) {
-        showNotification('هذه المادة مضافة مسبقاً في هذا الفصل', 'warning');
+    // 11. التعامل مع المادة الموجودة (استبدال أو إضافة)
+    if (existingCourseIndex !== -1) {
+        // تحديث المادة الموجودة
+        userData.semesters[semesterIndex].courses[existingCourseIndex] = newCourse;
+        showNotification('تم تحديث المادة بنجاح', 'success');
+    } else {
+        // إضافة مادة جديدة
+        userData.semesters[semesterIndex].courses.push(newCourse);
+        showNotification('تم إضافة المادة بنجاح', 'success');
+    }
+    
+    // 12. حذف التقييم (التعديل 5)
+    // لقد حذفنا قسم التقييم من النموذج أصلاً
+    
+    // 13. إعادة تعيين النموذج
+    if (courseSelect) courseSelect.value = '';
+    if (finalGradeInput) finalGradeInput.value = '';
+    if (semesterSelect) semesterSelect.value = '-1';
+    
+    // 14. حفظ البيانات
+    autoSave();
+    
+    // 15. تحديث الواجهة
+    renderSemesters();
+    updateAllCoursesView();
+    updateDashboard();
+    updateCharts();
+    
+    // 16. عرض رسالة تأكيد
+    const semester = userData.semesters[semesterIndex];
+    showNotification(
+        `تم ${existingCourseIndex !== -1 ? 'تحديث' : 'إضافة'} المادة في الفصل: ${semester.name}`,
+        'success'
+    );
+    
+    // 17. التبديل إلى قسم إدارة المواد تلقائياً إذا أضيفت مادة جديدة
+    if (existingCourseIndex === -1) {
+        // تبديل إلى تبويب إدارة المواد بعد إضافة المادة
+        setTimeout(() => {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.style.display = 'none';
+            });
+            
+            const manageTabBtn = document.querySelector('.tab-btn[data-tab="manageCourses"]');
+            if (manageTabBtn) {
+                manageTabBtn.classList.add('active');
+            }
+            
+            const manageTab = document.getElementById('manageCoursesTab');
+            if (manageTab) {
+                manageTab.style.display = 'block';
+            }
+        }, 500);
+    }
+}
+
+// 18. دالة مساعدة للتحقق من صحة البيانات
+function validateCourseInputs(courseName, finalGrade, credits, semesterIndex) {
+    const errors = [];
+    
+    if (!courseName || courseName.trim() === '') {
+        errors.push('يرجى اختيار المادة');
+    }
+    
+    if (finalGrade !== null && (finalGrade < 0 || finalGrade > 100)) {
+        errors.push('علامة المادة يجب أن تكون بين 0 و 100');
+    }
+    
+    if (credits < 1 || credits > 6) {
+        errors.push('الساعات يجب أن تكون بين 1 و 6');
+    }
+    
+    if (semesterIndex === -1 || !userData.semesters[semesterIndex]) {
+        errors.push('يرجى اختيار فصل دراسي صحيح');
+    }
+    
+    return errors;
+}
+
+// 19. دالة لتحديث نموذج إضافة المادة بناءً على نوع المستخدم
+function updateCourseForm() {
+    const container = document.getElementById('courseFormContainer');
+    const ratingSection = document.getElementById('courseRatingSection');
+    
+    // حذف قسم التقييم (التعديل 5)
+    if (ratingSection) {
+        ratingSection.style.display = 'none';
+    }
+    
+    // التحقق من وجود فصول دراسية
+    if (!userData.semesters || userData.semesters.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 30px;">
+                <i class="fas fa-calendar-plus fa-2x" style="color: var(--warning-color); margin-bottom: 15px;"></i>
+                <p style="color: var(--dark-color); font-weight: 600; margin-bottom: 10px;">
+                    يجب إضافة فصل دراسي أولاً
+                </p>
+                <p style="color: var(--gray-medium); margin-bottom: 20px;">
+                    انتقل إلى قسم "الفصول الدراسية" وأضف فصل دراسي جديد
+                </p>
+                <button class="btn btn-primary" onclick="switchTab('semesters')">
+                    <i class="fas fa-calendar-alt"></i> الانتقال إلى الفصول الدراسية
+                </button>
+            </div>
+        `;
         return;
     }
     
-    userData.semesters[semesterIndex].courses.push(newCourse);
+    // الحصول على المواد المتاحة بناءً على نوع المستخدم
+    let availableCourses = [];
     
-    // حفظ التقييم إذا كان موجوداً
-    if (selectedRating && courseId) {
-        if (!userData.courseRatings) userData.courseRatings = {};
-        userData.courseRatings[courseId] = selectedRating;
+    if (userData.userType === 'admin') {
+        // المشرف يرى جميع المواد
+        availableCourses = allCourses;
+    } else {
+        // الطالب يرى المواد المتاحة لتخصصه
+        availableCourses = getStudentAvailableCourses();
+        
+        if (availableCourses.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 30px;">
+                    <i class="fas fa-book fa-2x" style="color: var(--warning-color); margin-bottom: 15px;"></i>
+                    <p style="color: var(--dark-color); font-weight: 600; margin-bottom: 10px;">
+                        لا توجد مواد متاحة لتخصصك
+                    </p>
+                    <p style="color: var(--gray-medium); margin-bottom: 20px;">
+                        ${userData.college && userData.major ? 
+                            'يرجى تحديث إعدادات الكلية والتخصص' : 
+                            'يرجى اختيار الكلية والتخصص من إعدادات الحساب'}
+                    </p>
+                    <button class="btn btn-primary" onclick="switchTab('profile')">
+                        <i class="fas fa-user-cog"></i> الذهاب إلى إعدادات الحساب
+                    </button>
+                </div>
+            `;
+            return;
+        }
     }
     
-    // إعادة تعيين النموذج
-    document.getElementById('courseName').value = '';
-    document.getElementById('courseFinalGrade').value = '';
-    selectedRating = null;
-    document.querySelectorAll('.rating-option').forEach(opt => {
-        opt.classList.remove('selected');
-    });
+    // بناء النموذج
+    container.innerHTML = `
+        <div class="form-group">
+            <label for="courseName">اختر المادة *</label>
+            <select id="courseName" class="course-form-input" required>
+                <option value="">-- اختر المادة --</option>
+                ${availableCourses.map(course => {
+                    const typeInfo = courseTypes[course.type] || { name: '' };
+                    const credits = course.credits || 3;
+                    return `
+                        <option value="${course.id}" 
+                                data-credits="${credits}"
+                                data-type="${course.type || ''}">
+                            ${course.code ? `${course.code} - ` : ''}${course.name}
+                            ${typeInfo.name ? ` (${typeInfo.name})` : ''}
+                            - ${credits} ساعة
+                        </option>
+                    `;
+                }).join('')}
+            </select>
+            <small class="form-text text-muted">
+                ${userData.userType === 'admin' ? 
+                    'جميع المواد متاحة للمشرف' : 
+                    'المواد المتاحة لتخصصك الحالي'}
+            </small>
+        </div>
+        
+        <div class="form-group">
+            <label for="courseFinalGrade">العلامة الكاملة (%)</label>
+            <input type="number" 
+                   id="courseFinalGrade" 
+                   class="course-form-input" 
+                   min="0" 
+                   max="100" 
+                   step="0.1"
+                   placeholder="اتركه فارغاً إذا لم تحصل على العلامة بعد">
+            <small class="form-text text-muted">
+                علامة المادة النهائية من 100 (يمكن تركها فارغة)
+            </small>
+        </div>
+        
+        <div class="form-group">
+            <label for="courseCredits">الساعات المعتمدة *</label>
+            <select id="courseCredits" class="course-form-input" required>
+                <option value="1">1 ساعة</option>
+                <option value="2">2 ساعات</option>
+                <option value="3" selected>3 ساعات</option>
+                <option value="4">4 ساعات</option>
+                <option value="5">5 ساعات</option>
+                <option value="6">6 ساعات</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="courseSemester">الفصل الدراسي *</label>
+            <select id="courseSemester" class="course-form-input" required>
+                <option value="-1">-- اختر الفصل --</option>
+                ${userData.semesters.map((semester, index) => `
+                    <option value="${index}" 
+                            ${selectedSemesterIndex === index ? 'selected' : ''}>
+                        ${semester.name} (${semester.year})
+                        - ${semester.courses?.length || 0} مادة
+                    </option>
+                `).join('')}
+            </select>
+            <small class="form-text text-muted">
+                اختر الفصل الدراسي الذي تريد إضافة المادة إليه
+            </small>
+        </div>
+        
+        <div class="alert alert-info" style="margin: 15px 0; padding: 12px; border-radius: 8px;">
+            <i class="fas fa-info-circle"></i>
+            <strong>ملاحظة:</strong> يمكنك ترك حقل العلامة فارغاً وإضافته لاحقاً
+        </div>
+    `;
     
+    // إضافة مستمعات الأحداث
+    const courseNameSelect = document.getElementById('courseName');
+    const creditsSelect = document.getElementById('courseCredits');
+    const semesterSelect = document.getElementById('courseSemester');
+    
+    // تحديث الساعات عند اختيار المادة
+    if (courseNameSelect) {
+        courseNameSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption && selectedOption.value) {
+                const credits = selectedOption.getAttribute('data-credits');
+                if (credits && creditsSelect) {
+                    creditsSelect.value = credits;
+                }
+            }
+        });
+    }
+    
+    // تحديث الفهرس المختار للفصل الدراسي
+    if (semesterSelect) {
+        semesterSelect.addEventListener('change', function() {
+            selectedSemesterIndex = parseInt(this.value);
+        });
+    }
+}
+
+// 20. دالة مساعدة للحصول على المواد المتاحة للطالب
+function getStudentAvailableCourses() {
+    if (!userData.college || !userData.major) {
+        // إذا لم يكن لدى الطالب تخصص محدد، يعرض جميع المواد
+        return allCourses;
+    }
+    
+    // تصفية المواد المخصصة للطالب
+    return allCourses.filter(course => {
+        // البحث في المواد الموزعة
+        const assigned = assignedCourses.find(a => a.courseId === course.id);
+        
+        if (!assigned) {
+            // إذا لم تكن المادة موزعة، فهي غير متاحة
+            return false;
+        }
+        
+        // التحقق من التوزيع
+        const forAllColleges = !assigned.colleges || assigned.colleges.length === 0;
+        const forAllMajors = !assigned.majors || assigned.majors.length === 0;
+        
+        const forStudentCollege = forAllColleges || (assigned.colleges && assigned.colleges.includes(userData.college));
+        const forStudentMajor = forAllMajors || (assigned.majors && assigned.majors.includes(userData.major));
+        
+        return forStudentCollege && forStudentMajor;
+    });
+}
+
+// 21. دالة لتعديل المادة (مضافة بناءً على التعديل 3 و6)
+window.editCourseGrade = function(semesterIndex, courseIndex) {
+    const semester = userData.semesters[semesterIndex];
+    const course = semester.courses[courseIndex];
+    
+    // إنشاء نموذج تعديل
+    const modalHTML = `
+        <div class="edit-course-modal">
+            <h3>تعديل المادة: ${course.name}</h3>
+            <div class="form-group">
+                <label for="editFinalGrade">العلامة الكاملة (0-100)</label>
+                <input type="number" 
+                       id="editFinalGrade" 
+                       value="${course.finalGrade || ''}" 
+                       min="0" 
+                       max="100" 
+                       step="0.1"
+                       placeholder="اتركه فارغاً">
+                <small>اترك الحقل فارغاً إذا لم تحصل على العلامة بعد</small>
+            </div>
+            <div class="form-group">
+                <label for="editCredits">الساعات المعتمدة</label>
+                <input type="number" 
+                       id="editCredits" 
+                       value="${course.credits || 3}" 
+                       min="1" 
+                       max="6">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-success" onclick="saveCourseEdit(${semesterIndex}, ${courseIndex})">
+                    <i class="fas fa-save"></i> حفظ
+                </button>
+                <button class="btn btn-light" onclick="closeEditModal()">
+                    <i class="fas fa-times"></i> إلغاء
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // إنشاء وعرض النافذة المنبثقة
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = modalHTML;
+    document.body.appendChild(modal);
+    
+    // إضافة الأنماط
+    const style = document.createElement('style');
+    style.textContent = `
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        
+        .edit-course-modal {
+            background: white;
+            padding: 25px;
+            border-radius: var(--border-radius);
+            max-width: 400px;
+            width: 90%;
+            box-shadow: var(--box-shadow-lg);
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: flex-end;
+        }
+    `;
+    document.head.appendChild(style);
+};
+
+// 22. دالة حفظ التعديلات
+window.saveCourseEdit = function(semesterIndex, courseIndex) {
+    const finalGradeInput = document.getElementById('editFinalGrade');
+    const creditsInput = document.getElementById('editCredits');
+    
+    let finalGrade = null;
+    if (finalGradeInput.value && finalGradeInput.value.trim() !== '') {
+        const gradeValue = parseFloat(finalGradeInput.value);
+        if (!isNaN(gradeValue) && gradeValue >= 0 && gradeValue <= 100) {
+            finalGrade = gradeValue;
+        } else {
+            showNotification('العلامة يجب أن تكون بين 0 و 100', 'warning');
+            return;
+        }
+    }
+    
+    const credits = parseInt(creditsInput.value) || 3;
+    
+    if (credits < 1 || credits > 6) {
+        showNotification('الساعات يجب أن تكون بين 1 و 6', 'warning');
+        return;
+    }
+    
+    // تحديث البيانات
+    userData.semesters[semesterIndex].courses[courseIndex].finalGrade = finalGrade;
+    userData.semesters[semesterIndex].courses[courseIndex].credits = credits;
+    
+    // إغلاق النافذة المنبثقة
+    closeEditModal();
+    
+    // حفظ وتحديث الواجهة
     autoSave();
     renderSemesters();
     updateAllCoursesView();
     updateDashboard();
+    updateCharts();
     
-    showNotification('تم إضافة المادة بنجاح', 'success');
-}
+    showNotification('تم تعديل المادة بنجاح', 'success');
+};
+
+// 23. دالة إغلاق النافذة المنبثقة
+window.closeEditModal = function() {
+    const modal = document.querySelector('.modal-overlay');
+    const style = document.querySelector('style[data-modal-style]');
+    
+    if (modal) modal.remove();
+    if (style) style.remove();
+};
+
+// 24. دالة لحذف المادة (محدثة)
+window.deleteCourse = function(semesterIndex, courseIndex) {
+    const course = userData.semesters[semesterIndex].courses[courseIndex];
+    
+    if (confirm(`هل أنت متأكد من حذف المادة "${course.name}"؟`)) {
+        userData.semesters[semesterIndex].courses.splice(courseIndex, 1);
+        
+        autoSave();
+        renderSemesters();
+        updateAllCoursesView();
+        updateDashboard();
+        updateCharts();
+        
+        showNotification('تم حذف المادة بنجاح', 'success');
+    }
+};
         // ============ البحث عن المواد ============
-        function loadAllCoursesForSearch() {
-            const container = document.getElementById('searchResultsContainer');
-            container.innerHTML = '';
-            
-            if (allCourses.length === 0) {
-                container.innerHTML = `
-                    <div class="semester-card" style="text-align: center; padding: 50px;">
-                        <i class="fas fa-book fa-3x" style="color: var(--gray-medium); margin-bottom: 20px;"></i>
-                        <h3 style="margin-bottom: 15px;">لا توجد مواد في النظام</h3>
-                        <p style="color: var(--gray-medium); margin-bottom: 25px;">
-                            يرجى الانتظار حتى يقوم المشرف بإضافة المواد
-                        </p>
-                    </div>
-                `;
-                return;
+function loadAllCoursesForSearch() {
+    const container = document.getElementById('searchResultsContainer');
+    const searchInput = document.getElementById('courseSearchInput');
+    
+    // إذا كان حقل البحث فارغًا، اعرض رسالة
+    if (!searchInput || searchInput.value.trim() === '') {
+        container.innerHTML = `
+            <div class="semester-card" style="text-align: center; padding: 50px;">
+                <i class="fas fa-search fa-3x" style="color: var(--gray-medium); margin-bottom: 20px;"></i>
+                <h3 style="margin-bottom: 15px;">ابحث عن المواد</h3>
+                <p style="color: var(--gray-medium); margin-bottom: 25px;">
+                    اكتب في شريط البحث للعثور على المواد
+                </p>
+            </div>
+        `;
+        return;
             }
             
             allCourses.forEach(course => {
@@ -1364,23 +1835,78 @@ function addCourse() {
         }
 
         // تقييم المادة
-        window.rateCourse = async function(courseId, rating) {
-            if (!currentUser) {
-                showNotification('يجب تسجيل الدخول لتقييم المواد', 'warning');
-                return;
+// دالة لتحديث تقييم المادة
+window.rateCourse = async function(courseId, rating) {
+    if (!currentUser) {
+        showNotification('يجب تسجيل الدخول لتقييم المواد', 'warning');
+        return;
+    }
+    
+    try {
+        // تحديث في Firestore
+        const courseRef = db.collection('courses').doc(courseId);
+        const courseDoc = await courseRef.get();
+        
+        if (courseDoc.exists) {
+            const courseData = courseDoc.data();
+            const ratings = courseData.ratings || {};
+            const totalRatings = courseData.totalRatings || 0;
+            const averageRating = courseData.averageRating || 0;
+            
+            // احسب المعدل الجديد
+            const newTotalRatings = totalRatings + 1;
+            const newAverage = ((averageRating * totalRatings) + 
+                (rating === 'easy' ? 1 : rating === 'medium' ? 2 : 3)) / newTotalRatings;
+            
+            await courseRef.update({
+                ratings: {
+                    ...ratings,
+                    [currentUser.uid]: rating
+                },
+                totalRatings: newTotalRatings,
+                averageRating: newAverage
+            });
+            
+            // تحديث البيانات المحلية
+            const courseIndex = allCourses.findIndex(c => c.id === courseId);
+            if (courseIndex !== -1) {
+                allCourses[courseIndex].totalRatings = newTotalRatings;
+                allCourses[courseIndex].averageRating = newAverage;
             }
             
-            if (!userData.courseRatings) userData.courseRatings = {};
-            userData.courseRatings[courseId] = rating;
-            
-            await autoSave();
-            
             showNotification('تم تسجيل تقييمك للمادة', 'success');
-            
-            // تحديث العرض
-            searchCourses();
-        };
+            searchCourses(); // تحديث العرض
+        }
+    } catch (error) {
+        console.error('خطأ في تقييم المادة:', error);
+        showNotification('حدث خطأ أثناء التقييم', 'error');
+    }
+};
 
+// في دالة عرض المواد في البحث، عدل العرض ليشمل التقييمات
+function updateCourseDisplayInSearch(course) {
+    const average = course.averageRating || 0;
+    const total = course.totalRatings || 0;
+    
+    let ratingHTML = '';
+    if (total > 0) {
+        const stars = Math.round(average);
+        ratingHTML = `
+            <div style="margin-top: 10px;">
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <span style="color: #f59e0b;">
+                        ${'★'.repeat(stars)}${'☆'.repeat(3-stars)}
+                    </span>
+                    <span style="font-size: 0.9rem; color: var(--gray-medium);">
+                        (${average.toFixed(1)} من ${total} تقييم)
+                    </span>
+                </div>
+            </div>
+        `;
+    }
+    
+    return ratingHTML;
+}
         // ============ لوحة الإشراف ============
   async function loadAdminData() {
     if (userData.userType !== 'admin') {
@@ -1710,13 +2236,15 @@ function updateCoursesAdminList() {
                 <td style="padding: 15px;">
                     <span class="course-type ${typeInfo.class}">${typeInfo.name}</span>
                 </td>
-                <td style="padding: 15px;">
-                    <button class="btn btn-sm btn-danger" onclick="deleteCourseAdmin('${course.id}')">
-                        <i class="fas fa-trash"></i> حذف
-                    </button>
-                </td>
-            </tr>
-        `;
+        <td style="padding: 15px;">
+            <button class="btn btn-info btn-sm" onclick="editAdminCourse('${course.id}')" style="margin-left: 5px;">
+                <i class="fas fa-edit"></i> تعديل
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="deleteCourseAdmin('${course.id}')">
+                <i class="fas fa-trash"></i> حذف
+            </button>
+        </td>
+    `;
         
         // إضافة للاختيار في النماذج
         if (assignCourseSelect) {
@@ -1780,6 +2308,32 @@ function updateCoursesAdminList() {
             html += '</ul>';
             container.innerHTML = html;
         }
+
+window.editAdminCourse = async function(courseId) {
+    const course = allCourses.find(c => c.id === courseId);
+    
+    // إنشاء نموذج تعديل
+    const newName = prompt('اسم المادة:', course.name);
+    if (!newName) return;
+    
+    const newCode = prompt('كود المادة:', course.code || '');
+    const newCredits = prompt('الساعات المعتمدة:', course.credits || '3');
+    
+    try {
+        await db.collection('courses').doc(courseId).update({
+            name: newName,
+            code: newCode,
+            credits: parseInt(newCredits) || 3
+        });
+        
+        await loadSystemData();
+        updateCoursesAdminList();
+        showNotification('تم تعديل المادة بنجاح', 'success');
+    } catch (error) {
+        console.error('خطأ في تعديل المادة:', error);
+        showNotification('حدث خطأ أثناء التعديل', 'error');
+    }
+};
 
         async function updateUsersList() {
             const container = document.getElementById('usersList');
@@ -2317,16 +2871,6 @@ window.showCalculationDetails = function(semesterIndex) {
 };
 
 // ============ دوال إدارة المواد والفصول ============
-window.deleteCourse = function(semesterIndex, courseIndex) {
-    if (confirm('هل أنت متأكد من حذف هذه المادة؟')) {
-        userData.semesters[semesterIndex].courses.splice(courseIndex, 1);
-        autoSave();
-        renderSemesters();
-        updateAllCoursesView();
-        updateDashboard();
-        showNotification('تم حذف المادة بنجاح', 'success');
-    }
-};
 
 window.setSelectedSemester = function(semesterIndex) {
     console.log('🎯 تحديد الفصل الدراسي:', semesterIndex);
@@ -2475,14 +3019,18 @@ function updateAllCoursesView() {
                 </td>
                 <td style="padding: 15px;">${course.credits}</td>
                 <td style="padding: 15px; background: #f0f9ff;">${weightedMark.toFixed(2)}</td>
-                <td style="padding: 15px;">
-                    <button class="btn btn-danger btn-sm" onclick="deleteCourse(${course.semesterIndex}, ${course.courseIndex})">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
-    });
+        <td style="padding: 15px;">
+            <button class="btn btn-info btn-sm" onclick="editCourseInAllView(${course.semesterIndex}, ${course.courseIndex})">
+                <i class="fas fa-edit"></i> تعديل
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="deleteCourse(${course.semesterIndex}, ${course.courseIndex})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;  
+window.editCourseInAllView = editCourseGrade; // يمكن استخدام نفس الدالة
+
+  });
     
     html += `
                     </tbody>
@@ -3149,6 +3697,105 @@ async function loadSystemDataForUser() {
     }
 }
 
+// دالة البحث عن المستخدمين
+function searchUsers() {
+    const searchTerm = document.getElementById('userSearchInput').value.toLowerCase();
+    const rows = document.querySelectorAll('#usersList tbody tr');
+    
+    rows.forEach(row => {
+        const name = row.cells[0].textContent.toLowerCase();
+        const email = row.cells[1].textContent.toLowerCase();
+        
+        if (name.includes(searchTerm) || email.includes(searchTerm)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+// إضافة أزرار التحكم
+function addUserControls(user, row) {
+    const actionsCell = row.cells[4];
+    
+    // زر الترقية
+    if (user.userType !== 'admin') {
+        actionsCell.innerHTML += `
+            <button class="btn btn-success btn-sm" onclick="promoteUser('${user.id}')" style="margin-left: 5px;">
+                <i class="fas fa-user-shield"></i> ترقية
+            </button>
+        `;
+    }
+    
+    // زر الحظر
+    actionsCell.innerHTML += `
+        <button class="btn btn-warning btn-sm" onclick="temporaryBanUser('${user.id}')" style="margin-left: 5px;">
+            <i class="fas fa-ban"></i> حظر مؤقت
+        </button>
+    `;
+    
+    // زر التنبيه
+    actionsCell.innerHTML += `
+        <button class="btn btn-danger btn-sm" onclick="warnUser('${user.id}')" style="margin-left: 5px;">
+            <i class="fas fa-exclamation-triangle"></i> تنبيه
+        </button>
+    `;
+}
+
+// دوال التحكم
+window.promoteUser = async function(userId) {
+    if (confirm('هل تريد ترقية هذا المستخدم إلى مشرف؟')) {
+        try {
+            await db.collection('users').doc(userId).update({
+                userType: 'admin'
+            });
+            showNotification('تم ترقية المستخدم بنجاح', 'success');
+            updateUsersList();
+        } catch (error) {
+            console.error('خطأ في الترقية:', error);
+            showNotification('حدث خطأ أثناء الترقية', 'error');
+        }
+    }
+};
+
+window.temporaryBanUser = async function(userId) {
+    const duration = prompt('مدة الحظر بالأيام:', '7');
+    if (duration) {
+        try {
+            const banUntil = new Date();
+            banUntil.setDate(banUntil.getDate() + parseInt(duration));
+            
+            await db.collection('users').doc(userId).update({
+                bannedUntil: banUntil
+            });
+            
+            showNotification(`تم حظر المستخدم حتى ${banUntil.toLocaleDateString('ar-SA')}`, 'success');
+        } catch (error) {
+            console.error('خطأ في الحظر:', error);
+            showNotification('حدث خطأ أثناء الحظر', 'error');
+        }
+    }
+};
+
+window.warnUser = async function(userId) {
+    const reason = prompt('سبب التنبيه:', '');
+    if (reason) {
+        try {
+            await db.collection('users').doc(userId).update({
+                warnings: firebase.firestore.FieldValue.arrayUnion({
+                    reason: reason,
+                    date: new Date(),
+                    by: currentUser.uid
+                })
+            });
+            
+            showNotification('تم إرسال تنبيه للمستخدم', 'success');
+        } catch (error) {
+            console.error('خطأ في إرسال التنبيه:', error);
+            showNotification('حدث خطأ أثناء إرسال التنبيه', 'error');
+        }
+    }
+};
 
 // تهيئة الأحداث عند تحميل الصفحة
 document.addEventListener('DOMContentLoaded', function() {
