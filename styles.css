@@ -1445,3 +1445,334 @@ tr:hover {
         width: 100%;
     }
 }
+
+/* أنماط الخطة الدراسية */
+.course-select-card {
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.course-select-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--box-shadow);
+}
+
+.course-select-card.selected {
+    border-color: var(--primary-color) !important;
+    background: #f0f9ff !important;
+}
+
+.plan-controls {
+    background: #f8fafc;
+    padding: 15px;
+    border-radius: var(--border-radius);
+    margin-bottom: 20px;
+}
+
+.available-courses {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid var(--gray-light);
+    border-radius: var(--border-radius);
+    padding: 15px;
+}
+
+/* تحسينات للجوال */
+@media (max-width: 768px) {
+    .available-courses {
+        max-height: 300px;
+    }
+    
+    #availableCoursesList {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* أنماط الخطة الدراسية */
+.course-card {
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.course-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--box-shadow);
+}
+
+.course-card.selected {
+    border-color: var(--success-color) !important;
+    background: #f0f9ff !important;
+}
+
+.course-type-select {
+    width: 100%;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--gray-light);
+    background: white;
+    font-size: 0.9rem;
+}
+
+.course-type-select:focus {
+    border-color: var(--primary-color);
+    outline: none;
+}
+
+/* أنماط لعرض تفاصيل الخطة */
+.modal-content {
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* تحسينات للجوال */
+@media (max-width: 768px) {
+    #availableCoursesList {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .course-card {
+        margin-bottom: 15px;
+    }
+    
+    .modal-content {
+        padding: 20px;
+        margin: 10px;
+    }
+}
+
+/* أنماط خطة الدراسة للطالب */
+.plan-progress {
+    margin: 15px 0;
+}
+
+.progress-bar {
+    height: 10px;
+    background: var(--gray-light);
+    border-radius: 5px;
+    overflow: hidden;
+    margin-top: 5px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    border-radius: 5px;
+    transition: width 0.3s ease;
+}
+
+.course-info-hint {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* تلميح المواد */
+.course-tooltip {
+    position: relative;
+    display: inline-block;
+}
+
+.course-tooltip .tooltip-text {
+    visibility: hidden;
+    width: 200px;
+    background-color: var(--dark-color);
+    color: white;
+    text-align: center;
+    border-radius: 6px;
+    padding: 8px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 0.9rem;
+}
+
+.course-tooltip:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* رسالة عدم وجود خطة */
+.no-plan-message {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+    padding: 15px;
+    border-radius: var(--border-radius);
+    margin-bottom: 20px;
+}
+
+/* تحسين عرض معلومات الخطة */
+.plan-info-section {
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* تلميح المواد */
+.course-info-hint {
+    animation: fadeInUp 0.3s ease;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* رسائل التحذير */
+.warning-message {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+    padding: 15px;
+    border-radius: var(--border-radius);
+    margin-bottom: 20px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.8; }
+    100% { opacity: 1; }
+}
+
+/* أزرار الإجراءات */
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+}
+
+/* تحسينات للجوال */
+@media (max-width: 768px) {
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .plan-info-section {
+        padding: 12px;
+    }
+}
+
+/* تحسينات لعرض الرسائل */
+.spinner {
+    border: 3px solid var(--gray-light);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* تلميح تحميل */
+.loading-dots:after {
+    content: '';
+    animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+    0%, 20% { content: ''; }
+    40% { content: '.'; }
+    60% { content: '..'; }
+    80%, 100% { content: '...'; }
+}
+
+/* تحسينات للقوائم المنسدلة */
+select:disabled {
+    background-color: #f8f9fa;
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* أزرار الإجراءات */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* رسائل الحالة */
+.status-message {
+    padding: 10px 15px;
+    border-radius: var(--border-radius);
+    margin: 10px 0;
+    font-size: 0.9rem;
+}
+
+.status-success {
+    background-color: #d1fae5;
+    color: #065f46;
+    border-right: 4px solid #10b981;
+}
+
+.status-warning {
+    background-color: #fef3c7;
+    color: #92400e;
+    border-right: 4px solid #f59e0b;
+}
+
+.status-error {
+    background-color: #fee2e2;
+    color: #991b1b;
+    border-right: 4px solid #ef4444;
+}
+
+.status-info {
+    background-color: #dbeafe;
+    color: #1e40af;
+    border-right: 4px solid #3b82f6;
+}
+
+/* في ملف CSS أو داخل style tag */
+.course-name-cell {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 200px !important;
+    min-width: 150px !important;
+}
+
+.semester-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 250px;
+}
+
+.course-row span {
+    white-space: nowrap;
+    display: inline-block;
+}
