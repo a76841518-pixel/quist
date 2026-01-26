@@ -129,20 +129,21 @@ const firebaseConfig = {
                         mainContentWrapper.classList.remove('sidebar-active');
                     }
                 });
-// إغلاق القائمة الجانبية بالنقر على أيقونة الإغلاق
-document.querySelector('.close-sidebar')?.addEventListener('click', () => {
-    sidebar.classList.remove('active');
-    mainContentWrapper.classList.remove('sidebar-active');
-});
-
-// أو إغلاق القائمة الجانبية عند الضغط على أي عنصر في القائمة
 document.querySelectorAll('.nav-item[data-tab]').forEach(item => {
     item.addEventListener('click', () => {
+        const tabId = item.getAttribute('data-tab');
+        switchTab(tabId);
         if (window.innerWidth <= 768) {
             sidebar.classList.remove('active');
             mainContentWrapper.classList.remove('sidebar-active');
         }
     });
+}); // إضافة الإغلاق هنا
+
+// إغلاق القائمة الجانبية بالنقر على أيقونة الإغلاق
+document.querySelector('.close-sidebar')?.addEventListener('click', () => {
+    sidebar.classList.remove('active');
+    mainContentWrapper.classList.remove('sidebar-active');
 });
             });
             
@@ -286,8 +287,16 @@ function switchTab(tabId) {
                 
             case 'courses':
                 setTimeout(() => {
-                    updateAllCoursesView();
-                    updateCourseForm();
+                    // تحميل البيانات أولاً إذا لم تكن محملة
+                    if (userData.userType === 'student' && !userData.studyPlan) {
+                        loadStudentStudyPlan().then(() => {
+                            updateAllCoursesView();
+                            updateCourseForm();
+                        });
+                    } else {
+                        updateAllCoursesView();
+                        updateCourseForm();
+                    }
                 }, 50);
                 break;
                 
@@ -314,11 +323,19 @@ function switchTab(tabId) {
                     setTimeout(() => switchTab('dashboard'), 300);
                 }
                 break;
+                
+            case 'profile':
+                setTimeout(() => {
+                    // تحديث قوائم الكليات والتخصصات
+                    updateProfileUI();
+                }, 50);
+                break;
         }
     } else {
         console.error('❌ القسم غير موجود:', `${tabId}Section`);
     }
 }
+
        // تبديل تبويبات إدارة المواد
         function switchCourseTab(tab) {
             document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -363,61 +380,105 @@ function switchAdminTab(tabId) {
     const activeTab = document.querySelector(`.admin-tab[data-admin-tab="${tabId}"]`);
     if (activeTab) {
         activeTab.classList.add('active');
-    } else {
-        console.error('❌ تبويب غير موجود:', tabId);
     }
     
     // إظهار المحتوى
     const targetContent = document.getElementById(`${tabId}Tab`);
     if (targetContent) {
         targetContent.style.display = 'block';
-    } else {
-        console.error('❌ محتوى التبويب غير موجود:', `${tabId}Tab`);
+        
+        // تحميل البيانات الخاصة بكل تبويب
+        switch (tabId) {
+            case 'colleges':
+                updateCollegesList();
+                break;
+                
+            case 'majors':
+                updateMajorsList();
+                break;
+                
+            case 'coursesAdmin':
+                updateCoursesAdminList();
+                break;
+                
+            case 'plan':
+                // التأكد من تحميل البيانات
+                if (colleges.length === 0 || majors.length === 0 || allCourses.length === 0) {
+                    showNotification('جاري تحميل البيانات...', 'info');
+                    loadSystemData().then(() => {
+                        if (colleges.length > 0) {
+                            loadAvailableCourses();
+                        }
+                    });
+                } else {
+                    loadAvailableCourses();
+                }
+                break;
+                
+            case 'publishedPlans':
+                loadStudyPlans();
+                break;
+                
+            case 'users':
+                updateUsersList();
+                break;
+        }
     }
 }
         // ============ دوال المصادقة ============
-        function checkAuthState() {
-            console.log('🔐 التحقق من حالة المصادقة...');
-            
-            if (!auth) {
-                console.log('⚠️ Firebase غير متاح، تحميل وضع الزوار');
-                loadFromLocalStorage();
-                updateUIForGuest();
-                setTimeout(hideLoading, 500);
-                return;
-            }
-            
-            auth.onAuthStateChanged(async (user) => {
-                console.log('📊 حالة المصادقة:', user ? 'مستخدم مسجل' : 'زائر');
+function checkAuthState() {
+    console.log('🔐 التحقق من حالة المصادقة...');
+    
+    if (!auth) {
+        console.log('⚠️ Firebase غير متاح، تحميل وضع الزوار');
+        loadFromLocalStorage();
+        updateUIForGuest();
+        setTimeout(hideLoading, 500);
+        return;
+    }
+    
+    auth.onAuthStateChanged(async (user) => {
+        console.log('📊 حالة المصادقة:', user ? 'مستخدم مسجل' : 'زائر');
+        
+        if (user) {
+            currentUser = user;
+            try {
+                await loadUserData();
+                updateUIForLoggedInUser();
                 
-                if (user) {
-                    currentUser = user;
-                    try {
-                        await loadUserData();
-                        updateUIForLoggedInUser();
-                        await loadSystemData();
-                        showNotification('مرحباً بعودتك!', 'success');
-                    } catch (error) {
-                        console.error('❌ خطأ في تحميل بيانات المستخدم:', error);
-                        loadFromLocalStorage();
-                        updateUIForGuest();
-                        showNotification('تم تحميل البيانات المحلية', 'info');
-                    }
-                } else {
-                    currentUser = null;
-                    loadFromLocalStorage();
-                    updateUIForGuest();
+                // تحميل بيانات النظام
+                await loadSystemData();
+                
+                // إذا كان المستخدم طالباً، تحميل خطة الدراسة بعد تحميل البيانات
+                if (userData.userType === 'student' && userData.college && userData.major) {
+                    setTimeout(async () => {
+                        await loadStudentStudyPlan();
+                        updateDashboard();
+                        updateCourseForm();
+                    }, 1000);
                 }
                 
-                hideLoading();
-            }, (error) => {
-                console.error('❌ خطأ في مستمع حالة المصادقة:', error);
+                showNotification('مرحباً بعودتك!', 'success');
+            } catch (error) {
+                console.error('❌ خطأ في تحميل بيانات المستخدم:', error);
                 loadFromLocalStorage();
                 updateUIForGuest();
-                hideLoading();
-            });
+                showNotification('تم تحميل البيانات المحلية', 'info');
+            }
+        } else {
+            currentUser = null;
+            loadFromLocalStorage();
+            updateUIForGuest();
         }
-
+        
+        hideLoading();
+    }, (error) => {
+        console.error('❌ خطأ في مستمع حالة المصادقة:', error);
+        loadFromLocalStorage();
+        updateUIForGuest();
+        hideLoading();
+    });
+}
 
 function handleLogin() {
     // تحقق من وجود auth
@@ -551,81 +612,404 @@ function handleLogin() {
         }
 
         // ============ إدارة البيانات ============
-        async function loadUserData() {
-            if (!currentUser || !db) {
-                throw new Error('لا يوجد اتصال بقاعدة البيانات');
-            }
+async function loadUserData() {
+    if (!currentUser || !db) {
+        throw new Error('لا يوجد اتصال بقاعدة البيانات');
+    }
+    
+    try {
+        const userDoc = await db.collection('users').doc(currentUser.uid).get();
+        
+        if (userDoc.exists) {
+            const data = userDoc.data();
+            userData = {
+                ...data,
+                semesters: data.semesters || [],
+                profile: data.profile || {},
+                cumulativeGPA: data.cumulativeGPA || 0,
+                totalCredits: data.totalCredits || 0,
+                currentMarkType: data.currentMarkType || 1,
+                gradeHistory: data.gradeHistory || [],
+                userType: data.userType || 'student',
+                college: data.college || '',
+                major: data.major || '',
+                courseRatings: data.courseRatings || {},
+                studyPlanId: data.studyPlanId || '' // إضافة خطة الدراسة
+            };
+            console.log('✅ بيانات المستخدم محملة من Firebase');
+        } else {
+            // إنشاء بيانات افتراضية
+            userData = {
+                name: currentUser.displayName || currentUser.email.split('@')[0] || 'مستخدم',
+                email: currentUser.email,
+                userType: 'student',
+                college: '',
+                major: '',
+                studyPlanId: '',
+                createdAt: new Date(),
+                semesters: [],
+                cumulativeGPA: 0,
+                totalCredits: 0,
+                currentMarkType: 1,
+                gradeHistory: [],
+                courseRatings: {},
+                lastUpdated: new Date()
+            };
+            await saveUserData();
+            console.log('✅ تم إنشاء بيانات جديدة للمستخدم');
+        }
+        
+        // إذا كان المستخدم طالباً وله تخصص، تحميل خطة الدراسة
+        if (userData.userType === 'student' && userData.college && userData.major) {
+            await loadStudentStudyPlan();
+        }
+        
+        updateDashboard();
+        renderSemesters();
+        updateCharts();
+        updateProfileUI();
+        updateCourseForm();
+        updateGradeCalcForm();
+        updateGradeCalcHistory();
+        return true;
+        
+    } catch (error) {
+        console.error('❌ خطأ في تحميل البيانات:', error);
+        throw error;
+    }
+}
+
+// دالة لتحميل خطة الدراسة للطالب
+async function loadStudentStudyPlan() {
+    console.log('📘 جاري تحميل خطة الدراسة للطالب...');
+    
+    // التحقق من البيانات الأساسية
+    if (!userData.college) {
+        console.error('❌ لا توجد كلية محددة');
+        showNotification('يرجى تحديد الكلية في إعدادات الحساب', 'warning');
+        return false;
+    }
+    
+    if (!userData.major) {
+        console.error('❌ لا يوجد تخصص محدد');
+        showNotification('يرجى تحديد التخصص في إعدادات الحساب', 'warning');
+        return false;
+    }
+    
+    // الحصول على أسماء الكلية والتخصص لعرضها
+    const collegeName = getCollegeName(userData.college);
+    const majorName = getMajorName(userData.major);
+    
+    console.log(`🔍 البحث عن خطة لـ: ${collegeName} - ${majorName}`);
+    
+    try {
+        if (!db) {
+            console.error('❌ Firestore غير متاح');
+            showNotification('لا يمكن الاتصال بقاعدة البيانات حالياً', 'error');
+            return false;
+        }
+        
+        showNotification(`جاري البحث عن خطة دراسية لـ ${majorName}...`, 'info');
+        
+        // البحث عن خطة الدراسة بنمط أكثر مرونة
+        let plansQuery;
+        
+        try {
+            plansQuery = await db.collection('studyPlans')
+                .where('majorId', '==', userData.major)
+                .where('collegeId', '==', userData.college)
+                .where('status', '==', 'active')
+                .limit(1)
+                .get();
+        } catch (queryError) {
+            console.log('⚠️ خطأ في البحث، جاري البحث بدون فلتر النشاط...');
+            // البحث بدون فلتر النشاط
+            plansQuery = await db.collection('studyPlans')
+                .where('majorId', '==', userData.major)
+                .where('collegeId', '==', userData.college)
+                .limit(1)
+                .get();
+        }
+        
+        if (plansQuery.empty) {
+            console.log('⚠️ لم يتم العثور على خطط مطابقة، جاري البحث بأي خطة...');
             
-            try {
-                const userDoc = await db.collection('users').doc(currentUser.uid).get();
+            // البحث عن أي خطة للتخصص
+            const backupQuery = await db.collection('studyPlans')
+                .where('majorId', '==', userData.major)
+                .limit(1)
+                .get();
+            
+            if (!backupQuery.empty) {
+                const planDoc = backupQuery.docs[0];
+                const planData = planDoc.data();
                 
-                if (userDoc.exists) {
-                    const data = userDoc.data();
-                    userData = {
-                        ...data,
-                        semesters: data.semesters || [],
-                        profile: data.profile || {},
-                        cumulativeGPA: data.cumulativeGPA || 0,
-                        totalCredits: data.totalCredits || 0,
-                        currentMarkType: data.currentMarkType || 1,
-                        gradeHistory: data.gradeHistory || [],
-                        userType: data.userType || 'student',
-                        college: data.college || '',
-                        major: data.major || '',
-                        courseRatings: data.courseRatings || {}
-                    };
-                    console.log('✅ بيانات المستخدم محملة من Firebase');
-                } else {
-                    // إنشاء بيانات افتراضية
-                    userData = {
-                        name: currentUser.displayName || currentUser.email.split('@')[0] || 'مستخدم',
-                        email: currentUser.email,
-                        userType: 'student',
-                        college: '',
-                        major: '',
-                        createdAt: new Date(),
-                        semesters: [],
-                        cumulativeGPA: 0,
-                        totalCredits: 0,
-                        currentMarkType: 1,
-                        gradeHistory: [],
-                        courseRatings: {},
-                        lastUpdated: new Date()
-                    };
-                    await saveUserData();
-                    console.log('✅ تم إنشاء بيانات جديدة للمستخدم');
-                }
+                console.log('✅ تم العثور على خطة احتياطية:', planData.name);
                 
-                updateDashboard();
-                renderSemesters();
-                updateCharts();
-                updateProfileUI();
-                updateCourseForm();
-                updateGradeCalcForm();
-                updateGradeCalcHistory();
+                userData.studyPlanId = planDoc.id;
+                userData.studyPlan = {
+                    ...planData,
+                    id: planDoc.id
+                };
+                
+                showNotification(`تم تحميل خطة دراسية احتياطية: ${planData.name}`, 'warning');
                 return true;
-            } catch (error) {
-                console.error('❌ خطأ في تحميل البيانات:', error);
-                throw error;
+            } else {
+                console.log('❌ لا توجد خطط دراسية لهذا التخصص');
+                
+                // إنشاء خطة افتراضية مؤقتة
+                userData.studyPlanId = 'temp_plan_' + Date.now();
+                userData.studyPlan = createDefaultStudyPlan();
+                
+                showNotification('لم يتم العثور على خطة دراسية. سيتم استخدام قائمة المواد العامة', 'info');
+                return true;
             }
         }
+        
+        // إذا وجدنا خطة
+        const planDoc = plansQuery.docs[0];
+        const planData = planDoc.data();
+        
+        console.log('✅ تم العثور على خطة دراسية:', planData.name);
+        console.log('- عدد المواد:', planData.courses?.length || 0);
+        console.log('- إجمالي الساعات:', planData.totalCredits || 0);
+        
+        userData.studyPlanId = planDoc.id;
+        userData.studyPlan = {
+            ...planData,
+            id: planDoc.id
+        };
+        
+        // تحديث المستخدم
+        if (currentUser) {
+            try {
+                await db.collection('users').doc(currentUser.uid).update({
+                    studyPlanId: userData.studyPlanId,
+                    lastUpdated: new Date()
+                });
+            } catch (error) {
+                console.error('⚠️ خطأ في تحديث المستخدم:', error);
+            }
+        }
+        
+        saveToLocalStorage();
+        showNotification(`تم تحميل خطة الدراسة: ${planData.name}`, 'success');
+        return true;
+        
+    } catch (error) {
+        console.error('❌ خطأ في تحميل خطة الدراسة:', error);
+        
+        // محاولة تحميل من التخزين المحلي
+        const savedData = localStorage.getItem('gpaCalculatorData');
+        if (savedData) {
+            try {
+                const parsed = JSON.parse(savedData);
+                if (parsed.studyPlan) {
+                    userData.studyPlanId = parsed.studyPlanId || 'local_plan';
+                    userData.studyPlan = parsed.studyPlan;
+                    console.log('✅ تم تحميل الخطة من التخزين المحلي');
+                    showNotification('تم تحميل الخطة من الذاكرة المحلية', 'info');
+                    return true;
+                }
+            } catch (e) {
+                console.error('❌ خطأ في تحميل البيانات المحلية:', e);
+            }
+        }
+        
+        // خطة افتراضية
+        userData.studyPlanId = 'default_plan';
+        userData.studyPlan = createDefaultStudyPlan();
+        showNotification('تم تحميل قائمة المواد العامة', 'info');
+        return true;
+    }
+}
 
+// دوال مساعدة
+function getCollegeName(collegeId) {
+    if (!colleges || colleges.length === 0) return 'كلية';
+    const college = colleges.find(c => c.id === collegeId);
+    return college ? college.name : 'كلية';
+}
+
+function getMajorName(majorId) {
+    if (!majors || majors.length === 0) return 'تخصص';
+    const major = majors.find(m => m.id === majorId);
+    return major ? major.name : 'تخصص';
+}
+
+function createDefaultStudyPlan() {
+    return {
+        id: 'default_plan',
+        name: 'قائمة المواد العامة',
+        collegeId: userData.college,
+        collegeName: getCollegeName(userData.college),
+        majorId: userData.major,
+        majorName: getMajorName(userData.major),
+        courses: allCourses.slice(0, 20).map(course => ({
+            courseId: course.id,
+            code: course.code,
+            name: course.name,
+            credits: course.credits || 3,
+            type: 'required-major',
+            year: course.year || '1'
+        })),
+        totalCourses: Math.min(allCourses.length, 20),
+        totalCredits: Math.min(allCourses.length, 20) * 3,
+        isDefault: true
+    };
+}
+
+function buildCourseForm(availableCourses) {
+    let html = `
+        <form id="addCourseForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+            <div class="form-group">
+                <label for="courseName">اسم المادة</label>
+                <select id="courseName" class="form-control" required>
+                    <option value="">اختر المادة</option>
+    `;
+    
+    availableCourses.forEach(course => {
+        // البحث عن نوع المادة من الخطة الدراسية
+        let courseType = 'required-major';
+        let typeName = '';
+        
+        if (userData.studyPlan && userData.studyPlan.courses) {
+            const planCourse = userData.studyPlan.courses.find(pc => 
+                pc.courseId === course.id || pc.id === course.id
+            );
+            
+            if (planCourse) {
+                courseType = planCourse.type || planCourse.courseType || 'required-major';
+                const typeInfo = courseTypes[courseType] || { name: '' };
+                typeName = typeInfo.name;
+            }
+        } else {
+            const typeInfo = courseTypes[course.type] || { name: '' };
+            typeName = typeInfo.name;
+        }
+        
+        // عرض اسم المادة مع الكود فقط (بدون النوع)
+        const code = course.code || '';
+        const name = course.name || '';
+        const displayName = code ? `${code} - ${name}` : name;
+        
+        html += `<option value="${course.id}" data-type="${courseType}">${displayName}</option>`;
+    });
+    
+    html += `
+                </select>
+                <small id="courseTypeHint" style="color: var(--primary-color); margin-top: 5px; display: block;">
+                    اختر مادة لعرض نوعها
+                </small>
+            </div>
+            
+            <div class="form-group">
+                <label for="courseFinalGrade">العلامة الكاملة (0-100)</label>
+                <input type="number" id="courseFinalGrade" min="0" max="100" step="0.1" placeholder="اترك فارغاً إذا لم تحصل على العلامة">
+                <small>يمكن تركها فارغة للفصول الحالية</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="courseCredits">الساعات المعتمدة</label>
+                <select id="courseCredits" class="form-control">
+                    <option value="1">1 ساعة</option>
+                    <option value="2">2 ساعة</option>
+                    <option value="3" selected>3 ساعات</option>
+                    <option value="4">4 ساعات</option>
+                    <option value="6">6 ساعات</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="courseSemester">الفصل الدراسي</label>
+                <select id="courseSemester" class="form-control" required>
+                    <option value="">اختر الفصل</option>
+    `;
+    
+    if (userData.semesters && userData.semesters.length > 0) {
+        userData.semesters.forEach((semester, index) => {
+            html += `<option value="${index}" ${index === selectedSemesterIndex ? 'selected' : ''}>${semester.name} (${semester.year})</option>`;
+        });
+    }
+    
+    html += `
+                </select>
+            </div>
+            
+            <!-- قسم معلومات نوع المادة -->
+            <div class="form-group" style="grid-column: 1 / -1; background: #f8fafc; padding: 15px; border-radius: 8px; display: none;" id="courseTypeInfo">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-info-circle" style="color: var(--primary-color);"></i>
+                    <div>
+                        <strong>نوع المادة في الخطة:</strong>
+                        <span id="selectedCourseType" style="margin-right: 10px; font-weight: bold;"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <button type="button" class="btn btn-primary" onclick="addCourse()" style="width: 100%; padding: 12px;">
+                    <i class="fas fa-plus"></i> إضافة المادة
+                </button>
+            </div>
+        </form>
+    `;
+    
+    return html;
+}
+
+function setupCourseFormEventListeners() {
+    const courseNameSelect = document.getElementById('courseName');
+    const courseTypeHint = document.getElementById('courseTypeHint');
+    
+    if (courseNameSelect) {
+        courseNameSelect.addEventListener('change', function() {
+            const courseId = this.value;
+            
+            if (!courseId) {
+                if (courseTypeHint) {
+                    courseTypeHint.textContent = 'سيتم استخدام نوع المادة من الخطة الدراسية';
+                    courseTypeHint.style.color = 'var(--primary-color)';
+                }
+                return;
+            }
+            
+            const selectedOption = this.options[this.selectedIndex];
+            const courseType = selectedOption.getAttribute('data-type');
+            const typeInfo = courseTypes[courseType] || { name: 'إجباري تخصص' };
+            
+            // تحديث تلميح النوع
+            if (courseTypeHint) {
+                courseTypeHint.innerHTML = `<i class="fas fa-info-circle"></i> نوع المادة في الخطة: <strong>${typeInfo.name}</strong>`;
+                courseTypeHint.style.color = 'var(--success-color)';
+            }
+            
+            // تحديث الساعات إذا كانت موجودة في المادة
+            const course = allCourses.find(c => c.id === courseId);
+            if (course && course.credits) {
+                const creditsSelect = document.getElementById('courseCredits');
+                if (creditsSelect) {
+                    creditsSelect.value = course.credits;
+                }
+            }
+        });
+    }
+}
 async function loadSystemData() {
     if (!db) {
         console.error('❌ Firestore غير متاح!');
-        showNotification('خدمة قاعدة البيانات غير متاحة', 'error');
-        return;
+        return false;
     }
     
     try {
         console.log('📥 جاري تحميل بيانات النظام من Firestore...');
         
         // استخدام Promise.all لتحميل البيانات بشكل متوازي
-        const [collegesSnapshot, majorsSnapshot, coursesSnapshot, assignedSnapshot] = await Promise.all([
+        const [collegesSnapshot, majorsSnapshot, coursesSnapshot, studyPlansSnapshot] = await Promise.all([
             db.collection('colleges').get(),
             db.collection('majors').get(),
             db.collection('courses').get(),
-            db.collection('assignedCourses').get()
+            db.collection('studyPlans').get()
         ]);
         
         // تحميل الكليات
@@ -651,23 +1035,64 @@ async function loadSystemData() {
         });
         console.log(`✅ تم تحميل ${allCourses.length} مادة`);
         
-        // تحميل توزيع المواد
-        assignedCourses = [];
-        assignedSnapshot.forEach(doc => {
-            assignedCourses.push({ id: doc.id, ...doc.data() });
+        // تحميل الخطط الدراسية
+        studyPlans = [];
+        studyPlansSnapshot.forEach(doc => {
+            studyPlans.push({ id: doc.id, ...doc.data() });
         });
-        console.log(`✅ تم تحميل ${assignedCourses.length} توزيع للمواد`);
+        console.log(`✅ تم تحميل ${studyPlans.length} خطة دراسية`);
         
         console.log('🎉 تم تحميل جميع بيانات النظام بنجاح');
+        
+        // تحديث قوائم الاختيار
+        updateCollegeSelects();
+        
         return true;
         
     } catch (error) {
         console.error('❌ خطأ في تحميل بيانات النظام:', error);
         console.error('تفاصيل الخطأ:', error.message);
-        showNotification('حدث خطأ في تحميل بيانات النظام', 'error');
         return false;
     }
-}        async function saveUserData() {
+}
+
+// دالة لتحديث جميع قوائم اختيار الكليات
+function updateCollegeSelects() {
+    const collegeSelects = [
+        'majorCollege',        // في إضافة تخصص
+        'planCollege',         // في إنشاء خطة
+        'profileCollege',      // في الملف الشخصي
+        'assignCollege'        // في توزيع المواد (القديم)
+    ];
+    
+    collegeSelects.forEach(selectId => {
+        const select = document.getElementById(selectId);
+        if (select) {
+            // حفظ القيمة الحالية
+            const currentValue = select.value;
+            
+            // إعادة تعيين القائمة
+            select.innerHTML = '<option value="">اختر الكلية</option>';
+            
+            // إضافة الكليات
+            colleges.forEach(college => {
+                const option = document.createElement('option');
+                option.value = college.id;
+                option.textContent = college.name;
+                select.appendChild(option);
+            });
+            
+            // استعادة القيمة إذا كانت موجودة
+            if (currentValue && colleges.some(c => c.id === currentValue)) {
+                select.value = currentValue;
+            }
+        }
+    });
+}
+
+// تحديث دالة إنشاء خطة جديدة
+
+       async function saveUserData() {
             if (!currentUser || !db || isOfflineMode) {
                 saveToLocalStorage();
                 return;
@@ -889,60 +1314,86 @@ function createSemesterElement(semester, index) {
     
     return element;
 }
-        function renderCourses(courses, semesterIndex) {
-            if (!courses || courses.length === 0) {
-                return `
-                    <div style="text-align: center; padding: 30px; color: var(--gray-medium);">
-                        <i class="fas fa-book fa-2x" style="margin-bottom: 10px;"></i>
-                        <p>لم تتم إضافة أي مواد بعد</p>
-                    </div>
-                `;
-            }
-            
-            let html = '<h4 style="margin-bottom: 15px;">المواد الدراسية:</h4>';
-            
-            courses.forEach((course, courseIndex) => {
-                // عرض نوع المادة
-                const typeInfo = courseTypes[course.type] || { name: '', class: '' };
-                const typeBadge = course.type ? `<span class="course-type ${typeInfo.class}">${typeInfo.name}</span>` : '';
-                
-                html += `
-                    <div class="course-row" id="course-${semesterIndex}-${courseIndex}">
-                        <div class="course-input">
-                            <label>اسم المادة</label>
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <span>${course.name || ''}</span>
-                                ${typeBadge}
-                            </div>
-                        </div>
-                        
-                        <div class="course-input">
-                            <label>العلامة الكاملة</label>
-                            <input type="number" value="${course.finalGrade || 0}" disabled style="font-weight: bold;">
-                        </div>
-                        
-                        <div class="course-input">
-                            <label>الساعات</label>
-                            <input type="number" value="${course.credits || 3}" disabled>
-                        </div>
-                        
-                        <div class="course-input" style="flex: 0.5;">
-                            <label>العلامة × الساعات</label>
-                            <input type="number" value="${(course.finalGrade || 0) * (course.credits || 3)}" disabled style="background: #f0f9ff;">
-                        </div>
-                                            <button class="btn btn-info btn-sm" onclick="editCourseGrade(${semesterIndex}, ${courseIndex})">
-                        <i class="fas fa-edit"></i> تعديل
-                    </button>
-                        <button class="btn btn-danger btn-sm" onclick="deleteCourse(${semesterIndex}, ${courseIndex})">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                `;
-            });
-            
-            return html;
-        }
 
+function renderCourses(courses, semesterIndex) {
+    if (!courses || courses.length === 0) {
+        return `
+            <div style="text-align: center; padding: 30px; color: var(--gray-medium);">
+                <i class="fas fa-book fa-2x" style="margin-bottom: 10px;"></i>
+                <p>لم تتم إضافة أي مواد بعد</p>
+            </div>
+        `;
+    }
+    
+    let html = '<h4 style="margin-bottom: 15px;">المواد الدراسية:</h4>';
+    
+    courses.forEach((course, courseIndex) => {
+        // تنظيف اسم المادة من الفواصل الأسطر والأسطر الجديدة
+        const cleanCourseName = cleanText(course.name || '');
+        const typeInfo = courseTypes[course.type] || { name: '', class: '' };
+        const typeBadge = course.type ? `<span class="course-type ${typeInfo.class}">${typeInfo.name}</span>` : '';
+        
+        html += `
+            <div class="course-row" id="course-${semesterIndex}-${courseIndex}">
+                <div class="course-input">
+                    <label>اسم المادة</label>
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">
+                            ${cleanCourseName}
+                        </span>
+                        ${typeBadge}
+                    </div>
+                </div>
+                
+                <div class="course-input">
+                    <label>العلامة الكاملة</label>
+                    <input type="number" value="${course.finalGrade || 0}" disabled style="font-weight: bold;">
+                </div>
+                
+                <div class="course-input">
+                    <label>الساعات</label>
+                    <input type="number" value="${course.credits || 3}" disabled>
+                </div>
+                
+                <div class="course-input" style="flex: 0.5;">
+                    <label>العلامة × الساعات</label>
+                    <input type="number" value="${(course.finalGrade || 0) * (course.credits || 3)}" disabled style="background: #f0f9ff;">
+                </div>
+                
+                <button class="btn btn-info btn-sm" onclick="editCourseGrade(${semesterIndex}, ${courseIndex})">
+                    <i class="fas fa-edit"></i> تعديل
+                </button>
+                
+                <button class="btn btn-danger btn-sm" onclick="deleteCourse(${semesterIndex}, ${courseIndex})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+    });
+    
+    return html;
+}
+
+// دالة مساعدة لتنظيف النص
+function cleanText(text) {
+    if (!text) return '';
+    
+    // إزالة الفواصل الأسطر والأسطر الجديدة
+    let cleaned = text
+        .replace(/\n/g, ' ')          // استبدال الأسطر الجديدة بمسافات
+        .replace(/\r/g, ' ')          // استبدال الإرجاع بمسافات
+        .replace(/\t/g, ' ')          // استبدال التبويبات بمسافات
+        .replace(/  +/g, ' ')         // إزالة المسافات المزدوجة
+        .trim();                      // إزالة المسافات من البداية والنهاية
+    
+    // معالجة خاصة للعربية
+    cleaned = cleaned
+        .replace(/،/g, ' ')          // استبدال الفاصلة العربية بمسافة
+        .replace(/؛/g, ' ')          // استبدال الفاصلة المنقوطة بمسافة
+        .trim();
+    
+    return cleaned;
+}
 // دالة تعديل العلامة
 window.editCourseGrade = function(semesterIndex, courseIndex) {
     const course = userData.semesters[semesterIndex].courses[courseIndex];
@@ -966,36 +1417,11 @@ window.editCourseGrade = function(semesterIndex, courseIndex) {
         // ============ إضافة المواد مع الخيارات الجديدة ============
 
 
-function getStudentAvailableCourses() {
-    if (!userData.college || !userData.major) {
-        return allCourses; // إذا لم يكن لدى الطالب تخصص، عرض جميع المواد
-    }
-    
-    return allCourses.filter(course => {
-        // البحث عن توزيعات هذه المادة
-        const assigned = assignedCourses.find(a => a.courseId === course.id);
-        
-        if (!assigned) {
-            return false; // المادة غير موزعة لأي كلية/تخصص
-        }
-        
-        // التحقق إذا كانت المادة مخصصة للطالب
-        const forAllColleges = assigned.colleges.length === 0;
-        const forAllMajors = assigned.majors.length === 0;
-        
-        const forStudentCollege = forAllColleges || assigned.colleges.includes(userData.college);
-        const forStudentMajor = forAllMajors || assigned.majors.includes(userData.major);
-        
-        return forStudentCollege && forStudentMajor;
-    });
-}
-
 function addCourse() {
     // 1. الحصول على القيم من النموذج
     const courseSelect = document.getElementById('courseName');
     const courseId = courseSelect.value;
     
-    // 2. التحقق من اختيار المادة
     if (!courseId) {
         showNotification('يرجى اختيار المادة', 'warning');
         return;
@@ -1004,14 +1430,13 @@ function addCourse() {
     const selectedOption = courseSelect.options[courseSelect.selectedIndex];
     const courseName = selectedOption.text;
     
-    // 3. الحصول على العلامة (تسمح بالقيمة الفارغة - التعديل 4)
+    // 2. الحصول على العلامة (تسمح بالقيمة الفارغة)
     const finalGradeInput = document.getElementById('courseFinalGrade');
     let finalGrade = null;
     
     if (finalGradeInput && finalGradeInput.value && finalGradeInput.value.trim() !== '') {
         const gradeValue = parseFloat(finalGradeInput.value);
         
-        // التحقق من صحة العلامة
         if (isNaN(gradeValue) || gradeValue < 0 || gradeValue > 100) {
             showNotification('علامة المادة يجب أن تكون بين 0 و 100 أو فارغة', 'warning');
             return;
@@ -1020,22 +1445,20 @@ function addCourse() {
         finalGrade = gradeValue;
     }
     
-    // 4. الحصول على الساعات
+    // 3. الحصول على الساعات
     const creditsSelect = document.getElementById('courseCredits');
     const credits = creditsSelect ? parseInt(creditsSelect.value) || 3 : 3;
     
-    // 5. الحصول على الفصل الدراسي
+    // 4. الحصول على الفصل الدراسي
     const semesterSelect = document.getElementById('courseSemester');
     let semesterIndex = -1;
     
     if (semesterSelect) {
         semesterIndex = parseInt(semesterSelect.value);
     } else {
-        // استخدام الفصل المختار حالياً
         semesterIndex = selectedSemesterIndex;
     }
     
-    // 6. التحقق من صحة الفصل الدراسي
     if (semesterIndex === -1) {
         showNotification('يرجى اختيار الفصل الدراسي', 'warning');
         return;
@@ -1046,32 +1469,44 @@ function addCourse() {
         return;
     }
     
-    // 7. البحث عن معلومات المادة من قاعدة البيانات
+    // 5. البحث عن معلومات المادة من قاعدة البيانات
     const courseInfo = allCourses.find(c => c.id === courseId);
     
-    // 8. إنشاء كائن المادة
+    // 6. البحث عن نوع المادة من الخطة الدراسية (الجديد)
+    let courseType = 'required-major'; // قيمة افتراضية
+    
+    if (userData.studyPlan && userData.studyPlan.courses) {
+        const planCourse = userData.studyPlan.courses.find(pc => 
+            pc.courseId === courseId || pc.id === courseId
+        );
+        
+        if (planCourse && planCourse.type) {
+            courseType = planCourse.type;
+            console.log(`✅ تم تحديد نوع المادة من الخطة: ${courseType}`);
+        } else if (planCourse && planCourse.courseType) {
+            courseType = planCourse.courseType; // حالات قديمة
+            console.log(`✅ تم تحديد نوع المادة من الخطة (courseType): ${courseType}`);
+        } else {
+            console.log('⚠️ لم يتم العثور على نوع المادة في الخطة، استخدام افتراضي');
+        }
+    } else {
+        console.log('⚠️ لا توجد خطة دراسية، استخدام نوع افتراضي');
+    }
+    
+    // 7. إنشاء كائن المادة الجديد مع النوع من الخطة
     const newCourse = {
         id: courseId,
         name: courseName,
-        finalGrade: finalGrade, // يمكن أن تكون null (تعديل 4)
+        finalGrade: finalGrade,
         credits: credits,
         markType: userData.currentMarkType || 1,
-        type: courseInfo?.type || 'required-university',
+        type: courseType, // استخدام النوع من الخطة الدراسية
         code: courseInfo?.code || '',
-        addedAt: new Date().toISOString()
+        addedAt: new Date().toISOString(),
+        source: 'study_plan' // علامة أن المأخوذة من الخطة
     };
     
-    // 9. إضافة معلومات إضافية للمشرفين
-    if (userData.userType === 'admin') {
-        newCourse.courseInfo = {
-            originalName: courseInfo?.name || '',
-            originalCode: courseInfo?.code || '',
-            originalCredits: courseInfo?.credits || credits,
-            originalType: courseInfo?.type || 'required-university'
-        };
-    }
-    
-    // 10. التحقق من عدم تكرار المادة في نفس الفصل
+    // 8. التحقق من عدم تكرار المادة في نفس الفصل
     if (!userData.semesters[semesterIndex].courses) {
         userData.semesters[semesterIndex].courses = [];
     }
@@ -1080,65 +1515,39 @@ function addCourse() {
         course => course.id === courseId
     );
     
-    // 11. التعامل مع المادة الموجودة (استبدال أو إضافة)
+    // 9. التعامل مع المادة الموجودة (استبدال أو إضافة)
     if (existingCourseIndex !== -1) {
-        // تحديث المادة الموجودة
+        // الاحتفاظ بنوع المادة الحالي إذا كان موجوداً ومخصصاً
+        const existingType = userData.semesters[semesterIndex].courses[existingCourseIndex].type;
+        newCourse.type = existingType && existingType !== 'required-major' ? existingType : courseType;
+        
         userData.semesters[semesterIndex].courses[existingCourseIndex] = newCourse;
         showNotification('تم تحديث المادة بنجاح', 'success');
     } else {
-        // إضافة مادة جديدة
         userData.semesters[semesterIndex].courses.push(newCourse);
         showNotification('تم إضافة المادة بنجاح', 'success');
     }
     
-    // 12. حذف التقييم (التعديل 5)
-    // لقد حذفنا قسم التقييم من النموذج أصلاً
-    
-    // 13. إعادة تعيين النموذج
+    // 10. إعادة تعيين النموذج
     if (courseSelect) courseSelect.value = '';
     if (finalGradeInput) finalGradeInput.value = '';
     if (semesterSelect) semesterSelect.value = '-1';
     
-    // 14. حفظ البيانات
+    // 11. حفظ البيانات
     autoSave();
     
-    // 15. تحديث الواجهة
+    // 12. تحديث الواجهة
     renderSemesters();
     updateAllCoursesView();
     updateDashboard();
     updateCharts();
     
-    // 16. عرض رسالة تأكيد
     const semester = userData.semesters[semesterIndex];
     showNotification(
         `تم ${existingCourseIndex !== -1 ? 'تحديث' : 'إضافة'} المادة في الفصل: ${semester.name}`,
         'success'
     );
-    
-    // 17. التبديل إلى قسم إدارة المواد تلقائياً إذا أضيفت مادة جديدة
-    if (existingCourseIndex === -1) {
-        // تبديل إلى تبويب إدارة المواد بعد إضافة المادة
-        setTimeout(() => {
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.style.display = 'none';
-            });
-            
-            const manageTabBtn = document.querySelector('.tab-btn[data-tab="manageCourses"]');
-            if (manageTabBtn) {
-                manageTabBtn.classList.add('active');
-            }
-            
-            const manageTab = document.getElementById('manageCoursesTab');
-            if (manageTab) {
-                manageTab.style.display = 'block';
-            }
-        }, 500);
-    }
 }
-
 // 18. دالة مساعدة للتحقق من صحة البيانات
 function validateCourseInputs(courseName, finalGrade, credits, semesterIndex) {
     const errors = [];
@@ -1165,191 +1574,255 @@ function validateCourseInputs(courseName, finalGrade, credits, semesterIndex) {
 // 19. دالة لتحديث نموذج إضافة المادة بناءً على نوع المستخدم
 function updateCourseForm() {
     const container = document.getElementById('courseFormContainer');
-    const ratingSection = document.getElementById('courseRatingSection');
-    
-    // حذف قسم التقييم (التعديل 5)
-    if (ratingSection) {
-        ratingSection.style.display = 'none';
-    }
     
     // التحقق من وجود فصول دراسية
     if (!userData.semesters || userData.semesters.length === 0) {
-        container.innerHTML = `
-            <div style="text-align: center; padding: 30px;">
-                <i class="fas fa-calendar-plus fa-2x" style="color: var(--warning-color); margin-bottom: 15px;"></i>
-                <p style="color: var(--dark-color); font-weight: 600; margin-bottom: 10px;">
-                    يجب إضافة فصل دراسي أولاً
-                </p>
-                <p style="color: var(--gray-medium); margin-bottom: 20px;">
-                    انتقل إلى قسم "الفصول الدراسية" وأضف فصل دراسي جديد
-                </p>
-                <button class="btn btn-primary" onclick="switchTab('semesters')">
-                    <i class="fas fa-calendar-alt"></i> الانتقال إلى الفصول الدراسية
-                </button>
-            </div>
-        `;
+        container.innerHTML = getNoSemestersMessage();
         return;
     }
     
-    // الحصول على المواد المتاحة بناءً على نوع المستخدم
+    // التحقق من حالة الخطة الدراسية
+    const planStatus = checkStudyPlanStatus();
+    
+    // للطلاب: التأكد من وجود خطة دراسة
+    if (userData.userType === 'student') {
+        if (!planStatus.hasCollege || !planStatus.hasMajor) {
+            container.innerHTML = getNoCollegeMajorMessage();
+            return;
+        }
+        
+        if (!planStatus.hasPlan) {
+            container.innerHTML = getNoStudyPlanMessage();
+            
+            // محاولة تحميل الخطة تلقائياً إذا لم تكن محملة
+            setTimeout(async () => {
+                await loadStudentStudyPlan();
+                updateCourseForm(); // إعادة تحميل النموذج بعد تحميل الخطة
+            }, 500);
+            return;
+        }
+        
+        if (!planStatus.hasCourses) {
+            container.innerHTML = getNoCoursesInPlanMessage();
+            return;
+        }
+    }
+    
+    // الحصول على المواد المتاحة
     let availableCourses = [];
     
     if (userData.userType === 'admin') {
         // المشرف يرى جميع المواد
         availableCourses = allCourses;
     } else {
-        // الطالب يرى المواد المتاحة لتخصصه
+        // الطالب يرى المواد المتاحة لتخصصه بناءً على الخطة الدراسية
         availableCourses = getStudentAvailableCourses();
         
+        // إضافة معلومات للمستخدم إذا لم يكن هناك مواد
         if (availableCourses.length === 0) {
-            container.innerHTML = `
-                <div style="text-align: center; padding: 30px;">
-                    <i class="fas fa-book fa-2x" style="color: var(--warning-color); margin-bottom: 15px;"></i>
-                    <p style="color: var(--dark-color); font-weight: 600; margin-bottom: 10px;">
-                        لا توجد مواد متاحة لتخصصك
-                    </p>
-                    <p style="color: var(--gray-medium); margin-bottom: 20px;">
-                        ${userData.college && userData.major ? 
-                            'يرجى تحديث إعدادات الكلية والتخصص' : 
-                            'يرجى اختيار الكلية والتخصص من إعدادات الحساب'}
-                    </p>
-                    <button class="btn btn-primary" onclick="switchTab('profile')">
-                        <i class="fas fa-user-cog"></i> الذهاب إلى إعدادات الحساب
-                    </button>
-                </div>
-            `;
+            container.innerHTML = getNoAvailableCoursesMessage();
             return;
         }
     }
     
     // بناء النموذج
-    container.innerHTML = `
-        <div class="form-group">
-            <label for="courseName">اختر المادة *</label>
-            <select id="courseName" class="course-form-input" required>
-                <option value="">-- اختر المادة --</option>
-                ${availableCourses.map(course => {
-                    const typeInfo = courseTypes[course.type] || { name: '' };
-                    const credits = course.credits || 3;
-                    return `
-                        <option value="${course.id}" 
-                                data-credits="${credits}"
-                                data-type="${course.type || ''}">
-                            ${course.code ? `${course.code} - ` : ''}${course.name}
-                            ${typeInfo.name ? ` (${typeInfo.name})` : ''}
-                            - ${credits} ساعة
-                        </option>
-                    `;
-                }).join('')}
-            </select>
-            <small class="form-text text-muted">
-                ${userData.userType === 'admin' ? 
-                    'جميع المواد متاحة للمشرف' : 
-                    'المواد المتاحة لتخصصك الحالي'}
-            </small>
-        </div>
-        
-        <div class="form-group">
-            <label for="courseFinalGrade">العلامة الكاملة (%)</label>
-            <input type="number" 
-                   id="courseFinalGrade" 
-                   class="course-form-input" 
-                   min="0" 
-                   max="100" 
-                   step="0.1"
-                   placeholder="اتركه فارغاً إذا لم تحصل على العلامة بعد">
-            <small class="form-text text-muted">
-                علامة المادة النهائية من 100 (يمكن تركها فارغة)
-            </small>
-        </div>
-        
-        <div class="form-group">
-            <label for="courseCredits">الساعات المعتمدة *</label>
-            <select id="courseCredits" class="course-form-input" required>
-                <option value="1">1 ساعة</option>
-                <option value="2">2 ساعات</option>
-                <option value="3" selected>3 ساعات</option>
-                <option value="4">4 ساعات</option>
-                <option value="5">5 ساعات</option>
-                <option value="6">6 ساعات</option>
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label for="courseSemester">الفصل الدراسي *</label>
-            <select id="courseSemester" class="course-form-input" required>
-                <option value="-1">-- اختر الفصل --</option>
-                ${userData.semesters.map((semester, index) => `
-                    <option value="${index}" 
-                            ${selectedSemesterIndex === index ? 'selected' : ''}>
-                        ${semester.name} (${semester.year})
-                        - ${semester.courses?.length || 0} مادة
-                    </option>
-                `).join('')}
-            </select>
-            <small class="form-text text-muted">
-                اختر الفصل الدراسي الذي تريد إضافة المادة إليه
-            </small>
-        </div>
-        
-        <div class="alert alert-info" style="margin: 15px 0; padding: 12px; border-radius: 8px;">
-            <i class="fas fa-info-circle"></i>
-            <strong>ملاحظة:</strong> يمكنك ترك حقل العلامة فارغاً وإضافته لاحقاً
-        </div>
-    `;
+    container.innerHTML = buildCourseForm(availableCourses);
     
     // إضافة مستمعات الأحداث
-    const courseNameSelect = document.getElementById('courseName');
-    const creditsSelect = document.getElementById('courseCredits');
-    const semesterSelect = document.getElementById('courseSemester');
-    
-    // تحديث الساعات عند اختيار المادة
-    if (courseNameSelect) {
-        courseNameSelect.addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            if (selectedOption && selectedOption.value) {
-                const credits = selectedOption.getAttribute('data-credits');
-                if (credits && creditsSelect) {
-                    creditsSelect.value = credits;
-                }
-            }
-        });
-    }
-    
-    // تحديث الفهرس المختار للفصل الدراسي
-    if (semesterSelect) {
-        semesterSelect.addEventListener('change', function() {
-            selectedSemesterIndex = parseInt(this.value);
-        });
-    }
+    setupCourseFormEventListeners();
+}
+
+// دوال مساعدة لعرض الرسائل
+function getNoSemestersMessage() {
+    return `
+        <div style="text-align: center; padding: 30px;">
+            <i class="fas fa-calendar-plus fa-2x" style="color: var(--warning-color); margin-bottom: 15px;"></i>
+            <p style="color: var(--dark-color); font-weight: 600; margin-bottom: 10px;">
+                يجب إضافة فصل دراسي أولاً
+            </p>
+            <p style="color: var(--gray-medium); margin-bottom: 20px;">
+                انتقل إلى قسم "الفصول الدراسية" وأضف فصل دراسي جديد
+            </p>
+            <button class="btn btn-primary" onclick="switchTab('semesters')">
+                <i class="fas fa-calendar-alt"></i> الانتقال إلى الفصول الدراسية
+            </button>
+        </div>
+    `;
+}
+
+function getNoCollegeMajorMessage() {
+    return `
+        <div style="text-align: center; padding: 30px;">
+            <i class="fas fa-university fa-2x" style="color: var(--warning-color); margin-bottom: 15px;"></i>
+            <h4 style="color: var(--dark-color); margin-bottom: 10px;">يرجى تحديد الكلية والتخصص</h4>
+            <p style="color: var(--gray-medium); margin-bottom: 20px;">
+                انتقل إلى إعدادات الحساب واختر كليتك وتخصصك لعرض المواد المتاحة
+            </p>
+            <button class="btn btn-primary" onclick="switchTab('profile')">
+                <i class="fas fa-user-cog"></i> الذهاب إلى إعدادات الحساب
+            </button>
+        </div>
+    `;
+}
+
+function getNoStudyPlanMessage() {
+    return `
+        <div style="text-align: center; padding: 30px;">
+            <i class="fas fa-calendar-times fa-2x" style="color: var(--warning-color); margin-bottom: 15px;"></i>
+            <h4 style="color: var(--dark-color); margin-bottom: 10px;">لا توجد خطة دراسية</h4>
+            <p style="color: var(--gray-medium); margin-bottom: 15px;">
+                لم يتم العثور على خطة دراسية لتخصصك
+            </p>
+            <p style="color: var(--gray-medium); margin-bottom: 20px;">
+                جاري البحث عن خطة دراسية...
+            </p>
+            <div class="spinner" style="width: 30px; height: 30px; margin: 0 auto 20px;"></div>
+        </div>
+    `;
+}
+
+function getNoCoursesInPlanMessage() {
+    return `
+        <div style="text-align: center; padding: 30px;">
+            <i class="fas fa-book fa-2x" style="color: var(--warning-color); margin-bottom: 15px;"></i>
+            <h4 style="color: var(--dark-color); margin-bottom: 10px;">الخطة لا تحتوي على مواد</h4>
+            <p style="color: var(--gray-medium); margin-bottom: 20px;">
+                خطة الدراسة الحالية لا تحتوي على أي مواد. يرجى التواصل مع المشرف.
+            </p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button class="btn btn-primary" onclick="refreshStudyPlan()">
+                    <i class="fas fa-redo"></i> تحديث الخطة
+                </button>
+                <button class="btn btn-light" onclick="switchTab('profile')">
+                    <i class="fas fa-user-cog"></i> الإعدادات
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function getNoAvailableCoursesMessage() {
+    return `
+        <div style="text-align: center; padding: 30px;">
+            <i class="fas fa-book fa-2x" style="color: var(--warning-color); margin-bottom: 15px;"></i>
+            <h4 style="color: var(--dark-color); margin-bottom: 10px;">لا توجد مواد متاحة</h4>
+            <p style="color: var(--gray-medium); margin-bottom: 20px;">
+                لا توجد مواد متاحة في خطة الدراسة الحالية.
+            </p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button class="btn btn-primary" onclick="refreshStudyPlan()">
+                    <i class="fas fa-redo"></i> تحديث الخطة
+                </button>
+                <button class="btn btn-light" onclick="viewStudentStudyPlan()">
+                    <i class="fas fa-eye"></i> عرض الخطة
+                </button>
+            </div>
+        </div>
+    `;
 }
 
 // 20. دالة مساعدة للحصول على المواد المتاحة للطالب
 function getStudentAvailableCourses() {
-    if (!userData.college || !userData.major) {
-        // إذا لم يكن لدى الطالب تخصص محدد، يعرض جميع المواد
-        return allCourses;
+    console.log('📚 جاري تحميل المواد المتاحة للطالب...');
+    
+    if (!userData.major) {
+        console.log('⚠️ لا يوجد تخصص محدد للطالب');
+        return [];
     }
     
-    // تصفية المواد المخصصة للطالب
-    return allCourses.filter(course => {
-        // البحث في المواد الموزعة
-        const assigned = assignedCourses.find(a => a.courseId === course.id);
+    if (!allCourses || allCourses.length === 0) {
+        console.log('⚠️ لا توجد مواد في النظام');
+        return [];
+    }
+    
+    if (userData.studyPlan && userData.studyPlan.courses) {
+        console.log('✅ استخدام مواد من خطة الدراسة:', userData.studyPlan.name);
         
-        if (!assigned) {
-            // إذا لم تكن المادة موزعة، فهي غير متاحة
-            return false;
+        // الحصول على المواد من الخطة الدراسية
+        const planCourseIds = userData.studyPlan.courses.map(course => course.courseId || course.id);
+        
+        // تصفية المواد بناءً على الخطة
+        const availableCourses = allCourses.filter(course => {
+            return planCourseIds.includes(course.id);
+        });
+        
+        console.log('✅ عدد المواد المتاحة بعد الفلترة:', availableCourses.length);
+        
+        // إضافة معلومات نوع المادة من الخطة
+        return availableCourses.map(course => {
+            const planCourse = userData.studyPlan.courses.find(pc => 
+                pc.courseId === course.id || pc.id === course.id
+            );
+            
+            return {
+                ...course,
+                type: planCourse ? (planCourse.type || planCourse.courseType || 'required-major') : 'required-major'
+            };
+        });
+    }
+    
+    console.log('⚠️ لا توجد خطة دراسة، عرض جميع المواد');
+    return allCourses.map(course => ({
+        ...course,
+        type: course.type || 'required-major'
+    }));
+}
+
+// دالة للتحقق من حالة الخطة الدراسية
+function checkStudyPlanStatus() {
+    console.log('🔍 التحقق من حالة الخطة الدراسية...');
+    console.log('المستخدم:', userData.userType);
+    console.log('الكلية:', userData.college);
+    console.log('التخصص:', userData.major);
+    console.log('معرف الخطة:', userData.studyPlanId);
+    console.log('الخطة:', userData.studyPlan);
+    
+    if (userData.userType === 'student') {
+        if (!userData.college || !userData.major) {
+            console.log('❌ يجب تحديد الكلية والتخصص أولاً');
+            return {
+                hasCollege: false,
+                hasMajor: false,
+                hasPlan: false,
+                message: 'يرجى تحديد الكلية والتخصص أولاً'
+            };
         }
         
-        // التحقق من التوزيع
-        const forAllColleges = !assigned.colleges || assigned.colleges.length === 0;
-        const forAllMajors = !assigned.majors || assigned.majors.length === 0;
+        if (!userData.studyPlanId || !userData.studyPlan) {
+            console.log('❌ لا توجد خطة دراسية');
+            return {
+                hasCollege: true,
+                hasMajor: true,
+                hasPlan: false,
+                message: 'لم يتم العثور على خطة دراسية'
+            };
+        }
         
-        const forStudentCollege = forAllColleges || (assigned.colleges && assigned.colleges.includes(userData.college));
-        const forStudentMajor = forAllMajors || (assigned.majors && assigned.majors.includes(userData.major));
+        if (!userData.studyPlan.courses || userData.studyPlan.courses.length === 0) {
+            console.log('❌ الخطة لا تحتوي على مواد');
+            return {
+                hasCollege: true,
+                hasMajor: true,
+                hasPlan: true,
+                hasCourses: false,
+                message: 'الخطة لا تحتوي على مواد'
+            };
+        }
         
-        return forStudentCollege && forStudentMajor;
-    });
+        console.log('✅ الخطة الدراسية جاهزة');
+        return {
+            hasCollege: true,
+            hasMajor: true,
+            hasPlan: true,
+            hasCourses: true,
+            message: 'الخطة جاهزة'
+        };
+    }
+    
+    return {
+        isAdmin: true,
+        message: 'المشرف يرى جميع المواد'
+    };
 }
 
 // 21. دالة لتعديل المادة (مضافة بناءً على التعديل 3 و6)
@@ -1841,38 +2314,45 @@ function updateCourseDisplayInSearch(course) {
             }
         }
 
-        async function addCourseAdmin() {
-            const code = document.getElementById('newCourseCode').value.trim();
-            const name = document.getElementById('newCourseName').value.trim();
-            const credits = parseInt(document.getElementById('newCourseCredits').value) || 3;
-            const type = document.getElementById('newCourseType').value;
-            
-            if (!code || !name) {
-                showNotification('يرجى إدخال كود واسم المادة', 'warning');
-                return;
-            }
-            
-            try {
-                await db.collection('courses').add({
-                    code: code,
-                    name: name,
-                    credits: credits,
-                    type: type,
-                    createdAt: new Date()
-                });
-                
-                document.getElementById('newCourseCode').value = '';
-                document.getElementById('newCourseName').value = '';
-                await loadSystemData();
-                updateCoursesAdminList();
-                
-                showNotification('تم إضافة المادة بنجاح', 'success');
-            } catch (error) {
-                console.error('❌ خطأ في إضافة المادة:', error);
-                showNotification('حدث خطأ أثناء إضافة المادة', 'error');
-            }
-        }
-
+async function addCourseAdmin() {
+    const code = document.getElementById('newCourseCode').value.trim();
+    const name = document.getElementById('newCourseName').value.trim();
+    const credits = parseInt(document.getElementById('newCourseCredits').value) || 3;
+    const year = document.getElementById('newCourseYear').value;
+    const semester = document.getElementById('newCourseSemester').value;
+    const hasPractical = document.getElementById('newCourseHasPractical').checked;
+    
+    if (!code || !name) {
+        showNotification('يرجى إدخال كود واسم المادة', 'warning');
+        return;
+    }
+    
+    try {
+        await db.collection('courses').add({
+            code: code,
+            name: name,
+            credits: credits,
+            year: year,
+            semester: semester,
+            hasPractical: hasPractical,
+            createdAt: new Date()
+        });
+        
+        document.getElementById('newCourseCode').value = '';
+        document.getElementById('newCourseName').value = '';
+        document.getElementById('newCourseYear').value = '';
+        document.getElementById('newCourseSemester').value = '1';
+        document.getElementById('newCourseHasPractical').checked = false;
+        
+        await loadSystemData();
+        updateCoursesAdminList();
+        
+        showNotification('تم إضافة المادة بنجاح', 'success');
+    } catch (error) {
+        console.error('❌ خطأ في إضافة المادة:', error);
+        showNotification('حدث خطأ أثناء إضافة المادة', 'error');
+    }
+}
         async function assignCourseToMajors() {
             const courseId = document.getElementById('assignCourse').value;
             const collegeSelect = document.getElementById('assignCollege');
@@ -1987,6 +2467,7 @@ function updateCourseDisplayInSearch(course) {
             container.innerHTML = html;
         }
 
+// في دالة updateCoursesAdminList - استبدل جدول العرض بالكامل
 function updateCoursesAdminList() {
     console.log('🔄 جاري تحديث قائمة المواد في لوحة الإشراف...');
     
@@ -2015,7 +2496,7 @@ function updateCoursesAdminList() {
                 <i class="fas fa-book fa-3x" style="margin-bottom: 15px;"></i>
                 <h4 style="margin-bottom: 10px;">لا توجد مواد مضافة بعد</h4>
                 <p>استخدم نموذج إضافة المادة لإضافة مواد جديدة</p>
-                <button class="btn btn-primary" onclick="switchAdminTab('courses')" style="margin-top: 15px;">
+                <button class="btn btn-primary" onclick="switchAdminTab('coursesAdmin')" style="margin-top: 15px;">
                     <i class="fas fa-plus"></i> إضافة مادة
                 </button>
             </div>
@@ -2040,6 +2521,10 @@ function updateCoursesAdminList() {
                         <th style="padding: 15px; text-align: right; border-bottom: 2px solid var(--gray-light);">اسم المادة</th>
                         <th style="padding: 15px; text-align: right; border-bottom: 2px solid var(--gray-light);">الساعات</th>
                         <th style="padding: 15px; text-align: right; border-bottom: 2px solid var(--gray-light);">النوع</th>
+                        <th style="padding: 15px; text-align: right; border-bottom: 2px solid var(--gray-light);">السنة</th>
+                        <th style="padding: 15px; text-align: right; border-bottom: 2px solid var(--gray-light);">الفصل</th>
+                        <th style="padding: 15px; text-align: right; border-bottom: 2px solid var(--gray-light);">عملي</th>
+                        <th style="padding: 15px; text-align: right; border-bottom: 2px solid var(--gray-light);">تاريخ الإضافة</th>
                         <th style="padding: 15px; text-align: right; border-bottom: 2px solid var(--gray-light);">الإجراءات</th>
                     </tr>
                 </thead>
@@ -2047,28 +2532,43 @@ function updateCoursesAdminList() {
     `;
     
     allCourses.forEach(course => {
-        const typeInfo = courseTypes[course.type] || { name: 'غير محدد', class: '' };
+        const typeInfo = courseTypes[course.type] || { name: 'غير محدد' };
         const courseCode = course.code || 'بدون كود';
         const courseName = course.name || 'بدون اسم';
         const credits = course.credits || 3;
+        
+        // تحويل الفصل الدراسي إلى نص مقروء
+        let semesterText = '';
+        switch(course.semester) {
+            case '1': semesterText = 'الفصل الأول والثاني والصيفي'; break;
+            case '2': semesterText = 'الفصل الأول والثاني'; break;
+            case '3': semesterText = 'الفصل الأول والصيفي'; break;
+            case '4': semesterText = 'الفصل الثاني والصيفي'; break;
+            case '5': semesterText = 'الفصل الأول'; break;
+            case '6': semesterText = 'الفصل الثاني'; break;
+            default: semesterText = course.semester || 'غير محدد';
+        }
         
         html += `
             <tr style="border-bottom: 1px solid var(--gray-light);" id="course-row-${course.id}">
                 <td style="padding: 15px; font-weight: 600;">${courseCode}</td>
                 <td style="padding: 15px;">${courseName}</td>
                 <td style="padding: 15px;">${credits}</td>
+                <td style="padding: 15px;">${typeInfo.name}</td>
+                <td style="padding: 15px;">${course.year ? 'السنة ' + course.year : '-'}</td>
+                <td style="padding: 15px;">${semesterText}</td>
+                <td style="padding: 15px;">${course.hasPractical ? '✅ نعم' : '❌ لا'}</td>
+                <td style="padding: 15px;">${course.createdAt ? new Date(course.createdAt.seconds * 1000).toLocaleDateString('ar-SA') : '-'}</td>
                 <td style="padding: 15px;">
-                    <span class="course-type ${typeInfo.class}">${typeInfo.name}</span>
+                    <button class="btn btn-info btn-sm" onclick="editAdminCourse('${course.id}')" style="margin-left: 5px;">
+                        <i class="fas fa-edit"></i> تعديل
+                    </button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteCourseAdmin('${course.id}')">
+                        <i class="fas fa-trash"></i> حذف
+                    </button>
                 </td>
-        <td style="padding: 15px;">
-            <button class="btn btn-info btn-sm" onclick="editAdminCourse('${course.id}')" style="margin-left: 5px;">
-                <i class="fas fa-edit"></i> تعديل
-            </button>
-            <button class="btn btn-danger btn-sm" onclick="deleteCourseAdmin('${course.id}')">
-                <i class="fas fa-trash"></i> حذف
-            </button>
-        </td>
-    `;
+            </tr>
+        `;
         
         // إضافة للاختيار في النماذج
         if (assignCourseSelect) {
@@ -2293,165 +2793,465 @@ window.editAdminCourse = async function(courseId) {
         };
 
         // ============ تحديث واجهة المستخدم ============
-        function updateUIForLoggedInUser() {
-            document.getElementById('userInfo').style.display = 'flex';
-            document.getElementById('authButtons').style.display = 'none';
+function updateUIForLoggedInUser() {
+    console.log('👤 تحديث واجهة المستخدم للمستخدم المسجل');
+    
+    // إظهار قسم معلومات المستخدم وإخفاء أزرار المصادقة
+    const userInfo = document.getElementById('userInfo');
+    const authButtons = document.getElementById('authButtons');
+    
+    if (userInfo) {
+        userInfo.style.display = 'flex';
+        console.log('✅ تم إظهار قسم معلومات المستخدم');
+    }
+    
+    if (authButtons) {
+        authButtons.style.display = 'none';
+        console.log('✅ تم إخفاء أزرار المصادقة');
+    }
+    
+    // تحديث اسم المستخدم والصورة
+    const userName = userData.name || currentUser?.displayName || 
+                    currentUser?.email?.split('@')[0] || 'مستخدم';
+    
+    const userNameElement = document.getElementById('userName');
+    const userAvatar = document.getElementById('userAvatar');
+    
+    if (userNameElement) {
+        userNameElement.textContent = userName;
+        console.log('✅ تم تحديث اسم المستخدم:', userName);
+    }
+    
+    if (userAvatar) {
+        userAvatar.textContent = getInitials(userName);
+        console.log('✅ تم تحديث الصورة الرمزية');
+    }
+    
+    // التحقق من نوع المستخدم وعرض/إخفاء عناصر المشرف
+    console.log('🔍 التحقق من نوع المستخدم:', userData.userType);
+    
+    const adminDivider = document.getElementById('adminDivider');
+    const adminNavItem = document.getElementById('adminNavItem');
+    const userBadge = document.getElementById('userBadge');
+    
+    if (userData.userType === 'admin') {
+        console.log('👑 المستخدم هو مشرف - إظهار عناصر المشرف');
+        
+        // إظهار عناصر المشرف
+        if (adminDivider) {
+            adminDivider.style.display = 'block';
+            console.log('✅ تم إظهار الفاصل الإداري');
+        }
+        
+        if (adminNavItem) {
+            adminNavItem.style.display = 'block';
+            console.log('✅ تم إظهار عنصر لوحة الإشراف');
+        }
+        
+        // تحديث شارة المستخدم
+        if (userBadge) {
+            userBadge.innerHTML = '<span class="user-badge badge-admin">مشرف</span>';
+            userBadge.style.display = 'inline';
+            console.log('✅ تم تحديث الشارة إلى مشرف');
+        }
+    } else {
+        console.log('🎓 المستخدم هو طالب - إخفاء عناصر المشرف');
+        
+        // إخفاء عناصر المشرف
+        if (adminDivider) {
+            adminDivider.style.display = 'none';
+        }
+        
+        if (adminNavItem) {
+            adminNavItem.style.display = 'none';
+        }
+        
+        // تحديث شارة المستخدم
+        if (userBadge) {
+            userBadge.innerHTML = '<span class="user-badge badge-student">طالب</span>';
+            userBadge.style.display = 'inline';
+        }
+    }
+    
+    // تحديث لوحة التحكم
+    updateDashboard();
+    updateProfileUI();
+    
+    console.log('✅ تم تحديث واجهة المستخدم بنجاح');
+}
+function updateProfileUI() {
+    const profileName = document.getElementById('profileName');
+    const profileEmail = document.getElementById('profileEmail');
+    const profileAvatar = document.getElementById('profileAvatar');
+    const joinDate = document.getElementById('joinDate');
+    const profileNameInput = document.getElementById('profileNameInput');
+    const profileEmailInput = document.getElementById('profileEmailInput');
+    const profileRole = document.getElementById('profileRole');
+    const studentFields = document.getElementById('studentFields');
+    const profileCollege = document.getElementById('profileCollege');
+    const profileMajor = document.getElementById('profileMajor');
+    const userCollegeInfo = document.getElementById('userCollegeInfo');
+    const currentCollege = document.getElementById('currentCollege');
+    const currentMajor = document.getElementById('currentMajor');
+    
+    if (profileName) profileName.textContent = userData.name || 'مستخدم';
+    if (profileEmail) profileEmail.textContent = currentUser?.email || userData.email || 'example@email.com';
+    if (profileAvatar) profileAvatar.textContent = getInitials(userData.name || 'مستخدم');
+    
+    if (joinDate) {
+        if (userData.createdAt) {
+            const date = userData.createdAt.toDate ? userData.createdAt.toDate() : new Date(userData.createdAt);
+            joinDate.textContent = date.toLocaleDateString('ar-SA');
+        } else {
+            joinDate.textContent = '-';
+        }
+    }
+    
+    if (profileNameInput) profileNameInput.value = userData.name || '';
+    if (profileEmailInput) profileEmailInput.value = currentUser?.email || userData.email || '';
+    
+    // تحديث نوع الحساب
+    if (profileRole) {
+        profileRole.textContent = userData.userType === 'admin' ? 'مشرف' : 'طالب';
+    }
+    
+    // تحديث الكليات والتخصصات
+    updateCollegeAndMajorSelects(profileCollege, profileMajor);
+    
+    // إظهار/إخفاء حقول الكلية والتخصص للطلاب
+    if (studentFields) {
+        studentFields.style.display = userData.userType === 'student' ? 'block' : 'none';
+    }
+    
+    // تحديث معلومات الكلية والتخصص في لوحة التحكم
+    updateCollegeInfo(userCollegeInfo, currentCollege, currentMajor);
+    
+    // إضافة معلومات الخطة الدراسية للطلاب
+    addStudyPlanInfo();
+}
+
+// دالة منفصلة لتحديث قوائم الكليات والتخصصات
+function updateCollegeAndMajorSelects(collegeSelect, majorSelect) {
+    if (collegeSelect) {
+        const currentCollegeValue = collegeSelect.value || userData.college;
+        
+        // إعادة بناء القائمة
+        collegeSelect.innerHTML = '<option value="">اختر كليتك</option>';
+        
+        if (colleges && colleges.length > 0) {
+            colleges.forEach(college => {
+                const option = document.createElement('option');
+                option.value = college.id;
+                option.textContent = college.name;
+                
+                // تحديد القيمة الحالية
+                if (college.id === currentCollegeValue) {
+                    option.selected = true;
+                }
+                
+                collegeSelect.appendChild(option);
+            });
+        } else if (userData.college) {
+            // إذا لم تكن الكليات محملة، إضافة الكلية الحالية
+            const option = document.createElement('option');
+            option.value = userData.college;
+            option.textContent = userData.collegeName || 'كليتك';
+            option.selected = true;
+            collegeSelect.appendChild(option);
+        }
+        
+        // إضافة مستمع الحدث
+        collegeSelect.onchange = function() {
+            updateMajorSelectBasedOnCollege(majorSelect, this.value);
+        };
+        
+        // تحديث قائمة التخصصات بناءً على الكلية المختارة
+        updateMajorSelectBasedOnCollege(majorSelect, currentCollegeValue);
+    }
+}
+
+// دالة لتحديث قائمة التخصصات بناءً على الكلية
+function updateMajorSelectBasedOnCollege(majorSelect, collegeId) {
+    if (!majorSelect) return;
+    
+    const currentMajorValue = majorSelect.value || userData.major;
+    
+    // إعادة بناء القائمة
+    majorSelect.innerHTML = '<option value="">اختر تخصصك</option>';
+    
+    if (majors && majors.length > 0 && collegeId) {
+        const filteredMajors = majors.filter(major => major.collegeId === collegeId);
+        
+        filteredMajors.forEach(major => {
+            const college = colleges.find(c => c.id === major.collegeId);
+            const option = document.createElement('option');
+            option.value = major.id;
+            option.textContent = `${major.name} - ${college?.name || ''}`;
             
-            const userName = userData.name || currentUser.displayName || 
-                            currentUser.email.split('@')[0] || 'مستخدم';
+            // تحديد القيمة الحالية
+            if (major.id === currentMajorValue) {
+                option.selected = true;
+            }
             
-            document.getElementById('userName').textContent = userName;
-            document.getElementById('userAvatar').textContent = getInitials(userName);
+            majorSelect.appendChild(option);
+        });
+    } else if (userData.major && collegeId === userData.college) {
+        // إذا لم تكن التخصصات محملة، إضافة التخصص الحالي
+        const option = document.createElement('option');
+        option.value = userData.major;
+        option.textContent = userData.majorName || 'تخصصك';
+        option.selected = true;
+        majorSelect.appendChild(option);
+    }
+}
+
+// دالة لتحديث معلومات الكلية والتخصص
+function updateCollegeInfo(userCollegeInfo, currentCollege, currentMajor) {
+    if (userCollegeInfo && currentCollege && currentMajor) {
+        if (userData.college && userData.major) {
+            const college = colleges.find(c => c.id === userData.college);
+            const major = majors.find(m => m.id === userData.major);
             
-            // إظهار/إخفاء عناصر لوحة الإشراف
-            const adminDivider = document.getElementById('adminDivider');
-            const adminNavItem = document.getElementById('adminNavItem');
-            const userBadge = document.getElementById('userBadge');
-            
-            if (userData.userType === 'admin') {
-                adminDivider.style.display = 'block';
-                adminNavItem.style.display = 'block';
-                userBadge.innerHTML = '<span class="user-badge badge-admin">مشرف</span>';
-                userBadge.style.display = 'inline';
+            if (college && major) {
+                currentCollege.textContent = college.name;
+                currentMajor.textContent = major.name;
+                userCollegeInfo.style.display = 'block';
+            } else if (userData.studyPlan) {
+                // استخدام بيانات من الخطة الدراسية
+                currentCollege.textContent = userData.studyPlan.collegeName || 'كلية';
+                currentMajor.textContent = userData.studyPlan.majorName || 'تخصص';
+                userCollegeInfo.style.display = 'block';
             } else {
-                adminDivider.style.display = 'none';
-                adminNavItem.style.display = 'none';
-                userBadge.innerHTML = '<span class="user-badge badge-student">طالب</span>';
-                userBadge.style.display = 'inline';
+                userCollegeInfo.style.display = 'none';
             }
-            
-            updateDashboard();
-            updateProfileUI();
+        } else {
+            userCollegeInfo.style.display = 'none';
         }
+    }
+}
 
+// دالة لإضافة معلومات الخطة الدراسية
+function addStudyPlanInfo() {
+    // إزالة معلومات الخطة القديمة
+    const oldPlanInfo = document.querySelector('.plan-info-section');
+    if (oldPlanInfo) {
+        oldPlanInfo.remove();
+    }
+    
+    // إضافة معلومات الخطة الدراسية للطلاب
+    if (userData.userType === 'student' && userData.studyPlanId && userData.studyPlan) {
+        const planInfoDiv = document.createElement('div');
+        planInfoDiv.className = 'plan-info-section';
+        planInfoDiv.style.cssText = 'margin-top: 20px; padding: 15px; background: #f0f9ff; border-radius: var(--border-radius); border-right: 4px solid var(--primary-color);';
+        planInfoDiv.innerHTML = `
+            <h5 style="margin-bottom: 10px; color: var(--primary-color);">
+                <i class="fas fa-calendar-check"></i> معلومات الخطة الدراسية
+            </h5>
+            <p style="margin-bottom: 5px;">
+                <strong>اسم الخطة:</strong> ${userData.studyPlan.name || 'غير محدد'}
+            </p>
+            <p style="margin-bottom: 5px;">
+                <strong>عدد المواد:</strong> ${userData.studyPlan.totalCourses || 0} مادة
+            </p>
+            <p style="margin-bottom: 5px;">
+                <strong>إجمالي الساعات:</strong> ${userData.studyPlan.totalCredits || 0} ساعة
+            </p>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button class="btn btn-sm btn-info" onclick="viewStudentStudyPlan()">
+                    <i class="fas fa-eye"></i> عرض تفاصيل الخطة
+                </button>
+                <button class="btn btn-sm btn-light" onclick="refreshStudyPlan()">
+                    <i class="fas fa-redo"></i> تحديث الخطة
+                </button>
+            </div>
+        `;
+        
+        // إضافة إلى قسم معلومات الحساب
+        const profileCard = document.querySelector('#profileSection .semester-card');
+        if (profileCard) {
+            profileCard.appendChild(planInfoDiv);
+        }
+    }
+}
 
-        function updateProfileUI() {
-            const profileName = document.getElementById('profileName');
-            const profileEmail = document.getElementById('profileEmail');
-            const profileAvatar = document.getElementById('profileAvatar');
-            const joinDate = document.getElementById('joinDate');
-            const profileNameInput = document.getElementById('profileNameInput');
-            const profileEmailInput = document.getElementById('profileEmailInput');
-            const profileRole = document.getElementById('profileRole');
-            const studentFields = document.getElementById('studentFields');
-            const profileCollege = document.getElementById('profileCollege');
-            const profileMajor = document.getElementById('profileMajor');
-            const userCollegeInfo = document.getElementById('userCollegeInfo');
-            const currentCollege = document.getElementById('currentCollege');
-            const currentMajor = document.getElementById('currentMajor');
+// دالة لعرض خطة الدراسة للطالب
+async function viewStudentStudyPlan() {
+    if (!userData.studyPlan) {
+        showNotification('لا توجد خطة دراسية متاحة', 'warning');
+        return;
+    }
+    
+    let detailsHTML = `
+        <div style="background: white; padding: 25px; border-radius: var(--border-radius); max-width: 800px; max-height: 80vh; overflow: hidden;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: var(--primary-color);">
+                    <i class="fas fa-calendar-check"></i> ${userData.studyPlan.name}
+                </h3>
+                <button onclick="closePlanDetailsModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--gray-medium);">&times;</button>
+            </div>
             
-            if (profileName) profileName.textContent = userData.name || 'مستخدم';
-            if (profileEmail) profileEmail.textContent = currentUser?.email || userData.email || 'example@email.com';
-            if (profileAvatar) profileAvatar.textContent = getInitials(userData.name || 'مستخدم');
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
+                <div style="background: #f8fafc; padding: 15px; border-radius: var(--border-radius);">
+                    <div style="color: var(--gray-medium); font-size: 0.9rem;">الكلية</div>
+                    <div style="font-weight: 600; margin-top: 5px;">${userData.studyPlan.collegeName || 'غير معروف'}</div>
+                </div>
+                
+                <div style="background: #f8fafc; padding: 15px; border-radius: var(--border-radius);">
+                    <div style="color: var(--gray-medium); font-size: 0.9rem;">التخصص</div>
+                    <div style="font-weight: 600; margin-top: 5px;">${userData.studyPlan.majorName || 'غير معروف'}</div>
+                </div>
+                
+                <div style="background: #f8fafc; padding: 15px; border-radius: var(--border-radius);">
+                    <div style="color: var(--gray-medium); font-size: 0.9rem;">إجمالي الساعات</div>
+                    <div style="font-weight: 600; margin-top: 5px; color: var(--primary-color);">${userData.studyPlan.totalCredits || 0} ساعة</div>
+                </div>
+                
+                <div style="background: #f8fafc; padding: 15px; border-radius: var(--border-radius);">
+                    <div style="color: var(--gray-medium); font-size: 0.9rem;">عدد المواد</div>
+                    <div style="font-weight: 600; margin-top: 5px; color: var(--success-color);">${userData.studyPlan.totalCourses || 0} مادة</div>
+                </div>
+            </div>
             
-            if (joinDate) {
-                if (userData.createdAt) {
-                    const date = userData.createdAt.toDate ? userData.createdAt.toDate() : new Date(userData.createdAt);
-                    joinDate.textContent = date.toLocaleDateString('ar-SA');
-                } else {
-                    joinDate.textContent = '-';
-                }
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-book" style="color: var(--primary-color);"></i>
+                    المواد في خطتك الدراسية
+                </h4>
+                
+                <div style="max-height: 300px; overflow-y: auto;">
+    `;
+    
+    if (userData.studyPlan.courses && userData.studyPlan.courses.length > 0) {
+        // تجميع المواد حسب السنة
+        const coursesByYear = {};
+        userData.studyPlan.courses.forEach(course => {
+            const year = course.year || 'غير محدد';
+            if (!coursesByYear[year]) {
+                coursesByYear[year] = [];
             }
+            coursesByYear[year].push(course);
+        });
+        
+        // عرض المواد حسب السنة
+        Object.keys(coursesByYear).sort().forEach(year => {
+            detailsHTML += `
+                <div style="margin-bottom: 20px;">
+                    <h5 style="background: var(--primary-color); color: white; padding: 8px 15px; border-radius: 6px; margin-bottom: 10px;">
+                        السنة ${year}
+                    </h5>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                        <thead>
+                            <tr style="background: #f1f5f9;">
+                                <th style="padding: 10px; text-align: right;">المادة</th>
+                                <th style="padding: 10px; text-align: right;">النوع</th>
+                                <th style="padding: 10px; text-align: right;">الساعات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
             
-            if (profileNameInput) profileNameInput.value = userData.name || '';
-            if (profileEmailInput) profileEmailInput.value = currentUser?.email || userData.email || '';
+            coursesByYear[year].forEach(course => {
+                const typeInfo = courseTypes[course.type] || { name: 'غير محدد' };
+                detailsHTML += `
+                    <tr style="border-bottom: 1px solid var(--gray-light);">
+                        <td style="padding: 10px;">
+                            <strong style="color: var(--primary-color);">${course.code || '-'}</strong><br>
+                            ${course.name}
+                        </td>
+                        <td style="padding: 10px;">
+                            <span class="course-type type-${course.type}" style="font-size: 0.8rem;">
+                                ${typeInfo.name}
+                            </span>
+                        </td>
+                        <td style="padding: 10px; text-align: center;">${course.credits || 3}</td>
+                    </tr>
+                `;
+            });
             
-            // تحديث نوع الحساب
-            if (profileRole) {
-                profileRole.textContent = userData.userType === 'admin' ? 'مشرف' : 'طالب';
-            }
+            detailsHTML += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        });
+    } else {
+        detailsHTML += `
+            <div style="text-align: center; padding: 30px; color: var(--gray-medium);">
+                <i class="fas fa-book fa-2x" style="margin-bottom: 15px;"></i>
+                <p>لا توجد مواد في هذه الخطة</p>
+            </div>
+        `;
+    }
+    
+    detailsHTML += `
+                </div>
+            </div>
             
-            // تحديث الكليات والتخصصات
-            if (profileCollege && colleges.length > 0) {
-                profileCollege.innerHTML = '<option value="">اختر كليتك</option>';
-                colleges.forEach(college => {
-                    const option = document.createElement('option');
-                    option.value = college.id;
-                    option.textContent = college.name;
-                    if (college.id === userData.college) option.selected = true;
-                    profileCollege.appendChild(option);
-                });
-            }
+            <div style="text-align: left; margin-top: 20px;">
+                <button onclick="closePlanDetailsModal()" class="btn btn-light">
+                    <i class="fas fa-times"></i> إغلاق
+                </button>
+            </div>
+        </div>
+    `;
+    
+    showPlanDetailsModal(detailsHTML);
+}
+
+async function updateProfile() {
+    const newName = document.getElementById('profileNameInput').value.trim();
+    const college = document.getElementById('profileCollege')?.value || '';
+    const major = document.getElementById('profileMajor')?.value || '';
+    
+    if (!newName) {
+        showNotification('يرجى إدخال الاسم', 'warning');
+        return;
+    }
+    
+    const oldCollege = userData.college;
+    const oldMajor = userData.major;
+    
+    userData.name = newName;
+    
+    if (userData.userType === 'student') {
+        userData.college = college;
+        userData.major = major;
+        
+        // التحقق من صحة القيم
+        if (!college || !major) {
+            showNotification('يرجى اختيار الكلية والتخصص', 'warning');
+            return;
+        }
+        
+        // إذا تغير التخصص أو الكلية، إعادة تحميل خطة الدراسة
+        if (oldCollege !== college || oldMajor !== major) {
+            userData.studyPlanId = '';
+            userData.studyPlan = null;
             
-            if (profileMajor && majors.length > 0) {
-                profileMajor.innerHTML = '<option value="">اختر تخصصك</option>';
-                const filteredMajors = majors.filter(major => 
-                    !userData.college || major.collegeId === userData.college
-                );
-                filteredMajors.forEach(major => {
-                    const college = colleges.find(c => c.id === major.collegeId);
-                    const option = document.createElement('option');
-                    option.value = major.id;
-                    option.textContent = `${major.name} - ${college?.name || ''}`;
-                    if (major.id === userData.major) option.selected = true;
-                    profileMajor.appendChild(option);
-                });
-            }
+            // إظهار رسالة تحميل
+            showNotification('جاري تحديث خطة الدراسة...', 'info');
             
-            // إظهار/إخفاء حقول الكلية والتخصص للطلاب
-            if (studentFields) {
-                studentFields.style.display = userData.userType === 'student' ? 'block' : 'none';
-            }
+            // تحميل الخطة الجديدة
+            await loadStudentStudyPlan();
             
-            // تحديث معلومات الكلية والتخصص في لوحة التحكم
-            if (userCollegeInfo) {
-                if (userData.college && userData.major) {
-                    const college = colleges.find(c => c.id === userData.college);
-                    const major = majors.find(m => m.id === userData.major);
-                    
-                    if (college && major) {
-                        currentCollege.textContent = college.name;
-                        currentMajor.textContent = major.name;
-                        userCollegeInfo.style.display = 'block';
-                    } else {
-                        userCollegeInfo.style.display = 'none';
-                    }
-                } else {
-                    userCollegeInfo.style.display = 'none';
-                }
-            }
-            
-            // تحديث اختيار الكلية في نموذج التخصص
-            if (profileCollege) {
-                profileCollege.addEventListener('change', function() {
-                    if (profileMajor) {
-                        profileMajor.innerHTML = '<option value="">اختر تخصصك</option>';
-                        const filteredMajors = majors.filter(major => major.collegeId === this.value);
-                        filteredMajors.forEach(major => {
-                            const college = colleges.find(c => c.id === major.collegeId);
-                            const option = document.createElement('option');
-                            option.value = major.id;
-                            option.textContent = `${major.name} - ${college?.name || ''}`;
-                            profileMajor.appendChild(option);
-                        });
-                    }
-                });
+            // إذا لم يتم العثور على خطة
+            if (!userData.studyPlanId) {
+                showNotification('لم يتم العثور على خطة دراسية لهذا التخصص', 'warning');
             }
         }
-
-        async function updateProfile() {
-            const newName = document.getElementById('profileNameInput').value.trim();
-            const college = document.getElementById('profileCollege')?.value || '';
-            const major = document.getElementById('profileMajor')?.value || '';
-            
-            if (!newName) {
-                showNotification('يرجى إدخال الاسم', 'warning');
-                return;
-            }
-            
-            userData.name = newName;
-            
-            if (userData.userType === 'student') {
-                userData.college = college;
-                userData.major = major;
-            }
-            
-            await autoSave();
-            updateUIForLoggedInUser();
-            updateProfileUI();
-            
-            showNotification('تم تحديث الملف الشخصي بنجاح', 'success');
-        }
+    }
+    
+    // حفظ البيانات
+    await autoSave();
+    
+    // تحديث الواجهة
+    updateUIForLoggedInUser();
+    updateProfileUI(); // هذا سيحدث القوائم المنسدلة
+    updateDashboard();
+    updateCourseForm(); // تحديث قائمة المواد المتاحة
+    
+    showNotification('تم تحديث الملف الشخصي بنجاح', 'success');
+}
 
 // ============ دوال تسجيل الخروج وإدارة البيانات ============
 async function handleLogout() {
@@ -2828,13 +3628,14 @@ function updateAllCoursesView() {
     `;
     
     allCoursesList.forEach(course => {
+        const cleanCourseName = cleanText(course.name || '');
         const weightedMark = (course.finalGrade || 0) * (course.credits || 3);
         const typeInfo = courseTypes[course.type] || { name: '', class: '' };
         
         html += `
             <tr style="border-bottom: 1px solid #e2e8f0;">
-                <td style="padding: 15px;">
-                    <div>${course.name}</div>
+                <td style="padding: 15px; min-width: 150px;">
+                    <div style="font-weight: 500; margin-bottom: 5px;">${cleanCourseName}</div>
                     ${course.type ? `<small><span class="course-type ${typeInfo.class}">${typeInfo.name}</span></small>` : ''}
                 </td>
                 <td style="padding: 15px;">${course.semesterName}</td>
@@ -2843,18 +3644,17 @@ function updateAllCoursesView() {
                 </td>
                 <td style="padding: 15px;">${course.credits}</td>
                 <td style="padding: 15px; background: #f0f9ff;">${weightedMark.toFixed(2)}</td>
-        <td style="padding: 15px;">
-            <button class="btn btn-info btn-sm" onclick="editCourseInAllView(${course.semesterIndex}, ${course.courseIndex})">
-                <i class="fas fa-edit"></i> تعديل
-            </button>
-            <button class="btn btn-danger btn-sm" onclick="deleteCourse(${course.semesterIndex}, ${course.courseIndex})">
-                <i class="fas fa-trash"></i>
-            </button>
-        </td>
-    `;  
-window.editCourseInAllView = editCourseGrade; // يمكن استخدام نفس الدالة
-
-  });
+                <td style="padding: 15px;">
+                    <button class="btn btn-info btn-sm" onclick="editCourseInAllView(${course.semesterIndex}, ${course.courseIndex})">
+                        <i class="fas fa-edit"></i> تعديل
+                    </button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteCourse(${course.semesterIndex}, ${course.courseIndex})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
     
     html += `
                     </tbody>
@@ -2865,7 +3665,6 @@ window.editCourseInAllView = editCourseGrade; // يمكن استخدام نفس 
     
     container.innerHTML = html;
 }
-
 // ============ دوال حساب العلامات ============
 function calculateCumulativeGPA() {
     let totalWeightedMarks = 0;
@@ -3439,8 +4238,70 @@ function updateDashboard() {
         totalCourses += semester.courses?.length || 0;
     });
     if (totalCoursesSpan) totalCoursesSpan.textContent = totalCourses;
+    
+    // إضافة معلومات الخطة الدراسية للطلاب
+    if (userData.userType === 'student' && userData.studyPlanId) {
+        const planInfoDiv = document.getElementById('planDashboardInfo');
+        
+        if (!planInfoDiv) {
+            // إنشاء عنصر جديد إذا لم يكن موجوداً
+            const dashboardSection = document.getElementById('dashboardSection');
+            if (dashboardSection) {
+                const newPlanInfo = document.createElement('div');
+                newPlanInfo.id = 'planDashboardInfo';
+                newPlanInfo.style.cssText = 'background: linear-gradient(135deg, #f0f9ff, #e0f2fe); padding: 20px; border-radius: var(--border-radius); margin-top: 20px; border-right: 4px solid var(--primary-color);';
+                newPlanInfo.innerHTML = `
+                    <h4 style="margin-bottom: 10px; color: var(--primary-color);">
+                        <i class="fas fa-calendar-check"></i> خطة الدراسة الحالية
+                    </h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 15px;">
+                        <div>
+                            <div style="color: var(--gray-medium); font-size: 0.9rem;">اسم الخطة</div>
+                            <div style="font-weight: 600;">${userData.studyPlan?.name || 'غير محدد'}</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--gray-medium); font-size: 0.9rem;">المواد المتبقية</div>
+                            <div style="font-weight: 600; color: var(--warning-color);">
+                                ${Math.max(0, (userData.studyPlan?.totalCourses || 0) - totalCourses)} مادة
+                            </div>
+                        </div>
+                        <div>
+                            <div style="color: var(--gray-medium); font-size: 0.9rem;">الساعات المتبقية</div>
+                            <div style="font-weight: 600; color: var(--warning-color);">
+                                ${Math.max(0, (userData.studyPlan?.totalCredits || 0) - userData.totalCredits)} ساعة
+                            </div>
+                        </div>
+                        <div>
+                            <div style="color: var(--gray-medium); font-size: 0.9rem;">نسبة الإنجاز</div>
+                            <div style="font-weight: 600; color: var(--success-color);">
+                                ${userData.studyPlan?.totalCourses ? 
+                                    Math.round((totalCourses / userData.studyPlan.totalCourses) * 100) : 0}%
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-info" onclick="viewStudentStudyPlan()" style="margin-top: 15px;">
+                        <i class="fas fa-eye"></i> عرض تفاصيل الخطة
+                    </button>
+                `;
+                
+                // إضافة بعد مخطط المعدل التراكمي
+                const chartSection = dashboardSection.querySelector('.chart-section');
+                if (chartSection) {
+                    chartSection.after(newPlanInfo);
+                }
+            }
+        } else {
+            // تحديث العنصر الموجود
+            planInfoDiv.querySelector('div:first-child div:last-child').innerHTML = `
+                <div style="color: var(--gray-medium); font-size: 0.9rem;">نسبة الإنجاز</div>
+                <div style="font-weight: 600; color: var(--success-color);">
+                    ${userData.studyPlan?.totalCourses ? 
+                        Math.round((totalCourses / userData.studyPlan.totalCourses) * 100) : 0}%
+                </div>
+            `;
+        }
+    }
 }
-
 function updateUIForGuest() {
     document.getElementById('userInfo').style.display = 'none';
     document.getElementById('authButtons').style.display = 'flex';
@@ -3620,6 +4481,1056 @@ window.warnUser = async function(userId) {
         }
     }
 };
+
+// دوال إدارة الخطة الدراسية
+let selectedCoursesForPlan = [];
+
+function updatePlanMajors() {
+    const collegeId = document.getElementById('planCollege').value;
+    const majorSelect = document.getElementById('planMajor');
+    
+    majorSelect.innerHTML = '<option value="">اختر التخصص</option>';
+    
+    if (!collegeId) return;
+    
+    const filteredMajors = majors.filter(major => major.collegeId === collegeId);
+    filteredMajors.forEach(major => {
+        const option = document.createElement('option');
+        option.value = major.id;
+        option.textContent = major.name;
+        majorSelect.appendChild(option);
+    });
+}
+
+function loadAvailableCourses() {
+    const majorId = document.getElementById('planMajor').value;
+    const container = document.getElementById('availableCoursesList');
+    
+    if (!majorId) {
+        container.innerHTML = `
+            <p style="text-align: center; color: var(--gray-medium); padding: 20px;">
+                اختر تخصصاً أولاً لعرض المواد المتاحة
+            </p>
+        `;
+        return;
+    }
+    
+    // عرض جميع المواد
+    if (allCourses.length === 0) {
+        container.innerHTML = `
+            <p style="text-align: center; color: var(--gray-medium); padding: 20px;">
+                لا توجد مواد مضافة بعد
+            </p>
+        `;
+        return;
+    }
+    
+    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 15px;">';
+    
+    allCourses.forEach(course => {
+        const isSelected = selectedCoursesForPlan.some(c => c.courseId === course.id && c.majorId === majorId);
+        
+        html += `
+            <div class="course-card ${isSelected ? 'selected' : ''}" 
+                 style="border: 2px solid ${isSelected ? 'var(--success-color)' : 'var(--gray-light)'}; 
+                        border-radius: var(--border-radius); 
+                        padding: 15px; 
+                        background: ${isSelected ? '#f0f9ff' : 'white'}">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <div>
+                        <strong style="color: var(--primary-color);">${course.code || 'بدون كود'}</strong>
+                        <div style="font-weight: 600;">${course.name}</div>
+                    </div>
+                    <div style="text-align: left;">
+                        ${isSelected ? 
+                            '<i class="fas fa-check-circle" style="color: var(--success-color);"></i>' : 
+                            '<i class="fas fa-plus-circle" style="color: var(--gray-medium);"></i>'}
+                    </div>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: var(--gray-medium); margin-bottom: 10px;">
+                    <div>
+                        <strong>الساعات:</strong> ${course.credits || 3} ساعة
+                    </div>
+                    ${course.year ? `<div><strong>السنة:</strong> ${course.year}</div>` : ''}
+                </div>
+                
+                ${course.hasPractical ? `
+                    <div style="color: var(--primary-color); font-size: 0.9rem; margin-bottom: 10px;">
+                        <i class="fas fa-flask"></i> تحتوي على عملي
+                    </div>
+                ` : ''}
+                
+                <!-- اختيار نوع المادة للتخصص الحالي -->
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label for="courseType-${course.id}">نوع المادة للتخصص</label>
+                    <select id="courseType-${course.id}" class="course-type-select" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--gray-light);">
+                        <option value="">اختر النوع</option>
+                        <option value="required-university">إجباري جامعة</option>
+                        <option value="elective-university">اختياري جامعة</option>
+                        <option value="required-college">إجباري كلية</option>
+                        <option value="required-major">إجباري تخصص</option>
+                        <option value="elective-major">اختياري تخصص</option>
+                    </select>
+                </div>
+                
+                <button class="btn btn-sm ${isSelected ? 'btn-danger' : 'btn-primary'}" 
+                        style="width: 100%;"
+                        onclick="${isSelected ? `removeCourseFromPlan('${course.id}')` : `addCourseToPlan('${course.id}')`}">
+                    <i class="fas ${isSelected ? 'fa-trash' : 'fa-plus'}"></i> 
+                    ${isSelected ? 'إزالة من الخطة' : 'إضافة للخطة'}
+                </button>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function filterAvailableCourses() {
+    const searchTerm = document.getElementById('courseFilter').value.toLowerCase();
+    const courseCards = document.querySelectorAll('#availableCoursesList .course-card');
+    
+    courseCards.forEach(card => {
+        const courseCode = card.querySelector('strong').textContent.toLowerCase();
+        const courseName = card.querySelector('div[style*="font-weight: 600"]').textContent.toLowerCase();
+        
+        if (courseCode.includes(searchTerm) || courseName.includes(searchTerm)) {
+            card.style.display = '';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+function addCourseToPlan(courseId) {
+    const majorId = document.getElementById('planMajor').value;
+    if (!majorId) {
+        showNotification('يرجى اختيار التخصص أولاً', 'warning');
+        return;
+    }
+    
+    const course = allCourses.find(c => c.id === courseId);
+    if (!course) return;
+    
+    const courseTypeSelect = document.getElementById(`courseType-${courseId}`);
+    const courseType = courseTypeSelect ? courseTypeSelect.value : '';
+    
+    if (!courseType) {
+        showNotification('يرجى اختيار نوع المادة للتخصص', 'warning');
+        return;
+    }
+    
+    // التحقق إذا كانت المادة مضافة بالفعل لهذا التخصص
+    const existingIndex = selectedCoursesForPlan.findIndex(c => 
+        c.courseId === courseId && c.majorId === majorId
+    );
+    
+    if (existingIndex >= 0) {
+        // تحديث نوع المادة إذا كانت موجودة
+        selectedCoursesForPlan[existingIndex].courseType = courseType;
+        showNotification('تم تحديث نوع المادة', 'info');
+    } else {
+        // إضافة المادة للخطة
+        selectedCoursesForPlan.push({
+            courseId: course.id,
+            majorId: majorId,
+            code: course.code,
+            name: course.name,
+            credits: course.credits || 3,
+            courseType: courseType, // نوع المادة للتخصص
+            year: course.year,
+            hasPractical: course.hasPractical || false
+        });
+        showNotification('تم إضافة المادة للخطة', 'success');
+    }
+    
+    // تحديث العرض
+    loadAvailableCourses();
+    updateSelectedCoursesList();
+}
+
+function removeCourseFromPlan(courseId) {
+    const majorId = document.getElementById('planMajor').value;
+    const index = selectedCoursesForPlan.findIndex(c => 
+        c.courseId === courseId && c.majorId === majorId
+    );
+    
+    if (index >= 0) {
+        selectedCoursesForPlan.splice(index, 1);
+        showNotification('تم إزالة المادة من الخطة', 'success');
+        loadAvailableCourses();
+        updateSelectedCoursesList();
+    }
+}
+
+function toggleCourseForPlan(courseId) {
+    const course = allCourses.find(c => c.id === courseId);
+    if (!course) return;
+    
+    const existingIndex = selectedCoursesForPlan.findIndex(c => c.id === courseId);
+    
+    if (existingIndex >= 0) {
+        // إزالة المادة إذا كانت مختارة
+        selectedCoursesForPlan.splice(existingIndex, 1);
+    } else {
+        // إضافة المادة إذا لم تكن مختارة
+        selectedCoursesForPlan.push({
+            id: course.id,
+            code: course.code,
+            name: course.name,
+            credits: course.credits || 3,
+            type: course.type,
+            year: course.year,
+            hasPractical: course.hasPractical || false
+        });
+    }
+    
+    // تحديث العرض
+    loadAvailableCourses();
+    updateSelectedCoursesList();
+}
+
+function updateSelectedCoursesList() {
+    const container = document.getElementById('selectedCoursesList');
+    const totalCredits = document.getElementById('totalPlanCredits');
+    const totalCourses = document.getElementById('totalPlanCourses');
+    
+    if (selectedCoursesForPlan.length === 0) {
+        container.innerHTML = `
+            <i class="fas fa-book fa-2x" style="margin-bottom: 10px;"></i>
+            <p>لم يتم اختيار أي مواد بعد</p>
+        `;
+        totalCredits.textContent = '0';
+        totalCourses.textContent = '0';
+        return;
+    }
+    
+    // حساب إجمالي الساعات
+    const total = selectedCoursesForPlan.reduce((sum, course) => sum + (course.credits || 3), 0);
+    
+    let html = `
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #f8fafc;">
+                        <th style="padding: 10px; text-align: right;">المادة</th>
+                        <th style="padding: 10px; text-align: right;">النوع</th>
+                        <th style="padding: 10px; text-align: right;">الساعات</th>
+                        <th style="padding: 10px; text-align: right;">الإجراء</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    selectedCoursesForPlan.forEach((course, index) => {
+        const typeInfo = courseTypes[course.type] || { name: 'غير محدد', class: '' };
+        
+        html += `
+            <tr style="border-bottom: 1px solid var(--gray-light);">
+                <td style="padding: 10px;">
+                    <strong>${course.code || ''}</strong><br>
+                    ${course.name}
+                </td>
+                <td style="padding: 10px;">
+                    <span class="course-type ${typeInfo.class}">${typeInfo.name}</span>
+                </td>
+                <td style="padding: 10px;">${course.credits || 3}</td>
+                <td style="padding: 10px;">
+                    <button class="btn btn-sm btn-danger" onclick="removeCourseFromPlan(${index})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+    totalCredits.textContent = total;
+    totalCourses.textContent = selectedCoursesForPlan.length;
+}
+
+function removeCourseFromPlan(index) {
+    selectedCoursesForPlan.splice(index, 1);
+    loadAvailableCourses();
+    updateSelectedCoursesList();
+}
+
+async function createStudyPlan() {
+    const planName = document.getElementById('planName').value.trim();
+    const majorId = document.getElementById('planMajor').value;
+    const collegeId = document.getElementById('planCollege').value;
+    
+    if (!planName) {
+        showNotification('يرجى إدخال اسم الخطة', 'warning');
+        return;
+    }
+    
+    if (!majorId) {
+        showNotification('يرجى اختيار التخصص', 'warning');
+        return;
+    }
+    
+    const filteredCourses = selectedCoursesForPlan.filter(c => c.majorId === majorId);
+    
+    if (filteredCourses.length === 0) {
+        showNotification('يرجى اختيار مواد للخطة', 'warning');
+        return;
+    }
+    
+    try {
+        const major = majors.find(m => m.id === majorId);
+        const college = colleges.find(c => c.id === collegeId);
+        
+        const planData = {
+            name: planName,
+            majorId: majorId,
+            majorName: major ? major.name : 'غير معروف',
+            collegeId: collegeId,
+            collegeName: college ? college.name : 'غير معروف',
+            courses: filteredCourses.map(course => ({
+                courseId: course.courseId,
+                code: course.code,
+                name: course.name,
+                credits: course.credits,
+                type: course.courseType, // نوع المادة للتخصص
+                year: course.year,
+                hasPractical: course.hasPractical
+            })),
+            totalCredits: filteredCourses.reduce((sum, c) => sum + (c.credits || 3), 0),
+            totalCourses: filteredCourses.length,
+            createdAt: new Date(),
+            createdBy: currentUser.uid,
+            status: 'active'
+        };
+        
+        await db.collection('studyPlans').add(planData);
+        
+        // إعادة تعيين النموذج
+        document.getElementById('planName').value = '';
+        document.getElementById('planCollege').value = '';
+        document.getElementById('planMajor').innerHTML = '<option value="">اختر التخصص</option>';
+        selectedCoursesForPlan = selectedCoursesForPlan.filter(c => c.majorId !== majorId);
+        loadAvailableCourses();
+        updateSelectedCoursesList();
+        
+        showNotification('تم إنشاء الخطة الدراسية بنجاح', 'success');
+        
+        // تحميل الخطط المنشورة
+        loadStudyPlans();
+        
+        // التبديل إلى تبويب الخطط المنشورة
+        switchAdminTab('publishedPlans');
+        
+    } catch (error) {
+        console.error('❌ خطأ في إنشاء الخطة:', error);
+        showNotification('حدث خطأ أثناء إنشاء الخطة', 'error');
+    }
+}
+
+async function loadStudyPlans() {
+    const container = document.getElementById('plansList');
+    
+    try {
+        console.log('📘 جاري تحميل الخطط المنشورة...');
+        
+        // مسح المحتوى الحالي
+        container.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: var(--gray-medium);">
+                <i class="fas fa-spinner fa-spin fa-2x"></i>
+                <p>جاري تحميل الخطط...</p>
+            </div>
+        `;
+        
+        const plansSnapshot = await db.collection('studyPlans').orderBy('createdAt', 'desc').get();
+        
+        // إعادة تهيئة المصفوفة
+        studyPlans = [];
+        
+        if (plansSnapshot.empty) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--gray-medium);">
+                    <i class="fas fa-calendar-alt fa-3x" style="margin-bottom: 15px;"></i>
+                    <h4 style="margin-bottom: 10px;">لا توجد خطط منشورة بعد</h4>
+                    <p>استخدم تبويب "إنشاء خطة" لإنشاء أول خطة دراسية</p>
+                    <button class="btn btn-primary" onclick="switchAdminTab('plan')" style="margin-top: 15px;">
+                        <i class="fas fa-plus"></i> إنشاء خطة جديدة
+                    </button>
+                </div>
+            `;
+            console.log('📭 لا توجد خطط منشورة');
+            return;
+        }
+        
+        plansSnapshot.forEach(doc => {
+            const planData = doc.data();
+            studyPlans.push({ 
+                id: doc.id, 
+                ...planData,
+                // معالجة التاريخ
+                createdAt: planData.createdAt ? (planData.createdAt.toDate ? planData.createdAt.toDate() : new Date(planData.createdAt)) : new Date()
+            });
+        });
+        
+        console.log(`✅ تم تحميل ${studyPlans.length} خطة دراسية`);
+        
+        // تحديث واجهة المستخدم
+        renderStudyPlansList();
+        
+    } catch (error) {
+        console.error('❌ خطأ في تحميل الخطط:', error);
+        console.error('تفاصيل الخطأ:', error.message);
+        container.innerHTML = `
+            <div class="semester-card" style="text-align: center; padding: 40px; color: var(--danger-color);">
+                <i class="fas fa-exclamation-triangle fa-3x" style="margin-bottom: 15px;"></i>
+                <h4 style="margin-bottom: 10px;">حدث خطأ في تحميل الخطط</h4>
+                <p style="color: var(--gray-medium); margin-bottom: 15px;">${error.message}</p>
+                <button class="btn btn-primary" onclick="loadStudyPlans()">
+                    <i class="fas fa-redo"></i> إعادة المحاولة
+                </button>
+            </div>
+        `;
+    }
+}
+
+function renderStudyPlansList() {
+    const container = document.getElementById('plansList');
+    
+    if (!studyPlans || studyPlans.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: var(--gray-medium);">
+                <i class="fas fa-calendar-alt fa-3x" style="margin-bottom: 15px;"></i>
+                <h4 style="margin-bottom: 10px;">لا توجد خطط منشورة بعد</h4>
+                <p>استخدم تبويب "إنشاء خطة" لإنشاء أول خطة دراسية</p>
+                <button class="btn btn-primary" onclick="switchAdminTab('plan')" style="margin-top: 15px;">
+                    <i class="fas fa-plus"></i> إنشاء خطة جديدة
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = `
+        <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <h4 style="margin: 0;">
+                <i class="fas fa-calendar-check"></i> الخطط المنشورة (${studyPlans.length})
+            </h4>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
+    `;
+    
+    studyPlans.forEach(plan => {
+        // تحويل التاريخ
+        const date = plan.createdAt;
+        const dateStr = date ? date.toLocaleDateString('ar-SA') : 'غير محدد';
+        
+        html += `
+            <div class="semester-card" style="margin: 0; position: relative;" data-plan-id="${plan.id}">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+                    <div style="flex: 1;">
+                        <h4 style="margin-bottom: 5px; color: var(--primary-color);">${plan.name || 'بدون اسم'}</h4>
+                        <p style="color: var(--gray-medium); font-size: 0.9rem;">
+                            <i class="fas fa-university"></i> ${plan.collegeName || 'غير معروف'}
+                            <br>
+                            <i class="fas fa-graduation-cap"></i> ${plan.majorName || 'غير معروف'}
+                        </p>
+                    </div>
+                    <span class="course-type type-required-major" style="flex-shrink: 0;">خطة دراسية</span>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+                        <span><i class="fas fa-book"></i> <strong>المواد:</strong> ${plan.totalCourses || 0}</span>
+                        <span><i class="fas fa-clock"></i> <strong>الساعات:</strong> ${plan.totalCredits || 0}</span>
+                        <span style="background: #e0f2fe; padding: 3px 10px; border-radius: 15px; font-size: 0.8rem;">
+                            <i class="fas fa-calendar"></i> ${dateStr}
+                        </span>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; justify-content: flex-start; flex-wrap: wrap;">
+                    <button class="btn btn-sm btn-info" onclick="viewPlanDetails('${plan.id}')">
+                        <i class="fas fa-eye"></i> عرض التفاصيل
+                    </button>
+                    <button class="btn btn-sm btn-warning" onclick="editStudyPlan('${plan.id}')">
+                        <i class="fas fa-edit"></i> تعديل
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deletePlan('${plan.id}')">
+                        <i class="fas fa-trash"></i> حذف
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function searchPlans() {
+    const searchTerm = document.getElementById('searchPlansInput').value.toLowerCase();
+    const containers = document.querySelectorAll('#plansList .semester-card');
+    
+    containers.forEach(container => {
+        const planName = container.querySelector('h4').textContent.toLowerCase();
+        const collegeName = container.querySelector('p').textContent.toLowerCase();
+        
+        if (planName.includes(searchTerm) || collegeName.includes(searchTerm)) {
+            container.style.display = '';
+        } else {
+            container.style.display = 'none';
+        }
+    });
+}
+
+async function deletePlan(planId) {
+    if (confirm('هل أنت متأكد من حذف هذه الخطة الدراسية؟')) {
+        try {
+            await db.collection('studyPlans').doc(planId).delete();
+            showNotification('تم حذف الخطة الدراسية بنجاح', 'success');
+            loadStudyPlans();
+        } catch (error) {
+            console.error('❌ خطأ في حذف الخطة:', error);
+            showNotification('حدث خطأ أثناء حذف الخطة', 'error');
+        }
+    }
+}
+
+function viewPlanDetails(planId) {
+    const plan = studyPlans.find(p => p.id === planId);
+    if (!plan) {
+        showNotification('الخطة غير موجودة', 'error');
+        return;
+    }
+    
+    let detailsHTML = `
+        <div style="background: white; padding: 25px; border-radius: var(--border-radius); max-width: 800px; max-height: 80vh; overflow: hidden;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: var(--primary-color);">${plan.name}</h3>
+                <button onclick="closePlanDetailsModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--gray-medium);">&times;</button>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
+                <div style="background: #f8fafc; padding: 15px; border-radius: var(--border-radius);">
+                    <div style="color: var(--gray-medium); font-size: 0.9rem;">الكلية</div>
+                    <div style="font-weight: 600; margin-top: 5px;">${plan.collegeName || 'غير معروف'}</div>
+                </div>
+                
+                <div style="background: #f8fafc; padding: 15px; border-radius: var(--border-radius);">
+                    <div style="color: var(--gray-medium); font-size: 0.9rem;">التخصص</div>
+                    <div style="font-weight: 600; margin-top: 5px;">${plan.majorName || 'غير معروف'}</div>
+                </div>
+                
+                <div style="background: #f8fafc; padding: 15px; border-radius: var(--border-radius);">
+                    <div style="color: var(--gray-medium); font-size: 0.9rem;">إجمالي الساعات</div>
+                    <div style="font-weight: 600; margin-top: 5px; color: var(--primary-color);">${plan.totalCredits || 0} ساعة</div>
+                </div>
+                
+                <div style="background: #f8fafc; padding: 15px; border-radius: var(--border-radius);">
+                    <div style="color: var(--gray-medium); font-size: 0.9rem;">عدد المواد</div>
+                    <div style="font-weight: 600; margin-top: 5px; color: var(--success-color);">${plan.totalCourses || 0} مادة</div>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-book" style="color: var(--primary-color);"></i>
+                    المواد المضمنة في الخطة
+                </h4>
+                
+                <div style="max-height: 300px; overflow-y: auto;">
+    `;
+    
+    if (plan.courses && plan.courses.length > 0) {
+        detailsHTML += `
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                <thead>
+                    <tr style="background: #f1f5f9; position: sticky; top: 0;">
+                        <th style="padding: 12px; text-align: right; border-bottom: 2px solid var(--gray-light);">كود المادة</th>
+                        <th style="padding: 12px; text-align: right; border-bottom: 2px solid var(--gray-light);">اسم المادة</th>
+                        <th style="padding: 12px; text-align: right; border-bottom: 2px solid var(--gray-light);">النوع</th>
+                        <th style="padding: 12px; text-align: right; border-bottom: 2px solid var(--gray-light);">الساعات</th>
+                        <th style="padding: 12px; text-align: right; border-bottom: 2px solid var(--gray-light);">السنة</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        // ترتيب المواد حسب السنة أولاً
+        const sortedCourses = [...plan.courses].sort((a, b) => {
+            const yearA = a.year || 0;
+            const yearB = b.year || 0;
+            return yearA - yearB;
+        });
+        
+        sortedCourses.forEach(course => {
+            const typeInfo = courseTypes[course.type] || { name: 'غير محدد' };
+            detailsHTML += `
+                <tr style="border-bottom: 1px solid var(--gray-light);">
+                    <td style="padding: 12px; font-weight: 600; color: var(--primary-color);">
+                        ${course.code || '-'}
+                    </td>
+                    <td style="padding: 12px;">${course.name}</td>
+                    <td style="padding: 12px;">
+                        <span class="course-type type-${course.type}" style="font-size: 0.8rem;">
+                            ${typeInfo.name}
+                        </span>
+                    </td>
+                    <td style="padding: 12px; text-align: center;">${course.credits || 3}</td>
+                    <td style="padding: 12px; text-align: center;">${course.year ? 'السنة ' + course.year : '-'}</td>
+                </tr>
+            `;
+        });
+        
+        detailsHTML += `
+                </tbody>
+            </table>
+        `;
+    } else {
+        detailsHTML += `
+            <div style="text-align: center; padding: 30px; color: var(--gray-medium);">
+                <i class="fas fa-book fa-2x" style="margin-bottom: 15px;"></i>
+                <p>لا توجد مواد في هذه الخطة</p>
+            </div>
+        `;
+    }
+    
+    detailsHTML += `
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-start; margin-top: 20px;">
+                <button onclick="editStudyPlan('${plan.id}')" class="btn btn-warning">
+                    <i class="fas fa-edit"></i> تعديل الخطة
+                </button>
+                <button onclick="closePlanDetailsModal()" class="btn btn-light">
+                    <i class="fas fa-times"></i> إغلاق
+                </button>
+            </div>
+        </div>
+    `;
+    
+    showPlanDetailsModal(detailsHTML);
+}
+// إضافة مستمعات الأحداث
+document.addEventListener('DOMContentLoaded', function() {
+    // ... الأحداث الحالية ...
+    
+    // أحداث الخطة الدراسية
+    document.getElementById('planCollege')?.addEventListener('change', updatePlanMajors);
+    document.getElementById('planMajor')?.addEventListener('change', loadAvailableCourses);
+    
+    // أحداث الفلاتر
+    ['filterRequiredUni', 'filterElectiveUni', 'filterRequiredCollege', 
+     'filterRequiredMajor', 'filterElectiveMajor', 'filterYear'].forEach(id => {
+        document.getElementById(id)?.addEventListener('change', loadAvailableCourses);
+    });
+    
+    document.getElementById('createPlanBtn')?.addEventListener('click', createStudyPlan);
+    document.getElementById('clearPlanBtn')?.addEventListener('click', () => {
+        if (confirm('هل تريد مسح الخطة الحالية؟')) {
+            selectedCoursesForPlan = [];
+            loadAvailableCourses();
+            updateSelectedCoursesList();
+        }
+    });
+    
+});
+
+// متغير لتخزين الخطة الحالية للتعديل
+let currentEditingPlan = null;
+
+async function editStudyPlan(planId) {
+    console.log('✏️ تعديل الخطة:', planId);
+    
+    try {
+        // إظهار مؤشر التحميل
+        showNotification('جاري تحميل بيانات الخطة...', 'info');
+        
+        // الحصول على بيانات الخطة من Firestore
+        const planDoc = await db.collection('studyPlans').doc(planId).get();
+        
+        if (!planDoc.exists) {
+            showNotification('الخطة غير موجودة', 'error');
+            return;
+        }
+        
+        const planData = planDoc.data();
+        
+        // تخزين الخطة الحالية للتعديل
+        currentEditingPlan = {
+            id: planId,
+            ...planData
+        };
+        
+        // التحويل إلى تبويب إنشاء الخطة
+        switchAdminTab('plan');
+        
+        // تأخير لضمان تحميل الصفحة أولاً
+        setTimeout(() => {
+            // تعبئة النموذج ببيانات الخطة
+            document.getElementById('planName').value = planData.name || '';
+            
+            // اختيار الكلية
+            const collegeSelect = document.getElementById('planCollege');
+            if (collegeSelect && planData.collegeId) {
+                collegeSelect.value = planData.collegeId;
+                
+                // تشغيل حدث تغيير الكلية لتحميل التخصصات
+                const event = new Event('change');
+                collegeSelect.dispatchEvent(event);
+                
+                // بعد تحميل التخصصات، اختيار التخصص
+                setTimeout(() => {
+                    const majorSelect = document.getElementById('planMajor');
+                    if (majorSelect && planData.majorId) {
+                        majorSelect.value = planData.majorId;
+                        
+                        // تشغيل حدث تغيير التخصص لتحميل المواد
+                        const majorEvent = new Event('change');
+                        majorSelect.dispatchEvent(majorEvent);
+                        
+                        // بعد تحميل المواد، تحميل المواد المختارة
+                        setTimeout(() => {
+                            // تحميل المواد المختارة
+                            if (planData.courses && Array.isArray(planData.courses)) {
+                                // تصفية المواد الخاصة بهذا التخصص فقط
+                                selectedCoursesForPlan = selectedCoursesForPlan.filter(c => 
+                                    c.majorId !== planData.majorId
+                                );
+                                
+                                // إضافة مواد الخطة إلى القائمة المختارة
+                                planData.courses.forEach(course => {
+                                    selectedCoursesForPlan.push({
+                                        courseId: course.courseId || course.id,
+                                        majorId: planData.majorId,
+                                        code: course.code,
+                                        name: course.name,
+                                        credits: course.credits || 3,
+                                        courseType: course.type || course.courseType,
+                                        year: course.year,
+                                        hasPractical: course.hasPractical || false
+                                    });
+                                });
+                                
+                                // تحديث العرض
+                                loadAvailableCourses();
+                                updateSelectedCoursesList();
+                            }
+                        }, 500);
+                    }
+                }, 300);
+            }
+            
+            // تغيير زر الإنشاء إلى تحديث
+            const createBtn = document.getElementById('createPlanBtn');
+            if (createBtn) {
+                createBtn.innerHTML = '<i class="fas fa-save"></i> تحديث الخطة';
+                createBtn.onclick = () => updateStudyPlan(planId);
+                createBtn.className = 'btn btn-warning btn-lg';
+            }
+            
+            // إضافة زر إلغاء التعديل
+            const clearBtn = document.getElementById('clearPlanBtn');
+            if (clearBtn) {
+                clearBtn.innerHTML = '<i class="fas fa-times"></i> إلغاء التعديل';
+                clearBtn.onclick = cancelEditPlan;
+            }
+            
+            showNotification('تم تحميل بيانات الخطة للتعديل', 'success');
+        }, 500);
+        
+    } catch (error) {
+        console.error('❌ خطأ في تحميل الخصة للتعديل:', error);
+        showNotification('حدث خطأ أثناء تحميل الخطة', 'error');
+    }
+}
+
+async function updateStudyPlan(planId) {
+    const planName = document.getElementById('planName').value.trim();
+    const majorId = document.getElementById('planMajor').value;
+    const collegeId = document.getElementById('planCollege').value;
+    
+    if (!planName) {
+        showNotification('يرجى إدخال اسم الخطة', 'warning');
+        return;
+    }
+    
+    if (!majorId) {
+        showNotification('يرجى اختيار التخصص', 'warning');
+        return;
+    }
+    
+    const filteredCourses = selectedCoursesForPlan.filter(c => c.majorId === majorId);
+    
+    if (filteredCourses.length === 0) {
+        showNotification('يرجى اختيار مواد للخطة', 'warning');
+        return;
+    }
+    
+    try {
+        const major = majors.find(m => m.id === majorId);
+        const college = colleges.find(c => c.id === collegeId);
+        
+        const updatedPlanData = {
+            name: planName,
+            majorId: majorId,
+            majorName: major ? major.name : 'غير معروف',
+            collegeId: collegeId,
+            collegeName: college ? college.name : 'غير معروف',
+            courses: filteredCourses.map(course => ({
+                courseId: course.courseId,
+                code: course.code,
+                name: course.name,
+                credits: course.credits,
+                type: course.courseType,
+                year: course.year,
+                hasPractical: course.hasPractical
+            })),
+            totalCredits: filteredCourses.reduce((sum, c) => sum + (c.credits || 3), 0),
+            totalCourses: filteredCourses.length,
+            updatedAt: new Date()
+        };
+        
+        // تحديث الخطة في Firestore
+        await db.collection('studyPlans').doc(planId).update(updatedPlanData);
+        
+        showNotification('تم تحديث الخطة الدراسية بنجاح', 'success');
+        
+        // إعادة تعيين الواجهة
+        resetPlanForm();
+        
+        // تحميل الخطط المنشورة مجدداً
+        loadStudyPlans();
+        
+        // التبديل إلى تبويب الخطط المنشورة
+        switchAdminTab('publishedPlans');
+        
+    } catch (error) {
+        console.error('❌ خطأ في تحديث الخطة:', error);
+        showNotification('حدث خطأ أثناء تحديث الخطة', 'error');
+    }
+}
+
+function cancelEditPlan() {
+    if (confirm('هل تريد إلغاء التعديل؟ سيتم فقدان جميع التغييرات.')) {
+        resetPlanForm();
+        showNotification('تم إلغاء التعديل', 'info');
+    }
+}
+
+function resetPlanForm() {
+    // إعادة تعيين النموذج
+    document.getElementById('planName').value = '';
+    document.getElementById('planCollege').value = '';
+    document.getElementById('planMajor').innerHTML = '<option value="">اختر التخصص</option>';
+    
+    // إعادة تعيين القائمة المختارة
+    if (currentEditingPlan && currentEditingPlan.majorId) {
+        selectedCoursesForPlan = selectedCoursesForPlan.filter(c => 
+            c.majorId !== currentEditingPlan.majorId
+        );
+    }
+    
+    loadAvailableCourses();
+    updateSelectedCoursesList();
+    
+    // إعادة تعيين الأزرار
+    const createBtn = document.getElementById('createPlanBtn');
+    if (createBtn) {
+        createBtn.innerHTML = '<i class="fas fa-save"></i> إنشاء الخطة الدراسية';
+        createBtn.onclick = createStudyPlan;
+        createBtn.className = 'btn btn-success btn-lg';
+    }
+    
+    const clearBtn = document.getElementById('clearPlanBtn');
+    if (clearBtn) {
+        clearBtn.innerHTML = '<i class="fas fa-trash"></i> مسح الخطة';
+        clearBtn.onclick = () => {
+            const majorId = document.getElementById('planMajor').value;
+            if (!majorId) {
+                showNotification('لم يتم اختيار تخصص', 'warning');
+                return;
+            }
+            if (confirm('هل تريد مسح جميع المواد المختارة لهذا التخصص؟')) {
+                selectedCoursesForPlan = selectedCoursesForPlan.filter(c => c.majorId !== majorId);
+                loadAvailableCourses();
+                updateSelectedCoursesList();
+                showNotification('تم مسح الخطة', 'success');
+            }
+        };
+    }
+    
+    // إعادة تعيين الخطة الحالية
+    currentEditingPlan = null;
+}
+
+function showPlanDetailsModal(content) {
+    // إزالة أي نافذة سابقة
+    const existingModal = document.getElementById('planDetailsModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // إنشاء النافذة المنبثقة
+    const modalHTML = `
+        <div class="modal-overlay" id="planDetailsModal">
+            ${content}
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // إضافة مستمع لإغلاق النافذة بالنقر خارجها
+    const modal = document.getElementById('planDetailsModal');
+    modal.addEventListener('click', function(e) {
+        if (e.target === this) {
+            closePlanDetailsModal();
+        }
+    });
+    
+    // إضافة أنماط إذا لم تكن موجودة
+    if (!document.querySelector('#planDetailsStyles')) {
+        const styles = `
+            <style id="planDetailsStyles">
+                .modal-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0,0,0,0.7);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 10000;
+                    padding: 20px;
+                    animation: fadeIn 0.3s ease;
+                }
+                
+                .modal-overlay > div {
+                    animation: slideUp 0.3s ease;
+                }
+                
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                
+                @keyframes slideUp {
+                    from { opacity: 0; transform: translateY(20px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+            </style>
+        `;
+        document.head.insertAdjacentHTML('beforeend', styles);
+    }
+}
+
+window.closePlanDetailsModal = function() {
+    const modal = document.getElementById('planDetailsModal');
+    if (modal) {
+        modal.style.animation = 'fadeOut 0.3s ease';
+        setTimeout(() => {
+            modal.remove();
+        }, 300);
+    }
+    
+    // إضافة الأنماط للخروج
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+    `;
+    document.head.appendChild(style);
+    setTimeout(() => {
+        if (style && style.parentNode) {
+            style.parentNode.removeChild(style);
+        }
+    }, 500);
+};
+
+async function refreshStudyPlan() {
+    if (!userData.college || !userData.major) {
+        showNotification('يرجى تحديد الكلية والتخصص أولاً', 'warning');
+        return;
+    }
+    
+    showNotification('جاري تحديث خطة الدراسة...', 'info');
+    
+    try {
+        await loadStudentStudyPlan();
+        
+        if (userData.studyPlan) {
+            updateDashboard();
+            updateCourseForm();
+            showNotification('تم تحديث خطة الدراسة بنجاح', 'success');
+        } else {
+            showNotification('لم يتم العثور على خطة دراسية جديدة', 'warning');
+        }
+    } catch (error) {
+        console.error('❌ خطأ في تحديث الخطة:', error);
+        showNotification('حدث خطأ أثناء تحديث الخطة', 'error');
+    }
+}
+
+window.viewStudentStudyPlan = viewStudentStudyPlan;
+
+function closePlanDetailsModal() {
+    const modal = document.getElementById('planDetailsModal');
+    const style = document.querySelector('style:last-child');
+    
+    if (modal) modal.remove();
+    if (style && style.textContent.includes('.modal-overlay')) style.remove();
+}
+
+// في مستمعات الأحداث
+document.getElementById('clearPlanBtn')?.addEventListener('click', () => {
+    const majorId = document.getElementById('planMajor').value;
+    
+    if (!majorId) {
+        showNotification('لم يتم اختيار تخصص', 'warning');
+        return;
+    }
+    
+    if (confirm('هل تريد مسح جميع المواد المختارة لهذا التخصص؟')) {
+        // إزالة المواد المختارة لهذا التخصص فقط
+        selectedCoursesForPlan = selectedCoursesForPlan.filter(c => c.majorId !== majorId);
+        loadAvailableCourses();
+        updateSelectedCoursesList();
+        showNotification('تم مسح الخطة', 'success');
+    }
+});
+
+// دالة لفحص حالة البيانات
+function checkDataStatus() {
+    console.log('🔍 فحص حالة البيانات:');
+    console.log('- نوع المستخدم:', userData.userType);
+    console.log('- الكلية:', userData.college);
+    console.log('- التخصص:', userData.major);
+    console.log('- معرف الخطة:', userData.studyPlanId);
+    console.log('- بيانات الخطة:', userData.studyPlan);
+    console.log('- عدد الكليات في النظام:', colleges.length);
+    console.log('- عدد التخصصات في النظام:', majors.length);
+    console.log('- عدد المواد في النظام:', allCourses.length);
+}
+
+// استدعاء عند التحميل
+document.addEventListener('DOMContentLoaded', function() {
+    // ... الكود الحالي ...
+    
+    // إضافة فحص بعد التحميل
+    setTimeout(checkDataStatus, 2000);
+});
 
 // تهيئة الأحداث عند تحميل الصفحة
 document.addEventListener('DOMContentLoaded', function() {
