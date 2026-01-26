@@ -456,13 +456,16 @@
     <button class="admin-tab" data-admin-tab="coursesAdmin">
         <i class="fas fa-book"></i> المواد
     </button>
-    <button class="admin-tab" data-admin-tab="assign">
-        <i class="fas fa-link"></i> توزيع المواد
+    <button class="admin-tab" data-admin-tab="plan">
+        <i class="fas fa-calendar-plus"></i> إنشاء خطة
+    </button>
+    <button class="admin-tab" data-admin-tab="publishedPlans">
+        <i class="fas fa-calendar-check"></i> الخطط المنشورة
     </button>
     <button class="admin-tab" data-admin-tab="users">
         <i class="fas fa-users"></i> المستخدمين
     </button>
-</div>                        
+</div>
                         <!-- إدارة الكليات -->
                         <div class="admin-panel admin-tab-content active" id="collegesTab">
                             <h3 style="margin-bottom: 20px;">إدارة الكليات</h3>
@@ -502,75 +505,72 @@
                         </div>
                         
                         <!-- إدارة المواد -->
-                        <div class="admin-panel admin-tab-content" id="coursesAdminTab" style="display: none;">
-                            <h3 style="margin-bottom: 20px;">إدارة المواد</h3>
-                            <div class="form-group">
-                                <label for="newCourseCode">كود المادة</label>
-                                <input type="text" id="newCourseCode" placeholder="مثال: MATH101">
-                            </div>
-                            <div class="form-group">
-                                <label for="newCourseName">اسم المادة</label>
-                                <input type="text" id="newCourseName" placeholder="اسم المادة">
-                            </div>
-                            <div class="form-group">
-                                <label for="newCourseCredits">الساعات المعتمدة</label>
-                                <select id="newCourseCredits">
-                                    <option value="1">1 ساعة</option>
-                                    <option value="2">2 ساعات</option>
-                                    <option value="3" selected>3 ساعات</option>
-                                    <option value="4">4 ساعات</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="newCourseType">نوع المادة</label>
-                                <select id="newCourseType">
-                                    <option value="required-university">إجباري جامعة</option>
-                                    <option value="elective-university">اختياري جامعة</option>
-                                    <option value="required-college">إجباري كلية</option>
-                                    <option value="required-major">إجباري تخصص</option>
-                                    <option value="elective-major">اختياري تخصص</option>
-                                </select>
-                            </div>
-<div class="form-group">
-    <label for="newCourseYear">السنة الدراسية</label>
-    <select id="newCourseYear" class="form-control">
-        <option value="">اختر السنة</option>
-        <option value="1">الأولى</option>
-        <option value="2">الثانية</option>
-        <option value="3">الثالثة</option>
-        <option value="4">الرابعة</option>
-        <option value="5">الخامسة</option>
-    </select>
-</div>
-
-<div class="form-group">
-    <label for="newCourseSemester">يطرح في الفصل الدراسي</label>
-    <select id="newCourseSemester" class="form-control">
-        <option value="1">الفصل الأول والثاني والصيفي</option>
-        <option value="2">الفصل الأول والثاني</option>
-        <option value="3">الفصل الأول والصيفي</option>
-        <option value="4">الفصل الثاني والصيفي</option>
-        <option value="5">الفصل الأول</option>
-        <option value="6">الفصل الثاني</option>
-
-    </select>
-</div>
-
-<div class="form-group">
-    <label for="newCourseHasPractical">
-        <input type="checkbox" id="newCourseHasPractical">
-        تحتوي على عملي
-    </label>
-</div>
-                            <button class="btn btn-success" id="addCourseAdminBtn">
-                                <i class="fas fa-plus"></i> إضافة مادة
-                            </button>
-
-                            
-<!-- إدارة المواد - تأكد من أن الـ ID هو coursesAdminList -->
-<div id="coursesAdminList" style="margin-top: 30px;">
-    <!-- سيتم ملؤها ديناميكياً -->
-</div>                        
+<!-- إدارة المواد -->
+<div class="admin-panel admin-tab-content" id="coursesAdminTab" style="display: none;">
+    <h3 style="margin-bottom: 20px;">إدارة المواد</h3>
+    
+    <div class="semester-card" style="margin-bottom: 20px;">
+        <h4 style="margin-bottom: 15px;">إضافة مادة جديدة</h4>
+        
+        <div class="form-group">
+            <label for="newCourseCode">كود المادة *</label>
+            <input type="text" id="newCourseCode" placeholder="مثال: MATH101" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="newCourseName">اسم المادة *</label>
+            <input type="text" id="newCourseName" placeholder="اسم المادة" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="newCourseCredits">الساعات المعتمدة *</label>
+            <select id="newCourseCredits" required>
+                <option value="1">1 ساعة</option>
+                <option value="2">2 ساعات</option>
+                <option value="3" selected>3 ساعات</option>
+                <option value="4">4 ساعات</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="newCourseYear">السنة الدراسية *</label>
+            <select id="newCourseYear" required>
+                <option value="">اختر السنة</option>
+                <option value="1">الأولى</option>
+                <option value="2">الثانية</option>
+                <option value="3">الثالثة</option>
+                <option value="4">الرابعة</option>
+                <option value="5">الخامسة</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="newCourseSemester">يطرح في الفصل الدراسي *</label>
+            <select id="newCourseSemester" required>
+                <option value="1">الفصل الأول والثاني والصيفي</option>
+                <option value="2">الفصل الأول والثاني</option>
+                <option value="3">الفصل الأول والصيفي</option>
+                <option value="4">الفصل الثاني والصيفي</option>
+                <option value="5">الفصل الأول</option>
+                <option value="6">الفصل الثاني</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="newCourseHasPractical">
+                <input type="checkbox" id="newCourseHasPractical">
+                تحتوي على عملي
+            </label>
+        </div>
+        
+        <button class="btn btn-success" id="addCourseAdminBtn">
+            <i class="fas fa-plus"></i> إضافة مادة
+        </button>
+    </div>
+    
+    <div id="coursesAdminList" style="margin-top: 30px;">
+        <!-- سيتم ملؤها ديناميكياً -->
+    </div>
 </div>
 
                         <!-- توزيع المواد -->
@@ -615,6 +615,134 @@
                             </div>
                         </div>
 
+<!-- إنشاء خطة دراسية -->
+<div class="admin-panel admin-tab-content" id="planTab" style="display: none;">
+    <h3 style="margin-bottom: 20px;">
+        <i class="fas fa-calendar-plus"></i> إنشاء خطة دراسية جديدة
+    </h3>
+    
+    <div class="semester-card" style="margin-bottom: 20px;">
+        <h4 style="margin-bottom: 15px;">اختيار التخصص</h4>
+        <div class="form-group">
+            <label for="planCollege">اختر الكلية</label>
+            <select id="planCollege" class="form-control" onchange="updatePlanMajors()">
+                <option value="">اختر الكلية</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="planMajor">اختر التخصص</label>
+            <select id="planMajor" class="form-control">
+                <option value="">اختر التخصص</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="planName">اسم الخطة الدراسية</label>
+            <input type="text" id="planName" class="form-control" placeholder="مثال: خطة برمجة السنة الأولى">
+        </div>
+    </div>
+    
+    <div class="semester-card" style="margin-bottom: 20px;">
+        <h4 style="margin-bottom: 15px;">
+            <i class="fas fa-book"></i> إضافة مواد للخطة
+        </h4>
+        
+        <div class="plan-controls" style="margin-bottom: 20px;">
+            <div class="form-group">
+                <label>فلترة المواد حسب النوع</label>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+                    <label style="cursor: pointer;">
+                        <input type="checkbox" id="filterRequiredUni" checked> إجباري جامعة
+                    </label>
+                    <label style="cursor: pointer;">
+                        <input type="checkbox" id="filterElectiveUni" checked> اختياري جامعة
+                    </label>
+                    <label style="cursor: pointer;">
+                        <input type="checkbox" id="filterRequiredCollege" checked> إجباري كلية
+                    </label>
+                    <label style="cursor: pointer;">
+                        <input type="checkbox" id="filterRequiredMajor" checked> إجباري تخصص
+                    </label>
+                    <label style="cursor: pointer;">
+                        <input type="checkbox" id="filterElectiveMajor" checked> اختياري تخصص
+                    </label>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>فلترة المواد حسب السنة</label>
+                <select id="filterYear" class="form-control" style="width: 200px;">
+                    <option value="">جميع السنوات</option>
+                    <option value="1">السنة الأولى</option>
+                    <option value="2">السنة الثانية</option>
+                    <option value="3">السنة الثالثة</option>
+                    <option value="4">السنة الرابعة</option>
+                    <option value="5">السنة الخامسة</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="available-courses" id="availableCoursesList" style="margin-top: 20px; max-height: 300px; overflow-y: auto;">
+            <!-- قائمة المواد المتاحة -->
+            <p style="text-align: center; color: var(--gray-medium); padding: 20px;">
+                اختر تخصصاً أولاً لعرض المواد المتاحة
+            </p>
+        </div>
+    </div>
+    
+    <div class="semester-card" style="margin-bottom: 20px;">
+        <h4 style="margin-bottom: 15px;">
+            <i class="fas fa-list-check"></i> المواد المختارة للخطة
+        </h4>
+        
+        <div id="selectedCoursesList" style="min-height: 100px; border: 2px dashed var(--gray-light); border-radius: var(--border-radius); padding: 20px; text-align: center; color: var(--gray-medium);">
+            <i class="fas fa-book fa-2x" style="margin-bottom: 10px;"></i>
+            <p>لم يتم اختيار أي مواد بعد</p>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+            <div>
+                <strong>إجمالي الساعات:</strong> <span id="totalPlanCredits">0</span> ساعة
+            </div>
+            <div>
+                <strong>عدد المواد:</strong> <span id="totalPlanCourses">0</span> مادة
+            </div>
+        </div>
+    </div>
+    
+    <div style="text-align: center; margin-top: 30px;">
+        <button class="btn btn-success btn-lg" id="createPlanBtn">
+            <i class="fas fa-save"></i> إنشاء الخطة الدراسية
+        </button>
+        <button class="btn btn-light btn-lg" id="clearPlanBtn" style="margin-right: 10px;">
+            <i class="fas fa-trash"></i> مسح الخطة
+        </button>
+    </div>
+</div>
+
+<!-- الخطط المنشورة -->
+<div class="admin-panel admin-tab-content" id="publishedPlansTab" style="display: none;">
+    <h3 style="margin-bottom: 20px;">
+        <i class="fas fa-calendar-check"></i> الخطط المنشورة
+    </h3>
+    
+    <div class="search-box" style="margin-bottom: 20px;">
+        <input type="text" id="searchPlansInput" class="search-input" placeholder="ابحث في الخطط...">
+        <button class="search-button" onclick="searchPlans()">
+            <i class="fas fa-search"></i>
+        </button>
+    </div>
+    
+    <div id="plansList">
+        <!-- قائمة الخطط المنشورة -->
+        <div style="text-align: center; padding: 40px; color: var(--gray-medium);">
+            <i class="fas fa-calendar-alt fa-3x" style="margin-bottom: 15px;"></i>
+            <h4 style="margin-bottom: 10px;">لا توجد خطط منشورة بعد</h4>
+            <p>استخدم تبويب "إنشاء خطة" لإنشاء أول خطة دراسية</p>
+        </div>
+    </div>
+</div>
                         <!-- إدارة المستخدمين -->
                         <div class="admin-panel admin-tab-content" id="usersTab" style="display: none;">
                             <h3 style="margin-bottom: 20px;">إدارة المستخدمين</h3>
