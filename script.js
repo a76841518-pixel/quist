@@ -478,7 +478,7 @@ function formatDateFull(date) {
 }
 
 // ============================================================
-// نظام اللعب الجماعي المتطور - النسخة النهائية المستقرة
+// نظام اللعب الجماعي المتطور - إصلاح مشكلة الإجابة المكررة
 // ============================================================
 
 const MultiplayerManager = {
@@ -496,7 +496,7 @@ const MultiplayerManager = {
     _scores: {},
     _gameEnded: false,
     _gameSettings: {},
-    _hasAnsweredCurrent: false, // منع الإجابة مرتين
+    _isWaitingForNext: false, // منع الانتقال المتكرر
 
     async createGame(settings) {
         if (!AuthService.currentUser) {
@@ -526,13 +526,11 @@ const MultiplayerManager = {
                 bestStreak: 0,
                 totalTime: 0,
                 avgTime: 0,
-                answersCount: 0,
-                // إضافة حقل لتتبع الأسئلة التي أجاب عليها
-                answeredQuestions: []
+                answersCount: 0
             }],
             currentQuestion: 0,
             questions: [],
-            answers: {},
+            answers: {}, // { playerId: { questionIndex: { answer, isCorrect, timeTaken } } }
             scores: {},
             startTime: null,
             questionStartTime: null,
@@ -552,12 +550,12 @@ const MultiplayerManager = {
             gameData.players.forEach(p => {
                 this._scores[p.uid] = {
                     score: 0, correct: 0, wrong: 0, streak: 0, bestStreak: 0,
-                    totalTime: 0, avgTime: 0, answersCount: 0,
-                    answeredQuestions: []
+                    totalTime: 0, avgTime: 0, answersCount: 0
                 };
             });
             this._gameSettings = gameData.settings;
             this._totalTime = this._gameSettings.timeLimit || 15;
+            this._isWaitingForNext = false;
 
             showToast(`✅ تم إنشاء المباراة! الرمز: ${gameData.code}`, 'success', 5000);
             App._renderMultiplayerLobby(docRef.id);
@@ -616,8 +614,7 @@ const MultiplayerManager = {
                 bestStreak: 0,
                 totalTime: 0,
                 avgTime: 0,
-                answersCount: 0,
-                answeredQuestions: []
+                answersCount: 0
             };
 
             await db.collection('multiplayerGames').doc(gameId).update({
@@ -679,16 +676,14 @@ const MultiplayerManager = {
             bestStreak: 0,
             totalTime: 0,
             avgTime: 0,
-            answersCount: 0,
-            answeredQuestions: []
+            answersCount: 0
         }));
 
         const scores = {};
         players.forEach(p => {
             scores[p.uid] = {
                 score: 0, correct: 0, wrong: 0, streak: 0, bestStreak: 0,
-                totalTime: 0, avgTime: 0, answersCount: 0,
-                answeredQuestions: []
+                totalTime: 0, avgTime: 0, answersCount: 0
             };
         });
 
@@ -716,7 +711,7 @@ const MultiplayerManager = {
         this._gameEnded = false;
         this._totalTime = settings.timeLimit || 15;
         this._gameSettings = settings;
-        this._hasAnsweredCurrent = false;
+        this._isWaitingForNext = false;
 
         this._listenToGame(gameId);
         App._showMultiplayerGamePage();
@@ -744,7 +739,7 @@ const MultiplayerManager = {
                     return;
                 }
                 if (game.status === 'playing') {
-                    // تحديث البيانات فقط، لا نعيد رسم الواجهة بالكامل
+                    // تحديث البيانات
                     this._players = game.players || [];
                     this._scores = game.scores || {};
                     this._questions = game.questions || [];
@@ -752,14 +747,7 @@ const MultiplayerManager = {
                     this._answers = game.answers || {};
                     this._questionStartTime = game.questionStartTime || Date.now();
                     
-                    // تحديث حالة الإجابة للمستخدم الحالي
-                    const user = AuthService.currentUser;
-                    if (user) {
-                        const userAnswers = this._answers[user.uid] || {};
-                        this._hasAnsweredCurrent = userAnswers[this._currentQuestionIndex] !== undefined;
-                    }
-
-                    // تحديث واجهة اللعب
+                    // تحديث واجهة اللعب فقط إذا كانت ظاهرة
                     if (document.getElementById('section-multiplayer-game').style.display !== 'none') {
                         App._renderMultiplayerGame(gameId);
                     }
@@ -772,33 +760,52 @@ const MultiplayerManager = {
             });
     },
 
+    // ===== الدالة الأساسية لإرسال الإجابة =====
     async submitAnswer(gameId, answer) {
-        if (!AuthService.currentUser) return;
+        // التحقق من صحة البيانات
+        if (!AuthService.currentUser) {
+            showToast('يجب تسجيل الدخول أولاً', 'error');
+            return false;
+        }
+
         const user = AuthService.currentUser;
         const uid = user.uid;
 
-        // منع الإجابة إذا كان المستخدم قد أجاب بالفعل
-        if (this._hasAnsweredCurrent) {
-            showToast('لقد أجبت بالفعل على هذا السؤال', 'info');
-            return;
+        // منع الإجابة إذا كانت المباراة منتهية
+        if (this._gameEnded) {
+            showToast('المباراة انتهت بالفعل', 'info');
+            return false;
         }
 
+        // جلب بيانات المباراة من Firestore
         const doc = await db.collection('multiplayerGames').doc(gameId).get();
-        if (!doc.exists) return;
+        if (!doc.exists) {
+            showToast('المباراة غير موجودة', 'error');
+            return false;
+        }
+
         const game = doc.data();
-        if (game.status !== 'playing') return;
+        if (game.status !== 'playing') {
+            showToast('المباراة ليست في حالة لعب', 'info');
+            return false;
+        }
 
         const currentQ = game.currentQuestion;
         const question = game.questions[currentQ];
-        if (!question) return;
-
-        const answers = game.answers || {};
-        if (answers[uid] && answers[uid][currentQ] !== undefined) {
-            this._hasAnsweredCurrent = true;
-            showToast('لقد أجبت بالفعل', 'info');
-            return;
+        if (!question) {
+            showToast('لا يوجد سؤال حالياً', 'error');
+            return false;
         }
 
+        const answers = game.answers || {};
+
+        // ===== التحقق الأهم: هل أجاب المستخدم بالفعل على هذا السؤال؟ =====
+        if (answers[uid] && answers[uid][currentQ] !== undefined) {
+            showToast('لقد أجبت بالفعل على هذا السؤال', 'info');
+            return false;
+        }
+
+        // ===== معالجة الإجابة =====
         const elapsed = (Date.now() - game.questionStartTime) / 1000;
         let isCorrect = false;
         let answerValue = answer;
@@ -822,11 +829,10 @@ const MultiplayerManager = {
             isCorrect = false;
         }
 
-        // الحصول على بيانات اللاعب من scores
+        // ===== تحديث إحصائيات اللاعب من scores =====
         const playerScore = game.scores[uid] || {
             score: 0, correct: 0, wrong: 0, streak: 0, bestStreak: 0,
-            totalTime: 0, avgTime: 0, answersCount: 0,
-            answeredQuestions: []
+            totalTime: 0, avgTime: 0, answersCount: 0
         };
 
         // تحديث الإحصائيات
@@ -836,7 +842,6 @@ const MultiplayerManager = {
             if (playerScore.streak > (playerScore.bestStreak || 0)) {
                 playerScore.bestStreak = playerScore.streak;
             }
-            // حساب النقاط
             let points = 10;
             if (elapsed <= 1.5) points += 3;
             else if (elapsed <= 3) points += 2;
@@ -850,22 +855,15 @@ const MultiplayerManager = {
             playerScore.streak = 0;
         }
 
-        // تحديث الوقت والإجابات
         playerScore.totalTime = (playerScore.totalTime || 0) + elapsed;
         playerScore.answersCount = (playerScore.answersCount || 0) + 1;
         playerScore.avgTime = playerScore.totalTime / playerScore.answersCount;
 
-        // تتبع الأسئلة التي أجاب عليها
-        if (!playerScore.answeredQuestions) playerScore.answeredQuestions = [];
-        if (!playerScore.answeredQuestions.includes(currentQ)) {
-            playerScore.answeredQuestions.push(currentQ);
-        }
-
-        // حفظ الإجابة
+        // ===== حفظ الإجابة =====
         if (!answers[uid]) answers[uid] = {};
         answers[uid][currentQ] = { answer, isCorrect, timeTaken: elapsed };
 
-        // تحديث قاعدة البيانات
+        // ===== تحديث قاعدة البيانات =====
         await db.collection('multiplayerGames').doc(gameId).update({
             answers: answers,
             scores: { [uid]: playerScore },
@@ -877,28 +875,114 @@ const MultiplayerManager = {
             })
         });
 
-        // تعيين حالة الإجابة إلى true لمنع الإجابة مرة أخرى
-        this._hasAnsweredCurrent = true;
-
+        // ===== عرض رسالة النتيجة =====
         showToast(isCorrect ? '✅ إجابة صحيحة!' : '❌ إجابة خاطئة', isCorrect ? 'success' : 'error');
 
-        // التحقق من إجابة جميع اللاعبين
+        // ===== إيقاف المؤقت فوراً =====
+        if (this._timerInterval) {
+            clearInterval(this._timerInterval);
+            this._timerInterval = null;
+        }
+
+        // ===== التحقق من إجابة جميع اللاعبين =====
         const totalPlayers = game.players.length;
         const answeredCount = Object.keys(answers).length;
+
         if (answeredCount >= totalPlayers) {
-            // إيقاف المؤقت فوراً
+            // جميع اللاعبين أجابوا، انتقل للسؤال التالي بعد 1.5 ثانية
+            if (!this._isWaitingForNext) {
+                this._isWaitingForNext = true;
+                setTimeout(() => {
+                    this._isWaitingForNext = false;
+                    this.autoNextQuestion(gameId);
+                }, 1500);
+            }
+        } else {
+            // ليس جميع اللاعبين أجابوا، ننتظر البقية
+            // ولكن نعيد تشغيل المؤقت للانتظار
             if (this._timerInterval) {
                 clearInterval(this._timerInterval);
                 this._timerInterval = null;
             }
-            setTimeout(() => {
-                this.autoNextQuestion(gameId);
-            }, 1500);
+            // نبدأ مؤقت جديد للعد التنازلي (للباقي)
+            const remainingTime = this._totalTime - Math.floor(elapsed);
+            this._timeLeft = Math.max(0, remainingTime);
+            this._startTimer(gameId);
         }
+
+        return true;
     },
 
+    // ===== بدء المؤقت =====
+    _startTimer(gameId) {
+        if (this._timerInterval) {
+            clearInterval(this._timerInterval);
+            this._timerInterval = null;
+        }
+
+        this._timerInterval = setInterval(async () => {
+            if (this._gameEnded) {
+                clearInterval(this._timerInterval);
+                this._timerInterval = null;
+                return;
+            }
+
+            // جلب البيانات الحالية
+            const doc = await db.collection('multiplayerGames').doc(gameId).get();
+            if (!doc.exists) {
+                clearInterval(this._timerInterval);
+                this._timerInterval = null;
+                return;
+            }
+            const game = doc.data();
+            if (game.status !== 'playing') {
+                clearInterval(this._timerInterval);
+                this._timerInterval = null;
+                return;
+            }
+
+            const elapsed = (Date.now() - game.questionStartTime) / 1000;
+            const remaining = Math.max(0, this._totalTime - Math.floor(elapsed));
+
+            // تحديث واجهة المؤقت
+            const timerEl = document.querySelector('#section-multiplayer-game .game-header .badge-warning, #section-multiplayer-game .game-header .badge-danger');
+            if (timerEl) {
+                timerEl.textContent = `⏱ ${remaining}s`;
+                timerEl.className = `badge ${remaining <= 5 ? 'badge-danger' : 'badge-warning'}`;
+            }
+
+            // تحديث شريط التقدم
+            const progressFill = document.querySelector('#section-multiplayer-game .game-progress .fill');
+            if (progressFill) {
+                const prog = Math.min((elapsed / this._totalTime) * 100, 100);
+                progressFill.style.width = `${prog}%`;
+                progressFill.style.background = remaining <= 5 ? 'var(--secondary)' : 'linear-gradient(90deg, var(--primary), var(--accent))';
+            }
+
+            // إذا انتهى الوقت
+            if (remaining <= 0) {
+                clearInterval(this._timerInterval);
+                this._timerInterval = null;
+
+                // التحقق من إجابة المستخدم الحالي
+                const user = AuthService.currentUser;
+                if (user) {
+                    const answers = game.answers || {};
+                    const currentQ = game.currentQuestion;
+                    // إذا لم يجب المستخدم، نرسل إجابة خاطئة تلقائياً
+                    if (!answers[user.uid] || answers[user.uid][currentQ] === undefined) {
+                        showToast('⏰ انتهى الوقت!', 'error');
+                        await this.submitAnswer(gameId, -1); // -1 تعني إجابة خاطئة تلقائياً
+                    }
+                }
+            }
+        }, 500);
+    },
+
+    // ===== الانتقال للسؤال التالي =====
     async autoNextQuestion(gameId) {
         if (this._gameEnded) return;
+        
         const doc = await db.collection('multiplayerGames').doc(gameId).get();
         if (!doc.exists) return;
         const game = doc.data();
@@ -910,18 +994,27 @@ const MultiplayerManager = {
             return;
         }
 
-        // إعادة تعيين حالة الإجابة للسؤال الجديد
-        this._hasAnsweredCurrent = false;
+        // إعادة تعيين المؤقت
+        if (this._timerInterval) {
+            clearInterval(this._timerInterval);
+            this._timerInterval = null;
+        }
 
+        // تحديث السؤال التالي
         await db.collection('multiplayerGames').doc(gameId).update({
             currentQuestion: nextIndex,
             answers: {},
             questionStartTime: Date.now()
         });
 
+        // إعادة تعيين المتغيرات المحلية
         this._questionStartTime = Date.now();
         this._timeLeft = this._totalTime;
         this._answers = {};
+        this._isWaitingForNext = false;
+
+        // بدء المؤقت للجولة الجديدة
+        this._startTimer(gameId);
     },
 
     async endGame(gameId) {
@@ -940,7 +1033,12 @@ const MultiplayerManager = {
 
         showToast(`🏆 الفائز: ${winner.name} بـ ${winner.score || 0} نقطة!`, 'success', 6000);
         this._gameEnded = true;
-        // سيتم عرض النتائج عبر المستمع
+        this._isWaitingForNext = false;
+        
+        if (this._timerInterval) {
+            clearInterval(this._timerInterval);
+            this._timerInterval = null;
+        }
     },
 
     leaveGame() {
@@ -956,7 +1054,7 @@ const MultiplayerManager = {
         this._isHost = false;
         this._players = [];
         this._gameEnded = false;
-        this._hasAnsweredCurrent = false;
+        this._isWaitingForNext = false;
         App._hideMultiplayerGamePage();
         App._hideMultiplayerResultPage();
         App._activateSection('multiplayer');
@@ -17301,26 +17399,32 @@ if (userAnswered) {
     }
 }
 
+// ===== بدء المؤقت في بداية كل جولة =====
+if (!MultiplayerManager._timerInterval) {
+    MultiplayerManager._startTimer(gameId);
+}
+
         // ===== بناء خيارات السؤال =====
         let optionsHtml = '';
         const qType = question.type || 'multiple_choice';
 
         if (qType === 'multiple_choice' || qType === 'true_false') {
             const opts = question.options || [];
-            optionsHtml = opts.map((opt, idx) => {
-                const isSelected = userAnswered && answers[user.uid][currentQ].answer === idx;
-                const isCorrect = isSelected && answers[user.uid][currentQ].isCorrect;
-                const isWrong = isSelected && !isCorrect;
-                let btnClass = 'option-btn';
-                if (userAnswered) {
-                    btnClass += ' disabled';
-                    if (idx === question.correct) btnClass += ' show-correct';
-                    if (isWrong) btnClass += ' selected-wrong';
-                }
-                return `<button class="${btnClass}" onclick="App._submitMultiplayerAnswer(${idx})" ${userAnswered ? 'disabled' : ''}>
-                    ${String.fromCharCode(65 + idx)}. ${opt}
-                </button>`;
-            }).join('');
+// خيارات الإجابة (اختيار من متعدد / صح خطأ)
+optionsHtml = opts.map((opt, idx) => {
+    const isSelected = userAnswered && answers[user.uid][currentQ].answer === idx;
+    const isCorrect = isSelected && answers[user.uid][currentQ].isCorrect;
+    const isWrong = isSelected && !isCorrect;
+    let btnClass = 'option-btn';
+    if (userAnswered) {
+        btnClass += ' disabled';
+        if (idx === question.correct) btnClass += ' show-correct';
+        if (isWrong) btnClass += ' selected-wrong';
+    }
+    return `<button class="${btnClass}" onclick="App._submitMultiplayerAnswer(${idx})" ${userAnswered ? 'disabled' : ''}>
+        ${String.fromCharCode(65 + idx)}. ${opt}
+    </button>`;
+}).join('');
         } else if (qType === 'fill_blank') {
             optionsHtml = `
                 <div style="display:flex;gap:0.5rem;justify-content:center;max-width:400px;margin:0 auto;">
@@ -17473,14 +17577,35 @@ if (userAnswered) {
     });
 };
 
-// ===== دوال إرسال الإجابات =====
-App._submitMultiplayerAnswer = function(answerIndex) {
+// ===== إرسال إجابة (اختيار من متعدد / صح خطأ) =====
+App._submitMultiplayerAnswer = async function(answerIndex) {
     const gameId = MultiplayerManager.currentGameId;
-    if (!gameId) return;
+    if (!gameId) {
+        showToast('لا توجد مباراة نشطة', 'error');
+        return;
+    }
+    // منع الإجابة المكررة
+    const user = AuthService.currentUser;
+    if (!user) {
+        showToast('يجب تسجيل الدخول', 'error');
+        return;
+    }
+    // التحقق من أن المستخدم لم يجب بالفعل
+    const doc = await db.collection('multiplayerGames').doc(gameId).get();
+    if (doc.exists) {
+        const game = doc.data();
+        const answers = game.answers || {};
+        const currentQ = game.currentQuestion;
+        if (answers[user.uid] && answers[user.uid][currentQ] !== undefined) {
+            showToast('لقد أجبت بالفعل على هذا السؤال', 'info');
+            return;
+        }
+    }
     MultiplayerManager.submitAnswer(gameId, answerIndex);
 };
 
-App._submitMultiplayerFillBlank = function() {
+// ===== إرسال إجابة (ملء الفراغ) =====
+App._submitMultiplayerFillBlank = async function() {
     const input = document.getElementById('mpFillBlankInput');
     if (!input) return;
     const answer = input.value.trim();
@@ -17490,12 +17615,42 @@ App._submitMultiplayerFillBlank = function() {
     }
     const gameId = MultiplayerManager.currentGameId;
     if (!gameId) return;
+    
+    // التحقق من عدم الإجابة المكررة
+    const user = AuthService.currentUser;
+    if (!user) return;
+    const doc = await db.collection('multiplayerGames').doc(gameId).get();
+    if (doc.exists) {
+        const game = doc.data();
+        const answers = game.answers || {};
+        const currentQ = game.currentQuestion;
+        if (answers[user.uid] && answers[user.uid][currentQ] !== undefined) {
+            showToast('لقد أجبت بالفعل على هذا السؤال', 'info');
+            return;
+        }
+    }
     MultiplayerManager.submitAnswer(gameId, answer);
 };
 
-App._submitMultiplayerMatching = function() {
+// ===== إرسال إجابة (مطابقة) =====
+App._submitMultiplayerMatching = async function() {
     const gameId = MultiplayerManager.currentGameId;
     if (!gameId) return;
+    
+    // التحقق من عدم الإجابة المكررة
+    const user = AuthService.currentUser;
+    if (!user) return;
+    const doc = await db.collection('multiplayerGames').doc(gameId).get();
+    if (doc.exists) {
+        const game = doc.data();
+        const answers = game.answers || {};
+        const currentQ = game.currentQuestion;
+        if (answers[user.uid] && answers[user.uid][currentQ] !== undefined) {
+            showToast('لقد أجبت بالفعل على هذا السؤال', 'info');
+            return;
+        }
+    }
+    
     const selects = document.querySelectorAll('[id^="mpMatchSelect_"]');
     const result = {};
     selects.forEach(select => {
@@ -17514,6 +17669,7 @@ App._submitMultiplayerMatching = function() {
     MultiplayerManager.submitAnswer(gameId, result);
 };
 
+// ===== تحريك عنصر الترتيب =====
 App._moveOrderingItem = function(index, direction, gameId) {
     const orderKey = `mpOrder_${gameId}`;
     if (!window[orderKey]) return;
@@ -17524,9 +17680,25 @@ App._moveOrderingItem = function(index, direction, gameId) {
     App._renderMultiplayerGame(gameId);
 };
 
-App._submitMultiplayerOrdering = function(gameId) {
+// ===== إرسال إجابة (ترتيب) =====
+App._submitMultiplayerOrdering = async function(gameId) {
     const orderKey = `mpOrder_${gameId}`;
     if (!window[orderKey]) return;
+    
+    // التحقق من عدم الإجابة المكررة
+    const user = AuthService.currentUser;
+    if (!user) return;
+    const doc = await db.collection('multiplayerGames').doc(gameId).get();
+    if (doc.exists) {
+        const game = doc.data();
+        const answers = game.answers || {};
+        const currentQ = game.currentQuestion;
+        if (answers[user.uid] && answers[user.uid][currentQ] !== undefined) {
+            showToast('لقد أجبت بالفعل على هذا السؤال', 'info');
+            return;
+        }
+    }
+    
     const order = window[orderKey];
     MultiplayerManager.submitAnswer(gameId, order);
 };
