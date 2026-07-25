@@ -17994,24 +17994,33 @@ App._renderMultiplayerResult = function(gameId) {
             }
         }
 
-// ✅ هذا هو المكان الذي تضع فيه الكود المطلوب
-if (user) {
-    await MultiplayerRewards.applyRewards(user.uid, rewardsMap[user.uid]);
-    // تحديث واجهة المستخدم فوراً
-    App._updateUserUI(AuthService.currentUser);
-    App._updateProfileTabContent(AuthService.currentUser);
-    // تحديث العناصر الأخرى إن لزم
-    App._updateFollowCounts();
-    App._refreshActiveBoosts();
-}
+        // ===== 3. تطبيق المكافآت للمستخدم الحالي وتحديث الملف الشخصي فوراً =====
+        if (user && userRewards) {
+            await MultiplayerRewards.applyRewards(user.uid, userRewards);
+            // تحديث واجهة المستخدم فوراً
+            App._updateUserUI(AuthService.currentUser);
+            App._updateProfileTabContent(AuthService.currentUser);
+            App._updateFollowCounts();
+            App._refreshActiveBoosts();
+        }
 
-        // ===== 4. حساب تقدم المستوى والرتبة =====
+        // ===== 4. حساب تقدم المستوى والرتبة (قبل وبعد المكافآت) =====
         const userData = AuthService.currentUser;
-        const oldLevel = userData ? getLevel((userData.totalScore || 0) - (userRewards?.levelPoints || 0)) : { level: 1 };
-        const newLevel = userData ? getLevel(userData.totalScore || 0) : { level: 1 };
-        const levelProgress = userData ? getLevelProgress(userData.totalScore || 0) : { progress: 0 };
-        const oldRank = userData ? getRank((userData.rankPoints || 0) - (userRewards?.rankPoints || 0)) : { progress: 0, name: 'برونزي 1' };
-        const newRank = userData ? getRank(userData.rankPoints || 0) : { progress: 0, name: 'برونزي 1' };
+        const oldTotalScore = (userData?.totalScore || 0) - (userRewards?.levelPoints || 0);
+        const newTotalScore = userData?.totalScore || 0;
+        const oldLevel = getLevel(oldTotalScore);
+        const newLevel = getLevel(newTotalScore);
+        const oldLevelProgress = getLevelProgress(oldTotalScore);
+        const newLevelProgress = getLevelProgress(newTotalScore);
+
+        const oldRankPoints = (userData?.rankPoints || 0) - (userRewards?.rankPoints || 0);
+        const newRankPoints = userData?.rankPoints || 0;
+        const oldRank = getRank(oldRankPoints);
+        const newRank = getRank(newRankPoints);
+
+        const levelUp = newLevel.level > oldLevel.level;
+        const rankUp = newRank.name !== oldRank.name && newRankPoints > oldRankPoints;
+        const rankDown = newRankPoints < oldRankPoints;
 
         // ===== 5. دالة عرض الإحصائيات الكاملة (الخطوة النهائية) =====
         const displayFullResults = function() {
@@ -18205,79 +18214,178 @@ if (user) {
         };
 
         // ===== 6. عرض شريط التقدم المتحرك =====
-        const renderProgressStep = (title, progress, sub, isLast = false) => {
+        const renderProgressStep = (title, icon, oldProgress, newProgress, oldLabel, newLabel, sub, isLast = false, isLevel = true) => {
+            const diff = newProgress - oldProgress;
+            const isPositive = diff >= 0;
+            const isRank = !isLevel;
+
+            // رسالة عند التقدم
+            let messageHtml = '';
+            if (isLevel && levelUp) {
+                messageHtml = `
+                    <div style="margin-top:0.8rem;padding:0.6rem;background:rgba(255,217,61,0.15);border-radius:10px;border:1px solid var(--accent);animation: fadeUp 0.5s ease;">
+                        <span style="font-size:2rem;">🎉</span>
+                        <span style="font-weight:700;color:var(--accent);font-size:1.3rem;">مستوى جديد! ${newLevel.level}</span>
+                        <div style="font-size:0.9rem;color:var(--gray);">تهانينا! وصلت إلى المستوى ${newLevel.level}</div>
+                    </div>
+                `;
+            } else if (isRank && rankUp) {
+                messageHtml = `
+                    <div style="margin-top:0.8rem;padding:0.6rem;background:rgba(255,217,61,0.15);border-radius:10px;border:1px solid var(--accent);animation: fadeUp 0.5s ease;">
+                        <span style="font-size:2rem;">👑</span>
+                        <span style="font-weight:700;color:var(--accent);font-size:1.3rem;">رتبة جديدة! ${newRank.name}</span>
+                        <div style="font-size:0.9rem;color:var(--gray);">رائع! لقد وصلت إلى ${newRank.name}</div>
+                    </div>
+                `;
+            } else if (isRank && rankDown) {
+                messageHtml = `
+                    <div style="margin-top:0.8rem;padding:0.6rem;background:rgba(255,107,107,0.15);border-radius:10px;border:1px solid var(--secondary);animation: fadeUp 0.5s ease;">
+                        <span style="font-size:2rem;">💔</span>
+                        <span style="font-weight:700;color:var(--secondary);font-size:1.3rem;">تراجع في الرتبة</span>
+                        <div style="font-size:0.9rem;color:var(--gray);">${oldRank.name} → ${newRank.name}</div>
+                    </div>
+                `;
+            }
+
             return `
-                <div class="progress-step" style="text-align:center;padding:1rem 0;">
-                    <h3 style="font-size:1.5rem;font-weight:800;margin-bottom:0.5rem;">${title}</h3>
-                    <div style="max-width:400px;margin:0 auto;">
-                        <div class="progress-bar" style="height:12px;background:var(--glass);border-radius:10px;overflow:hidden;">
-                            <div class="fill" style="width:0%;height:100%;background:linear-gradient(90deg, var(--primary), var(--accent));border-radius:10px;transition:width 1.5s ease;"></div>
+                <div class="progress-step" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;text-align:center;padding:1rem;">
+                    <div style="font-size:3.5rem;margin-bottom:0.5rem;">${icon}</div>
+                    <h3 style="font-size:2rem;font-weight:800;margin-bottom:0.3rem;color:var(--light);">${title}</h3>
+                    <div style="font-size:0.9rem;color:var(--gray);margin-bottom:0.5rem;">${oldLabel} → ${newLabel}</div>
+                    <div style="max-width:450px;width:100%;margin:0 auto;">
+                        <div class="progress-bar" style="height:16px;background:var(--glass);border-radius:10px;overflow:hidden;position:relative;">
+                            <div class="fill" style="width:${Math.max(0, Math.min(oldProgress, 100))}%;height:100%;background:${isPositive ? 'linear-gradient(90deg, var(--primary), var(--accent))' : 'linear-gradient(90deg, var(--secondary), var(--primary))'};border-radius:10px;transition:width 1.8s cubic-bezier(0.4, 0, 0.2, 1);"></div>
+                            <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:0.75rem;font-weight:700;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,0.6);" id="progressPercent">${Math.round(oldProgress)}%</span>
                         </div>
-                        <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--gray);margin-top:0.3rem;">
-                            <span>0%</span>
-                            <span id="progressPercent">0%</span>
-                            <span>100%</span>
+                        <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--gray);margin-top:0.2rem;">
+                            <span>${oldLabel}</span>
+                            <span>${newLabel}</span>
                         </div>
                     </div>
-                    <div style="font-size:0.9rem;color:var(--gray);margin-top:0.3rem;">${sub}</div>
-                    <button class="btn btn-primary mt-2" id="progressNextBtn" style="justify-content:center;min-width:120px;">
+                    <div style="font-size:0.9rem;color:var(--gray);margin-top:0.5rem;">${sub}</div>
+                    ${messageHtml}
+                    <button class="btn btn-primary mt-2" id="progressNextBtn" style="justify-content:center;min-width:140px;font-size:1rem;padding:12px 30px;">
                         ${isLast ? 'عرض النتائج 🏆' : 'التالي →'}
                     </button>
                 </div>
             `;
         };
 
+        // ===== 7. تعريف الخطوات =====
+        let currentStep = 0;
         const steps = [
             {
                 title: `المستوى ${newLevel.level}`,
-                progress: levelProgress.progress,
-                sub: `+${userRewards?.levelPoints || 0} نقطة مستوى`
+                icon: '⭐',
+                oldProgress: oldLevelProgress.progress,
+                newProgress: newLevelProgress.progress,
+                oldLabel: `المستوى ${oldLevel.level}`,
+                newLabel: `المستوى ${newLevel.level}`,
+                sub: `+${userRewards?.levelPoints || 0} نقطة مستوى`,
+                isLevel: true
             },
             {
                 title: `الرتبة ${newRank.name}`,
-                progress: newRank.progress,
-                sub: `${userRewards?.rankPoints >= 0 ? '+' : ''}${userRewards?.rankPoints || 0} نقطة رتبة`
+                icon: '🏅',
+                oldProgress: oldRank.progress,
+                newProgress: newRank.progress,
+                oldLabel: oldRank.name,
+                newLabel: newRank.name,
+                sub: `${userRewards?.rankPoints >= 0 ? '+' : ''}${userRewards?.rankPoints || 0} نقطة رتبة`,
+                isLevel: false
             }
         ];
 
-        let currentStep = 0;
-
-        // عرض الخطوة الأولى
+        // ===== 8. عرض الخطوة الأولى =====
         container.innerHTML = `
-            <div id="progressStepsContainer">
-                ${renderProgressStep(steps[0].title, steps[0].progress, steps[0].sub, steps.length === 1)}
+            <div id="progressStepsContainer" style="display:flex;align-items:center;justify-content:center;min-height:80vh;">
+                ${renderProgressStep(
+                    steps[0].title,
+                    steps[0].icon,
+                    steps[0].oldProgress,
+                    steps[0].newProgress,
+                    steps[0].oldLabel,
+                    steps[0].newLabel,
+                    steps[0].sub,
+                    steps.length === 1,
+                    steps[0].isLevel
+                )}
             </div>
         `;
 
-        // تحريك شريط التقدم للخطوة الأولى
+        // ===== 9. تحريك شريط التقدم للخطوة الأولى =====
         setTimeout(() => {
             const fill = document.querySelector('.progress-step .fill');
             const percent = document.getElementById('progressPercent');
             if (fill) {
-                fill.style.width = `${steps[0].progress}%`;
-                if (percent) percent.textContent = `${Math.round(steps[0].progress)}%`;
+                const start = steps[0].oldProgress;
+                const end = steps[0].newProgress;
+                let startTime = null;
+                const duration = 1800;
+                const animate = (time) => {
+                    if (!startTime) startTime = time;
+                    const elapsed = time - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    const current = start + (end - start) * progress;
+                    fill.style.width = `${Math.max(0, Math.min(current, 100))}%`;
+                    if (percent) percent.textContent = `${Math.round(current)}%`;
+                    if (progress < 1) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        if (percent) percent.textContent = `${Math.round(end)}%`;
+                    }
+                };
+                requestAnimationFrame(animate);
             }
         }, 300);
 
-        // ربط زر "التالي" للخطوة الأولى
+        // ===== 10. ربط زر "التالي" للخطوة الأولى =====
         document.getElementById('progressNextBtn')?.addEventListener('click', function() {
             currentStep++;
             if (currentStep >= steps.length) {
-                // عرض الإحصائيات الكاملة
                 displayFullResults();
                 return;
             }
             // عرض الخطوة التالية
             const container = document.getElementById('progressStepsContainer');
             container.innerHTML = `
-                ${renderProgressStep(steps[currentStep].title, steps[currentStep].progress, steps[currentStep].sub, currentStep === steps.length - 1)}
+                <div style="display:flex;align-items:center;justify-content:center;min-height:80vh;">
+                    ${renderProgressStep(
+                        steps[currentStep].title,
+                        steps[currentStep].icon,
+                        steps[currentStep].oldProgress,
+                        steps[currentStep].newProgress,
+                        steps[currentStep].oldLabel,
+                        steps[currentStep].newLabel,
+                        steps[currentStep].sub,
+                        currentStep === steps.length - 1,
+                        steps[currentStep].isLevel
+                    )}
+                </div>
             `;
+            // تحريك الشريط
             setTimeout(() => {
                 const fill = document.querySelector('.progress-step .fill');
                 const percent = document.getElementById('progressPercent');
                 if (fill) {
-                    fill.style.width = `${steps[currentStep].progress}%`;
-                    if (percent) percent.textContent = `${Math.round(steps[currentStep].progress)}%`;
+                    const start = steps[currentStep].oldProgress;
+                    const end = steps[currentStep].newProgress;
+                    let startTime = null;
+                    const duration = 1800;
+                    const animate = (time) => {
+                        if (!startTime) startTime = time;
+                        const elapsed = time - startTime;
+                        const progress = Math.min(elapsed / duration, 1);
+                        const current = start + (end - start) * progress;
+                        fill.style.width = `${Math.max(0, Math.min(current, 100))}%`;
+                        if (percent) percent.textContent = `${Math.round(current)}%`;
+                        if (progress < 1) {
+                            requestAnimationFrame(animate);
+                        } else {
+                            if (percent) percent.textContent = `${Math.round(end)}%`;
+                        }
+                    };
+                    requestAnimationFrame(animate);
                 }
             }, 300);
             // ربط زر "التالي" الجديد
@@ -18285,8 +18393,6 @@ if (user) {
                 currentStep++;
                 if (currentStep >= steps.length) {
                     displayFullResults();
-                } else {
-                    // عرض الخطوة التالية (لن يحدث هنا لأننا في آخر خطوة)
                 }
             });
         });
