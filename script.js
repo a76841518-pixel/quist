@@ -7,13 +7,14 @@
 // ============================================================
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyC0fnT157NEKAsDKuZHuwJ4112pJmX1tzM",
-  authDomain: "fotbal-78571.firebaseapp.com",
-  projectId: "fotbal-78571",
-  storageBucket: "fotbal-78571.firebasestorage.app",
-  messagingSenderId: "1095690966958",
-  appId: "1:1095690966958:web:431077bdb6e488efae1a3f",
-  measurementId: "G-DKVJDTR4TC"
+  apiKey: "AIzaSyCuuiGi5XhEojPKgmWBGWJTG1sQHj630aQ",
+  authDomain: "football-808ec.firebaseapp.com",
+  databaseURL: "https://football-808ec-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "football-808ec",
+  storageBucket: "football-808ec.firebasestorage.app",
+  messagingSenderId: "331174502798",
+  appId: "1:331174502798:web:bd0d3b476fd3e88ad9c4df",
+  measurementId: "G-N24YLB4G4K"
 };
 
 let db = null;
@@ -117,122 +118,184 @@ const RealtimeService = {
 // ============================================================
 
 const MultiplayerRewards = {
-    calculateRewards(player, rank, totalPlayers, gameStats) {
-        const rewards = {
-            rankPoints: 0,
-            levelPoints: 0,
-            coins: 0,
-            bonus: [],
-            penalty: false,
-            total: 0
+// داخل MultiplayerRewards
+// داخل MultiplayerRewards
+calculateRewards(player, rank, totalPlayers, gameStats) {
+    const score = player.score || 0;
+    const correct = player.correct || 0;
+    const answers = player.answersCount || 0;
+    const accuracy = answers > 0 ? (correct / answers) * 100 : 0;
+    const bestStreak = player.bestStreak || 0;
+    const avgTime = player.avgTime || 0;
+    const totalQuestions = gameStats?.totalQuestions || 0;
+
+    // ===== تفاصيل المكافآت =====
+    const breakdown = {
+        rankPoints: [],
+        levelPoints: [],
+        coins: []
+    };
+
+    let rankPoints = 0;
+    let levelPoints = 0;
+    let coins = 0;
+
+    // ----- 1. نقاط الرتبة -----
+    let rankFromCorrect = 0, rankFromAccuracy = 0, rankFromStreak = 0, rankFromSpeed = 0, rankFromRank = 0, rankPenalty = 0;
+
+    if (rank === 1) {
+        rankFromRank = 30 + Math.min(totalPlayers * 5, 30);
+        breakdown.rankPoints.push({ label: `👑 بطل المباراة (+${rankFromRank})`, value: rankFromRank });
+    } else if (rank === 2 && totalPlayers >= 3) {
+        rankFromRank = 15;
+        breakdown.rankPoints.push({ label: `🥈 الوصيف (+${rankFromRank})`, value: rankFromRank });
+    } else if (rank === 3 && totalPlayers >= 4) {
+        rankFromRank = 8;
+        breakdown.rankPoints.push({ label: `🥉 الثالث (+${rankFromRank})`, value: rankFromRank });
+    } else {
+        // عقوبة الرتبة (تعتمد على عدد اللاعبين والمركز)
+        rankPenalty = -Math.min(Math.floor((totalPlayers - rank + 1) * 2), 25);
+        breakdown.rankPoints.push({ label: `💔 عقوبة الرتبة (${rankPenalty})`, value: rankPenalty });
+    }
+    rankPoints += rankFromRank + rankPenalty;
+
+    // ----- 2. نقاط المستوى (مع تفاصيل) -----
+    let levelFromCorrect = score * 10; // أساسي من النقاط
+    breakdown.levelPoints.push({ label: `⭐ نقاط المباراة (${score}×10)`, value: levelFromCorrect });
+    levelPoints += levelFromCorrect;
+
+    // مكافأة الدقة
+    let accBonus = 0;
+    if (accuracy >= 90) accBonus = 50;
+    else if (accuracy >= 70) accBonus = 30;
+    else if (accuracy >= 50) accBonus = 15;
+    if (accBonus > 0) {
+        breakdown.levelPoints.push({ label: `🎯 مكافأة الدقة (${accuracy}%)`, value: accBonus });
+        levelPoints += accBonus;
+    }
+
+    // مكافأة السلسلة
+    let streakBonus = 0;
+    if (bestStreak >= 10) streakBonus = 100;
+    else if (bestStreak >= 5) streakBonus = 50;
+    else if (bestStreak >= 3) streakBonus = 20;
+    if (streakBonus > 0) {
+        breakdown.levelPoints.push({ label: `🔥 مكافأة أفضل سلسلة (${bestStreak})`, value: streakBonus });
+        levelPoints += streakBonus;
+    }
+
+    // مكافأة السرعة
+    let speedBonus = 0;
+    if (avgTime > 0 && avgTime < 3) speedBonus = 40;
+    else if (avgTime > 0 && avgTime < 5) speedBonus = 20;
+    if (speedBonus > 0) {
+        breakdown.levelPoints.push({ label: `⚡ مكافأة السرعة (متوسط ${avgTime.toFixed(1)}s)`, value: speedBonus });
+        levelPoints += speedBonus;
+    }
+
+    // مكافأة المركز (نقاط مستوى إضافية)
+    let rankLevelBonus = 0;
+    if (rank === 1) rankLevelBonus = 100;
+    else if (rank === 2) rankLevelBonus = 50;
+    else if (rank === 3) rankLevelBonus = 30;
+    if (rankLevelBonus > 0) {
+        breakdown.levelPoints.push({ label: `🏅 مكافأة المركز (${rank})`, value: rankLevelBonus });
+        levelPoints += rankLevelBonus;
+    }
+
+    // مكافأة المشاركة الكاملة
+    if (answers === totalQuestions && totalQuestions > 0) {
+        breakdown.levelPoints.push({ label: `✅ إكمال جميع الأسئلة (+20)`, value: 20 });
+        levelPoints += 20;
+    }
+
+    // مكافأة الدقة 100%
+    if (accuracy === 100 && correct > 0) {
+        breakdown.levelPoints.push({ label: `💯 دقة كاملة (+50)`, value: 50 });
+        levelPoints += 50;
+    }
+
+    // ----- 3. العملات (مع تفاصيل) -----
+    let coinFromAccuracy = 0, coinFromStreak = 0, coinFromRank = 0, coinFromSpeed = 0;
+
+    if (accuracy >= 90) coinFromAccuracy = 20;
+    else if (accuracy >= 70) coinFromAccuracy = 10;
+    else if (accuracy >= 50) coinFromAccuracy = 5;
+    if (coinFromAccuracy > 0) {
+        breakdown.coins.push({ label: `🎯 مكافأة الدقة (${accuracy}%)`, value: coinFromAccuracy });
+        coins += coinFromAccuracy;
+    }
+
+    if (bestStreak >= 10) coinFromStreak = 25;
+    else if (bestStreak >= 5) coinFromStreak = 10;
+    else if (bestStreak >= 3) coinFromStreak = 5;
+    if (coinFromStreak > 0) {
+        breakdown.coins.push({ label: `🔥 مكافأة السلسلة (${bestStreak})`, value: coinFromStreak });
+        coins += coinFromStreak;
+    }
+
+    if (rank === 1) coinFromRank = 30;
+    else if (rank === 2) coinFromRank = 15;
+    else if (rank === 3) coinFromRank = 8;
+    if (coinFromRank > 0) {
+        breakdown.coins.push({ label: `🏅 مكافأة المركز (${rank})`, value: coinFromRank });
+        coins += coinFromRank;
+    }
+
+    if (avgTime > 0 && avgTime < 3) coinFromSpeed = 8;
+    else if (avgTime > 0 && avgTime < 5) coinFromSpeed = 4;
+    if (coinFromSpeed > 0) {
+        breakdown.coins.push({ label: `⚡ مكافأة السرعة (متوسط ${avgTime.toFixed(1)}s)`, value: coinFromSpeed });
+        coins += coinFromSpeed;
+    }
+
+    // ----- المجموع الكلي -----
+    const total = rankPoints + levelPoints + coins;
+
+    return {
+        total: total,
+        rankPoints: rankPoints,
+        levelPoints: levelPoints,
+        coins: coins,
+        breakdown: breakdown,
+        penalty: rankPenalty < 0
+    };
+},
+
+async applyRewards(userId, rewards) {
+    if (!userId) return null;
+    try {
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) return null;
+        const user = userDoc.data();
+
+        const currentRankPoints = user.rankPoints || 0;
+        const newRankPoints = Math.max(0, currentRankPoints + rewards.rankPoints);
+
+        const updates = {
+            rankPoints: newRankPoints,
+            totalScore: (user.totalScore || 0) + rewards.levelPoints,
+            coins: (user.coins || 0) + rewards.coins
         };
 
-        // نقاط الرتبة مع عقوبات
-        if (rank === 1) {
-            const basePoints = 30;
-            const bonus = Math.min(totalPlayers * 5, 30);
-            rewards.rankPoints = basePoints + bonus;
-            rewards.bonus.push(`👑 بطل المباراة (+${rewards.rankPoints} رتبة)`);
-        } else if (rank === 2 && totalPlayers >= 3) {
-            rewards.rankPoints = 15;
-            rewards.bonus.push(`🥈 الوصيف (+${rewards.rankPoints} رتبة)`);
-        } else if (rank === 3 && totalPlayers >= 4) {
-            rewards.rankPoints = 8;
-            rewards.bonus.push(`🥉 الثالث (+${rewards.rankPoints} رتبة)`);
-        } else {
-            const penaltyBase = Math.floor((totalPlayers - rank + 1) * 2);
-            let penalty = Math.min(penaltyBase, 25);
-            if (totalPlayers === 2 && rank === 2) {
-                penalty = 15;
-            }
-            rewards.rankPoints = -penalty;
-            rewards.penalty = true;
-            rewards.bonus.push(`💔 عقوبة رتبة (${-penalty})`);
+        await db.collection('users').doc(userId).update(updates);
+        
+        // تحديث الكائن المحلي للمستخدم الحالي
+        const updatedUser = AuthService.currentUser;
+        if (updatedUser && updatedUser.uid === userId) {
+            updatedUser.rankPoints = newRankPoints;
+            updatedUser.totalScore = updates.totalScore;
+            updatedUser.coins = updates.coins;
+            // إشعار المستمعين لتحديث الواجهة
+            AuthService._notifyListeners();
         }
-
-        // مكافأة الدقة (باستخدام correct و answersCount الصحيحين)
-        const accuracy = player.correct && player.answersCount ? 
-            (player.correct / player.answersCount) * 100 : 0;
-        if (accuracy >= 90) {
-            rewards.coins += 20;
-            rewards.levelPoints += 15;
-            rewards.bonus.push('🎯 دقة عالية (90%+)');
-        } else if (accuracy >= 70) {
-            rewards.coins += 10;
-            rewards.levelPoints += 8;
-            rewards.bonus.push('✅ دقة جيدة (70%+)');
-        } else if (accuracy >= 50) {
-            rewards.coins += 5;
-            rewards.levelPoints += 4;
-            rewards.bonus.push('📊 دقة متوسطة (50%+)');
-        }
-
-        // مكافأة السلسلة
-        if (player.bestStreak >= 10) {
-            rewards.coins += 25;
-            rewards.levelPoints += 20;
-            rewards.bonus.push(`🔥 سلسلة أسطورية (${player.bestStreak})`);
-        } else if (player.bestStreak >= 5) {
-            rewards.coins += 10;
-            rewards.levelPoints += 10;
-            rewards.bonus.push(`⚡ سلسلة ممتازة (${player.bestStreak})`);
-        } else if (player.bestStreak >= 3) {
-            rewards.coins += 5;
-            rewards.levelPoints += 5;
-            rewards.bonus.push(`💫 سلسلة جيدة (${player.bestStreak})`);
-        }
-
-        // مكافأة المشاركة الكاملة
-        if (player.answersCount === gameStats.totalQuestions && gameStats.totalQuestions > 0) {
-            rewards.coins += 5;
-            rewards.bonus.push('📚 مشاركة كاملة');
-        }
-
-        // مكافأة السرعة
-        if (player.avgTime && player.avgTime < 3) {
-            rewards.coins += 8;
-            rewards.levelPoints += 5;
-            rewards.bonus.push('⚡ ردود فعل سريعة');
-        } else if (player.avgTime && player.avgTime < 5) {
-            rewards.coins += 4;
-            rewards.levelPoints += 3;
-            rewards.bonus.push('⏱ سرعة جيدة');
-        }
-
-        // مكافأة الفوز
-        if (rank === 1) {
-            rewards.coins += 30;
-            rewards.levelPoints += 25;
-            rewards.bonus.push('🏆 مكافأة البطولة');
-        }
-
-        rewards.total = rewards.rankPoints + rewards.levelPoints + rewards.coins;
-        return rewards;
-    },
-
-    async applyRewards(userId, rewards) {
-        if (!userId) return;
-        try {
-            const userDoc = await db.collection('users').doc(userId).get();
-            if (!userDoc.exists) return;
-            const user = userDoc.data();
-
-            const currentRankPoints = user.rankPoints || 0;
-            const newRankPoints = Math.max(0, currentRankPoints + rewards.rankPoints);
-
-            const updates = {
-                rankPoints: newRankPoints,
-                totalScore: (user.totalScore || 0) + rewards.levelPoints,
-                coins: (user.coins || 0) + rewards.coins
-            };
-
-            await db.collection('users').doc(userId).update(updates);
-            return updates;
-        } catch (e) {
-            console.error('Error applying rewards:', e);
-            return null;
-        }
-    },
+        
+        return updates;
+    } catch (e) {
+        console.error('Error applying rewards:', e);
+        return null;
+    }
+},
 
     // عرض المكافآت للمستخدم الحالي فقط
     renderRewardsUI(rewards, player, isWinner = false) {
@@ -829,51 +892,123 @@ const MultiplayerManager = {
             isCorrect = false;
         }
 
-        // ===== تحديث إحصائيات اللاعب من scores =====
-        const playerScore = game.scores[uid] || {
-            score: 0, correct: 0, wrong: 0, streak: 0, bestStreak: 0,
-            totalTime: 0, avgTime: 0, answersCount: 0
-        };
+// ===== تحديث إحصائيات اللاعب =====
+const playerScore = game.scores[uid] || {
+    score: 0,           // نقاط المباراة
+    correct: 0,
+    wrong: 0,
+    streak: 0,
+    bestStreak: 0,
+    totalTime: 0,
+    avgTime: 0,
+    answersCount: 0,
+    answeredQuestions: [],
+    // ✅ إضافة حقول جديدة للنقاط المتكاملة
+    rankPoints: 0,      // نقاط الرتبة التراكمية
+    levelPoints: 0,     // نقاط المستوى التراكمية
+    coins: 0,           // العملات التراكمية
+    totalScore: 0       // المجموع الكلي (للعرض)
+};
 
-        // تحديث الإحصائيات
-        if (isCorrect) {
-            playerScore.correct = (playerScore.correct || 0) + 1;
-            playerScore.streak = (playerScore.streak || 0) + 1;
-            if (playerScore.streak > (playerScore.bestStreak || 0)) {
-                playerScore.bestStreak = playerScore.streak;
-            }
-            let points = 10;
-            if (elapsed <= 1.5) points += 3;
-            else if (elapsed <= 3) points += 2;
-            else if (elapsed <= 5) points += 1;
-            if (playerScore.streak >= 5) {
-                points += Math.floor(playerScore.streak / 5) * 2;
-            }
-            playerScore.score = (playerScore.score || 0) + points;
-        } else {
-            playerScore.wrong = (playerScore.wrong || 0) + 1;
-            playerScore.streak = 0;
+// ===== حساب نقاط المباراة (score) =====
+let pointsEarned = 0;
+if (isCorrect) {
+    // النقاط الأساسية
+    pointsEarned = 10;
+    
+    // مكافأة السرعة
+    if (elapsed <= 1.5) pointsEarned += 5;
+    else if (elapsed <= 3) pointsEarned += 3;
+    else if (elapsed <= 5) pointsEarned += 1;
+    
+    // مكافأة السلسلة
+    const currentStreak = (playerScore.streak || 0) + 1;
+    if (currentStreak >= 10) pointsEarned += 10;
+    else if (currentStreak >= 5) pointsEarned += 5;
+    else if (currentStreak >= 3) pointsEarned += 2;
+    
+    // مكافأة الإجابة الصحيحة
+    playerScore.correct = (playerScore.correct || 0) + 1;
+    playerScore.streak = currentStreak;
+    if (playerScore.streak > (playerScore.bestStreak || 0)) {
+        playerScore.bestStreak = playerScore.streak;
+    }
+} else {
+    // إجابة خاطئة
+    pointsEarned = 0;
+    playerScore.wrong = (playerScore.wrong || 0) + 1;
+    playerScore.streak = 0;
+}
+
+// ===== حساب نقاط المستوى (levelPoints) =====
+// تُحسب بناءً على نقاط المباراة × 10 + مكافآت إضافية
+const accuracy = playerScore.correct && playerScore.answersCount ? 
+    (playerScore.correct / (playerScore.answersCount + 1)) * 100 : 0;
+
+let levelPointsEarned = pointsEarned * 8; // قاعدة: 8 أضعاف نقاط المباراة
+
+// مكافأة الدقة (تُضاف تدريجياً)
+if (accuracy >= 90) levelPointsEarned += 50;
+else if (accuracy >= 70) levelPointsEarned += 30;
+else if (accuracy >= 50) levelPointsEarned += 15;
+
+// مكافأة السلسلة (تُضاف لكل سلسلة طويلة)
+if (playerScore.bestStreak >= 10) levelPointsEarned += 100;
+else if (playerScore.bestStreak >= 5) levelPointsEarned += 50;
+else if (playerScore.bestStreak >= 3) levelPointsEarned += 20;
+
+// مكافأة السرعة (متوسط الوقت)
+if (playerScore.avgTime && playerScore.avgTime < 3) levelPointsEarned += 40;
+else if (playerScore.avgTime && playerScore.avgTime < 5) levelPointsEarned += 20;
+
+// ===== حساب العملات (coins) =====
+let coinsEarned = 0;
+if (isCorrect) {
+    coinsEarned = 2; // أساسي
+    
+    // مكافأة السرعة
+    if (elapsed <= 1.5) coinsEarned += 3;
+    else if (elapsed <= 3) coinsEarned += 2;
+    else if (elapsed <= 5) coinsEarned += 1;
+    
+    // مكافأة السلسلة
+    if (playerScore.streak >= 10) coinsEarned += 5;
+    else if (playerScore.streak >= 5) coinsEarned += 3;
+    else if (playerScore.streak >= 3) coinsEarned += 1;
+}
+
+// ===== تحديث الإحصائيات التراكمية =====
+playerScore.score = (playerScore.score || 0) + pointsEarned;
+playerScore.levelPoints = (playerScore.levelPoints || 0) + levelPointsEarned;
+playerScore.coins = (playerScore.coins || 0) + coinsEarned;
+
+// حساب النقاط الكلية (للعرض فقط)
+playerScore.totalScore = playerScore.score + playerScore.levelPoints + playerScore.coins;
+
+// تحديث الوقت
+playerScore.totalTime = (playerScore.totalTime || 0) + elapsed;
+playerScore.answersCount = (playerScore.answersCount || 0) + 1;
+playerScore.avgTime = playerScore.totalTime / playerScore.answersCount;
+
+// ✅ تسجيل السؤال الذي تمت إجابته
+if (!playerScore.answeredQuestions) playerScore.answeredQuestions = [];
+playerScore.answeredQuestions.push(currentQ);
+
+// ===== حفظ الإجابة =====
+if (!answers[uid]) answers[uid] = {};
+answers[uid][currentQ] = { answer, isCorrect, timeTaken: elapsed };
+
+// ===== تحديث قاعدة البيانات =====
+await db.collection('multiplayerGames').doc(gameId).update({
+    answers: answers,
+    scores: { ...(game.scores || {}), [uid]: playerScore },  // دمج
+    players: game.players.map(p => {
+        if (p.uid === uid) {
+            return { ...p, ...playerScore };
         }
-
-        playerScore.totalTime = (playerScore.totalTime || 0) + elapsed;
-        playerScore.answersCount = (playerScore.answersCount || 0) + 1;
-        playerScore.avgTime = playerScore.totalTime / playerScore.answersCount;
-
-        // ===== حفظ الإجابة =====
-        if (!answers[uid]) answers[uid] = {};
-        answers[uid][currentQ] = { answer, isCorrect, timeTaken: elapsed };
-
-        // ===== تحديث قاعدة البيانات =====
-        await db.collection('multiplayerGames').doc(gameId).update({
-            answers: answers,
-            scores: { [uid]: playerScore },
-            players: game.players.map(p => {
-                if (p.uid === uid) {
-                    return { ...p, ...playerScore };
-                }
-                return p;
-            })
-        });
+        return p;
+    })
+});
 
         // ===== عرض رسالة النتيجة =====
         showToast(isCorrect ? '✅ إجابة صحيحة!' : '❌ إجابة خاطئة', isCorrect ? 'success' : 'error');
@@ -1376,15 +1511,16 @@ async register(email, password, username, fullName) {
             adminRole: null,
             friends: [],
             blocked: [],
-            stats: { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 }
+            stats: { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 },
+            rankPoints: 0  // ✅ إضافة rankPoints هنا
         });
         
         // ✅ تحديث المستخدم الحالي
         this.currentUser = {
             uid: cred.user.uid,
             email: email,
-            displayName: fullName,      // ✅ الاسم الظاهر
-            username: username,          // ✅ المعرف الفريد
+            displayName: fullName,
+            username: username,
             fullName: fullName,
             role: 'user',
             totalScore: 0,
@@ -1399,7 +1535,7 @@ async register(email, password, username, fullName) {
             friends: [],
             blocked: [],
             stats: { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 },
-            rankPoints: data.rankPoints || 0
+            rankPoints: 0  // ✅ إضافة rankPoints هنا
         };
         
         localStorage.setItem('football_user_uid', cred.user.uid);
@@ -17348,18 +17484,24 @@ App._renderMultiplayerLobby = function(gameId) {
     });
 };
 
-// ===== عرض شاشة اللعب (مع إصلاح الترتيب) =====
 App._renderMultiplayerGame = function(gameId) {
     const container = document.getElementById('multiplayerGameContent');
-    if (!container) return;
+    if (!container) {
+        console.warn('⚠️ multiplayerGameContent not found');
+        return;
+    }
 
+    // التحقق من وجود المباراة
     db.collection('multiplayerGames').doc(gameId).get().then((doc) => {
         if (!doc.exists) {
             container.innerHTML = '<div class="text-gray">المباراة غير موجودة</div>';
             return;
         }
         const g = doc.data();
-        if (g.status !== 'playing') return;
+        if (g.status !== 'playing') {
+            container.innerHTML = '<div class="text-gray">المباراة ليست في حالة لعب</div>';
+            return;
+        }
 
         const currentQ = g.currentQuestion || 0;
         const questions = g.questions || [];
@@ -17371,7 +17513,6 @@ App._renderMultiplayerGame = function(gameId) {
         const players = g.players || [];
         const answers = g.answers || {};
         const user = AuthService.currentUser;
-        const isHost = g.hostId === user?.uid;
         const totalPlayers = players.length;
         const answeredCount = Object.keys(answers).length;
 
@@ -17380,56 +17521,82 @@ App._renderMultiplayerGame = function(gameId) {
         const timeLeft = Math.max(0, timeLimit - Math.floor(elapsed));
         const progress = Math.min((elapsed / timeLimit) * 100, 100);
 
-        // ===== الترتيب الصحيح =====
-        const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+        // ============================================================
+        // استخراج النقاط والإحصائيات من scores
+        // ============================================================
+        const scoresData = g.scores || {};
+        const playersWithScores = players.map(p => {
+            const stats = scoresData[p.uid] || {};
+            return {
+                ...p,
+                // نقاط المباراة
+                score: stats.score || 0,
+                correct: stats.correct || 0,
+                wrong: stats.wrong || 0,
+                streak: stats.streak || 0,
+                bestStreak: stats.bestStreak || 0,
+                totalTime: stats.totalTime || 0,
+                avgTime: stats.avgTime || 0,
+                answersCount: stats.answersCount || 0,
+                answeredQuestions: stats.answeredQuestions || [],
+                // النقاط المتكاملة
+                levelPoints: stats.levelPoints || 0,
+                coins: stats.coins || 0,
+                totalScore: stats.totalScore || stats.score || 0
+            };
+        });
+
+        // ============================================================
+        // الترتيب حسب النقاط الكلية (totalScore)
+        // ============================================================
+        const sorted = [...playersWithScores].sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
+
+        // ============================================================
+        // التحقق من إجابة المستخدم الحالي
+        // ============================================================
         const userAnswered = user && answers[user.uid] && answers[user.uid][currentQ] !== undefined;
+        if (userAnswered) {
+            if (MultiplayerManager._timerInterval) {
+                clearInterval(MultiplayerManager._timerInterval);
+                MultiplayerManager._timerInterval = null;
+            }
+        }
 
-if (userAnswered) {
-    // إيقاف المؤقت فوراً
-    if (MultiplayerManager._timerInterval) {
-        clearInterval(MultiplayerManager._timerInterval);
-        MultiplayerManager._timerInterval = null;
-    }
-    // إظهار الوقت المتبقي عند الإجابة
-    const timeElapsed = (Date.now() - g.questionStartTime) / 1000;
-    const remaining = Math.max(0, timeLimit - Math.floor(timeElapsed));
-    const timerEl = document.querySelector('.game-header .badge-warning, .game-header .badge-danger');
-    if (timerEl) {
-        timerEl.textContent = `⏱ ${remaining}s`;
-    }
-}
+        if (!MultiplayerManager._timerInterval && !userAnswered) {
+            MultiplayerManager._startTimer(gameId);
+        }
 
-// ===== بدء المؤقت في بداية كل جولة =====
-if (!MultiplayerManager._timerInterval) {
-    MultiplayerManager._startTimer(gameId);
-}
-
-        // ===== بناء خيارات السؤال =====
+        // ============================================================
+        // بناء خيارات السؤال حسب النوع
+        // ============================================================
         let optionsHtml = '';
         const qType = question.type || 'multiple_choice';
 
         if (qType === 'multiple_choice' || qType === 'true_false') {
             const opts = question.options || [];
-// خيارات الإجابة (اختيار من متعدد / صح خطأ)
-optionsHtml = opts.map((opt, idx) => {
-    const isSelected = userAnswered && answers[user.uid][currentQ].answer === idx;
-    const isCorrect = isSelected && answers[user.uid][currentQ].isCorrect;
-    const isWrong = isSelected && !isCorrect;
-    let btnClass = 'option-btn';
-    if (userAnswered) {
-        btnClass += ' disabled';
-        if (idx === question.correct) btnClass += ' show-correct';
-        if (isWrong) btnClass += ' selected-wrong';
-    }
-    return `<button class="${btnClass}" onclick="App._submitMultiplayerAnswer(${idx})" ${userAnswered ? 'disabled' : ''}>
-        ${String.fromCharCode(65 + idx)}. ${opt}
-    </button>`;
-}).join('');
+            optionsHtml = opts.map((opt, idx) => {
+                const isSelected = userAnswered && answers[user.uid][currentQ].answer === idx;
+                const isCorrect = isSelected && answers[user.uid][currentQ].isCorrect;
+                const isWrong = isSelected && !isCorrect;
+                let btnClass = 'option-btn';
+                if (userAnswered) {
+                    btnClass += ' disabled';
+                    if (idx === question.correct) btnClass += ' show-correct';
+                    if (isWrong) btnClass += ' selected-wrong';
+                }
+                return `<button class="${btnClass}" onclick="App._submitMultiplayerAnswer(${idx})" ${userAnswered ? 'disabled' : ''}>
+                    ${String.fromCharCode(65 + idx)}. ${opt}
+                </button>`;
+            }).join('');
         } else if (qType === 'fill_blank') {
             optionsHtml = `
                 <div style="display:flex;gap:0.5rem;justify-content:center;max-width:400px;margin:0 auto;">
-                    <input type="text" id="mpFillBlankInput" placeholder="اكتب الإجابة..." style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);color:var(--light);" ${userAnswered ? 'disabled' : ''}>
-                    <button class="btn btn-primary" onclick="App._submitMultiplayerFillBlank()" ${userAnswered ? 'disabled' : ''}>تأكيد</button>
+                    <input type="text" id="mpFillBlankInput" placeholder="اكتب الإجابة..." 
+                           style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);color:var(--light);" 
+                           ${userAnswered ? 'disabled' : ''}>
+                    <button class="btn btn-primary" onclick="App._submitMultiplayerFillBlank()" ${userAnswered ? 'disabled' : ''}>
+                        تأكيد
+                    </button>
                 </div>
             `;
         } else if (qType === 'matching') {
@@ -17493,11 +17660,16 @@ optionsHtml = opts.map((opt, idx) => {
                     <button class="btn btn-primary mt-1" onclick="App._submitMultiplayerOrdering('${gameId}')">تأكيد الترتيب</button>
                 `;
             }
+        } else {
+            optionsHtml = `<div class="text-gray">نوع السؤال غير مدعوم</div>`;
         }
 
-        // ===== بناء واجهة اللعب =====
+        // ============================================================
+        // بناء واجهة اللعب
+        // ============================================================
         let html = `
             <div class="game-container">
+                <!-- رأس اللعبة -->
                 <div class="game-header">
                     <div style="display:flex;align-items:center;gap:0.8rem;flex-wrap:wrap;">
                         <span class="badge badge-primary">${currentQ+1}/${questions.length}</span>
@@ -17509,6 +17681,14 @@ optionsHtml = opts.map((opt, idx) => {
                     </button>
                 </div>
 
+                <!-- شريط التقدم -->
+                <div class="game-progress" style="margin-bottom:0.8rem;">
+                    <div class="progress-bar" style="height:6px;">
+                        <div class="fill" style="width:${progress}%;height:100%;background:linear-gradient(90deg, var(--primary), var(--accent));border-radius:10px;transition:width 0.3s ease;"></div>
+                    </div>
+                </div>
+
+                <!-- مربع السؤال -->
                 <div class="question-box">
                     <div class="q-category">📚 ${question.category || 'عام'}</div>
                     <div class="q-type-badge">${GameEngine._getTypeLabel(question.type)}</div>
@@ -17518,62 +17698,108 @@ optionsHtml = opts.map((opt, idx) => {
                     </div>
                 </div>
 
+                <!-- الترتيب الحالي -->
                 <div class="card" style="padding:0.8rem;">
-                    <div class="card-title" style="font-size:1rem;"><i class="fas fa-crown"></i> الترتيب الحالي</div>
-                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.3rem;">
-                        ${sortedPlayers.map((p, i) => {
+                    <div class="card-title" style="font-size:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.3rem;">
+                        <span><i class="fas fa-crown" style="color:var(--accent);"></i> الترتيب الحالي</span>
+                        <span style="font-size:0.7rem;color:var(--gray);">
+                            ⭐ النقاط الكلية • ✅ الصحيح • ❌ الخاطئ
+                        </span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.3rem;">
+                        ${sorted.map((p, i) => {
                             const isMe = p.uid === user?.uid;
-                            // حساب النقاط من scores إذا كانت موجودة
-                            const scoreData = g.scores[p.uid] || p;
+                            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
+                            const isTop = i < 3;
+                            const pTotal = (p.totalScore || p.score || 0);
+                            const pCorrect = p.correct || 0;
+                            const pWrong = p.wrong || 0;
+                            
                             return `
-                                <div class="player-rank-item ${i === 0 ? 'top1' : ''} ${isMe ? 'me' : ''}" style="background:${i === 0 ? 'var(--accent)' : 'var(--glass)'};${i === 0 ? 'color:var(--dark);' : ''}">
-                                    <span>${i+1}. ${p.name} ${isMe ? '(أنت)' : ''}</span>
-                                    <span style="font-weight:700;">⭐ ${scoreData.score || 0}</span>
+                                <div class="player-rank-item ${isTop ? 'top' : ''} ${isMe ? 'me' : ''}" 
+                                     style="background:${isTop ? 'var(--accent)' : (isMe ? 'var(--primary)' : 'var(--glass)')};
+                                            ${isTop ? 'color:var(--dark);' : ''}
+                                            ${isMe && !isTop ? 'color:#fff;' : ''}
+                                            padding:0.3rem 0.6rem;border-radius:6px;
+                                            display:flex;justify-content:space-between;align-items:center;
+                                            border:${isMe ? '2px solid var(--accent)' : '1px solid var(--glass-border)'};
+                                            transition:all 0.3s ease;">
+                                    <div style="display:flex;align-items:center;gap:0.3rem;min-width:0;">
+                                        <span style="font-weight:700;font-size:0.9rem;flex-shrink:0;">${medal}</span>
+                                        <span style="font-weight:600;font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px;">
+                                            ${p.name} ${isMe ? '👈' : ''}
+                                        </span>
+                                        ${p.bestStreak >= 5 ? '<span style="font-size:0.7rem;flex-shrink:0;">🔥</span>' : ''}
+                                        ${p.streak >= 3 ? '<span style="font-size:0.6rem;flex-shrink:0;">⚡</span>' : ''}
+                                    </div>
+                                    <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
+                                        <span style="font-weight:700;font-size:0.9rem;color:${isTop ? 'var(--dark)' : 'var(--accent)'};">⭐ ${pTotal}</span>
+                                        <span style="font-size:0.6rem;color:${isTop ? 'rgba(0,0,0,0.5)' : 'var(--gray)'};display:flex;gap:0.2rem;">
+                                            <span style="color:var(--success);">✅${pCorrect}</span>
+                                            <span style="color:var(--secondary);">❌${pWrong}</span>
+                                        </span>
+                                    </div>
                                 </div>
                             `;
                         }).join('')}
                     </div>
+                    
+                    <!-- إحصائيات سريعة -->
+                    <div style="display:flex;flex-wrap:wrap;gap:0.5rem 1rem;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--glass-border);font-size:0.7rem;color:var(--gray);">
+                        <span>🎯 متوسط الدقة: 
+                            <strong style="color:var(--light);">
+                                ${sorted.length > 0 ? Math.round(sorted.reduce((sum, p) => {
+                                    const acc = p.answersCount > 0 ? (p.correct / p.answersCount) * 100 : 0;
+                                    return sum + acc;
+                                }, 0) / sorted.length) : 0}%
+                            </strong>
+                        </span>
+                        <span>🔥 أفضل سلسلة: 
+                            <strong style="color:var(--accent);">
+                                ${Math.max(...sorted.map(p => p.bestStreak || 0))}
+                            </strong>
+                        </span>
+                        <span>⚡ متوسط السرعة: 
+                            <strong style="color:var(--info);">
+                                ${sorted.length > 0 ? (sorted.reduce((sum, p) => sum + (p.avgTime || 0), 0) / sorted.length).toFixed(1) : 0}s
+                            </strong>
+                        </span>
+                        <span>📊 إجمالي الإجابات: 
+                            <strong style="color:var(--primary);">
+                                ${sorted.reduce((sum, p) => sum + (p.answersCount || 0), 0)}
+                            </strong>
+                        </span>
+                    </div>
                 </div>
             </div>
         `;
+
         container.innerHTML = html;
 
+        // ============================================================
         // ربط أزرار الخروج
+        // ============================================================
         const exitBtn = document.getElementById('mpExitGameBtn');
         if (exitBtn) {
-            exitBtn.addEventListener('click', () => {
+            exitBtn.onclick = function() {
                 if (confirm('هل تريد مغادرة المباراة؟')) {
                     MultiplayerManager.leaveGame();
                 }
-            });
+            };
         }
 
-        // ===== تحديث المؤقت =====
-        if (MultiplayerManager._timerInterval) {
-            clearInterval(MultiplayerManager._timerInterval);
-        }
-        MultiplayerManager._timerInterval = setInterval(() => {
-            const elapsedNow = (Date.now() - g.questionStartTime) / 1000;
-            const remaining = Math.max(0, timeLimit - Math.floor(elapsedNow));
-            const timerEl = document.querySelector('.game-header .badge-warning, .game-header .badge-danger');
-            if (timerEl) {
-                timerEl.textContent = `⏱ ${remaining}s`;
-                timerEl.className = `badge ${remaining <= 5 ? 'badge-danger' : 'badge-warning'}`;
-            }
-            // شريط التقدم
-            const progressFill = document.querySelector('.game-progress .fill');
-            if (progressFill) {
-                const prog = Math.min((elapsedNow / timeLimit) * 100, 100);
-                progressFill.style.width = `${prog}%`;
-                progressFill.style.background = remaining <= 5 ? 'var(--secondary)' : 'linear-gradient(90deg, var(--primary), var(--accent))';
-            }
-
-            if (remaining === 0 && !userAnswered && !MultiplayerManager._gameEnded) {
-                if (user) {
-                    MultiplayerManager.submitAnswer(gameId, -1);
-                }
-            }
-        }, 1000);
+    }).catch(error => {
+        console.error('❌ Error rendering multiplayer game:', error);
+        container.innerHTML = `
+            <div class="card" style="text-align:center;padding:2rem;color:var(--secondary);">
+                <i class="fas fa-exclamation-circle" style="font-size:3rem;"></i>
+                <h3>حدث خطأ في تحميل واجهة اللعب</h3>
+                <p class="text-gray">${error.message}</p>
+                <button class="btn btn-primary mt-1" onclick="MultiplayerManager.leaveGame();">
+                    <i class="fas fa-home"></i> العودة
+                </button>
+            </div>
+        `;
     });
 };
 
@@ -17705,26 +17931,27 @@ App._submitMultiplayerOrdering = async function(gameId) {
 
 App._renderMultiplayerResult = function(gameId) {
     const container = document.getElementById('multiplayerResultContent');
-    if (!container) return;
+    if (!container) {
+        console.error('❌ multiplayerResultContent not found');
+        return;
+    }
 
     db.collection('multiplayerGames').doc(gameId).get().then(async (doc) => {
         if (!doc.exists) {
             container.innerHTML = '<div class="text-gray">المباراة غير موجودة</div>';
             return;
         }
+
         const g = doc.data();
         const user = AuthService.currentUser;
         const isLightTheme = document.body.classList.contains('light-theme');
 
-        // ===== استخراج البيانات الصحيحة من scores =====
+        // ===== 1. استخراج بيانات اللاعبين والإحصائيات =====
         const scoresData = g.scores || {};
-        
-        // بناء قائمة اللاعبين مع الإحصائيات الصحيحة من scores
         const playersWithStats = g.players.map(p => {
             const stats = scoresData[p.uid] || {};
             return {
                 ...p,
-                // الإحصائيات الأساسية من scores
                 score: stats.score || 0,
                 correct: stats.correct || 0,
                 wrong: stats.wrong || 0,
@@ -17732,8 +17959,7 @@ App._renderMultiplayerResult = function(gameId) {
                 bestStreak: stats.bestStreak || 0,
                 totalTime: stats.totalTime || 0,
                 avgTime: stats.avgTime || 0,
-                answersCount: stats.answersCount || 0,
-                answeredQuestions: stats.answeredQuestions || []
+                answersCount: stats.answersCount || 0
             };
         });
 
@@ -17741,178 +17967,345 @@ App._renderMultiplayerResult = function(gameId) {
         const winner = sorted[0];
         const totalQuestions = g.questions ? g.questions.length : 0;
 
-        // ===== حساب المكافآت لكل لاعب =====
+        // ===== 2. حساب المكافآت لكل لاعب =====
         const rewardsMap = {};
+        let userRewards = null;
         for (let i = 0; i < sorted.length; i++) {
             const player = sorted[i];
             const rank = i + 1;
-            const rewards = MultiplayerRewards.calculateRewards(player, rank, sorted.length, {
-                totalQuestions: totalQuestions
-            });
-            rewardsMap[player.uid] = rewards;
-
-            // تطبيق المكافآت على المستخدم الحالي فقط (تطبيق فوري)
-            if (player.uid === user?.uid) {
-                await MultiplayerRewards.applyRewards(player.uid, rewards);
-                // تحديث واجهة المستخدم
-                App._updateUserUI(user);
-            } else {
-                // تطبيق المكافآت في الخلفية للاعبين الآخرين
-                MultiplayerRewards.applyRewards(player.uid, rewards).catch(() => {});
+            try {
+                const rewards = MultiplayerRewards.calculateRewards(player, rank, sorted.length, {
+                    totalQuestions: totalQuestions
+                });
+                rewardsMap[player.uid] = rewards;
+                if (player.uid === user?.uid) {
+                    userRewards = rewards;
+                }
+            } catch (e) {
+                console.warn('Error calculating rewards for player', player.uid, e);
+                rewardsMap[player.uid] = {
+                    total: 0,
+                    rankPoints: 0,
+                    levelPoints: 0,
+                    coins: 0,
+                    breakdown: { rankPoints: [], levelPoints: [], coins: [] },
+                    penalty: false
+                };
             }
         }
 
-        // ===== الإحصائيات الجماعية =====
-        const totalCorrect = sorted.reduce((sum, p) => sum + (p.correct || 0), 0);
-        const totalWrong = sorted.reduce((sum, p) => sum + (p.wrong || 0), 0);
-        const totalAnswers = sorted.reduce((sum, p) => sum + (p.answersCount || 0), 0);
-        const avgScore = sorted.length > 0 ? Math.round(sorted.reduce((sum, p) => sum + (p.score || 0), 0) / sorted.length) : 0;
+// ✅ هذا هو المكان الذي تضع فيه الكود المطلوب
+if (user) {
+    await MultiplayerRewards.applyRewards(user.uid, rewardsMap[user.uid]);
+    // تحديث واجهة المستخدم فوراً
+    App._updateUserUI(AuthService.currentUser);
+    App._updateProfileTabContent(AuthService.currentUser);
+    // تحديث العناصر الأخرى إن لزم
+    App._updateFollowCounts();
+    App._refreshActiveBoosts();
+}
 
-        // ===== بناء الواجهة =====
-        const textColor = isLightTheme ? 'var(--dark)' : 'var(--light)';
-        const cardBg = isLightTheme ? 'rgba(255,255,255,0.9)' : 'var(--card-bg)';
-        const borderColor = isLightTheme ? 'rgba(0,0,0,0.08)' : 'var(--border-color)';
+        // ===== 4. حساب تقدم المستوى والرتبة =====
+        const userData = AuthService.currentUser;
+        const oldLevel = userData ? getLevel((userData.totalScore || 0) - (userRewards?.levelPoints || 0)) : { level: 1 };
+        const newLevel = userData ? getLevel(userData.totalScore || 0) : { level: 1 };
+        const levelProgress = userData ? getLevelProgress(userData.totalScore || 0) : { progress: 0 };
+        const oldRank = userData ? getRank((userData.rankPoints || 0) - (userRewards?.rankPoints || 0)) : { progress: 0, name: 'برونزي 1' };
+        const newRank = userData ? getRank(userData.rankPoints || 0) : { progress: 0, name: 'برونزي 1' };
 
-        let html = `
-            <div style="text-align:center;margin-bottom:1.5rem;color:${textColor};">
-                <div style="font-size:4rem;margin-bottom:0.5rem;">🏆</div>
-                <h2 style="font-size:2rem;font-weight:900;color:${textColor};">انتهت المباراة!</h2>
-                <div style="font-size:1.5rem;font-weight:700;color:var(--accent);">
-                    الفائز: ${winner.name} (⭐ ${winner.score || 0} نقطة)
-                </div>
-                <div style="font-size:0.9rem;color:var(--gray);margin-top:0.3rem;">
-                    ${totalQuestions} سؤال • ${sorted.length} لاعب
-                </div>
-                <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;margin-top:0.5rem;">
-                    <button class="btn btn-sm btn-outline" onclick="App._shareMultiplayerResult('${gameId}')">
-                        <i class="fas fa-share-alt"></i> مشاركة النتيجة
-                    </button>
-                    <button class="btn btn-sm btn-primary" onclick="MultiplayerManager.leaveGame();">
-                        <i class="fas fa-home"></i> العودة إلى القائمة
-                    </button>
-                </div>
-            </div>
-            <hr style="border-color:var(--glass-border);margin:1rem 0;">
+        // ===== 5. دالة عرض الإحصائيات الكاملة (الخطوة النهائية) =====
+        const displayFullResults = function() {
+            const textColor = isLightTheme ? 'var(--dark)' : 'var(--light)';
+            const cardBg = isLightTheme ? 'rgba(255,255,255,0.9)' : 'var(--card-bg)';
+            const borderColor = isLightTheme ? 'rgba(0,0,0,0.08)' : 'var(--border-color)';
 
-            <h3 style="font-size:1.2rem;margin-bottom:1rem;color:${textColor};"><i class="fas fa-list"></i> الترتيب النهائي والإحصائيات</h3>
-        `;
-
-        // ===== عرض كل لاعب =====
-        sorted.forEach((p, i) => {
-            const isMe = p.uid === user?.uid;
-            const rank = i + 1;
-            const rewards = rewardsMap[p.uid] || { total: 0, rankPoints: 0, levelPoints: 0, coins: 0, bonus: [], penalty: false };
-            const isWinner = rank === 1;
-            const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
-
-            // حساب الدقة بشكل صحيح
-            const accuracy = p.answersCount > 0 ? Math.round((p.correct / p.answersCount) * 100) : 0;
-
-            // ألوان البطاقة
-            let cardBgColor = cardBg;
-            let cardTextColor = textColor;
-            let cardBorder = borderColor;
-
-            if (isWinner) {
-                cardBgColor = '#FFD700';
-                cardTextColor = '#1a1a2e';
-                cardBorder = '#FFD700';
-            } else if (isLightTheme) {
-                cardBgColor = 'rgba(255,255,255,0.95)';
-                cardTextColor = '#1a1a2e';
-            }
-
-            html += `
-                <div style="background:${cardBgColor};padding:0.8rem 1.2rem;border-radius:10px;border:2px solid ${isWinner ? 'var(--accent)' : cardBorder};${isWinner ? 'box-shadow: 0 0 40px rgba(255,217,61,0.3);' : ''} ${isMe && !isWinner ? 'border-right:4px solid var(--primary);' : ''} margin-bottom:0.8rem;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-                        <div style="display:flex;align-items:center;gap:0.5rem;">
-                            <span style="font-weight:700;font-size:1.1rem;color:${cardTextColor};">${medal}</span>
-                            <span style="font-weight:700;font-size:1.1rem;color:${cardTextColor};">${p.name} ${isMe ? '👈 (أنت)' : ''}</span>
-                            ${isWinner ? '<span style="font-size:1.5rem;">👑</span>' : ''}
-                            ${rewards.penalty ? '<span style="font-size:1.2rem;color:var(--secondary);">💔</span>' : ''}
-                        </div>
-                        <span style="font-weight:900;font-size:1.3rem;color:${isWinner ? 'var(--dark)' : 'var(--accent)'};">⭐ ${p.score || 0}</span>
+            let html = `
+                <div style="text-align:center;margin-bottom:1.5rem;color:${textColor};">
+                    <div style="font-size:4rem;margin-bottom:0.5rem;">🏆</div>
+                    <h2 style="font-size:2rem;font-weight:900;color:${textColor};">انتهت المباراة!</h2>
+                    <div style="font-size:1.5rem;font-weight:700;color:var(--accent);">
+                        الفائز: ${winner.name} (⭐ ${winner.score || 0} نقطة)
                     </div>
-
-                    <!-- الإحصائيات -->
-                    <div style="display:flex;flex-wrap:wrap;gap:0.5rem 1.2rem;font-size:0.85rem;color:${isWinner ? 'rgba(0,0,0,0.7)' : 'var(--gray)'};margin-top:0.3rem;">
-                        <span>✅ صحيح: <strong style="color:${isWinner ? 'var(--dark)' : 'var(--success)'};">${p.correct || 0}</strong></span>
-                        <span>❌ خاطئ: <strong style="color:${isWinner ? 'var(--dark)' : 'var(--secondary)'};">${p.wrong || 0}</strong></span>
-                        <span>🎯 الدقة: <strong style="color:${accuracy >= 70 ? (isWinner ? 'var(--dark)' : 'var(--success)') : 'var(--secondary)'};">${accuracy}%</strong></span>
-                        <span>🔥 أفضل سلسلة: <strong style="color:${isWinner ? 'var(--dark)' : 'var(--accent)'};">${p.bestStreak || 0}</strong></span>
-                        <span>⏱ متوسط الوقت: <strong style="color:${isWinner ? 'var(--dark)' : 'var(--light)'};">${p.avgTime ? p.avgTime.toFixed(1) : 0}s</strong></span>
-                        <span>📊 الإجابات: <strong style="color:${isWinner ? 'var(--dark)' : 'var(--light)'};">${p.answersCount || 0}</strong></span>
-                        <span>📝 الأسئلة المجاب عليها: <strong style="color:${isWinner ? 'var(--dark)' : 'var(--info)'};">${p.answeredQuestions?.length || 0}</strong></span>
+                    <div style="font-size:0.9rem;color:var(--gray);margin-top:0.3rem;">
+                        ${totalQuestions} سؤال • ${sorted.length} لاعب
                     </div>
+                    <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;margin-top:0.5rem;">
+                        <button class="btn btn-sm btn-outline" onclick="App._shareMultiplayerResult('${gameId}')">
+                            <i class="fas fa-share-alt"></i> مشاركة النتيجة
+                        </button>
+                        <button class="btn btn-sm btn-primary" onclick="MultiplayerManager.leaveGame();">
+                            <i class="fas fa-home"></i> العودة إلى القائمة
+                        </button>
+                    </div>
+                </div>
+                <hr style="border-color:var(--glass-border);margin:1rem 0;">
+                <h3 style="font-size:1.2rem;margin-bottom:1rem;color:${textColor};"><i class="fas fa-list"></i> الترتيب النهائي والإحصائيات</h3>
+            `;
 
-                    <!-- عرض المكافآت للمستخدم الحالي فقط -->
-                    ${isMe ? `
-                        <div style="margin-top:0.5rem;">
-                            ${MultiplayerRewards.renderRewardsUI(rewards, p, isWinner)}
+            // عرض كل لاعب مع تفاصيل المكافآت
+            sorted.forEach((p, idx) => {
+                const isMe = p.uid === user?.uid;
+                const rank = idx + 1;
+                const rewards = rewardsMap[p.uid] || {
+                    total: 0,
+                    rankPoints: 0,
+                    levelPoints: 0,
+                    coins: 0,
+                    breakdown: { rankPoints: [], levelPoints: [], coins: [] },
+                    penalty: false
+                };
+                const isWinner = rank === 1;
+                const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
+
+                const answeredCount = p.answersCount || 0;
+                const missed = totalQuestions - answeredCount;
+                const accuracy = answeredCount > 0 ? Math.round((p.correct / answeredCount) * 100) : 0;
+                const avgTime = p.avgTime ? p.avgTime.toFixed(1) : '0';
+                const pScore = p.score || 0;
+                const pCorrect = p.correct || 0;
+                const pWrong = p.wrong || 0;
+                const pBestStreak = p.bestStreak || 0;
+
+                // بناء تفاصيل المكافآت
+                let rewardsDetailsHtml = '';
+
+                const buildBreakdownList = (items) => {
+                    if (!items || items.length === 0) return '';
+                    return items.map(item => `
+                        <span style="font-size:0.55rem;background:var(--card-bg);padding:0.1rem 0.5rem;border-radius:30px;border:1px solid var(--glass-border);">
+                            ${item.label}
+                        </span>
+                    `).join('');
+                };
+
+                if (isMe) {
+                    // عرض كامل للمستخدم الحالي
+                    rewardsDetailsHtml = `
+                        <div style="margin-top:0.5rem;padding:0.5rem;background:var(--glass);border-radius:8px;border:1px solid ${rewards.penalty ? 'var(--secondary)' : 'var(--accent)'};">
+                            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.3rem;text-align:center;">
+                                <div style="background:${rewards.rankPoints >= 0 ? 'rgba(46,204,113,0.1)' : 'rgba(255,107,107,0.1)'};border-radius:6px;padding:0.3rem;">
+                                    <div style="font-size:0.6rem;color:var(--gray);">🏅 نقاط الرتبة</div>
+                                    <div style="font-weight:700;font-size:1.1rem;color:${rewards.rankPoints >= 0 ? 'var(--success)' : 'var(--secondary)'};">${rewards.rankPoints >= 0 ? '+' : ''}${rewards.rankPoints}</div>
+                                </div>
+                                <div style="background:rgba(108,99,255,0.1);border-radius:6px;padding:0.3rem;">
+                                    <div style="font-size:0.6rem;color:var(--gray);">⭐ نقاط المستوى</div>
+                                    <div style="font-weight:700;font-size:1.1rem;color:var(--primary);">+${rewards.levelPoints}</div>
+                                </div>
+                                <div style="background:rgba(255,217,61,0.1);border-radius:6px;padding:0.3rem;">
+                                    <div style="font-size:0.6rem;color:var(--gray);">🪙 العملات</div>
+                                    <div style="font-weight:700;font-size:1.1rem;color:var(--accent);">+${rewards.coins}</div>
+                                </div>
+                            </div>
+                            
+                            ${rewards.breakdown?.rankPoints?.length > 0 ? `
+                                <div style="margin-top:0.3rem;padding:0.3rem;background:rgba(46,204,113,0.05);border-radius:6px;border-right:2px solid var(--success);">
+                                    <div style="font-size:0.6rem;font-weight:700;color:var(--gray);">🏅 تفاصيل نقاط الرتبة:</div>
+                                    <div style="display:flex;flex-wrap:wrap;gap:0.2rem;margin-top:0.2rem;">
+                                        ${buildBreakdownList(rewards.breakdown.rankPoints)}
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            ${rewards.breakdown?.levelPoints?.length > 0 ? `
+                                <div style="margin-top:0.3rem;padding:0.3rem;background:rgba(108,99,255,0.05);border-radius:6px;border-right:2px solid var(--primary);">
+                                    <div style="font-size:0.6rem;font-weight:700;color:var(--gray);">⭐ تفاصيل نقاط المستوى:</div>
+                                    <div style="display:flex;flex-wrap:wrap;gap:0.2rem;margin-top:0.2rem;">
+                                        ${buildBreakdownList(rewards.breakdown.levelPoints)}
+                                    </div>
+                                </div>
+                            ` : ''}
+                            
+                            ${rewards.breakdown?.coins?.length > 0 ? `
+                                <div style="margin-top:0.3rem;padding:0.3rem;background:rgba(255,217,61,0.05);border-radius:6px;border-right:2px solid var(--accent);">
+                                    <div style="font-size:0.6rem;font-weight:700;color:var(--gray);">🪙 تفاصيل العملات:</div>
+                                    <div style="display:flex;flex-wrap:wrap;gap:0.2rem;margin-top:0.2rem;">
+                                        ${buildBreakdownList(rewards.breakdown.coins)}
+                                    </div>
+                                </div>
+                            ` : ''}
+
+                            <div style="margin-top:0.3rem;display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.2rem;font-size:0.6rem;color:var(--gray);border-top:1px solid var(--glass-border);padding-top:0.3rem;">
+                                <div>✅ صحيح: <strong style="color:var(--success);">${pCorrect}</strong></div>
+                                <div>❌ خاطئ: <strong style="color:var(--secondary);">${pWrong}</strong></div>
+                                <div>🎯 دقة: <strong>${accuracy}%</strong></div>
+                                <div>🔥 أفضل سلسلة: <strong style="color:var(--accent);">${pBestStreak}</strong></div>
+                                <div>⏱ متوسط الوقت: <strong>${avgTime}s</strong></div>
+                                <div>⏳ لم يجب: <strong style="color:${missed > 0 ? 'var(--secondary)' : 'var(--success)'};">${missed}</strong></div>
+                            </div>
                         </div>
-                    ` : `
-                        ${rewards.total > 0 ? `
-                            <div style="margin-top:0.3rem;font-size:0.7rem;color:var(--gray);">
-                                <i class="fas fa-gift"></i> حصل على ${rewards.total} مكافأة
+                    `;
+                } else {
+                    // عرض مختصر للآخرين مع زر عرض التفاصيل
+                    const rankBreakdown = rewards.breakdown?.rankPoints?.map(item => item.label).join(' • ') || '';
+                    const levelBreakdown = rewards.breakdown?.levelPoints?.map(item => item.label).join(' • ') || '';
+                    const coinBreakdown = rewards.breakdown?.coins?.map(item => item.label).join(' • ') || '';
+
+                    rewardsDetailsHtml = `
+                        <button class="btn btn-xs btn-outline" onclick="
+                            const container = this.nextElementSibling;
+                            const icon = this.querySelector('i');
+                            if (container.style.display === 'none') {
+                                container.style.display = 'block';
+                                icon.className = 'fas fa-chevron-up';
+                            } else {
+                                container.style.display = 'none';
+                                icon.className = 'fas fa-chevron-down';
+                            }
+                        " style="font-size:0.55rem;padding:2px 8px;margin-top:0.2rem;background:transparent;border:1px solid var(--glass-border);border-radius:30px;color:var(--gray);">
+                            <i class="fas fa-chevron-down"></i> عرض المكافآت
+                        </button>
+                        <div style="display:none;margin-top:0.3rem;padding:0.4rem;background:var(--glass);border-radius:6px;">
+                            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.2rem;text-align:center;font-size:0.75rem;">
+                                <div>
+                                    <div style="font-size:0.5rem;color:var(--gray);">🏅 رتبة</div>
+                                    <div style="font-weight:700;color:${rewards.rankPoints >= 0 ? 'var(--success)' : 'var(--secondary)'};">${rewards.rankPoints >= 0 ? '+' : ''}${rewards.rankPoints}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size:0.5rem;color:var(--gray);">⭐ مستوى</div>
+                                    <div style="font-weight:700;color:var(--primary);">+${rewards.levelPoints}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size:0.5rem;color:var(--gray);">🪙 عملات</div>
+                                    <div style="font-weight:700;color:var(--accent);">+${rewards.coins}</div>
+                                </div>
                             </div>
-                        ` : ''}
-                        ${rewards.penalty ? `
-                            <div style="margin-top:0.3rem;font-size:0.7rem;color:var(--secondary);">
-                                <i class="fas fa-exclamation-triangle"></i> عقوبة رتبة: ${rewards.rankPoints}
+                            ${rankBreakdown ? `<div style="margin-top:0.2rem;font-size:0.55rem;color:var(--gray);border-top:1px solid var(--glass-border);padding-top:0.2rem;"><strong>🏅 رتبة:</strong> ${rankBreakdown}</div>` : ''}
+                            ${levelBreakdown ? `<div style="font-size:0.55rem;color:var(--gray);"><strong>⭐ مستوى:</strong> ${levelBreakdown}</div>` : ''}
+                            ${coinBreakdown ? `<div style="font-size:0.55rem;color:var(--gray);"><strong>🪙 عملات:</strong> ${coinBreakdown}</div>` : ''}
+                            <div style="margin-top:0.2rem;display:grid;grid-template-columns:1fr 1fr;gap:0.1rem;font-size:0.55rem;color:var(--gray);border-top:1px solid var(--glass-border);padding-top:0.2rem;">
+                                <div>✅ ${pCorrect} صحيح</div>
+                                <div>❌ ${pWrong} خاطئ</div>
+                                <div>🎯 ${accuracy}% دقة</div>
+                                <div>🔥 ${pBestStreak} أفضل سلسلة</div>
                             </div>
-                        ` : ''}
-                    `}
+                        </div>
+                    `;
+                }
+
+                html += `
+                    <div style="background:${isWinner ? '#FFD700' : cardBg};padding:0.8rem 1.2rem;border-radius:10px;border:2px solid ${isWinner ? 'var(--accent)' : borderColor};${isWinner ? 'box-shadow: 0 0 40px rgba(255,217,61,0.3);' : ''} ${isMe && !isWinner ? 'border-right:4px solid var(--primary);' : ''} margin-bottom:0.8rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                            <div style="display:flex;align-items:center;gap:0.5rem;">
+                                <span style="font-weight:700;font-size:1.1rem;color:${isWinner ? 'var(--dark)' : textColor};">${medal}</span>
+                                <span style="font-weight:700;font-size:1.1rem;color:${isWinner ? 'var(--dark)' : textColor};">${p.name} ${isMe ? '👈 (أنت)' : ''}</span>
+                                ${isWinner ? '<span style="font-size:1.5rem;">👑</span>' : ''}
+                                ${rewards.penalty ? '<span style="font-size:1.2rem;color:var(--secondary);">💔</span>' : ''}
+                            </div>
+                            <div style="display:flex;gap:0.8rem;flex-wrap:wrap;align-items:center;">
+                                <span style="font-weight:900;font-size:1.2rem;color:${isWinner ? 'var(--dark)' : 'var(--accent)'};">⭐ ${pScore}</span>
+                                <span style="font-size:0.75rem;color:${isWinner ? 'rgba(0,0,0,0.6)' : 'var(--gray)'};">المجموع: ${rewards.total}</span>
+                            </div>
+                        </div>
+                        ${rewardsDetailsHtml}
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        };
+
+        // ===== 6. عرض شريط التقدم المتحرك =====
+        const renderProgressStep = (title, progress, sub, isLast = false) => {
+            return `
+                <div class="progress-step" style="text-align:center;padding:1rem 0;">
+                    <h3 style="font-size:1.5rem;font-weight:800;margin-bottom:0.5rem;">${title}</h3>
+                    <div style="max-width:400px;margin:0 auto;">
+                        <div class="progress-bar" style="height:12px;background:var(--glass);border-radius:10px;overflow:hidden;">
+                            <div class="fill" style="width:0%;height:100%;background:linear-gradient(90deg, var(--primary), var(--accent));border-radius:10px;transition:width 1.5s ease;"></div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--gray);margin-top:0.3rem;">
+                            <span>0%</span>
+                            <span id="progressPercent">0%</span>
+                            <span>100%</span>
+                        </div>
+                    </div>
+                    <div style="font-size:0.9rem;color:var(--gray);margin-top:0.3rem;">${sub}</div>
+                    <button class="btn btn-primary mt-2" id="progressNextBtn" style="justify-content:center;min-width:120px;">
+                        ${isLast ? 'عرض النتائج 🏆' : 'التالي →'}
+                    </button>
                 </div>
             `;
+        };
+
+        const steps = [
+            {
+                title: `المستوى ${newLevel.level}`,
+                progress: levelProgress.progress,
+                sub: `+${userRewards?.levelPoints || 0} نقطة مستوى`
+            },
+            {
+                title: `الرتبة ${newRank.name}`,
+                progress: newRank.progress,
+                sub: `${userRewards?.rankPoints >= 0 ? '+' : ''}${userRewards?.rankPoints || 0} نقطة رتبة`
+            }
+        ];
+
+        let currentStep = 0;
+
+        // عرض الخطوة الأولى
+        container.innerHTML = `
+            <div id="progressStepsContainer">
+                ${renderProgressStep(steps[0].title, steps[0].progress, steps[0].sub, steps.length === 1)}
+            </div>
+        `;
+
+        // تحريك شريط التقدم للخطوة الأولى
+        setTimeout(() => {
+            const fill = document.querySelector('.progress-step .fill');
+            const percent = document.getElementById('progressPercent');
+            if (fill) {
+                fill.style.width = `${steps[0].progress}%`;
+                if (percent) percent.textContent = `${Math.round(steps[0].progress)}%`;
+            }
+        }, 300);
+
+        // ربط زر "التالي" للخطوة الأولى
+        document.getElementById('progressNextBtn')?.addEventListener('click', function() {
+            currentStep++;
+            if (currentStep >= steps.length) {
+                // عرض الإحصائيات الكاملة
+                displayFullResults();
+                return;
+            }
+            // عرض الخطوة التالية
+            const container = document.getElementById('progressStepsContainer');
+            container.innerHTML = `
+                ${renderProgressStep(steps[currentStep].title, steps[currentStep].progress, steps[currentStep].sub, currentStep === steps.length - 1)}
+            `;
+            setTimeout(() => {
+                const fill = document.querySelector('.progress-step .fill');
+                const percent = document.getElementById('progressPercent');
+                if (fill) {
+                    fill.style.width = `${steps[currentStep].progress}%`;
+                    if (percent) percent.textContent = `${Math.round(steps[currentStep].progress)}%`;
+                }
+            }, 300);
+            // ربط زر "التالي" الجديد
+            document.getElementById('progressNextBtn')?.addEventListener('click', function() {
+                currentStep++;
+                if (currentStep >= steps.length) {
+                    displayFullResults();
+                } else {
+                    // عرض الخطوة التالية (لن يحدث هنا لأننا في آخر خطوة)
+                }
+            });
         });
 
-        // ===== إحصائيات إضافية =====
-        html += `
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.5rem;margin-top:1rem;padding:0.8rem;background:${cardBg};border-radius:var(--radius-sm);border:1px solid ${borderColor};">
-                <div style="text-align:center;color:${textColor};">
-                    <div style="font-size:0.7rem;color:var(--gray);">إجمالي النقاط</div>
-                    <div style="font-weight:700;font-size:1.1rem;color:var(--accent);">⭐ ${sorted.reduce((sum, p) => sum + (p.score || 0), 0)}</div>
+    }).catch(error => {
+        console.error('❌ Error rendering multiplayer result:', error);
+        const container = document.getElementById('multiplayerResultContent');
+        if (container) {
+            container.innerHTML = `
+                <div class="card" style="text-align:center;padding:2rem;color:var(--secondary);">
+                    <i class="fas fa-exclamation-circle" style="font-size:3rem;"></i>
+                    <h3>حدث خطأ في عرض النتائج</h3>
+                    <p class="text-gray">${error.message}</p>
+                    <button class="btn btn-primary mt-1" onclick="MultiplayerManager.leaveGame();">
+                        <i class="fas fa-home"></i> العودة
+                    </button>
                 </div>
-                <div style="text-align:center;color:${textColor};">
-                    <div style="font-size:0.7rem;color:var(--gray);">متوسط النقاط</div>
-                    <div style="font-weight:700;font-size:1.1rem;color:var(--primary);">⭐ ${avgScore}</div>
-                </div>
-                <div style="text-align:center;color:${textColor};">
-                    <div style="font-size:0.7rem;color:var(--gray);">إجمالي الصحيح</div>
-                    <div style="font-weight:700;font-size:1.1rem;color:var(--success);">✅ ${totalCorrect}</div>
-                </div>
-                <div style="text-align:center;color:${textColor};">
-                    <div style="font-size:0.7rem;color:var(--gray);">إجمالي الخاطئ</div>
-                    <div style="font-weight:700;font-size:1.1rem;color:var(--secondary);">❌ ${totalWrong}</div>
-                </div>
-                <div style="text-align:center;color:${textColor};">
-                    <div style="font-size:0.7rem;color:var(--gray);">إجمالي الإجابات</div>
-                    <div style="font-weight:700;font-size:1.1rem;color:var(--info);">📊 ${totalAnswers}</div>
-                </div>
-            </div>
-        `;
-
-        html += `
-            <div style="margin-top:1.5rem;display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;">
-                <button class="btn btn-primary" onclick="MultiplayerManager.leaveGame();">
-                    <i class="fas fa-home"></i> العودة إلى القائمة
-                </button>
-                <button class="btn btn-outline" onclick="App._shareMultiplayerResult('${gameId}')">
-                    <i class="fas fa-share-alt"></i> مشاركة النتيجة
-                </button>
-                <button class="btn btn-success" onclick="MultiplayerManager.createGame({ 
-                    difficulty: '${g.settings?.difficulty || 'medium'}', 
-                    category: '${g.settings?.category || 'all'}', 
-                    questionType: '${g.settings?.questionType || 'all'}', 
-                    questionCount: '${g.settings?.questionCount || 10}', 
-                    timeLimit: '${g.settings?.timeLimit || 15}' 
-                })">
-                    <i class="fas fa-redo"></i> لعب مرة أخرى
-                </button>
-            </div>
-        `;
-
-        container.innerHTML = html;
+            `;
+        }
     });
 };
 
