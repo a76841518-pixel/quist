@@ -7224,3 +7224,980 @@ body.light-theme .dashboard-menu-icon {
         grid-template-columns: 1fr;
     }
 }
+
+/* ============================================================
+   إصلاح القوائم المنسدلة في الوضع الداكن
+   ============================================================ */
+
+/* تنسيق القوائم المنسدلة في الوضع الداكن */
+select,
+.form-group select,
+.game-select,
+.filter-select,
+.questions-toolbar .filter-select,
+.rooms-filters .filter-select {
+    background-color: #2a2a3e !important;
+    color: #ffffff !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* تنسيق خيارات القائمة المنسدلة */
+select option,
+.form-group select option,
+.game-select option,
+.filter-select option,
+.questions-toolbar .filter-select option,
+.rooms-filters .filter-select option {
+    background-color: #1a1a2e !important;
+    color: #ffffff !important;
+    padding: 8px 12px !important;
+}
+
+/* تنسيق القائمة المنسدلة عند الضغط عليها (في المتصفحات المختلفة) */
+select:focus,
+.form-group select:focus,
+.game-select:focus,
+.filter-select:focus {
+    outline: 2px solid var(--primary) !important;
+    outline-offset: 2px !important;
+}
+
+/* ===== تنسيق خاص لـ Firefox ===== */
+select:-moz-focusring {
+    color: transparent !important;
+    text-shadow: 0 0 0 #ffffff !important;
+}
+
+/* ===== تنسيق خاص لـ Chrome/Edge/Safari ===== */
+select::-webkit-listbox,
+select::-webkit-listbox option {
+    background-color: #1a1a2e !important;
+    color: #ffffff !important;
+}
+
+/* تنسيق القوائم المنسدلة في الوضع النهاري */
+body.light-theme select,
+body.light-theme .form-group select,
+body.light-theme .game-select,
+body.light-theme .filter-select,
+body.light-theme .questions-toolbar .filter-select,
+body.light-theme .rooms-filters .filter-select {
+    background-color: #ffffff !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+body.light-theme select option,
+body.light-theme .form-group select option,
+body.light-theme .game-select option,
+body.light-theme .filter-select option {
+    background-color: #ffffff !important;
+    color: #1a1a2e !important;
+}
+
+/* ===== تنسيق القوائم المنسدلة في المودالات ===== */
+.modal-card select,
+.modal-card .form-group select {
+    background-color: #2a2a3e !important;
+    color: #ffffff !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.modal-card select option,
+.modal-card .form-group select option {
+    background-color: #1a1a2e !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .modal-card select,
+body.light-theme .modal-card .form-group select {
+    background-color: #ffffff !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+body.light-theme .modal-card select option,
+body.light-theme .modal-card .form-group select option {
+    background-color: #ffffff !important;
+    color: #1a1a2e !important;
+}
+
+/* ===== تنسيق خاص للقوائم المنسدلة في صفحة الأسئلة ===== */
+.questions-toolbar .filter-select {
+    background-color: #2a2a3e !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+.questions-toolbar .filter-select option {
+    background-color: #1a1a2e !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .questions-toolbar .filter-select {
+    background-color: #f0f2f8 !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .questions-toolbar .filter-select option {
+    background-color: #ffffff !important;
+    color: #1a1a2e !important;
+}
+
+/* ===== تنسيق القوائم المنسدلة في صفحة الغرف ===== */
+.rooms-filters .filter-select {
+    background-color: #2a2a3e !important;
+    color: #ffffff !important;
+}
+
+.rooms-filters .filter-select option {
+    background-color: #1a1a2e !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .rooms-filters .filter-select {
+    background-color: #f0f2f8 !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .rooms-filters .filter-select option {
+    background-color: #ffffff !important;
+    color: #1a1a2e !important;
+}
+
+/* ===== تنسيق القوائم المنسدلة في لوحة المشرفين ===== */
+.admin-page select,
+.admin-page .form-group select {
+    background-color: #2a2a3e !important;
+    color: #ffffff !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.admin-page select option,
+.admin-page .form-group select option {
+    background-color: #1a1a2e !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .admin-page select,
+body.light-theme .admin-page .form-group select {
+    background-color: #ffffff !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .admin-page select option,
+body.light-theme .admin-page .form-group select option {
+    background-color: #ffffff !important;
+    color: #1a1a2e !important;
+}
+
+/* ===== تنسيق القوائم المنسدلة في صفحة الإعدادات ===== */
+#section-settings select,
+#section-settings .form-group select {
+    background-color: #2a2a3e !important;
+    color: #ffffff !important;
+}
+
+#section-settings select option,
+#section-settings .form-group select option {
+    background-color: #1a1a2e !important;
+    color: #ffffff !important;
+}
+
+body.light-theme #section-settings select,
+body.light-theme #section-settings .form-group select {
+    background-color: #ffffff !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme #section-settings select option,
+body.light-theme #section-settings .form-group select option {
+    background-color: #ffffff !important;
+    color: #1a1a2e !important;
+}
+
+/* ===== تنسيق القوائم المنسدلة في نموذج التسجيل ===== */
+#registerForm select,
+#registerForm .form-group select {
+    background-color: #2a2a3e !important;
+    color: #ffffff !important;
+}
+
+#registerForm select option,
+#registerForm .form-group select option {
+    background-color: #1a1a2e !important;
+    color: #ffffff !important;
+}
+
+body.light-theme #registerForm select,
+body.light-theme #registerForm .form-group select {
+    background-color: #ffffff !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme #registerForm select option,
+body.light-theme #registerForm .form-group select option {
+    background-color: #ffffff !important;
+    color: #1a1a2e !important;
+}
+
+/* ============================================================
+   إصلاح خلفية الصفحة الرئيسية في الوضع الفاتح
+   ============================================================ */
+
+/* تعديل خلفية الصفحة الرئيسية لتتغير مع الثيم */
+.dashboard-container {
+    position: relative;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0f0e17, #1a1a2e); /* الوضع الداكن */
+    padding: 0.8rem 0.6rem;
+    overflow-x: hidden;
+    transition: background 0.4s ease;
+}
+
+/* خلفية الصفحة الرئيسية في الوضع الفاتح */
+body.light-theme .dashboard-container {
+    background: linear-gradient(135deg, #f5f7fa, #e8ecf1) !important;
+}
+
+/* تعديل خلفية عناصر الصفحة الرئيسية في الوضع الفاتح */
+body.light-theme .dashboard-container .profile-card {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-theme .dashboard-container .level-box {
+    background: rgba(0, 0, 0, 0.03) !important;
+}
+
+body.light-theme .dashboard-container .rank-box {
+    background: rgba(0, 0, 0, 0.03) !important;
+}
+
+body.light-theme .dashboard-container .battlepass-box {
+    background: rgba(0, 0, 0, 0.05) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-theme .dashboard-container .btn-action {
+    background: rgba(0, 0, 0, 0.04) !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-theme .dashboard-container .btn-action.primary {
+    background: var(--primary) !important;
+    color: #fff !important;
+    border-color: var(--primary) !important;
+}
+
+body.light-theme .dashboard-container .btn-action.secondary {
+    background: var(--accent) !important;
+    color: #1a1a2e !important;
+    border-color: var(--accent) !important;
+}
+
+body.light-theme .dashboard-container .menu-icon-btn {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+body.light-theme .dashboard-container .top-currencies span {
+    background: rgba(0, 0, 0, 0.04) !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-theme .dashboard-container .store-btn {
+    background: rgba(0, 0, 0, 0.04) !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-theme .dashboard-container .store-btn:hover {
+    background: var(--primary) !important;
+    color: #fff !important;
+}
+
+body.light-theme .dashboard-container .level-header strong {
+    color: #1a1a2e !important;
+}
+
+body.light-theme .dashboard-container .rank-header strong {
+    color: #1a1a2e !important;
+}
+
+body.light-theme .dashboard-container .user-fullname {
+    color: #1a1a2e !important;
+}
+
+body.light-theme .dashboard-container .stats-row {
+    background: rgba(0, 0, 0, 0.04) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-theme .dashboard-container .stat-item .stat-value {
+    color: var(--accent) !important;
+}
+
+body.light-theme .dashboard-container .stat-item .stat-label {
+    color: #666688 !important;
+}
+
+/* ============================================================
+   إصلاح القائمة المنسدلة في الوضع الفاتح
+   ============================================================ */
+
+body.light-theme .dropdown-menu {
+    background: #ffffff !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1) !important;
+}
+
+body.light-theme .dropdown-item {
+    color: #555577 !important;
+}
+
+body.light-theme .dropdown-item:hover {
+    background: rgba(0, 0, 0, 0.04) !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .dropdown-item i {
+    color: var(--primary) !important;
+}
+
+body.light-theme .dropdown-divider {
+    background: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* ============================================================
+   إصلاح خلفية البطاقات في الوضع الفاتح
+   ============================================================ */
+
+body.light-theme .dashboard-bg {
+    opacity: 0.3 !important;
+}
+
+/* ============================================================
+   إصلاح صناديق النصوص في الوضع الفاتح
+   ============================================================ */
+
+/* تنسيق عام لصناديق النصوص في الوضع الفاتح */
+body.light-theme input,
+body.light-theme textarea,
+body.light-theme .form-group input,
+body.light-theme .form-group textarea,
+body.light-theme .search-input,
+body.light-theme .game-select,
+body.light-theme .filter-select,
+body.light-theme .questions-toolbar .search-wrapper input,
+body.light-theme .rooms-filters .search-wrapper input {
+    background-color: #f5f7fa !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+/* تنسيق placeholder في الوضع الفاتح */
+body.light-theme input::placeholder,
+body.light-theme textarea::placeholder,
+body.light-theme .form-group input::placeholder,
+body.light-theme .form-group textarea::placeholder,
+body.light-theme .search-input::placeholder {
+    color: #8888aa !important;
+    opacity: 0.7 !important;
+}
+
+/* تنسيق صناديق النصوص عند التركيز في الوضع الفاتح */
+body.light-theme input:focus,
+body.light-theme textarea:focus,
+body.light-theme .form-group input:focus,
+body.light-theme .form-group textarea:focus {
+    background-color: #ffffff !important;
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 4px rgba(108, 99, 255, 0.1) !important;
+}
+
+/* ============================================================
+   تنسيق صناديق النصوص في المودالات (الوضع الفاتح)
+   ============================================================ */
+
+body.light-theme .modal-card input,
+body.light-theme .modal-card textarea,
+body.light-theme .modal-card .form-group input,
+body.light-theme .modal-card .form-group textarea {
+    background-color: #f5f7fa !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+body.light-theme .modal-card input::placeholder,
+body.light-theme .modal-card textarea::placeholder {
+    color: #8888aa !important;
+}
+
+body.light-theme .modal-card input:focus,
+body.light-theme .modal-card textarea:focus {
+    background-color: #ffffff !important;
+    border-color: var(--primary) !important;
+}
+
+/* ============================================================
+   تنسيق صناديق النصوص في صفحة الأسئلة (الوضع الفاتح)
+   ============================================================ */
+
+body.light-theme .questions-toolbar .search-wrapper {
+    background-color: #f5f7fa !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+body.light-theme .questions-toolbar .search-wrapper input {
+    background-color: transparent !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .questions-toolbar .search-wrapper input::placeholder {
+    color: #8888aa !important;
+}
+
+body.light-theme .questions-toolbar .search-wrapper:focus-within {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 4px rgba(108, 99, 255, 0.1) !important;
+}
+
+/* ============================================================
+   تنسيق صناديق النصوص في صفحة الغرف (الوضع الفاتح)
+   ============================================================ */
+
+body.light-theme .rooms-filters .search-wrapper {
+    background-color: #f5f7fa !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+body.light-theme .rooms-filters .search-wrapper input {
+    background-color: transparent !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .rooms-filters .search-wrapper input::placeholder {
+    color: #8888aa !important;
+}
+
+/* ============================================================
+   تنسيق صناديق النصوص في صفحة الأصدقاء (الوضع الفاتح)
+   ============================================================ */
+
+body.light-theme #friendsAddInput,
+body.light-theme .friends-page input[type="text"] {
+    background-color: #f5f7fa !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+body.light-theme #friendsAddInput::placeholder {
+    color: #8888aa !important;
+}
+
+/* ============================================================
+   تنسيق صناديق النصوص في صفحة الإعدادات (الوضع الفاتح)
+   ============================================================ */
+
+body.light-theme #section-settings input,
+body.light-theme #section-settings textarea {
+    background-color: #f5f7fa !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+body.light-theme #section-settings input::placeholder,
+body.light-theme #section-settings textarea::placeholder {
+    color: #8888aa !important;
+}
+
+/* ============================================================
+   تنسيق صناديق النصوص في لوحة المشرفين (الوضع الفاتح)
+   ============================================================ */
+
+body.light-theme .admin-page input,
+body.light-theme .admin-page textarea {
+    background-color: #f5f7fa !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+body.light-theme .admin-page input::placeholder,
+body.light-theme .admin-page textarea::placeholder {
+    color: #8888aa !important;
+}
+
+/* ============================================================
+   تنسيق صناديق النصوص في نموذج التسجيل (الوضع الفاتح)
+   ============================================================ */
+
+body.light-theme #registerForm input,
+body.light-theme #registerForm textarea {
+    background-color: #f5f7fa !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+body.light-theme #registerForm input::placeholder {
+    color: #8888aa !important;
+}
+
+body.light-theme #registerForm input:focus {
+    background-color: #ffffff !important;
+}
+
+/* ============================================================
+   تنسيق صناديق النصوص في نموذج تسجيل الدخول (الوضع الفاتح)
+   ============================================================ */
+
+body.light-theme #loginForm input {
+    background-color: #f5f7fa !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+body.light-theme #loginForm input::placeholder {
+    color: #8888aa !important;
+}
+
+body.light-theme #loginForm input:focus {
+    background-color: #ffffff !important;
+}
+
+/* ============================================================
+   تنسيق صناديق النصوص في صفحة اللعبة (الوضع الفاتح)
+   ============================================================ */
+
+body.light-theme .game-play-container input,
+body.light-theme .game-play-container textarea,
+body.light-theme .fill-blank-input {
+    background-color: #f5f7fa !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+body.light-theme .game-play-container input::placeholder {
+    color: #8888aa !important;
+}
+
+body.light-theme .game-play-container input:focus {
+    background-color: #ffffff !important;
+}
+
+/* ============================================================
+   تنسيق صناديق النصوص في وضع التحرير (الوضع الفاتح)
+   ============================================================ */
+
+body.light-theme #editPostContent,
+body.light-theme #editPostImage,
+body.light-theme #editPostTitle {
+    background-color: #f5f7fa !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+body.light-theme #editPostContent::placeholder {
+    color: #8888aa !important;
+}
+
+/* ============================================================
+   إصلاح البادجات والصناديق الملونة في الوضع الفاتح
+   ============================================================ */
+
+/* ===== البادجات الملونة ===== */
+body.light-theme .badge {
+    background: rgba(0, 0, 0, 0.06) !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+body.light-theme .badge-primary {
+    background: var(--primary) !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+body.light-theme .badge-success {
+    background: var(--success) !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+body.light-theme .badge-warning {
+    background: var(--accent) !important;
+    color: #1a1a2e !important;
+    border: none !important;
+}
+
+body.light-theme .badge-danger {
+    background: var(--secondary) !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+body.light-theme .badge-info {
+    background: var(--info) !important;
+    color: #1a1a2e !important;
+    border: none !important;
+}
+
+body.light-theme .badge-gold {
+    background: linear-gradient(135deg, #FFD700, #FFA500) !important;
+    color: #1a1a2e !important;
+    border: none !important;
+}
+
+body.light-theme .badge-sm {
+    color: #1a1a2e !important;
+}
+
+/* ===== بادجات الأسئلة ===== */
+body.light-theme .badge-category {
+    background: var(--primary) !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .badge-difficulty.easy {
+    background: var(--success) !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .badge-difficulty.medium {
+    background: var(--accent) !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .badge-difficulty.hard {
+    background: var(--secondary) !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .badge-options {
+    background: var(--info) !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .badge-used {
+    background: var(--accent) !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .badge-type {
+    background: var(--primary) !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .badge-public {
+    background: #4ECDC4 !important;
+    color: #1a1a2e !important;
+}
+
+/* ===== بادجات الأدوار في لوحة المشرفين ===== */
+body.light-theme .admin-role-badge {
+    color: #1a1a2e !important;
+}
+
+body.light-theme .admin-role-badge.super {
+    background: #FFD700 !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .admin-role-badge.general {
+    background: var(--primary) !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .admin-role-badge.user {
+    background: #4fc3f7 !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .admin-role-badge.player {
+    background: var(--success) !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .admin-role-badge.club {
+    background: var(--secondary) !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .admin-role-badge.tournament {
+    background: var(--accent) !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .admin-role-badge.match {
+    background: #a29bfe !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .admin-role-badge.question {
+    background: #fd79a8 !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .admin-role-badge.content {
+    background: #00cec9 !important;
+    color: #1a1a2e !important;
+}
+
+/* ===== بادجات حالة الغرف ===== */
+body.light-theme .room-status.waiting {
+    background: var(--success) !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .room-status.playing {
+    background: var(--accent) !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .room-status.finished {
+    background: var(--gray) !important;
+    color: #ffffff !important;
+}
+
+/* ===== بادجات حالة اللاعبين ===== */
+body.light-theme .player-status-badge.ready {
+    background: var(--success) !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .player-status-badge.not-ready {
+    background: var(--gray) !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .player-status-badge.host {
+    background: var(--accent) !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .lobby-player-card .host-badge {
+    background: var(--accent) !important;
+    color: #1a1a2e !important;
+}
+
+/* ===== بادجات المتجر ===== */
+body.light-theme .store-item .owned-badge {
+    background: var(--success) !important;
+    color: #ffffff !important;
+}
+
+/* ===== بادجات الإنجازات ===== */
+body.light-theme .achievement-card.unlocked {
+    border-color: var(--accent) !important;
+}
+
+body.light-theme .achievement-card.locked {
+    opacity: 0.5 !important;
+}
+
+/* ===== بادجات الإشعارات ===== */
+body.light-theme .notification-item.unread {
+    background: rgba(108, 99, 255, 0.05) !important;
+    border-right-color: var(--primary) !important;
+}
+
+body.light-theme .notification-item .badge {
+    background: rgba(0, 0, 0, 0.06) !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .notification-item .badge-primary {
+    background: var(--primary) !important;
+    color: #ffffff !important;
+}
+
+/* ===== بادجات المستوى والرتبة ===== */
+body.light-theme .level-name {
+    color: var(--accent) !important;
+}
+
+body.light-theme .rank-name {
+    color: var(--primary) !important;
+}
+
+/* ===== بادجات النقود والعملات ===== */
+body.light-theme .currency-display {
+    background: rgba(0, 0, 0, 0.04) !important;
+    color: #1a1a2e !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-theme .currency-display i {
+    color: var(--accent) !important;
+}
+
+/* ===== بادجات الصناديق المخصصة ===== */
+body.light-theme .badge.badge-primary {
+    background: var(--primary) !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .badge.badge-success {
+    background: var(--success) !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .badge.badge-warning {
+    background: var(--accent) !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .badge.badge-danger {
+    background: var(--secondary) !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .badge.badge-info {
+    background: var(--info) !important;
+    color: #1a1a2e !important;
+}
+
+/* ===== بادجات حالة المباريات ===== */
+body.light-theme .game-info-bar .badge-primary {
+    background: var(--primary) !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .game-info-bar .badge-warning {
+    background: var(--accent) !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .game-info-bar .badge-danger {
+    background: var(--secondary) !important;
+    color: #ffffff !important;
+}
+
+body.light-theme .game-info-bar .badge-info {
+    background: var(--info) !important;
+    color: #1a1a2e !important;
+}
+
+body.light-theme .game-info-bar .badge-success {
+    background: var(--success) !important;
+    color: #ffffff !important;
+}
+
+/* ============================================================
+   صفحة الرتب المطورة
+   ============================================================ */
+.ranks-page {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 0.5rem;
+}
+
+/* شريط التقدم بين الرتب */
+.ranks-page .progress-bar {
+    height: 8px;
+    background: var(--glass);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 2px 0;
+}
+
+.ranks-page .progress-bar .fill {
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.8s ease;
+}
+
+/* تحسين عرض الرتبة */
+.ranks-page .rank-item {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+}
+
+.ranks-page .rank-item img {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* استجابة للشاشات الصغيرة */
+@media (max-width: 480px) {
+    .ranks-page .rank-item {
+        padding: 0.3rem 0.3rem !important;
+        gap: 0.5rem !important;
+    }
+    .ranks-page .rank-item img {
+        width: 40px !important;
+        height: 40px !important;
+    }
+    .ranks-page .progress-bar {
+        height: 6px !important;
+    }
+    .ranks-page .progress-bar .fill {
+        height: 6px !important;
+    }
+    .ranks-page .rank-item .rank-name {
+        font-size: 0.85rem !important;
+    }
+    .ranks-page .rank-item .rank-points {
+        font-size: 0.6rem !important;
+    }
+}
+
+/* ============================================================
+   صفحة الرتب - تصميم عمودي
+   ============================================================ */
+.ranks-page {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 0.5rem;
+}
+
+.ranks-page .rank-item {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+}
+
+.ranks-page .rank-item img {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* تحسين عرض الشريط العمودي */
+.ranks-page .vertical-bar {
+    position: relative;
+    overflow: hidden;
+    border-radius: 2px;
+}
+
+.ranks-page .vertical-bar .fill {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    transition: height 0.8s ease;
+    border-radius: 2px;
+}
+
+/* استجابة للشاشات الصغيرة */
+@media (max-width: 480px) {
+    .ranks-page .rank-item {
+        padding: 0.3rem 0.3rem !important;
+        gap: 0.5rem !important;
+    }
+    .ranks-page .rank-item img {
+        width: 40px !important;
+        height: 40px !important;
+    }
+    .ranks-page .rank-item .rank-name {
+        font-size: 0.85rem !important;
+    }
+    .ranks-page .rank-item .rank-points {
+        font-size: 0.6rem !important;
+    }
+    .ranks-page .vertical-bar {
+        height: 25px !important;
+    }
+}
