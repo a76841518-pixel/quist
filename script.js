@@ -113,6 +113,88 @@ const RealtimeService = {
     }
 };
 
+const GENERAL_CATEGORIES = [
+    { id: 'عام', icon: '🌍', label: 'عام' },
+    { id: 'تاريخ', icon: '📜', label: 'تاريخ عام' },
+    { id: 'جغرافيا', icon: '🌏', label: 'جغرافيا' },
+    { id: 'علوم', icon: '🔬', label: 'علوم' },
+    { id: 'تقنية', icon: '💻', label: 'تقنية' },
+    { id: 'رياضيات', icon: '📐', label: 'رياضيات' },
+    { id: 'أدب', icon: '📚', label: 'أدب' },
+    { id: 'فن', icon: '🎨', label: 'فن' },
+    { id: 'موسيقى', icon: '🎵', label: 'موسيقى' },
+    { id: 'أفلام', icon: '🎬', label: 'أفلام' },
+    { id: 'ألعاب', icon: '🎮', label: 'ألعاب فيديو' },
+    { id: 'رياضة', icon: '⚽', label: 'رياضة' },
+    { id: 'صحة', icon: '💊', label: 'صحة' },
+    { id: 'طبخ', icon: '🍳', label: 'طبخ' },
+    { id: 'حيوانات', icon: '🐾', label: 'حيوانات' },
+    { id: 'نباتات', icon: '🌱', label: 'نباتات' },
+    { id: 'فضاء', icon: '🚀', label: 'فضاء' },
+    { id: 'دين', icon: '🕌', label: 'دين' },
+    { id: 'اقتصاد', icon: '📈', label: 'اقتصاد' },
+    { id: 'سياسة', icon: '🏛️', label: 'سياسة' },
+    { id: 'لغة', icon: '🔤', label: 'لغة' },
+    { id: 'ثقافة عامة', icon: '🧠', label: 'ثقافة عامة' }
+];
+
+function getCategoryOptions() {
+    return GENERAL_CATEGORIES.map(c => `<option value="${c.id}">${c.icon} ${c.label}</option>`).join('');
+}
+
+// ============================================================
+// تعريف الرتب مع الصور
+// ============================================================
+// ============================================================
+// تعريف الرتب مع الصور (محدث مع رتب البلاتيني والنقاط الجديدة)
+// ============================================================
+const RANKS = [
+    // ===== برونزي =====
+    { name: 'برونزي 1', min: 0, icon: '🥉', color: '#cd7f32', image: 'bronze1.png', lockedImage: 'bronze1_locked.png' },
+    { name: 'برونزي 2', min: 100, icon: '🥉', color: '#cd7f32', image: 'bronze2.png', lockedImage: 'bronze2_locked.png' },
+    { name: 'برونزي 3', min: 200, icon: '🥉', color: '#cd7f32', image: 'bronze3.png', lockedImage: 'bronze3_locked.png' },
+    { name: 'برونزي 4', min: 300, icon: '🥉', color: '#cd7f32', image: 'bronze4.png', lockedImage: 'bronze4_locked.png' },
+    { name: 'برونزي 5', min: 400, icon: '🥉', color: '#cd7f32', image: 'bronze5.png', lockedImage: 'bronze5_locked.png' },
+    
+    // ===== فضي =====
+    { name: 'فضي 1', min: 600, icon: '🥈', color: '#c0c0c0', image: 'silver1.png', lockedImage: 'silver1_locked.png' },
+    { name: 'فضي 2', min: 800, icon: '🥈', color: '#c0c0c0', image: 'silver2.png', lockedImage: 'silver2_locked.png' },
+    { name: 'فضي 3', min: 1000, icon: '🥈', color: '#c0c0c0', image: 'silver3.png', lockedImage: 'silver3_locked.png' },
+    { name: 'فضي 4', min: 1200, icon: '🥈', color: '#c0c0c0', image: 'silver4.png', lockedImage: 'silver4_locked.png' },
+    { name: 'فضي 5', min: 1400, icon: '🥈', color: '#c0c0c0', image: 'silver5.png', lockedImage: 'silver5_locked.png' },
+    
+    // ===== ذهبي =====
+    { name: 'ذهبي 1', min: 1700, icon: '🥇', color: '#ffd700', image: 'gold1.png', lockedImage: 'gold1_locked.png' },
+    { name: 'ذهبي 2', min: 2000, icon: '🥇', color: '#ffd700', image: 'gold2.png', lockedImage: 'gold2_locked.png' },
+    { name: 'ذهبي 3', min: 2300, icon: '🥇', color: '#ffd700', image: 'gold3.png', lockedImage: 'gold3_locked.png' },
+    { name: 'ذهبي 4', min: 2600, icon: '🥇', color: '#ffd700', image: 'gold4.png', lockedImage: 'gold4_locked.png' },
+    { name: 'ذهبي 5', min: 2900, icon: '🥇', color: '#ffd700', image: 'gold5.png', lockedImage: 'gold5_locked.png' },
+    
+    // ===== بلاتيني =====
+    { name: 'بلاتيني 1', min: 3200, icon: '💎', color: '#e5e4e2', image: 'platinum1.png', lockedImage: 'platinum1_locked.png' },
+    { name: 'بلاتيني 2', min: 3500, icon: '💎', color: '#e5e4e2', image: 'platinum2.png', lockedImage: 'platinum2_locked.png' },
+    { name: 'بلاتيني 3', min: 3800, icon: '💎', color: '#e5e4e2', image: 'platinum3.png', lockedImage: 'platinum3_locked.png' },
+    { name: 'بلاتيني 4', min: 4100, icon: '💎', color: '#e5e4e2', image: 'platinum4.png', lockedImage: 'platinum4_locked.png' },
+    { name: 'بلاتيني 5', min: 4400, icon: '💎', color: '#e5e4e2', image: 'platinum5.png', lockedImage: 'platinum5_locked.png' },
+    
+    // ===== ماسي =====
+    { name: 'ماسي 1', min: 4800, icon: '💎', color: '#b9f2ff', image: 'diamond1.png', lockedImage: 'diamond1_locked.png' },
+    { name: 'ماسي 2', min: 5200, icon: '💎', color: '#b9f2ff', image: 'diamond2.png', lockedImage: 'diamond2_locked.png' },
+    { name: 'ماسي 3', min: 5600, icon: '💎', color: '#b9f2ff', image: 'diamond3.png', lockedImage: 'diamond3_locked.png' },
+    { name: 'ماسي 4', min: 6000, icon: '💎', color: '#b9f2ff', image: 'diamond4.png', lockedImage: 'diamond4_locked.png' },
+    { name: 'ماسي 5', min: 6400, icon: '💎', color: '#b9f2ff', image: 'diamond5.png', lockedImage: 'diamond5_locked.png' },
+    
+    // ===== أسطوري =====
+    { name: 'أسطوري', min: 7000, icon: '⭐', color: '#f1c40f', image: 'legendary.png', lockedImage: 'legendary_locked.png' },
+    
+    // ===== محترف (8000 نقطة) =====
+    { name: 'محترف', min: 8000, icon: '🏆', color: '#e67e22', image: 'pro.png', lockedImage: 'pro_locked.png' },
+    
+    // ===== البطل (10000 نقطة) =====
+    { name: 'البطل', min: 10000, icon: '👑', color: '#ff4500', image: 'champion.png', lockedImage: 'champion_locked.png' },
+];
+
+
 // ============================================================
 // نظام المكافآت والعقوبات - عرض للمستخدم الحالي فقط
 // ============================================================
@@ -3876,6 +3958,15 @@ _buildSections() {
             <div id="multiplayerGameContent" style="max-width:800px;margin:0 auto;"></div>
         </section>
         
+<section id="section-ranks" class="section">
+    <div class="back-to-home" onclick="App._activateSection('profile')">
+        <i class="fas fa-arrow-right"></i> العودة للملف الشخصي
+    </div>
+    <div id="ranksPageContainer">
+        <!-- سيتم تعبئته بواسطة JavaScript -->
+    </div>
+</section>
+
         <section id="section-multiplayer-result" class="section" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:1050;background:var(--dark);padding:1rem;overflow-y:auto;">
             <div class="back-to-home" onclick="MultiplayerManager.leaveGame(); App._activateSection('multiplayer')">
                 <i class="fas fa-arrow-right"></i> العودة للرئيسية
@@ -4108,15 +4199,11 @@ _buildModals() {
                 </div>
                 <div class="form-group">
                     <label>التصنيف</label>
-                    <select id="qCategory">
-                        <option value="عام">عام</option>
-                        <option value="تاريخ">تاريخ</option>
-                        <option value="لاعبين">لاعبين</option>
-                        <option value="أندية">أندية</option>
-                        <option value="بطولات">بطولات</option>
-                        <option value="قوانين">قوانين</option>
-                        <option value="إحصائيات">إحصائيات</option>
-                    </select>
+<select id="qCategory">
+    ${GENERAL_CATEGORIES.map(cat => 
+        `<option value="${cat.id}">${cat.icon} ${cat.label}</option>`
+    ).join('')}
+</select>
                 </div>
             </div>
             
@@ -5333,16 +5420,12 @@ _renderQuestionsSection() {
                         <option value="matching">🔗 مطابقة</option>
                         <option value="ordering">🔢 ترتيب</option>
                     </select>
-                    <select id="filterQuestionCategory" class="filter-select">
-                        <option value="">كل التصنيفات</option>
-                        <option value="عام">عام</option>
-                        <option value="تاريخ">تاريخ</option>
-                        <option value="لاعبين">لاعبين</option>
-                        <option value="أندية">أندية</option>
-                        <option value="بطولات">بطولات</option>
-                        <option value="قوانين">قوانين</option>
-                        <option value="إحصائيات">إحصائيات</option>
-                    </select>
+<select id="filterQuestionCategory" class="filter-select">
+    <option value="">كل التصنيفات</option>
+    ${GENERAL_CATEGORIES.map(cat => 
+        `<option value="${cat.id}">${cat.icon} ${cat.label}</option>`
+    ).join('')}
+</select>
                     <select id="filterQuestionDifficulty" class="filter-select">
                         <option value="">كل المستويات</option>
                         <option value="سهل">🟢 سهل</option>
@@ -5509,16 +5592,12 @@ _renderGameSection() {
                             </div>
                             <div class="form-group">
                                 <label>الفئة</label>
-                                <select id="gameCategory" class="game-select">
-                                    <option value="all">📚 كل الفئات</option>
-                                    <option value="عام">🌍 عام</option>
-                                    <option value="تاريخ">📜 تاريخ</option>
-                                    <option value="لاعبين">⚽ لاعبين</option>
-                                    <option value="أندية">🏆 أندية</option>
-                                    <option value="بطولات">🏅 بطولات</option>
-                                    <option value="قوانين">📋 قوانين</option>
-                                    <option value="إحصائيات">📊 إحصائيات</option>
-                                </select>
+<select id="gameCategory" class="game-select">
+    <option value="all">📚 كل الفئات</option>
+    ${GENERAL_CATEGORIES.map(cat => 
+        `<option value="${cat.id}">${cat.icon} ${cat.label}</option>`
+    ).join('')}
+</select>
                             </div>
                             <div class="form-group">
                                 <label>نوع السؤال</label>
@@ -5712,7 +5791,7 @@ _renderProfileSection() {
     </div>
 </div>
 <!-- الرتبة -->
-<div class="profile-rank" style="margin:0.5rem 0;padding:0.5rem;background:var(--glass);border-radius:var(--radius-sm);">
+<div class="profile-rank" style="margin:0.5rem 0;padding:0.5rem;background:var(--glass);border-radius:var(--radius-sm);cursor:pointer;" onclick="App._showRanksPage()">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
         <span id="profileRankDisplay">🏅 برونزي 1</span>
         <span class="text-gray" style="font-size:0.8rem;">نقاط الرتبة: <span id="profileRankPoints">0</span></span>
@@ -5725,6 +5804,7 @@ _renderProfileSection() {
         <span>برونزي 2 (100)</span>
     </div>
 </div>
+
                     </div>
 <div class="profile-actions">
     <button class="btn btn-primary" id="editProfileBtn"><i class="fas fa-edit"></i> تعديل الملف</button>
@@ -7461,6 +7541,126 @@ _renderAdminUsersPanel() {
     `;
 },
 
+_showRanksPage() {
+    const user = AuthService.currentUser;
+    if (!user) {
+        showToast('يجب تسجيل الدخول', 'error');
+        return;
+    }
+    const points = user.rankPoints || 0;
+    const container = document.getElementById('ranksPageContainer');
+    if (!container) return;
+
+    let html = `
+        <div class="ranks-page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:1rem;max-width:700px;margin:0 auto;width:100%;">
+            <h2 style="text-align:center;font-size:1.8rem;font-weight:800;margin-bottom:0.5rem;">
+                <i class="fas fa-crown" style="color:var(--accent);"></i> 
+                الرتب والتقدم
+            </h2>
+            <div style="text-align:center;padding:0.5rem;margin-bottom:1rem;">
+                <span style="font-size:1.2rem;font-weight:700;">نقاط الرتبة: <span style="color:var(--accent);">${points}</span></span>
+                <span style="display:block;font-size:0.85rem;color:var(--gray);">تقدمك في سلم الرتب</span>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;width:100%;max-width:400px;margin:0 auto;">
+    `;
+
+    const totalRanks = RANKS.length;
+
+    for (let i = 0; i < totalRanks; i++) {
+        const rank = RANKS[i];
+        const isUnlocked = points >= rank.min;
+        const nextRank = RANKS[i + 1];
+        const isCompleted = isUnlocked && (i === totalRanks - 1 || points >= nextRank.min);
+        const isCurrent = !isCompleted && isUnlocked && (i === totalRanks - 1 || points < nextRank.min);
+        
+        const imgSrc = isUnlocked ? rank.image : rank.lockedImage;
+        const imgAlt = isUnlocked ? rank.name : `${rank.name} (مقفل)`;
+
+        let statusText = '';
+        let statusColor = '';
+        if (isCompleted) {
+            statusText = '✅ مكتمل';
+            statusColor = 'var(--success)';
+        } else if (isCurrent) {
+            statusText = '👈 الحالي';
+            statusColor = 'var(--accent)';
+        } else {
+            statusText = '🔒 مقفل';
+            statusColor = 'var(--gray)';
+        }
+
+        // عرض الرتبة
+        html += `
+            <div style="display:flex;flex-direction:column;align-items:center;width:100%;padding:0.5rem 0;opacity:${isUnlocked ? 1 : 0.6};background:transparent;border:none;box-shadow:none;">
+                <div style="flex-shrink:0;width:60px;height:60px;border-radius:50%;overflow:hidden;border:none;box-shadow:none;display:flex;align-items:center;justify-content:center;margin-bottom:0.3rem;">
+                    <img src="images/ranks/${imgSrc}" alt="${imgAlt}" style="width:100%;height:100%;object-fit:cover;">
+                </div>
+                <div style="text-align:center;border:none;box-shadow:none;">
+                    <span style="font-weight:700;color:${isUnlocked ? rank.color : 'var(--gray)'};font-size:1.05rem;">
+                        ${rank.name}
+                    </span>
+                    <div style="font-size:0.7rem;color:${statusColor};">
+                        ${statusText}
+                    </div>
+                    <div style="font-size:0.75rem;color:var(--gray);">
+                        ${isCompleted ? 'مكتمل' : `${rank.min}+ نقطة`}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // شريط التقدم العمودي بين الرتب (ما عدا الأخيرة)
+        if (i < totalRanks - 1) {
+            const nextRank2 = RANKS[i + 1];
+            const range = nextRank2.min - rank.min;
+            let progress = 0;
+            let barColor = 'var(--glass-border)';
+            let isComplete = false;
+            
+            if (points >= nextRank2.min) {
+                progress = 100;
+                isComplete = true;
+                barColor = 'var(--success)';
+            } else if (points >= rank.min) {
+                progress = ((points - rank.min) / range) * 100;
+                barColor = `linear-gradient(to bottom, ${rank.color}, var(--accent))`;
+            } else {
+                progress = 0;
+                barColor = 'var(--glass-border)';
+            }
+            progress = Math.min(Math.max(progress, 0), 100);
+
+            const barHeight = 60;
+
+            // ✅ حذف الأرقام الجانبية (rank.min و nextRank2.min)
+            html += `
+                <div style="display:flex;flex-direction:column;align-items:center;width:100%;padding:0.2rem 0;margin:0;border:none;box-shadow:none;">
+                    <div style="display:flex;align-items:center;justify-content:center;width:100%;">
+                        <div style="width:6px;height:${barHeight}px;background:var(--glass);border-radius:3px;overflow:hidden;position:relative;flex-shrink:0;">
+                            <div style="position:absolute;top:0;width:100%;height:${progress}%;background:${barColor};transition:height 0.8s ease;border-radius:3px;"></div>
+                        </div>
+                    </div>
+                    <div style="text-align:center;font-size:0.55rem;color:${isComplete ? 'var(--success)' : 'var(--gray)'};margin-top:0.2rem;">
+                        ${isComplete ? '✓ تم الاجتياز' : ''}
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    html += `
+            </div>
+            <div style="text-align:center;margin-top:2rem;">
+                <button class="btn btn-outline" onclick="App._activateSection('profile')">
+                    <i class="fas fa-arrow-right"></i> العودة للملف الشخصي
+                </button>
+            </div>
+        </div>
+    `;
+    container.innerHTML = html;
+    this._activateSection('ranks');
+},
+
 /**
  * عرض إدارة المحتوى
  */
@@ -8743,15 +8943,15 @@ _updateUserUI(user) {
 
     if (user) {
             // الرتبة
-    const rank = getRank(user.rankPoints || 0);
-    const rankDisplay = document.getElementById('profileRankDisplay');
-    if (rankDisplay) {
-        rankDisplay.innerHTML = `
-            <span style="font-size:1.2rem;">${rank.icon}</span>
-            <span style="font-weight:700;color:${rank.color};">${rank.name}</span>
-            <span style="font-size:0.7rem;color:var(--gray);">${user.rankPoints || 0} نقطة رتبة</span>
-        `;
-    }
+const rank = getRank(user.rankPoints || 0);
+const rankDisplay = document.getElementById('profileRankDisplay');
+if (rankDisplay) {
+    rankDisplay.innerHTML = `
+        <img src="images/ranks/${rank.image}" alt="${rank.name}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;margin-left:8px;">
+        <span style="font-weight:700;color:${rank.color};">${rank.name}</span>
+        <span style="font-size:0.7rem;color:var(--gray);">${user.rankPoints || 0} نقطة رتبة</span>
+    `;
+}
     const rankPointsEl = document.getElementById('profileRankPoints');
     if (rankPointsEl) rankPointsEl.textContent = user.rankPoints || 0;
     
@@ -8828,15 +9028,15 @@ _updateUserUI(user) {
 
 if (user) {
     // عرض الرتبة
-    const rank = getRank(user.rankPoints || 0);
-    const rankDisplay = document.getElementById('profileRankDisplay');
-    if (rankDisplay) {
-        rankDisplay.innerHTML = `
-            <span style="font-size:1.2rem;">${rank.icon}</span>
-            <span style="font-weight:700;color:${rank.color};">${rank.name}</span>
-            <span style="font-size:0.7rem;color:var(--gray);">${user.rankPoints || 0} نقطة رتبة</span>
-        `;
-    }
+const rank = getRank(user.rankPoints || 0);
+const rankDisplay = document.getElementById('profileRankDisplay');
+if (rankDisplay) {
+    rankDisplay.innerHTML = `
+        <img src="images/ranks/${rank.image}" alt="${rank.name}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;margin-left:8px;">
+        <span style="font-weight:700;color:${rank.color};">${rank.name}</span>
+        <span style="font-size:0.7rem;color:var(--gray);">${user.rankPoints || 0} نقطة رتبة</span>
+    `;
+}
     
     // شريط تقدم الرتبة
     const rankProgress = document.getElementById('rankProgressFill');
@@ -12845,12 +13045,6 @@ _closeAllModals() {
 
 _refreshAllData() {
     const data = DataManager.data;
-    this._renderAllTables(data);
-    this._populateSelects(data);
-    this._renderLeagueTable(data);
-    this._updateCharts(data);
-    this._renderRecent(data);
-    this._renderTopScorers(data);
     this._updateStats(DataManager.getStats());
     this._updateLastUpdateTime();
     const user = AuthService.currentUser;
@@ -15506,16 +15700,12 @@ App._renderMultiplayerSection = function() {
                     </div>
                     <div class="form-group">
                         <label>الفئة</label>
-                        <select id="mpCategory" class="game-select">
-                            <option value="all">📚 الكل</option>
-                            <option value="عام">🌍 عام</option>
-                            <option value="تاريخ">📜 تاريخ</option>
-                            <option value="لاعبين">⚽ لاعبين</option>
-                            <option value="أندية">🏆 أندية</option>
-                            <option value="بطولات">🏅 بطولات</option>
-                            <option value="قوانين">📋 قوانين</option>
-                            <option value="إحصائيات">📊 إحصائيات</option>
-                        </select>
+<select id="mpCategory" class="game-select">
+    <option value="all">📚 الكل</option>
+    ${GENERAL_CATEGORIES.map(cat => 
+        `<option value="${cat.id}">${cat.icon} ${cat.label}</option>`
+    ).join('')}
+</select>
                     </div>
                     <div class="form-group">
                         <label>نوع السؤال</label>
@@ -16807,58 +16997,29 @@ App._shareMultiplayerResult = function(gameId) {
 
 function getRank(rankPoints) {
     const points = typeof rankPoints === 'number' ? rankPoints : 0;
-    
-    const ranks = [
-        { name: 'برونزي 1', min: 0, icon: '🥉', color: '#cd7f32' },
-        { name: 'برونزي 2', min: 100, icon: '🥉', color: '#cd7f32' },
-        { name: 'برونزي 3', min: 200, icon: '🥉', color: '#cd7f32' },
-        { name: 'برونزي 4', min: 300, icon: '🥉', color: '#cd7f32' },
-        { name: 'برونزي 5', min: 400, icon: '🥉', color: '#cd7f32' },
-        { name: 'فضي 1', min: 600, icon: '🥈', color: '#c0c0c0' },
-        { name: 'فضي 2', min: 800, icon: '🥈', color: '#c0c0c0' },
-        { name: 'فضي 3', min: 1000, icon: '🥈', color: '#c0c0c0' },
-        { name: 'فضي 4', min: 1200, icon: '🥈', color: '#c0c0c0' },
-        { name: 'فضي 5', min: 1400, icon: '🥈', color: '#c0c0c0' },
-        { name: 'ذهبي 1', min: 1700, icon: '🥇', color: '#ffd700' },
-        { name: 'ذهبي 2', min: 2000, icon: '🥇', color: '#ffd700' },
-        { name: 'ذهبي 3', min: 2300, icon: '🥇', color: '#ffd700' },
-        { name: 'ذهبي 4', min: 2600, icon: '🥇', color: '#ffd700' },
-        { name: 'ذهبي 5', min: 2900, icon: '🥇', color: '#ffd700' },
-        { name: 'ماسي 1', min: 3300, icon: '💎', color: '#b9f2ff' },
-        { name: 'ماسي 2', min: 3700, icon: '💎', color: '#b9f2ff' },
-        { name: 'ماسي 3', min: 4100, icon: '💎', color: '#b9f2ff' },
-        { name: 'ماسي 4', min: 4500, icon: '💎', color: '#b9f2ff' },
-        { name: 'ماسي 5', min: 4900, icon: '💎', color: '#b9f2ff' },
-        { name: 'أسطوري', min: 5400, icon: '⭐', color: '#f1c40f' },
-        { name: 'محترف', min: 6000, icon: '🏆', color: '#e67e22' },
-        { name: 'البطل', min: 7000, icon: '👑', color: '#ff4500' },
-    ];
-    
-    let currentRank = ranks[0];
-    for (const rank of ranks) {
+    let currentRank = RANKS[0];
+    for (const rank of RANKS) {
         if (points >= rank.min) {
             currentRank = rank;
         }
     }
-    
-    // حساب التقدم نحو الرتبة التالية
-    const currentIndex = ranks.indexOf(currentRank);
-    const nextRank = ranks[currentIndex + 1] || null;
+    const currentIndex = RANKS.indexOf(currentRank);
+    const nextRank = RANKS[currentIndex + 1] || null;
     let progress = 100;
     let nextMin = null;
-    
     if (nextRank) {
         const range = nextRank.min - currentRank.min;
         progress = range > 0 ? ((points - currentRank.min) / range) * 100 : 100;
         progress = Math.min(Math.max(progress, 0), 100);
         nextMin = nextRank.min;
     }
-    
     return {
         ...currentRank,
         progress: progress,
         nextMin: nextMin,
-        nextName: nextRank ? nextRank.name : 'مكتمل 🏆'
+        nextName: nextRank ? nextRank.name : 'مكتمل 🏆',
+        image: currentRank.image,
+        lockedImage: currentRank.lockedImage,
     };
 }
 
