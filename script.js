@@ -3785,7 +3785,6 @@ window.addEventListener('offline', () => {
     _buildLayout() {
         this._buildSections();
         this._buildModals();
-        this.navLinks = document.querySelectorAll('#mainNav a, #mobileNav a');
     },
 
 _buildSections() {
@@ -9190,21 +9189,6 @@ _openAdminPanel() {
     _setupUI() {
         this._initSearch();
         // Navigation
-        this.navLinks = document.querySelectorAll('#mainNav a, #mobileNav a');
-        this.navLinks.forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const section = link.dataset.section;
-                this._activateSection(section);
-                if (section === 'game') {
-                    document.getElementById('gameStartScreen').style.display = 'block';
-                    document.getElementById('gamePlayScreen').style.display = 'none';
-                    document.getElementById('gameResultScreen').style.display = 'none';
-                }
-                if (section === 'admin') this._renderAdminData();
-                if (section === 'store') this._renderStore(DataManager.data.storeItems || []);
-            });
-        });
 
 const searchInput = document.getElementById('searchQuestion');
 if (searchInput) {
