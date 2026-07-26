@@ -4213,137 +4213,98 @@ _buildModals() {
 _renderDashboard() {
     const user = AuthService.currentUser;
     const level = user ? getLevel(user.totalScore || 0) : { level: 1 };
-    const rank = user ? getRank(user.rankPoints || 0) : { name: 'برونزي 1', progress: 0 };
+    const rank = user ? getRank(user.rankPoints || 0) : { name: 'برونزي 1', progress: 0, icon: '🥉', nextName: 'برونزي 2' };
     const progress = user ? getLevelProgress(user.totalScore || 0) : { progress: 0, currentLevel: 1, nextMin: 1000 };
     const stats = user?.stats || {};
     const gamesPlayed = stats.gamesPlayed || 0;
     const gamesWon = stats.gamesWon || 0;
     const winRate = gamesPlayed > 0 ? Math.round((gamesWon / gamesPlayed) * 100) : 0;
     const avatarHtml = user?.avatar ? `<img src="${user.avatar}" alt="avatar">` : '👤';
-    
-    // ✅ استخدام _isAdminUser للتحقق من صلاحية المشرف
     const isAdmin = this._isAdminUser();
-    
-    console.log('👤 _renderDashboard - User:', user);
-    console.log('🔑 isAdmin:', isAdmin);
-    console.log('📋 Role:', user?.role);
-    console.log('📋 AdminRole:', user?.adminRole);
 
     return `
-    <div class="game-dashboard">
-        <div class="game-bg-overlay"></div>
-        <div class="game-dashboard-content">
-            
+    <div class="dashboard-container">
+        <!-- خلفية -->
+        <div class="dashboard-bg"></div>
 
+        <!-- المحتوى -->
+        <div class="dashboard-content">
 
-            <!-- ===== باقي محتوى الداشبورد ===== -->
-            <div class="game-header" id="dashboardProfileClick" style="cursor:pointer;">
-                        <!-- ===== القائمة المنسدلة (أيقونة ☰ في الأعلى) ===== -->
-            <div class="dashboard-menu-top">
-                <button class="dashboard-menu-icon" id="dashboardMenuBtn" title="القائمة">
+            <!-- الشريط العلوي: القائمة ☰ + النقود + المتجر -->
+            <div class="dashboard-top-bar">
+                <button class="menu-icon-btn" id="dashboardMenuBtn" title="القائمة">
                     <i class="fas fa-bars"></i>
-                    <span class="menu-badge-dot" id="menuNotificationBadge" style="display:none;"></span>
+                    <span class="notif-dot" id="menuNotificationBadge" style="display:none;"></span>
                 </button>
-                <div class="dashboard-dropdown-menu" id="dashboardDropdownMenu">
+                <div class="top-currencies">
+                    <span class="coin-display"><i class="fas fa-coins"></i> <span id="dashboardCoins">${user?.coins || 0}</span></span>
+                    <span class="gem-display"><i class="fas fa-gem"></i> <span id="dashboardGems">${user?.gems || 0}</span></span>
+                    <button class="store-btn" id="dashboardStoreBtnNew"><i class="fas fa-store"></i></button>
+                </div>
+            </div>
+
+            <!-- القائمة المنسدلة -->
+            <div class="dropdown-menu" id="dashboardDropdownMenu">
+                <div class="dropdown-item" data-action="notifications"><i class="fas fa-bell"></i> الإشعارات <span class="badge-dot" id="dropdownNotifBadge"></span></div>
+                <div class="dropdown-item" data-action="friends"><i class="fas fa-user-friends"></i> الأصدقاء</div>
+                <div class="dropdown-item" data-action="messages"><i class="fas fa-envelope"></i> الرسائل</div>
                 <div class="dropdown-divider"></div>
-                    <div class="dropdown-item" data-action="notifications">
-                        <i class="fas fa-bell"></i>
-                        <span>الإشعارات</span>
-                        <span class="badge-dot" id="dropdownNotifBadge" style="display:none;"></span>
-                    </div>
-                    <div class="dropdown-item" data-action="friends">
-                        <i class="fas fa-user-friends"></i>
-                        <span>الأصدقاء</span>
-                    </div>
-                    <div class="dropdown-item" data-action="messages">
-                        <i class="fas fa-envelope"></i>
-                        <span>الرسائل</span>
-                    </div>
-                    <div class="dropdown-divider"></div>
-                    <div class="dropdown-item" data-action="questions">
-                        <i class="fas fa-question-circle"></i>
-                        <span>الأسئلة</span>
-                    </div>
-                    ${isAdmin ? `
-                    <div class="dropdown-item" data-action="admin">
-                        <i class="fas fa-shield-halved"></i>
-                        <span>لوحة المشرف</span>
-                    </div>
-                    ` : `
+                <div class="dropdown-item" data-action="questions"><i class="fas fa-question-circle"></i> الأسئلة</div>
                     <!-- عنصر مخفي للمشرفين فقط -->
                     <div class="dropdown-item" data-action="admin" style="display:none;">
                         <i class="fas fa-shield-halved"></i>
                         <span>لوحة المشرف</span>
                     </div>
-                    `}
-                    <div class="dropdown-divider"></div>
-                    <div class="dropdown-item" data-action="settings">
-                        <i class="fas fa-cog"></i>
-                        <span>الإعدادات</span>
-                    </div>
-                    <!-- ===== زر تسجيل الخروج ===== -->
-                    <div class="dropdown-divider"></div>
-                    <div class="dropdown-item logout-item" id="dashboardLogoutBtn">
-                        <i class="fas fa-sign-out-alt" style="color:var(--secondary);"></i>
-                        <span style="color:var(--secondary);">تسجيل الخروج</span>
-                    </div>
-                </div>
-            </div>
-                <div class="game-user-info">
-                    <div class="user-avatar-large" id="dashboardAvatar">${avatarHtml}</div>
-                    <div class="user-name-level">
-                        <div class="user-name" id="dashboardUserName">${user?.displayName || user?.username || 'زائر'}</div>
-                        <div class="user-level" id="dashboardUserLevel">المستوى ${level.level}</div>
-                    </div>
-                </div>
-                <div class="game-currencies">
-                    <span class="currency"><i class="fas fa-coins"></i> <span id="dashboardCoins">${user?.coins || 0}</span></span>
-                    <span class="currency"><i class="fas fa-gem"></i> <span id="dashboardGems">${user?.gems || 0}</span></span>
-                    <button class="currency-btn" id="dashboardStoreBtnNew" title="المتجر"><i class="fas fa-store"></i></button>
-                </div>
-            </div>
-            <!-- ===== شريط المستوى ===== -->
-            <div class="game-level-section">
-                <div class="level-bar">
-                    <div class="level-bar-label">
-                        <span>المستوى <strong id="dashboardLevelNum">${progress.currentLevel || 1}</strong></span>
-                        <span id="dashboardLevelPoints">${user?.totalScore || 0}</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="fill" id="dashboardLevelProgress" style="width:${progress.progress}%;"></div>
-                    </div>
-                    <div class="level-bar-sub">إلى المستوى التالي: <span id="dashboardLevelMax">${progress.nextMin || 1000}</span> نقطة</div>
-                </div>
+                                    <div class="dropdown-divider"></div>
+                <div class="dropdown-item" data-action="settings"><i class="fas fa-cog"></i> الإعدادات</div>
+                <div class="dropdown-divider"></div>
+                <div class="dropdown-item logout" id="dashboardLogoutBtn"><i class="fas fa-sign-out-alt"></i> تسجيل الخروج</div>
             </div>
 
-
-            <!-- ===== الرتبة والباتل باس ===== -->
-            <div class="game-rank-battlepass">
-                <div class="rank-block">
-                    <div class="rank-icon">${rank.icon || '🏅'}</div>
-                    <div class="rank-info">
-                        <div class="rank-name" id="dashboardRankName">${rank.name}</div>
-                        <div class="rank-progress">
-                            <div class="progress-bar"><div class="fill" id="dashboardRankProgress" style="width:${rank.progress}%;"></div></div>
+            <!-- بطاقة الملف الشخصي -->
+            <div class="profile-card" id="dashboardProfileClick">
+                <div class="profile-left">
+                    <!-- المستوى -->
+                    <div class="level-box">
+                        <div class="level-header">
+                            <span>المستوى <strong id="dashboardLevelNum">${progress.currentLevel || 1}</strong></span>
+                            <span id="dashboardLevelPoints">${user?.totalScore || 0}</span>
                         </div>
+                        <div class="progress-track"><div class="progress-fill" id="dashboardLevelProgress" style="width:${progress.progress}%;"></div></div>
+                        <div class="level-next">إلى المستوى التالي: <span id="dashboardLevelMax">${progress.nextMin || 1000}</span></div>
                     </div>
+                    <!-- الرتبة -->
+<div class="rank-box">
+    <div class="rank-header">
+        <span><span class="rank-icon">${rank.icon || '🏅'}</span> <strong id="dashboardRankName">${rank.name}</strong></span>
+        <span id="dashboardRankPoints">${user?.rankPoints || 0}</span>
+    </div>
+    <div class="rank-track"><div class="rank-fill" id="dashboardRankProgress" style="width:${rank.progress}%;"></div></div>
+    <div class="rank-next">إلى الرتبة التالية: <span id="dashboardRankNext">${rank.nextName || 'مكتمل 🏆'}</span></div>
+</div>
                 </div>
-                <div class="battle-pass-block">
-                    <div class="battle-pass-placeholder">🎟️ الباتل باس قريباً...</div>
-                </div>
+<div class="profile-top">
+    <div class="avatar-large" id="dashboardAvatar">${avatarHtml}</div>
+    <div class="user-fullname" id="dashboardUserName">${user?.displayName || user?.username || 'زائر'}</div>
+</div>
             </div>
 
-            <!-- ===== أزرار الإجراءات السريعة ===== -->
-            <div class="game-quick-actions">
-                <button class="game-btn primary" id="dashboardPlayBtn"><i class="fas fa-play"></i> العب الآن</button>
-                <button class="game-btn secondary" id="dashboardMultiplayerBtn"><i class="fas fa-users"></i> لعب جماعي</button>
-                <button class="game-btn" id="dashboardAchievementsBtn"><i class="fas fa-star"></i> الإنجازات</button>
+            <!-- الباتل باس -->
+            <div class="battlepass-box">
+                <span>🎟️ الباتل باس قريباً...</span>
             </div>
+
+            <!-- أزرار الإجراءات -->
+            <div class="action-buttons">
+                <button class="btn-action primary" id="dashboardPlayBtn"><i class="fas fa-play"></i> العب الآن</button>
+                <button class="btn-action secondary" id="dashboardMultiplayerBtn"><i class="fas fa-users"></i> لعب جماعي</button>
+                <button class="btn-action" id="dashboardAchievementsBtn"><i class="fas fa-star"></i> الإنجازات</button>
+            </div>
+
         </div>
     </div>
     `;
 },
-
 /**
  * تبديل إظهار/إخفاء القائمة المنسدلة
  */
@@ -4396,51 +4357,30 @@ case 'friends':
 _updateDashboardUI() {
     const user = AuthService.currentUser;
     if (!user) return;
-    
-    // تحديث الصورة
-    const avatarEl = document.getElementById('dashboardAvatar');
-    if (avatarEl) {
-        avatarEl.innerHTML = user.avatar ? `<img src="${user.avatar}" alt="avatar">` : '👤';
-    }
-    // تحديث الاسم
-    const nameEl = document.getElementById('dashboardUserName');
-    if (nameEl) nameEl.textContent = user.displayName || user.username || 'زائر';
-    // تحديث المستوى
-    const level = getLevel(user.totalScore || 0);
-    const levelEl = document.getElementById('dashboardUserLevel');
-    if (levelEl) levelEl.textContent = `المستوى ${level.level}`;
-    // تحديث العملات
-    const coinsEl = document.getElementById('dashboardCoins');
-    if (coinsEl) coinsEl.textContent = user.coins || 0;
-    const gemsEl = document.getElementById('dashboardGems');
-    if (gemsEl) gemsEl.textContent = user.gems || 0;
-    // تحديث شريط تقدم المستوى
+
+    const avatar = document.getElementById('dashboardAvatar');
+    if (avatar) avatar.innerHTML = user.avatar ? `<img src="${user.avatar}">` : '👤';
+
+    const name = document.getElementById('dashboardUserName');
+    if (name) name.textContent = user.displayName || user.username || 'زائر';
+
+    document.getElementById('dashboardCoins').textContent = user.coins || 0;
+    document.getElementById('dashboardGems').textContent = user.gems || 0;
+
     const progress = getLevelProgress(user.totalScore || 0);
-    const levelProgressFill = document.getElementById('dashboardLevelProgress');
-    if (levelProgressFill) levelProgressFill.style.width = `${progress.progress}%`;
-    const levelNumEl = document.getElementById('dashboardLevelNum');
-    if (levelNumEl) levelNumEl.textContent = progress.currentLevel || 1;
-    const levelPointsEl = document.getElementById('dashboardLevelPoints');
-    if (levelPointsEl) levelPointsEl.textContent = user.totalScore || 0;
-    const levelMaxEl = document.getElementById('dashboardLevelMax');
-    if (levelMaxEl) levelMaxEl.textContent = progress.nextMin || 1000;
-    // تحديث الرتبة
+    document.getElementById('dashboardLevelProgress').style.width = progress.progress + '%';
+    document.getElementById('dashboardLevelNum').textContent = progress.currentLevel || 1;
+    document.getElementById('dashboardLevelPoints').textContent = user.totalScore || 0;
+    document.getElementById('dashboardLevelMax').textContent = progress.nextMin || 1000;
+
     const rank = getRank(user.rankPoints || 0);
-    const rankNameEl = document.getElementById('dashboardRankName');
-    if (rankNameEl) rankNameEl.textContent = rank.name;
-    const rankProgressFill = document.getElementById('dashboardRankProgress');
-    if (rankProgressFill) rankProgressFill.style.width = `${rank.progress}%`;
-    // تحديث الإحصائيات
+    document.getElementById('dashboardRankName').textContent = rank.name;
+    document.getElementById('dashboardRankProgress').style.width = rank.progress + '%';
+
     const stats = user.stats || {};
     const gamesPlayed = stats.gamesPlayed || 0;
     const gamesWon = stats.gamesWon || 0;
     const winRate = gamesPlayed > 0 ? Math.round((gamesWon / gamesPlayed) * 100) : 0;
-    const gamesPlayedEl = document.getElementById('dashboardGamesPlayed');
-    if (gamesPlayedEl) gamesPlayedEl.textContent = gamesPlayed;
-    const gamesWonEl = document.getElementById('dashboardGamesWon');
-    if (gamesWonEl) gamesWonEl.textContent = gamesWon;
-    const winRateEl = document.getElementById('dashboardWinRate');
-    if (winRateEl) winRateEl.textContent = winRate + '%';
 },
 
 // ============================================================
