@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>⚽ مدير كرة القدم المتطور</title>
+    <title>معركة العقول</title>
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet" />
@@ -13,45 +13,12 @@
     <div class="glow-bg"></div>
     <div class="glow-bg glow-bg-2"></div>
 
-    <!-- Menu Toggle -->
-    <button class="menu-toggle" id="menuToggle" aria-label="فتح القائمة">
-        <i class="fas fa-bars"></i>
-    </button>
 
     <!-- Connection Status -->
     <div class="connection-status" id="connectionStatus">
         <i class="fas fa-wifi"></i> <span id="connectionText">جاري الاتصال...</span>
     </div>
 
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-        <div class="logo-side"><i class="fas fa-futbol"></i><span>مدير كرة القدم</span></div>
-        <nav id="mainNav">
-            <a href="#" data-section="dashboard" class="active"><i class="fas fa-house"></i><span>الرئيسية</span></a>
-            <a href="#" data-section="notifications" id="notificationBell" onclick="App._showNotifications(); return false;" style="position:relative;"><i class="fas fa-bell"></i><span>الإشعارات</span>
-            <span class="badge-dot" id="notificationBadge" style="display:none;position:absolute;top:-2px;right:-5px;background:var(--secondary);color:#fff;font-size:0.55rem;padding:1px 6px;border-radius:50%;min-width:18px;text-align:center;">0</span></a>
-            <a href="#" data-section="players"><i class="fas fa-users"></i><span>اللاعبين</span></a>
-            <a href="#" data-section="clubs"><i class="fas fa-trophy"></i><span>الأندية</span></a>
-            <a href="#" data-section="matches"><i class="fas fa-futbol"></i><span>المباريات</span></a>
-            <a href="#" data-section="tournaments"><i class="fas fa-medal"></i><span>البطولات</span></a>
-            <a href="#" data-section="league"><i class="fas fa-table"></i><span>ترتيب الدوري</span></a>
-            <a href="#" data-section="questions"><i class="fas fa-question-circle"></i><span>الأسئلة</span></a>
-            <a href="#" data-section="game"><i class="fas fa-gamepad"></i><span>اللعبة</span></a>
-            <a href="#" data-section="multiplayer"><i class="fas fa-users"></i><span>لعب جماعي</span></a>
-            <a href="#" data-section="achievements"><i class="fas fa-star"></i><span>الإنجازات</span></a>
-            <a href="#" data-section="store"><i class="fas fa-store"></i><span>المتجر</span></a>
-            <a href="#" data-section="profile"><i class="fas fa-user"></i><span>الملف الشخصي</span></a>
-            <a href="#" data-section="analytics"><i class="fas fa-chart-pie"></i><span>التحليلات</span></a>
-            <a href="#" data-section="admin" id="adminNavLink" style="display:none;"><i class="fas fa-shield-halved"></i><span>لوحة المشرفين</span></a>
-            <a href="#" data-section="settings"><i class="fas fa-cog"></i><span>الإعدادات</span></a>
-        </nav>
-        <div class="user-badge" id="userBadge">
-            <i class="fas fa-user-circle"></i>
-            <span id="userNameDisplay">زائر</span>
-            <span class="role-badge" id="userRoleDisplay">viewer</span>
-            <button class="btn btn-sm btn-outline" id="logoutBtn" style="display:none;"><i class="fas fa-sign-out-alt"></i></button>
-        </div>
-    </aside>
 
     <!-- Main Content -->
     <main class="main-content">
