@@ -143,6 +143,347 @@ function getCategoryOptions() {
 }
 
 // ============================================================
+// نظام الصوتيات المتقدم
+// ============================================================
+
+const SoundSystem = {
+    // أصوات مدمجة (Base64) لتجنب الحاجة لملفات خارجية
+    _sounds: {
+        click: null,
+        correct: null,
+        wrong: null,
+        points: null,
+        coins: null,
+        levelUp: null,
+        progress: null,
+        gameStart: null,
+        gameEnd: null
+    },
+    
+    _audioContext: null,
+    _isEnabled: true,
+    _volume: 0.7,
+
+    init() {
+        try {
+            this._audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            this._generateSounds();
+            this._loadSettings();
+        } catch (e) {
+            console.warn('⚠️ Audio not supported:', e);
+            this._isEnabled = false;
+        }
+    },
+
+    _generateSounds() {
+        // 1. صوت الضغط على الأزرار (Click)
+        this._sounds.click = this._createClickSound();
+        
+        // 2. صوت الإجابة الصحيحة (Correct)
+        this._sounds.correct = this._createCorrectSound();
+        
+        // 3. صوت الإجابة الخاطئة (Wrong)
+        this._sounds.wrong = this._createWrongSound();
+        
+        // 4. صوت إضافة النقاط (Points)
+        this._sounds.points = this._createPointsSound();
+        
+        // 5. صوت إضافة النقود (Coins)
+        this._sounds.coins = this._createCoinsSound();
+        
+        // 6. صوت المستوى الجديد (Level Up)
+        this._sounds.levelUp = this._createLevelUpSound();
+        
+        // 7. صوت شريط التقدم (Progress)
+        this._sounds.progress = this._createProgressSound();
+        
+        // 8. صوت بدء اللعبة
+        this._sounds.gameStart = this._createGameStartSound();
+        
+        // 9. صوت نهاية اللعبة
+        this._sounds.gameEnd = this._createGameEndSound();
+    },
+
+// ============================================================
+// داخل SoundSystem
+// ============================================================
+
+playStatIncrease() {
+    // صوت عند زيادة أرقام الإحصائيات (نغمة تصاعدية قصيرة)
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        // سلسلة نغمات تصاعدية سريعة
+        const notes = [500, 600, 700, 800, 900];
+        notes.forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = freq;
+            osc.type = 'sine';
+            const startTime = ctx.currentTime + i * 0.04;
+            gain.gain.setValueAtTime(0.05 * this._volume, startTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.05);
+            osc.start(startTime);
+            osc.stop(startTime + 0.05);
+        });
+    } catch (e) {
+        // تجاهل الأخطاء
+    }
+},
+
+    // ===== إنشاء الأصوات باستخدام Web Audio API =====
+    
+    _createClickSound() {
+        return () => {
+            if (!this._isEnabled) return;
+            try {
+                const ctx = this._audioContext;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = 800;
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0.15 * this._volume, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.08);
+            } catch (e) {}
+        };
+    },
+
+    _createCorrectSound() {
+        return () => {
+            if (!this._isEnabled) return;
+            try {
+                const ctx = this._audioContext;
+                const notes = [523, 659, 784]; // C5, E5, G5
+                notes.forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = freq;
+                    osc.type = 'sine';
+                    const startTime = ctx.currentTime + i * 0.12;
+                    gain.gain.setValueAtTime(0.12 * this._volume, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.2);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.2);
+                });
+            } catch (e) {}
+        };
+    },
+
+    _createWrongSound() {
+        return () => {
+            if (!this._isEnabled) return;
+            try {
+                const ctx = this._audioContext;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = 200;
+                osc.type = 'sawtooth';
+                gain.gain.setValueAtTime(0.1 * this._volume, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.3);
+            } catch (e) {}
+        };
+    },
+
+    _createPointsSound() {
+        return () => {
+            if (!this._isEnabled) return;
+            try {
+                const ctx = this._audioContext;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = 1000;
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0.1 * this._volume, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.1);
+                // نغمة ثانية أعلى
+                setTimeout(() => {
+                    const osc2 = ctx.createOscillator();
+                    const gain2 = ctx.createGain();
+                    osc2.connect(gain2);
+                    gain2.connect(ctx.destination);
+                    osc2.frequency.value = 1200;
+                    osc2.type = 'sine';
+                    gain2.gain.setValueAtTime(0.08 * this._volume, ctx.currentTime);
+                    gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+                    osc2.start(ctx.currentTime);
+                    osc2.stop(ctx.currentTime + 0.08);
+                }, 100);
+            } catch (e) {}
+        };
+    },
+
+    _createCoinsSound() {
+        return () => {
+            if (!this._isEnabled) return;
+            try {
+                const ctx = this._audioContext;
+                const notes = [800, 1000, 1200];
+                notes.forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = freq;
+                    osc.type = 'sine';
+                    const startTime = ctx.currentTime + i * 0.06;
+                    gain.gain.setValueAtTime(0.08 * this._volume, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.08);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.08);
+                });
+            } catch (e) {}
+        };
+    },
+
+    _createLevelUpSound() {
+        return () => {
+            if (!this._isEnabled) return;
+            try {
+                const ctx = this._audioContext;
+                const notes = [523, 659, 784, 1047];
+                notes.forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = freq;
+                    osc.type = 'sine';
+                    const startTime = ctx.currentTime + i * 0.15;
+                    gain.gain.setValueAtTime(0.15 * this._volume, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.25);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.25);
+                });
+            } catch (e) {}
+        };
+    },
+
+    _createProgressSound() {
+        return () => {
+            if (!this._isEnabled) return;
+            try {
+                const ctx = this._audioContext;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = 600;
+                osc.type = 'sine';
+                gain.gain.setValueAtTime(0.05 * this._volume, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.05);
+            } catch (e) {}
+        };
+    },
+
+    _createGameStartSound() {
+        return () => {
+            if (!this._isEnabled) return;
+            try {
+                const ctx = this._audioContext;
+                const notes = [440, 554, 659];
+                notes.forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = freq;
+                    osc.type = 'sine';
+                    const startTime = ctx.currentTime + i * 0.15;
+                    gain.gain.setValueAtTime(0.12 * this._volume, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.2);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.2);
+                });
+            } catch (e) {}
+        };
+    },
+
+    _createGameEndSound() {
+        return () => {
+            if (!this._isEnabled) return;
+            try {
+                const ctx = this._audioContext;
+                const notes = [659, 784, 1047];
+                notes.forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = freq;
+                    osc.type = 'sine';
+                    const startTime = ctx.currentTime + i * 0.2;
+                    gain.gain.setValueAtTime(0.15 * this._volume, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.3);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.3);
+                });
+            } catch (e) {}
+        };
+    },
+
+    // ===== دوال تشغيل الأصوات =====
+    
+    play(soundName) {
+        if (!this._isEnabled || !this._sounds[soundName]) return;
+        try {
+            this._sounds[soundName]();
+        } catch (e) {
+            console.warn('⚠️ Sound error:', e);
+        }
+    },
+
+    playClick() { this.play('click'); },
+    playCorrect() { this.play('correct'); },
+    playWrong() { this.play('wrong'); },
+    playPoints() { this.play('points'); },
+    playCoins() { this.play('coins'); },
+    playLevelUp() { this.play('levelUp'); },
+    playProgress() { this.play('progress'); },
+    playGameStart() { this.play('gameStart'); },
+    playGameEnd() { this.play('gameEnd'); },
+
+    // ===== إعدادات الصوت =====
+    
+    toggle(enabled) {
+        this._isEnabled = enabled;
+        localStorage.setItem('soundEnabled', enabled ? 'true' : 'false');
+    },
+
+    setVolume(volume) {
+        this._volume = Math.min(Math.max(volume, 0), 1);
+        localStorage.setItem('soundVolume', this._volume.toString());
+    },
+
+    _loadSettings() {
+        const savedEnabled = localStorage.getItem('soundEnabled');
+        if (savedEnabled !== null) {
+            this._isEnabled = savedEnabled === 'true';
+        }
+        const savedVolume = localStorage.getItem('soundVolume');
+        if (savedVolume !== null) {
+            this._volume = parseFloat(savedVolume);
+        }
+    }
+};
+
+// ============================================================
 // تعريف الرتب مع الصور
 // ============================================================
 // ============================================================
@@ -2042,6 +2383,8 @@ const GameEngine = {
     questionPool: [],
     streaksHistory: [],     // لتخزين جميع السلاسل التي تم تحقيقها
     levelDisplayed: false,  // لمنع تكرار عرض المستوى
+    _lastProgressSound: 0,  // ✅ جديد
+    _progressCompleteSoundPlayed: false,
 
     init() {
         document.getElementById('startGameBtn')?.addEventListener('click', () => this.start());
@@ -2136,13 +2479,16 @@ start() {
     this.totalAnswered = 0;
     this._matchingAnswers = {};
     this._orderingAnswers = [];
-
+    this._lastProgressSound = 0;
+    this._progressCompleteSoundPlayed = false;
+    
     // عرض الواجهة
     document.getElementById('gameHintBtn').style.display = this.isTimeAttack ? 'none' : 'inline-flex';
     document.getElementById('gameStartScreen').style.display = 'none';
     document.getElementById('gamePlayScreen').style.display = 'block';
     document.getElementById('gameResultScreen').style.display = 'none';
     
+    SoundSystem.playGameStart();
     this._updateGameStats();
     this.renderQuestion();
     this.startTimer();
@@ -2179,9 +2525,12 @@ renderQuestion() {
         : `${this.currentIndex + 1} / ${this.gameQuestions.length}`;
     document.getElementById('gameQCounter').textContent = counterText;
     
+    // ✅ تحديث شريط التقدم مع الصوت
     const progress = this.isTimeAttack
         ? ((this.totalTime - this.timeLeft) / this.totalTime) * 100
-        : ((this.currentIndex) / this.gameQuestions.length) * 100;
+        : ((this.currentIndex) / this.gameQuestions.length) * 100;   
+    this._updateProgressBar(progress);  // ✅ استخدم الدالة الجديدة
+
     document.getElementById('gameProgressFill').style.width = `${Math.min(progress, 100)}%`;
     document.getElementById('gameScoreDisplay').textContent = `⭐ ${this.score}`;
     document.getElementById('gameQCategory').textContent = `📚 ${q.category || 'عام'}`;
@@ -2302,6 +2651,22 @@ renderQuestion() {
         
         container.appendChild(wrapper);
     },
+
+// داخل GameEngine
+_updateProgressBar(progress) {
+    // تحديث شريط التقدم في اللعبة
+    const progressFill = document.getElementById('gameProgressFill');
+    if (progressFill) {
+        progressFill.style.width = `${Math.min(progress, 100)}%`;
+    }
+    
+    // ✅ تشغيل صوت عند كل 10% تقدم (مع تجنب التكرار)
+    const currentProgress = Math.floor(progress / 10) * 10;
+    if (currentProgress > 0 && currentProgress !== this._lastProgressSound) {
+        this._lastProgressSound = currentProgress;
+        SoundSystem.playProgress();
+    }
+},
 
 // ============================================================
 // دوال حساب النقاط الجديدة
@@ -2745,9 +3110,12 @@ _handleAnswer(isCorrect, q) {
         // ✅ حساب النقاط مع مكافأة السرعة
         const pointsEarned = this._calculatePoints(true, this.streak + 1, elapsed) + speedBonus;
         this.score += pointsEarned;
+        SoundSystem.playPoints();
         this.correctCount++;
         this.streak++;
-        
+
+        SoundSystem.playCorrect();
+
         // ✅ تسجيل السلسلة عند الوصول إلى 5
         if (this.streak >= 5 && !this.streaksHistory.includes(this.streak)) {
             this.streaksHistory.push(this.streak);
@@ -2761,6 +3129,7 @@ _handleAnswer(isCorrect, q) {
         else if (this.streak >= 5) baseCoins += 1;
         const earnedCoins = this._calculateCoins(baseCoins);
         this.coinsEarned += earnedCoins;
+        SoundSystem.playCoins();
         
         if (this.isTimeAttack) {
             this.timeLeft += this.timeBonusCorrect;
@@ -2780,7 +3149,10 @@ _handleAnswer(isCorrect, q) {
         
         const earnedCoins = this._calculateCoins(1);
         this.coinsEarned += earnedCoins;
-        
+        SoundSystem.playCoins();
+
+        SoundSystem.playWrong();
+
         if (this.isTimeAttack) {
             this.timeLeft -= this.timePenaltyWrong;
             bonusTime = -this.timePenaltyWrong;
@@ -3115,6 +3487,7 @@ setTimeout(() => {
     if (pointsEl) pointsEl.textContent = finalPoints;
     if (streakEl) streakEl.textContent = this.streak;
 
+    SoundSystem.playGameEnd();
     this._isEnding = false;
 },
 
@@ -3128,12 +3501,25 @@ _displayLevelAndProgress(pointsEarned) {
         const oldLevel = getLevel(oldTotal);
         const newLevel = getLevel(newTotal);
         
+        // ✅ تشغيل صوت عند ترقية المستوى
+        const levelUp = newLevel.level > oldLevel.level;
+        if (levelUp && typeof SoundSystem !== 'undefined') {
+            SoundSystem.playLevelUp();
+        }
+        
         // عرض المستوى
         const levelEl = document.getElementById('resultLevel');
         if (levelEl) {
             levelEl.textContent = `المستوى ${newLevel.level}`;
             levelEl.style.backgroundColor = 'var(--primary)';
             levelEl.style.display = 'inline-block';
+            
+            // ✅ إضافة تأثير صوتي عند عرض المستوى الجديد
+            if (typeof SoundSystem !== 'undefined') {
+                setTimeout(() => {
+                    SoundSystem.playStatIncrease();
+                }, 300);
+            }
         }
         
         // ✅ عرض شريط التقدم (يبقى ولا يختفي)
@@ -3163,15 +3549,19 @@ _displayLevelAndProgress(pointsEarned) {
             levelDisplay.parentElement.insertBefore(progressContainer, levelDisplay.nextSibling);
         }
         
-        // تشغيل حركة شريط التقدم
+        // ✅ تشغيل صوت عند اكتمال شريط التقدم
         setTimeout(() => {
             const fill = document.getElementById('levelProgressFillResult');
             if (fill) {
                 const oldProgress = ((oldTotal - oldLevel.min) / 1000) * 100;
                 const newProgress = ((newTotal - newLevel.min) / 1000) * 100;
-                fill.style.width = `${Math.min(newProgress, 100)}%`;
+                
+                // إذا وصل الشريط إلى 100%، شغل صوت
+                if (newProgress >= 100 && typeof SoundSystem !== 'undefined') {
+                    SoundSystem.playLevelUp();
+                }
             }
-        }, 300);
+        }, 500);
         
         // ✅ لا نختفي، نبقى ظاهرين
         resolve();
@@ -3404,10 +3794,62 @@ _displayResultDetails(details) {
 
     container.innerHTML = html;
 
-    // ✅ جميع الأرقام تبدأ من 0، نبدأ العد التسلسلي فوراً
+    // ✅ ضع الكود هنا - بعد تعبئة HTML وقبل بدء العد
+    setTimeout(() => {
+        // ✅ تشغيل صوت عند تحديث الإحصائيات
+        const statElements = document.querySelectorAll('.result-detail-item .detail-number, .result-section-total');
+        statElements.forEach((el, index) => {
+            const target = parseInt(el.textContent) || 0;
+            if (target > 0) {
+                setTimeout(() => {
+                    if (typeof SoundSystem !== 'undefined') {
+                        SoundSystem.playStatIncrease();
+                    }
+                }, index * 100);
+            }
+        });
+    }, 300);
+
+    // ✅ بدء العد التصاعدي
     setTimeout(() => {
         this._startSequentialCounting();
     }, 400);
+},
+
+/**
+ * عد تصاعدي ديناميكي مع تباطؤ تدريجي
+ * @param {string} elementId - معرف العنصر
+ * @param {number} targetValue - القيمة المستهدفة
+ * @param {number} duration - المدة الزمنية (اختياري)
+ * @param {function} onComplete - دالة عند الانتهاء (اختياري)
+ */
+_animateNumberDynamic(elementId, targetValue, duration = 800, onComplete = null) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    const startValue = parseInt(element.textContent) || 0;
+    const diff = Math.abs(targetValue - startValue);
+    
+    // ✅ حساب المدة ديناميكياً
+    let dynamicDuration = duration;
+    if (diff < 5) {
+        dynamicDuration = 1200; // بطيء جداً
+    } else if (diff < 10) {
+        dynamicDuration = 900;
+    } else if (diff < 50) {
+        dynamicDuration = 700;
+    } else if (diff < 100) {
+        dynamicDuration = 500;
+    } else {
+        dynamicDuration = 350;
+    }
+    
+    // ✅ تشغيل صوت عند بدء العد
+    if (targetValue > startValue && typeof SoundSystem !== 'undefined') {
+        SoundSystem.playStatIncrease();
+    }
+    
+    this._animateNumberElement(element, targetValue, dynamicDuration, onComplete);
 },
 
 _resetAllNumbersToZero() {
@@ -3599,7 +4041,15 @@ _startSequentialCounting() {
 
         console.log('✅ All animations complete!');
     };
-
+    // مثال: عد النقود
+    this._animateNumberDynamic('resultCoinsTotal', this._resultValues.coins, 800);
+    
+    // مثال: عد النقاط
+    this._animateNumberDynamic('resultPointsTotal', this._resultValues.points, 800);
+    
+    // مثال: عد السلسلة
+    this._animateNumberDynamic('resultStreakTotal', this._resultValues.streak, 600);
+    
     // بدء العد بعد 300ms
     setTimeout(processNext, 300);
 },
@@ -3679,27 +4129,73 @@ _animateTotals() {
     }, 300);
 },
 
-/**
- * عد تصاعدي لعنصر DOM
- */
 _animateNumber(elementId, targetValue, duration = 800, onComplete = null) {
     const element = document.getElementById(elementId);
     if (!element) return;
+    
+    // ✅ تشغيل صوت عند بدء العد
+    const currentValue = parseInt(element.textContent) || 0;
+    if (targetValue > currentValue && typeof SoundSystem !== 'undefined') {
+        SoundSystem.playStatIncrease();
+    }
+    
     this._animateNumberElement(element, targetValue, duration, onComplete);
 },
 
 _animateNumberElement(element, targetValue, duration = 500, onComplete = null) {
     if (!element) return;
+    
     const startTime = performance.now();
-    const startValue = 0;
+    const startValue = parseInt(element.textContent) || 0;
     element.classList.add('counting-active');
+
+    // ✅ تشغيل صوت عند بدء العد
+    if (targetValue > startValue && typeof SoundSystem !== 'undefined') {
+        SoundSystem.playStatIncrease();
+    }
+
+    // ✅ حساب المدة ديناميكياً بناءً على القيمة
+    // الأرقام الصغيرة (أقل من 10) → بطيئة (800ms)
+    // الأرقام المتوسطة (10-100) → متوسطة (600ms)
+    // الأرقام الكبيرة (أكثر من 100) → سريعة (400ms)
+    let dynamicDuration = duration;
+    const diff = Math.abs(targetValue - startValue);
+    
+    if (diff < 5) {
+        dynamicDuration = 1000; // بطيء جداً للأرقام الصغيرة
+    } else if (diff < 10) {
+        dynamicDuration = 800;
+    } else if (diff < 50) {
+        dynamicDuration = 600;
+    } else if (diff < 100) {
+        dynamicDuration = 500;
+    } else {
+        dynamicDuration = 350; // سريع للأرقام الكبيرة
+    }
+    
+    // ✅ إضافة تباطؤ تدريجي (easing function)
+    const easeOutQuart = (t) => {
+        return 1 - Math.pow(1 - t, 4);
+    };
+
+    let lastPlayedSound = startValue;
 
     const updateValue = (currentTime) => {
         const elapsed = currentTime - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        const eased = 1 - Math.pow(1 - progress, 2);
+        const progress = Math.min(elapsed / dynamicDuration, 1);
+        
+        // استخدام دالة التباطؤ التدريجي
+        const eased = easeOutQuart(progress);
         const currentValue = Math.round(startValue + (targetValue - startValue) * eased);
         element.textContent = currentValue;
+
+        // ✅ تشغيل صوت عند كل زيادة ملحوظة (كل 5 وحدات)
+        if (currentValue > lastPlayedSound && currentValue % 5 === 0 && currentValue !== startValue) {
+            lastPlayedSound = currentValue;
+            if (typeof SoundSystem !== 'undefined') {
+                SoundSystem.playStatIncrease();
+            }
+        }
 
         if (progress < 1) {
             requestAnimationFrame(updateValue);
@@ -3850,7 +4346,8 @@ window.addEventListener('offline', () => {
     updateFirebaseStatus(isFirebaseReady);
     this._updateLastUpdateTime();
 
-
+    // ✅ تهيئة نظام الصوتيات
+    SoundSystem.init();
     // ✅ عرض القوائم بعد تحميل البيانات
     this._renderStore(DataManager.data.storeItems || []);
 
@@ -5729,6 +6226,16 @@ _renderGameSection() {
     `;
 },
 
+// إضافة مستمع للأزرار لتشغيل صوت عند الضغط
+_setupSoundButtons() {
+    document.addEventListener('click', (e) => {
+        const target = e.target.closest('button, .btn, .tab-btn, .filter-chip, .dropdown-item');
+        if (target && !target.classList.contains('no-sound')) {
+            SoundSystem.playClick();
+        }
+    });
+},
+
 // ============================================================
 // إضافة عملات الماسات للمستخدم
 // ============================================================
@@ -7470,6 +7977,24 @@ async _executeReset() {
     }
 },
 
+// داخل App
+_animateAdminStats() {
+    // تشغيل صوت عند تحديث إحصائيات لوحة المشرفين
+    const statElements = document.querySelectorAll('.admin-stat .admin-stat-number');
+    statElements.forEach((el, index) => {
+        const target = parseInt(el.textContent) || 0;
+        const current = parseInt(el.dataset.oldValue) || 0;
+        if (target > current) {
+            setTimeout(() => {
+                if (typeof SoundSystem !== 'undefined') {
+                    SoundSystem.playStatIncrease();
+                }
+            }, index * 120);
+        }
+        el.dataset.oldValue = target;
+    });
+},
+
 // ✅ دالة مساعدة لحذف مجموعة على دفعات صغيرة
 async _deleteCollectionInBatches(collectionPath, batchSize = 100) {
     const collectionRef = db.collection(collectionPath);
@@ -8204,6 +8729,10 @@ async _updateAdminDashboard() {
         // في حالة الخطأ، استخدم البيانات المخزنة
         this._updateAdminDashboardOffline();
     }
+        // ✅ تشغيل صوت عند تحديث الإحصائيات
+    setTimeout(() => {
+        this._animateAdminStats();
+    }, 300);
 },
 
 // ============================================================
@@ -9932,6 +10461,7 @@ document.getElementById('loginToPostBtn')?.addEventListener('click', () => {
         this._setupProfileHandlers();
         this._initQuestionForm();
         this._setupMultiplayerHandlers();
+        this._setupSoundButtons();
     },
 
 _setupModalHandlers() {
@@ -12151,6 +12681,24 @@ _renderAdminStats(stats) {
             </div>
         `;
     },
+
+// داخل App
+_animateProfileStats() {
+    // تشغيل صوت عند تحديث إحصائيات الملف الشخصي
+    const statElements = document.querySelectorAll('.profile-quick-stats .stat-number, .profile-stats .stat-number');
+    statElements.forEach((el, index) => {
+        const target = parseInt(el.textContent) || 0;
+        const current = parseInt(el.dataset.oldValue) || 0;
+        if (target > current) {
+            setTimeout(() => {
+                if (typeof SoundSystem !== 'undefined') {
+                    SoundSystem.playStatIncrease();
+                }
+            }, index * 150);
+        }
+        el.dataset.oldValue = target;
+    });
+},
 
     /**
      * عرض المضاعفات النشطة في واجهة اللعبة
@@ -15495,6 +16043,18 @@ _updateConnectionStatusUI() {
         const warning = document.getElementById('offlineWarning');
         if (warning) warning.remove();
     }
+},
+
+_toggleSound() {
+    const enabled = SoundSystem._isEnabled;
+    SoundSystem.toggle(!enabled);
+    const btn = document.getElementById('soundToggleBtn');
+    if (btn) {
+        btn.innerHTML = enabled ? 
+            '<i class="fas fa-volume-mute"></i> كتم' : 
+            '<i class="fas fa-volume-up"></i> الصوت';
+    }
+    showToast(enabled ? '🔇 تم كتم الصوت' : '🔊 تم تشغيل الصوت', 'info');
 },
 
 // ============================================================
