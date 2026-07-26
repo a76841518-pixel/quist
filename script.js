@@ -524,22 +524,6 @@ function formatDate(date) {
     return d.toLocaleDateString('ar-SA');
 }
 
-function formatDateFull(date) {
-    if (!date) return '—';
-    let d;
-    if (typeof date === 'object' && date !== null && typeof date.toDate === 'function') {
-        d = date.toDate();
-    } else if (typeof date === 'string' || typeof date === 'number') {
-        d = new Date(date);
-    } else if (date instanceof Date) {
-        d = date;
-    } else {
-        return '—';
-    }
-    if (isNaN(d.getTime())) return '—';
-    return d.toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-}
-
 // ============================================================
 // نظام اللعب الجماعي المتطور - إصلاح مشكلة الإجابة المكررة
 // ============================================================
@@ -1249,15 +1233,6 @@ function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-function truncateText(text, maxLength = 30) {
-    if (!text) return '';
-    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
-}
-
-function generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
-}
-
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -1757,19 +1732,11 @@ listenWhere(collection, field, operator, value, callback) {
 // ============================================================
 const AchievementSystem = {
     achievements: [
-        { id: 'first_goal', name: '🎯 الهدف الأول', desc: 'سجل هدفاً في المباراة الأولى', icon: '⚽', points: 10, category: 'مباريات' },
-        { id: 'top_scorer', name: '🏅 الهداف', desc: 'سجل 10 أهداف في المباريات', icon: '🏆', points: 50, category: 'مباريات' },
-        { id: 'champion', name: '👑 البطل', desc: 'فزت ببطولة الدوري', icon: '👑', points: 100, category: 'بطولات' },
         { id: 'quiz_master', name: '📚 خبير الأسئلة', desc: 'أجب على 50 سؤالاً صحيحاً', icon: '🧠', points: 50, category: 'أسئلة' },
         { id: 'legend', name: '🌟 أسطورة', desc: 'احصل على 500 نقطة', icon: '🌟', points: 200, category: 'نقاط' },
-        { id: 'manager', name: '📋 المدير', desc: 'أضف 20 لاعباً', icon: '📋', points: 30, category: 'إدارة' },
-        { id: 'scout', name: '🔍 الكشاف', desc: 'اكتشف لاعباً جديداً', icon: '🔍', points: 20, category: 'إدارة' },
-        { id: 'first_match', name: '🏟️ أول مباراة', desc: 'أضف مباراة جديدة', icon: '🏟️', points: 15, category: 'مباريات' },
-        { id: 'club_creator', name: '🏛️ مؤسس الأندية', desc: 'أضف 5 أندية جديدة', icon: '🏛️', points: 25, category: 'إدارة' },
         { id: 'question_master', name: '📝 صانع الأسئلة', desc: 'أضف 10 أسئلة', icon: '📝', points: 30, category: 'أسئلة' },
         { id: 'game_winner', name: '🎮 بطل اللعبة', desc: 'اربح 10 مباريات في لعبة الأسئلة', icon: '🎮', points: 60, category: 'لعبة' },
         { id: 'social_butterfly', name: '🦋 اجتماعي', desc: 'أضف 5 أصدقاء', icon: '🦋', points: 20, category: 'اجتماعي' },
-        { id: 'post_master', name: '📢 ناشر محتوى', desc: 'أنشئ 10 منشورات', icon: '📢', points: 30, category: 'اجتماعي' },
         { id: 'shopaholic', name: '🛒 متسوق محترف', desc: 'اشترِ 5 عناصر من المتجر', icon: '🛒', points: 25, category: 'متجر' },
         { id: 'room_host', name: '🏠 مضيف الغرف', desc: 'استضف 5 غرف لعب', icon: '🏠', points: 40, category: 'غرف' }
     ],
@@ -1783,34 +1750,12 @@ const AchievementSystem = {
             if (userAchievements.includes(ach.id)) return;
             let condition = false;
             switch (ach.id) {
-                case 'first_goal':
-                    condition = data.matches.some(m => m.score1 > 0 || m.score2 > 0);
-                    break;
-                case 'top_scorer':
-                    const totalGoals = data.players.reduce((sum, p) => sum + (p.goals || 0), 0);
-                    condition = totalGoals >= 10;
-                    break;
-                case 'champion':
-                    condition = data.tournaments.some(t => t.winner === user.username);
-                    break;
                 case 'quiz_master':
                     const correctAnswers = parseInt(localStorage.getItem('correctAnswers') || '0');
                     condition = correctAnswers >= 50;
                     break;
                 case 'legend':
                     condition = user.totalScore >= 500;
-                    break;
-                case 'manager':
-                    condition = data.players.length >= 20;
-                    break;
-                case 'scout':
-                    condition = data.players.some(p => p.scoutedBy === user.uid);
-                    break;
-                case 'first_match':
-                    condition = data.matches.length >= 1;
-                    break;
-                case 'club_creator':
-                    condition = data.clubs.length >= 5;
                     break;
                 case 'question_master':
                     condition = data.questions.length >= 10;
@@ -1821,10 +1766,6 @@ const AchievementSystem = {
                     break;
                 case 'social_butterfly':
                     condition = (user.friends || []).length >= 5;
-                    break;
-                case 'post_master':
-                    const posts = data.posts ? data.posts.filter(p => p.userId === user.uid) : [];
-                    condition = posts.length >= 10;
                     break;
                 case 'shopaholic':
                     condition = (user.inventory || []).length >= 5;
@@ -1886,19 +1827,13 @@ const AchievementSystem = {
 // 6. مدير البيانات (DataManager)
 // ============================================================
 const DataManager = {
-    data: {
-        players: [],
-        clubs: [],
-        matches: [],
-        tournaments: [],
-        questions: [],
-        leaderboard: [],
-        comments: [],
-        posts: [],
-        rooms: [],
-        storeItems: [],
-        transactions: []
-    },
+data: {
+    questions: [],
+    leaderboard: [],
+    rooms: [],
+    storeItems: [],
+    transactions: []
+},
     _listeners: [],
     _unsubscribers: [],
     _isLoading: false,
@@ -1908,9 +1843,8 @@ const DataManager = {
         if (this._isLoading) return this.data;
         this._isLoading = true;
         try {
-            const collections = ['players', 'clubs', 'matches', 'tournaments', 'questions', 'leaderboard',
-                'comments', 'posts', 'rooms', 'storeItems', 'transactions'
-            ];
+            const collections = ['questions', 'leaderboard', 'rooms', 'storeItems', 'transactions'];
+
             const results = await Promise.all(
                 collections.map(col => FirestoreService.getAll(col))
             );
@@ -1934,14 +1868,8 @@ startListening() {
     this._unsubscribers.forEach(unsub => unsub());
     this._unsubscribers = [];
     const collections = [
-        { name: 'players', key: 'players' },
-        { name: 'clubs', key: 'clubs' },
-        { name: 'matches', key: 'matches' },
-        { name: 'tournaments', key: 'tournaments' },
         { name: 'questions', key: 'questions' },
         { name: 'leaderboard', key: 'leaderboard' },
-        { name: 'comments', key: 'comments' },
-        { name: 'posts', key: 'posts' },
         { name: 'rooms', key: 'rooms' },
         { name: 'storeItems', key: 'storeItems' },
         { name: 'transactions', key: 'transactions' }
@@ -1984,55 +1912,14 @@ startListening() {
         await FirestoreService.delete(collection, id);
     },
 
-    getStats() {
-        return {
-            players: this.data.players.length,
-            clubs: this.data.clubs.length,
-            matches: this.data.matches.length,
-            tournaments: this.data.tournaments.length,
-            questions: this.data.questions.length,
-            comments: this.data.comments.length,
-            leaderboard: this.data.leaderboard.length,
-            posts: this.data.posts.length,
-            rooms: this.data.rooms.length,
-            storeItems: this.data.storeItems.length
-        };
-    },
-
-    getTopPlayers(limit = 5) {
-        return [...this.data.players]
-            .sort((a, b) => (b.goals || 0) - (a.goals || 0))
-            .slice(0, limit);
-    },
-
-    getTopTeams() {
-        const teams = {};
-        this.data.matches.forEach(m => {
-            if (!teams[m.team1]) teams[m.team1] = { wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 };
-            if (!teams[m.team2]) teams[m.team2] = { wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 };
-            teams[m.team1].goalsFor += m.score1 || 0;
-            teams[m.team1].goalsAgainst += m.score2 || 0;
-            teams[m.team2].goalsFor += m.score2 || 0;
-            teams[m.team2].goalsAgainst += m.score1 || 0;
-            if ((m.score1 || 0) > (m.score2 || 0)) {
-                teams[m.team1].wins++;
-                teams[m.team2].losses++;
-            } else if ((m.score1 || 0) < (m.score2 || 0)) {
-                teams[m.team2].wins++;
-                teams[m.team1].losses++;
-            } else {
-                teams[m.team1].draws++;
-                teams[m.team2].draws++;
-            }
-        });
-        return Object.entries(teams)
-            .sort((a, b) => {
-                const ptsA = a[1].wins * 3 + a[1].draws;
-                const ptsB = b[1].wins * 3 + b[1].draws;
-                return ptsB - ptsA;
-            })
-            .slice(0, 10);
-    }
+getStats() {
+    return {
+        questions: this.data.questions.length,
+        leaderboard: this.data.leaderboard.length,
+        rooms: this.data.rooms.length,
+        storeItems: this.data.storeItems.length
+    };
+},
 };
 
 // ============================================================
@@ -3883,23 +3770,14 @@ window.addEventListener('offline', () => {
 
 
     // ✅ عرض القوائم بعد تحميل البيانات
-    this._renderAllTables(DataManager.data);
-    this._populateSelects(DataManager.data);
-    this._renderLeagueTable(DataManager.data);
-    this._updateCharts(DataManager.data);
-    this._renderRecent(DataManager.data);
-    this._renderTopScorers(DataManager.data);
-    this._renderPosts(DataManager.data.posts || []);
     this._renderStore(DataManager.data.storeItems || []);
-    this._renderAnalytics(DataManager.data);
-    this._renderUpcomingMatches(DataManager.data);
 
     setTimeout(() => {
         if (typeof this._refreshActiveBoosts === 'function') {
             this._refreshActiveBoosts();
         }
     }, 500);
-
+    this._updateDashboardUI();
     showToast('مرحباً بك في مدير كرة القدم المتطور! 🚀', 'success');
 },
 
@@ -3910,33 +3788,103 @@ window.addEventListener('offline', () => {
         this.navLinks = document.querySelectorAll('#mainNav a, #mobileNav a');
     },
 
-    _buildSections() {
-        const container = document.getElementById('sectionsContainer');
-        container.innerHTML = `
-            <section id="section-dashboard" class="section active">${this._renderDashboard()}</section>
-            <section id="section-notifications" class="section">${this._renderNotificationsSection()}</section>
-            <section id="section-players" class="section">${this._renderPlayersSection()}</section>
-            <section id="section-clubs" class="section">${this._renderClubsSection()}</section>
-            <section id="section-matches" class="section">${this._renderMatchesSection()}</section>
-            <section id="section-tournaments" class="section">${this._renderTournamentsSection()}</section>
-            <section id="section-league" class="section">${this._renderLeagueSection()}</section>
-            <section id="section-questions" class="section">${this._renderQuestionsSection()}</section>
-            <section id="section-game" class="section">${this._renderGameSection()}</section>
-            <section id="section-multiplayer" class="section">${this._renderMultiplayerSection()}</section>
-            <section id="section-achievements" class="section">${this._renderAchievementsSection()}</section>
-            <section id="section-store" class="section">${this._renderStoreSection()}</section>
-            <section id="section-profile" class="section">${this._renderProfileSection()}</section>
-            <section id="section-analytics" class="section">${this._renderAnalyticsSection()}</section>
-            <section id="section-admin" class="section">${this._renderAdminSection()}</section>
-            <section id="section-settings" class="section">${this._renderSettingsSection()}</section>
-<section id="section-multiplayer-game" class="section" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:1050;background:var(--dark);padding:1rem;overflow-y:auto;">
-    <div id="multiplayerGameContent" style="max-width:800px;margin:0 auto;"></div>
-</section>
-<section id="section-multiplayer-result" class="section" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:1050;background:var(--dark);padding:1rem;overflow-y:auto;">
-    <div id="multiplayerResultContent" style="max-width:800px;margin:0 auto;"></div>
-</section>
-        `;
-    },
+_buildSections() {
+    const container = document.getElementById('sectionsContainer');
+    container.innerHTML = `
+        <section id="section-dashboard" class="section active">${this._renderDashboard()}</section>
+        
+        <section id="section-notifications" class="section">
+            <div class="back-to-home" onclick="App._activateSection('dashboard')">
+                <i class="fas fa-arrow-right"></i> العودة للرئيسية
+            </div>
+            ${this._renderNotificationsSection()}
+        </section>
+        
+        <section id="section-questions" class="section">
+            <div class="back-to-home" onclick="App._activateSection('dashboard')">
+                <i class="fas fa-arrow-right"></i> العودة للرئيسية
+            </div>
+            ${this._renderQuestionsSection()}
+        </section>
+        
+        <section id="section-game" class="section">
+            <div class="back-to-home" onclick="App._activateSection('dashboard')">
+                <i class="fas fa-arrow-right"></i> العودة للرئيسية
+            </div>
+            ${this._renderGameSection()}
+        </section>
+        
+        <section id="section-multiplayer" class="section">
+            <div class="back-to-home" onclick="App._activateSection('dashboard')">
+                <i class="fas fa-arrow-right"></i> العودة للرئيسية
+            </div>
+            ${this._renderMultiplayerSection()}
+        </section>
+        
+        <section id="section-achievements" class="section">
+            <div class="back-to-home" onclick="App._activateSection('dashboard')">
+                <i class="fas fa-arrow-right"></i> العودة للرئيسية
+            </div>
+            ${this._renderAchievementsSection()}
+        </section>
+        
+        <section id="section-store" class="section">
+            <div class="back-to-home" onclick="App._activateSection('dashboard')">
+                <i class="fas fa-arrow-right"></i> العودة للرئيسية
+            </div>
+            ${this._renderStoreSection()}
+        </section>
+        
+        <section id="section-profile" class="section">
+            <div class="back-to-home" onclick="App._activateSection('dashboard')">
+                <i class="fas fa-arrow-right"></i> العودة للرئيسية
+            </div>
+            ${this._renderProfileSection()}
+        </section>
+        
+        <section id="section-friends" class="section">
+            <div class="back-to-home" onclick="App._activateSection('dashboard')">
+                <i class="fas fa-arrow-right"></i> العودة للرئيسية
+            </div>
+            ${this._renderFriendsPage()}
+        </section>
+        
+        <section id="section-analytics" class="section">
+            <div class="back-to-home" onclick="App._activateSection('dashboard')">
+                <i class="fas fa-arrow-right"></i> العودة للرئيسية
+            </div>
+            ${this._renderAnalyticsSection()}
+        </section>
+        
+        <section id="section-admin" class="section">
+            <div class="back-to-home" onclick="App._activateSection('dashboard')">
+                <i class="fas fa-arrow-right"></i> العودة للرئيسية
+            </div>
+            ${this._renderAdminSection()}
+        </section>
+        
+        <section id="section-settings" class="section">
+            <div class="back-to-home" onclick="App._activateSection('dashboard')">
+                <i class="fas fa-arrow-right"></i> العودة للرئيسية
+            </div>
+            ${this._renderSettingsSection()}
+        </section>
+        
+        <section id="section-multiplayer-game" class="section" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:1050;background:var(--dark);padding:1rem;overflow-y:auto;">
+            <div class="back-to-home" onclick="MultiplayerManager.leaveGame(); App._activateSection('multiplayer')">
+                <i class="fas fa-arrow-right"></i> العودة للرئيسية
+            </div>
+            <div id="multiplayerGameContent" style="max-width:800px;margin:0 auto;"></div>
+        </section>
+        
+        <section id="section-multiplayer-result" class="section" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:1050;background:var(--dark);padding:1rem;overflow-y:auto;">
+            <div class="back-to-home" onclick="MultiplayerManager.leaveGame(); App._activateSection('multiplayer')">
+                <i class="fas fa-arrow-right"></i> العودة للرئيسية
+            </div>
+            <div id="multiplayerResultContent" style="max-width:800px;margin:0 auto;"></div>
+        </section>
+    `;
+},
 
 _buildModals() {
     const container = document.getElementById('modalsContainer');
@@ -4026,85 +3974,6 @@ _buildModals() {
                 </form>
             </div>
         </div>
-
-<!-- Edit Post Modal -->
-<div class="modal-overlay" id="editPostModal">
-    <div class="modal-card">
-        <div class="modal-header">
-            <h3><i class="fas fa-edit"></i> تعديل المنشور</h3>
-            <button class="btn btn-sm" id="closeEditPostModal" style="background:transparent;color:var(--gray);">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <form id="editPostForm">
-            <input type="hidden" id="editPostId">
-            <div class="form-group">
-                <label>المحتوى *</label>
-                <textarea id="editPostContent" required rows="4" placeholder="عدل محتوى المنشور..."></textarea>
-            </div>
-            <div class="form-group">
-                <label>رابط الصورة (اختياري)</label>
-                <input type="url" id="editPostImage" placeholder="https://example.com/image.jpg">
-            </div>
-            <button type="submit" class="btn btn-primary w-100" style="justify-content:center;">
-                <i class="fas fa-save"></i> حفظ التغييرات
-            </button>
-        </form>
-    </div>
-</div>
-
-            <!-- Player Modal -->
-            <div class="modal-overlay" id="playerModal"><div class="modal-card">
-                <div class="modal-header"><h3 id="playerModalTitle"><i class="fas fa-user"></i> إضافة لاعب</h3><button class="btn btn-sm" id="closePlayerModal" style="background:transparent;color:var(--gray);"><i class="fas fa-times"></i></button></div>
-                <form id="playerForm">
-                    <input type="hidden" id="playerFormId">
-                    <div class="form-row"><div class="form-group"><label>الاسم *</label><input type="text" id="pName" required></div><div class="form-group"><label>النادي *</label><select id="pClub" required></select></div></div>
-                    <div class="form-row"><div class="form-group"><label>المركز *</label><select id="pPosition" required><option value="">اختر</option><option value="حارس مرمى">حارس مرمى</option><option value="مدافع">مدافع</option><option value="وسط">وسط</option><option value="مهاجم">مهاجم</option></select></div><div class="form-group"><label>العمر *</label><input type="number" id="pAge" required min="16" max="45"></div></div>
-                    <div class="form-row"><div class="form-group"><label>الجنسية</label><input type="text" id="pNationality"></div><div class="form-group"><label>رقم القميص</label><input type="number" id="pNumber" min="1" max="99"></div></div>
-                    <div class="form-row"><div class="form-group"><label>الأهداف</label><input type="number" id="pGoals" min="0" value="0"></div><div class="form-group"><label>التمريرات</label><input type="number" id="pAssists" min="0" value="0"></div></div>
-                    <div class="form-group"><label>رابط الصورة</label><input type="url" id="pImage" placeholder="https://example.com/player.jpg"></div>
-                    <button type="submit" class="btn btn-primary w-100" style="justify-content:center;"><i class="fas fa-save"></i> حفظ</button>
-                </form>
-            </div></div>
-
-            <!-- Club Modal -->
-            <div class="modal-overlay" id="clubModal"><div class="modal-card">
-                <div class="modal-header"><h3 id="clubModalTitle"><i class="fas fa-trophy"></i> إضافة نادي</h3><button class="btn btn-sm" id="closeClubModal" style="background:transparent;color:var(--gray);"><i class="fas fa-times"></i></button></div>
-                <form id="clubForm">
-                    <input type="hidden" id="clubFormId">
-                    <div class="form-group"><label>اسم النادي *</label><input type="text" id="cName" required></div>
-                    <div class="form-group"><label>المدينة</label><input type="text" id="cCity"></div>
-                    <div class="form-group"><label>الدوري</label><input type="text" id="cLeague"></div>
-                    <div class="form-group"><label>سنة التأسيس</label><input type="number" id="cFounded" min="1800" max="2030"></div>
-                    <div class="form-group"><label>رابط الشعار</label><input type="url" id="cLogo" placeholder="https://example.com/logo.png"></div>
-                    <button type="submit" class="btn btn-primary w-100" style="justify-content:center;"><i class="fas fa-save"></i> حفظ</button>
-                </form>
-            </div></div>
-
-            <!-- Match Modal -->
-            <div class="modal-overlay" id="matchModal"><div class="modal-card">
-                <div class="modal-header"><h3 id="matchModalTitle"><i class="fas fa-futbol"></i> إضافة مباراة</h3><button class="btn btn-sm" id="closeMatchModal" style="background:transparent;color:var(--gray);"><i class="fas fa-times"></i></button></div>
-                <form id="matchForm">
-                    <input type="hidden" id="matchFormId">
-                    <div class="form-row"><div class="form-group"><label>الفريق الأول *</label><select id="mTeam1" required></select></div><div class="form-group"><label>الفريق الثاني *</label><select id="mTeam2" required></select></div></div>
-                    <div class="form-row"><div class="form-group"><label>نتيجة الفريق الأول</label><input type="number" id="mScore1" min="0" value="0"></div><div class="form-group"><label>نتيجة الفريق الثاني</label><input type="number" id="mScore2" min="0" value="0"></div></div>
-                    <div class="form-row"><div class="form-group"><label>التاريخ</label><input type="date" id="mDate"></div><div class="form-group"><label>البطولة</label><select id="mTournament"></select></div></div>
-                    <button type="submit" class="btn btn-primary w-100" style="justify-content:center;"><i class="fas fa-save"></i> حفظ</button>
-                </form>
-            </div></div>
-
-            <!-- Tournament Modal -->
-            <div class="modal-overlay" id="tournamentModal"><div class="modal-card">
-                <div class="modal-header"><h3 id="tournamentModalTitle"><i class="fas fa-medal"></i> إضافة بطولة</h3><button class="btn btn-sm" id="closeTournamentModal" style="background:transparent;color:var(--gray);"><i class="fas fa-times"></i></button></div>
-                <form id="tournamentForm">
-                    <input type="hidden" id="tournamentFormId">
-                    <div class="form-group"><label>اسم البطولة *</label><input type="text" id="tName" required></div>
-                    <div class="form-group"><label>السنة</label><input type="number" id="tYear" min="1900" max="2100"></div>
-                    <div class="form-group"><label>الفائز</label><select id="tWinner"><option value="">—</option></select></div>
-                    <div class="form-group"><label>الأندية المشاركة (اختيار متعدد)</label><select id="tClubs" multiple style="height:100px;"></select></div>
-                    <button type="submit" class="btn btn-primary w-100" style="justify-content:center;"><i class="fas fa-save"></i> حفظ</button>
-                </form>
-            </div></div>
 
 <!-- Question Modal - نسخة متطورة -->
 <div class="modal-overlay" id="questionModal">
@@ -4275,27 +4144,6 @@ _buildModals() {
     </div>
 </div>
 
-            <!-- Comment Modal -->
-            <div class="modal-overlay" id="commentModal"><div class="modal-card">
-                <div class="modal-header"><h3><i class="fas fa-comment"></i> إضافة تعليق</h3><button class="btn btn-sm" id="closeCommentModal" style="background:transparent;color:var(--gray);"><i class="fas fa-times"></i></button></div>
-                <form id="commentForm">
-                    <input type="hidden" id="commentMatchId">
-                    <div class="form-group"><label>نص التعليق *</label><textarea id="commentText" required></textarea></div>
-                    <div class="form-row"><div class="form-group"><label>التقييم (1-5)</label><input type="number" id="commentRating" min="1" max="5" value="3"></div></div>
-                    <button type="submit" class="btn btn-primary w-100" style="justify-content:center;"><i class="fas fa-save"></i> حفظ</button>
-                </form>
-            </div></div>
-
-            <!-- Post Modal -->
-            <div class="modal-overlay" id="postModal"><div class="modal-card">
-                <div class="modal-header"><h3><i class="fas fa-pen"></i> إنشاء منشور</h3><button class="btn btn-sm" id="closePostModal" style="background:transparent;color:var(--gray);"><i class="fas fa-times"></i></button></div>
-                <form id="postForm">
-                    <div class="form-group"><label>المحتوى *</label><textarea id="postContent" required rows="4" placeholder="اكتب منشورك..."></textarea></div>
-                    <div class="form-group"><label>رابط الصورة (اختياري)</label><input type="url" id="postImage" placeholder="https://example.com/image.jpg"></div>
-                    <button type="submit" class="btn btn-primary w-100" style="justify-content:center;"><i class="fas fa-share"></i> نشر</button>
-                </form>
-            </div></div>
-
             <!-- Profile Edit Modal -->
 <div class="modal-overlay" id="profileEditModal">
     <div class="modal-card fullscreen-modal">
@@ -4362,89 +4210,237 @@ _buildModals() {
         `;
     },
 
-    // ===== دوال العرض (Sections) =====
 _renderDashboard() {
+    const user = AuthService.currentUser;
+    const level = user ? getLevel(user.totalScore || 0) : { level: 1 };
+    const rank = user ? getRank(user.rankPoints || 0) : { name: 'برونزي 1', progress: 0 };
+    const progress = user ? getLevelProgress(user.totalScore || 0) : { progress: 0, currentLevel: 1, nextMin: 1000 };
+    const stats = user?.stats || {};
+    const gamesPlayed = stats.gamesPlayed || 0;
+    const gamesWon = stats.gamesWon || 0;
+    const winRate = gamesPlayed > 0 ? Math.round((gamesWon / gamesPlayed) * 100) : 0;
+    const avatarHtml = user?.avatar ? `<img src="${user.avatar}" alt="avatar">` : '👤';
+    
+    // ✅ استخدام _isAdminUser للتحقق من صلاحية المشرف
+    const isAdmin = this._isAdminUser();
+    
+    console.log('👤 _renderDashboard - User:', user);
+    console.log('🔑 isAdmin:', isAdmin);
+    console.log('📋 Role:', user?.role);
+    console.log('📋 AdminRole:', user?.adminRole);
+
     return `
-        <div class="dashboard-posts-only">
-            <!-- رأس الصفحة الرئيسية -->
-            <div class="flex-between mb-2">
-                <h1 style="font-size:2rem;font-weight:900;">
-                    <i class="fas fa-newspaper" style="color:var(--accent);"></i> 
-                    المنشورات
-                </h1>
-                <div class="flex-center" style="flex-wrap:wrap;gap:8px;">
-                    ${AuthService.currentUser ? `
-                        <button class="btn btn-primary" id="openAddPostBtn">
-                            <i class="fas fa-plus"></i> إنشاء منشور
-                        </button>
-                        <button class="btn btn-sm btn-outline" id="refreshPostsBtn">
-                            <i class="fas fa-sync"></i> تحديث
-                        </button>
-                    ` : ``}
+    <div class="game-dashboard">
+        <div class="game-bg-overlay"></div>
+        <div class="game-dashboard-content">
+            
+
+
+            <!-- ===== باقي محتوى الداشبورد ===== -->
+            <div class="game-header" id="dashboardProfileClick" style="cursor:pointer;">
+                        <!-- ===== القائمة المنسدلة (أيقونة ☰ في الأعلى) ===== -->
+            <div class="dashboard-menu-top">
+                <button class="dashboard-menu-icon" id="dashboardMenuBtn" title="القائمة">
+                    <i class="fas fa-bars"></i>
+                    <span class="menu-badge-dot" id="menuNotificationBadge" style="display:none;"></span>
+                </button>
+                <div class="dashboard-dropdown-menu" id="dashboardDropdownMenu">
+                <div class="dropdown-divider"></div>
+                    <div class="dropdown-item" data-action="notifications">
+                        <i class="fas fa-bell"></i>
+                        <span>الإشعارات</span>
+                        <span class="badge-dot" id="dropdownNotifBadge" style="display:none;"></span>
+                    </div>
+                    <div class="dropdown-item" data-action="friends">
+                        <i class="fas fa-user-friends"></i>
+                        <span>الأصدقاء</span>
+                    </div>
+                    <div class="dropdown-item" data-action="messages">
+                        <i class="fas fa-envelope"></i>
+                        <span>الرسائل</span>
+                    </div>
+                    <div class="dropdown-divider"></div>
+                    <div class="dropdown-item" data-action="questions">
+                        <i class="fas fa-question-circle"></i>
+                        <span>الأسئلة</span>
+                    </div>
+                    ${isAdmin ? `
+                    <div class="dropdown-item" data-action="admin">
+                        <i class="fas fa-shield-halved"></i>
+                        <span>لوحة المشرف</span>
+                    </div>
+                    ` : `
+                    <!-- عنصر مخفي للمشرفين فقط -->
+                    <div class="dropdown-item" data-action="admin" style="display:none;">
+                        <i class="fas fa-shield-halved"></i>
+                        <span>لوحة المشرف</span>
+                    </div>
+                    `}
+                    <div class="dropdown-divider"></div>
+                    <div class="dropdown-item" data-action="settings">
+                        <i class="fas fa-cog"></i>
+                        <span>الإعدادات</span>
+                    </div>
+                    <!-- ===== زر تسجيل الخروج ===== -->
+                    <div class="dropdown-divider"></div>
+                    <div class="dropdown-item logout-item" id="dashboardLogoutBtn">
+                        <i class="fas fa-sign-out-alt" style="color:var(--secondary);"></i>
+                        <span style="color:var(--secondary);">تسجيل الخروج</span>
+                    </div>
                 </div>
             </div>
-            
-            <!-- شريط البحث المتقدم -->
-            <div class="search-section mb-2">
-                <div class="search-container">
-                    <div class="search-input-wrapper">
-                        <i class="fas fa-search search-icon"></i>
-                        <input type="text" id="globalSearchInput" 
-                               placeholder="ابحث عن منشورات، هاشتاغات، لاعبين، أندية، مستخدمين..." 
-                               class="search-input"
-                               autocomplete="off">
-                        <button class="btn btn-sm btn-primary search-btn" id="globalSearchBtn">
-                            <i class="fas fa-arrow-left"></i> بحث
-                        </button>
+                <div class="game-user-info">
+                    <div class="user-avatar-large" id="dashboardAvatar">${avatarHtml}</div>
+                    <div class="user-name-level">
+                        <div class="user-name" id="dashboardUserName">${user?.displayName || user?.username || 'زائر'}</div>
+                        <div class="user-level" id="dashboardUserLevel">المستوى ${level.level}</div>
                     </div>
-                    
-                    <!-- القائمة المنسدلة للنتائج السريعة -->
-                    <div class="search-dropdown" id="searchDropdown" style="display:none;">
-                        <div class="search-dropdown-header">
-                            <span>نتائج سريعة</span>
-                            <span class="search-dropdown-close" id="searchDropdownClose">✕</span>
-                        </div>
-                        <div class="search-dropdown-results" id="searchDropdownResults">
-                            <!-- سيتم تعبئتها بواسطة JavaScript -->
-                        </div>
-                        <div class="search-dropdown-footer" id="searchDropdownFooter">
-                            <button class="btn btn-sm btn-primary" id="searchViewAllBtn">
-                                <i class="fas fa-eye"></i> عرض جميع النتائج
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- فلاتر البحث -->
-                    <div class="search-filters" id="searchFilters">
-                        <button class="filter-chip active" data-filter="all">الكل</button>
-                        <button class="filter-chip" data-filter="posts">📝 منشورات</button>
-                        <button class="filter-chip" data-filter="players">⚽ لاعبين</button>
-                        <button class="filter-chip" data-filter="clubs">🏆 أندية</button>
-                        <button class="filter-chip" data-filter="users">👤 مستخدمين</button>
-                        <button class="filter-chip" data-filter="hashtags"># هاشتاغات</button>
-                    </div>
+                </div>
+                <div class="game-currencies">
+                    <span class="currency"><i class="fas fa-coins"></i> <span id="dashboardCoins">${user?.coins || 0}</span></span>
+                    <span class="currency"><i class="fas fa-gem"></i> <span id="dashboardGems">${user?.gems || 0}</span></span>
+                    <button class="currency-btn" id="dashboardStoreBtnNew" title="المتجر"><i class="fas fa-store"></i></button>
                 </div>
             </div>
-            
-            <!-- نتائج البحث الكاملة -->
-            <div id="searchResults" style="display:none;">
-                <div class="flex-between mb-1">
-                    <h3 id="searchResultsTitle">نتائج البحث</h3>
-                    <button class="btn btn-sm btn-outline" id="clearSearchBtn"><i class="fas fa-times"></i> إلغاء</button>
+            <!-- ===== شريط المستوى ===== -->
+            <div class="game-level-section">
+                <div class="level-bar">
+                    <div class="level-bar-label">
+                        <span>المستوى <strong id="dashboardLevelNum">${progress.currentLevel || 1}</strong></span>
+                        <span id="dashboardLevelPoints">${user?.totalScore || 0}</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="fill" id="dashboardLevelProgress" style="width:${progress.progress}%;"></div>
+                    </div>
+                    <div class="level-bar-sub">إلى المستوى التالي: <span id="dashboardLevelMax">${progress.nextMin || 1000}</span> نقطة</div>
                 </div>
-                <div id="searchResultsContainer"></div>
-                <hr style="border-color:var(--glass-border);margin:1.5rem 0;">
             </div>
-            
-            <!-- عرض المنشورات -->
-            <div id="postsFeed">
-                <div class="text-gray text-center" style="padding:2rem;">
-                    <i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i>
-                    <p>جاري تحميل المنشورات...</p>
+
+
+            <!-- ===== الرتبة والباتل باس ===== -->
+            <div class="game-rank-battlepass">
+                <div class="rank-block">
+                    <div class="rank-icon">${rank.icon || '🏅'}</div>
+                    <div class="rank-info">
+                        <div class="rank-name" id="dashboardRankName">${rank.name}</div>
+                        <div class="rank-progress">
+                            <div class="progress-bar"><div class="fill" id="dashboardRankProgress" style="width:${rank.progress}%;"></div></div>
+                        </div>
+                    </div>
                 </div>
+                <div class="battle-pass-block">
+                    <div class="battle-pass-placeholder">🎟️ الباتل باس قريباً...</div>
+                </div>
+            </div>
+
+            <!-- ===== أزرار الإجراءات السريعة ===== -->
+            <div class="game-quick-actions">
+                <button class="game-btn primary" id="dashboardPlayBtn"><i class="fas fa-play"></i> العب الآن</button>
+                <button class="game-btn secondary" id="dashboardMultiplayerBtn"><i class="fas fa-users"></i> لعب جماعي</button>
+                <button class="game-btn" id="dashboardAchievementsBtn"><i class="fas fa-star"></i> الإنجازات</button>
             </div>
         </div>
+    </div>
     `;
+},
+
+/**
+ * تبديل إظهار/إخفاء القائمة المنسدلة
+ */
+_toggleDashboardMenu() {
+    const menu = document.getElementById('dashboardDropdownMenu');
+    if (menu) {
+        menu.classList.toggle('open');
+    }
+},
+
+/**
+ * إغلاق القائمة المنسدلة
+ */
+_closeDashboardMenu() {
+    const menu = document.getElementById('dashboardDropdownMenu');
+    if (menu) {
+        menu.classList.remove('open');
+    }
+},
+
+_handleDashboardMenuAction(action) {
+    this._closeDashboardMenu();
+    
+    switch(action) {
+        case 'notifications':
+            this._showNotifications();
+            break;
+case 'friends':
+    this._activateSection('friends');
+    setTimeout(() => this._loadFriendsPage(), 100);
+    break;
+        case 'messages':
+            showToast('📨 ميزة الرسائل قيد التطوير', 'info');
+            break;
+        case 'questions':
+            this._activateSection('questions');
+            break;
+        case 'admin':
+            console.log('🛡️ Opening admin panel...');
+            this._activateSection('admin');
+            break;
+        case 'settings':
+            this._activateSection('settings');
+            break;
+        default:
+            console.warn('Unknown action:', action);
+    }
+},
+
+_updateDashboardUI() {
+    const user = AuthService.currentUser;
+    if (!user) return;
+    
+    // تحديث الصورة
+    const avatarEl = document.getElementById('dashboardAvatar');
+    if (avatarEl) {
+        avatarEl.innerHTML = user.avatar ? `<img src="${user.avatar}" alt="avatar">` : '👤';
+    }
+    // تحديث الاسم
+    const nameEl = document.getElementById('dashboardUserName');
+    if (nameEl) nameEl.textContent = user.displayName || user.username || 'زائر';
+    // تحديث المستوى
+    const level = getLevel(user.totalScore || 0);
+    const levelEl = document.getElementById('dashboardUserLevel');
+    if (levelEl) levelEl.textContent = `المستوى ${level.level}`;
+    // تحديث العملات
+    const coinsEl = document.getElementById('dashboardCoins');
+    if (coinsEl) coinsEl.textContent = user.coins || 0;
+    const gemsEl = document.getElementById('dashboardGems');
+    if (gemsEl) gemsEl.textContent = user.gems || 0;
+    // تحديث شريط تقدم المستوى
+    const progress = getLevelProgress(user.totalScore || 0);
+    const levelProgressFill = document.getElementById('dashboardLevelProgress');
+    if (levelProgressFill) levelProgressFill.style.width = `${progress.progress}%`;
+    const levelNumEl = document.getElementById('dashboardLevelNum');
+    if (levelNumEl) levelNumEl.textContent = progress.currentLevel || 1;
+    const levelPointsEl = document.getElementById('dashboardLevelPoints');
+    if (levelPointsEl) levelPointsEl.textContent = user.totalScore || 0;
+    const levelMaxEl = document.getElementById('dashboardLevelMax');
+    if (levelMaxEl) levelMaxEl.textContent = progress.nextMin || 1000;
+    // تحديث الرتبة
+    const rank = getRank(user.rankPoints || 0);
+    const rankNameEl = document.getElementById('dashboardRankName');
+    if (rankNameEl) rankNameEl.textContent = rank.name;
+    const rankProgressFill = document.getElementById('dashboardRankProgress');
+    if (rankProgressFill) rankProgressFill.style.width = `${rank.progress}%`;
+    // تحديث الإحصائيات
+    const stats = user.stats || {};
+    const gamesPlayed = stats.gamesPlayed || 0;
+    const gamesWon = stats.gamesWon || 0;
+    const winRate = gamesPlayed > 0 ? Math.round((gamesWon / gamesPlayed) * 100) : 0;
+    const gamesPlayedEl = document.getElementById('dashboardGamesPlayed');
+    if (gamesPlayedEl) gamesPlayedEl.textContent = gamesPlayed;
+    const gamesWonEl = document.getElementById('dashboardGamesWon');
+    if (gamesWonEl) gamesWonEl.textContent = gamesWon;
+    const winRateEl = document.getElementById('dashboardWinRate');
+    if (winRateEl) winRateEl.textContent = winRate + '%';
 },
 
 // ============================================================
@@ -4601,48 +4597,6 @@ _performQuickSearch(query) {
     // جمع النتائج من جميع الفئات (حد أقصى 5)
     const allResults = [];
     
-    // المنشورات
-    if (results.posts && results.posts.length > 0) {
-        results.posts.slice(0, 2).forEach(p => {
-            allResults.push({
-                type: 'post',
-                id: p.id,
-                icon: '📝',
-                text: p.content?.substring(0, 50) || 'منشور',
-                sub: p.userName || 'مجهول',
-                badge: 'منشور'
-            });
-        });
-    }
-    
-    // اللاعبين
-    if (results.players && results.players.length > 0) {
-        results.players.slice(0, 2).forEach(p => {
-            allResults.push({
-                type: 'player',
-                id: p.id,
-                icon: '⚽',
-                text: p.name,
-                sub: p.club || 'بدون نادي',
-                badge: 'لاعب'
-            });
-        });
-    }
-    
-    // الأندية
-    if (results.clubs && results.clubs.length > 0) {
-        results.clubs.slice(0, 1).forEach(c => {
-            allResults.push({
-                type: 'club',
-                id: c.id,
-                icon: '🏆',
-                text: c.name,
-                sub: c.city || '',
-                badge: 'نادي'
-            });
-        });
-    }
-    
     // المستخدمين (من النتائج المحلية فقط - سيتم جلبهم من Firebase عند البحث الكامل)
     if (results.users && results.users.length > 0) {
         results.users.slice(0, 1).forEach(u => {
@@ -4653,20 +4607,6 @@ _performQuickSearch(query) {
                 text: u.username || u.displayName,
                 sub: `⭐ ${u.totalScore || 0}`,
                 badge: 'مستخدم'
-            });
-        });
-    }
-    
-    // الهاشتاغات
-    if (results.hashtags && results.hashtags.length > 0) {
-        results.hashtags.slice(0, 1).forEach(h => {
-            allResults.push({
-                type: 'hashtag',
-                id: h.tag,
-                icon: '#',
-                text: h.tag,
-                sub: `${h.count} منشور`,
-                badge: 'هاشتاغ'
             });
         });
     }
@@ -4715,44 +4655,9 @@ _searchAll(query) {
     const data = DataManager.data;
     const queryLower = query.toLowerCase();
     const results = {
-        posts: [],
-        players: [],
-        clubs: [],
         users: [],
         hashtags: []
     };
-    
-    // البحث في المنشورات
-    results.posts = (data.posts || []).filter(p => 
-        p.content?.toLowerCase().includes(queryLower) ||
-        p.userName?.toLowerCase().includes(queryLower)
-    );
-    
-    // البحث في اللاعبين
-    results.players = (data.players || []).filter(p =>
-        p.name?.toLowerCase().includes(queryLower) ||
-        p.club?.toLowerCase().includes(queryLower) ||
-        p.position?.toLowerCase().includes(queryLower)
-    );
-    
-    // البحث في الأندية
-    results.clubs = (data.clubs || []).filter(c =>
-        c.name?.toLowerCase().includes(queryLower) ||
-        c.city?.toLowerCase().includes(queryLower) ||
-        c.league?.toLowerCase().includes(queryLower)
-    );
-    
-    // البحث في الهاشتاغات
-    const hashtagRegex = /#[\u0600-\u06FFa-zA-Z0-9_]+/g;
-    const allContent = (data.posts || []).map(p => p.content || '').join(' ');
-    const matches = allContent.match(hashtagRegex) || [];
-    const uniqueHashtags = [...new Set(matches)].filter(h => 
-        h.toLowerCase().includes(queryLower)
-    );
-    results.hashtags = uniqueHashtags.map(h => {
-        const count = (data.posts || []).filter(p => (p.content || '').includes(h)).length;
-        return { tag: h, count };
-    });
     
     // البحث المحلي عن المستخدمين (من Firestore سيتم جلبهم عند البحث الكامل)
     // نضيف المستخدم الحالي إذا كان متطابقاً
@@ -4808,76 +4713,6 @@ _displayFullSearchResults(results, query, filter) {
     let totalCount = 0;
     let html = '';
     const hasResults = false;
-    
-    // 1. المنشورات
-    if (results.posts && results.posts.length > 0 && (filter === 'all' || filter === 'posts')) {
-        totalCount += results.posts.length;
-        html += `
-            <div class="search-category">
-                <h4><i class="fas fa-newspaper"></i> منشورات (${results.posts.length})</h4>
-                ${results.posts.slice(0, 10).map(p => `
-                    <div class="search-result-item post-result" onclick="App._scrollToPost('${p.id}')">
-                        <div class="result-avatar" style="${App._getUserAvatar(p.userId) ? `background-image:url('${App._getUserAvatar(p.userId)}');background-size:cover;background-position:center;` : 'background:var(--primary);'}">
-                            ${!App._getUserAvatar(p.userId) ? (p.userName || 'U').charAt(0).toUpperCase() : ''}
-                        </div>
-                        <div class="result-content-wrapper">
-                            <div class="result-content">${p.content?.substring(0, 150) || ''}${p.content?.length > 150 ? '...' : ''}</div>
-                            <div class="result-meta">بواسطة ${p.userName || 'مجهول'} • ${formatDate(p.createdAt)}</div>
-                        </div>
-                        <div class="result-actions">
-                            <span class="result-badge">❤️ ${p.likes?.length || 0}</span>
-                            <span class="result-badge">💬 ${(DataManager.data.comments || []).filter(c => c.postId === p.id).length}</span>
-                        </div>
-                    </div>
-                `).join('')}
-                ${results.posts.length > 10 ? `<div class="search-more">و ${results.posts.length - 10} منشورات أخرى</div>` : ''}
-            </div>
-        `;
-    }
-    
-    // 2. اللاعبين
-    if (results.players && results.players.length > 0 && (filter === 'all' || filter === 'players')) {
-        totalCount += results.players.length;
-        html += `
-            <div class="search-category">
-                <h4><i class="fas fa-users"></i> لاعبين (${results.players.length})</h4>
-                <div class="search-results-grid">
-                    ${results.players.slice(0, 8).map(p => `
-                        <div class="search-result-item player-result" onclick="App._showPlayerProfile('${p.id}')">
-                            <div class="result-avatar" style="background:var(--primary);">${p.name?.charAt(0) || '⚽'}</div>
-                            <div class="result-info">
-                                <div class="result-name">${p.name}</div>
-                                <div class="result-sub">${p.club || 'لا يوجد'} • ${p.position || '—'}</div>
-                                <div class="result-sub">⚽ ${p.goals || 0} أهداف</div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-    
-    // 3. الأندية
-    if (results.clubs && results.clubs.length > 0 && (filter === 'all' || filter === 'clubs')) {
-        totalCount += results.clubs.length;
-        html += `
-            <div class="search-category">
-                <h4><i class="fas fa-trophy"></i> أندية (${results.clubs.length})</h4>
-                <div class="search-results-grid">
-                    ${results.clubs.slice(0, 8).map(c => `
-                        <div class="search-result-item club-result" onclick="App._showClubProfile('${c.id}')">
-                            <div class="result-avatar" style="background:var(--primary);">${c.name?.charAt(0) || '🏆'}</div>
-                            <div class="result-info">
-                                <div class="result-name">${c.name}</div>
-                                <div class="result-sub">${c.city || '—'} • ${c.league || '—'}</div>
-                                <div class="result-sub">تأسس ${c.founded || '—'}</div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
     
     // 4. المستخدمين
     if (results.users && results.users.length > 0 && (filter === 'all' || filter === 'users')) {
@@ -4992,41 +4827,12 @@ _performSearch(query, filter = 'all') {
     }
     
     const results = {
-        posts: [],
-        players: [],
-        clubs: [],
         users: [],
         hashtags: []
     };
     
     const data = DataManager.data;
     const queryLower = query.toLowerCase();
-    
-    // 1. البحث في المنشورات
-    if (filter === 'all' || filter === 'posts') {
-        results.posts = (data.posts || []).filter(p => 
-            p.content?.toLowerCase().includes(queryLower) ||
-            p.userName?.toLowerCase().includes(queryLower)
-        );
-    }
-    
-    // 2. البحث في اللاعبين
-    if (filter === 'all' || filter === 'players') {
-        results.players = (data.players || []).filter(p =>
-            p.name?.toLowerCase().includes(queryLower) ||
-            p.club?.toLowerCase().includes(queryLower) ||
-            p.position?.toLowerCase().includes(queryLower)
-        );
-    }
-    
-    // 3. البحث في الأندية
-    if (filter === 'all' || filter === 'clubs') {
-        results.clubs = (data.clubs || []).filter(c =>
-            c.name?.toLowerCase().includes(queryLower) ||
-            c.city?.toLowerCase().includes(queryLower) ||
-            c.league?.toLowerCase().includes(queryLower)
-        );
-    }
     
     // 4. البحث في المستخدمين (من Firebase)
     if (filter === 'all' || filter === 'users') {
@@ -5036,23 +4842,6 @@ _performSearch(query, filter = 'all') {
             this._displaySearchResults(results, query, filter);
         });
         return; // انتظار نتيجة البحث عن المستخدمين
-    }
-    
-    // 5. البحث في الهاشتاغات
-    if (filter === 'all' || filter === 'hashtags') {
-        const hashtagRegex = /#[\u0600-\u06FFa-zA-Z0-9_]+/g;
-        const allContent = (data.posts || []).map(p => p.content || '').join(' ');
-        const matches = allContent.match(hashtagRegex) || [];
-        const uniqueHashtags = [...new Set(matches)].filter(h => 
-            h.toLowerCase().includes(queryLower)
-        );
-        results.hashtags = uniqueHashtags.map(h => ({ tag: h, count: 0 }));
-        // حساب عدد مرات ظهور كل هاشتاغ
-        results.hashtags.forEach(h => {
-            h.count = (data.posts || []).filter(p => 
-                (p.content || '').includes(h.tag)
-            ).length;
-        });
     }
     
     this._displaySearchResults(results, query, filter);
@@ -5101,65 +4890,6 @@ _displaySearchResults(results, query, filter) {
     // حساب العدد الإجمالي
     let totalCount = 0;
     let html = '';
-    
-    // 1. المنشورات
-    if (results.posts && results.posts.length > 0 && (filter === 'all' || filter === 'posts')) {
-        totalCount += results.posts.length;
-        html += `
-            <div class="search-category">
-                <h4><i class="fas fa-newspaper"></i> منشورات (${results.posts.length})</h4>
-                ${results.posts.slice(0, 5).map(p => `
-                    <div class="search-result-item post-result" onclick="App._scrollToPost('${p.id}')">
-                        <div class="result-content">${p.content?.substring(0, 150) || ''}${p.content?.length > 150 ? '...' : ''}</div>
-                        <div class="result-meta">بواسطة ${p.userName || 'مجهول'} • ${formatDate(p.createdAt)}</div>
-                    </div>
-                `).join('')}
-                ${results.posts.length > 5 ? `<div class="search-more">و ${results.posts.length - 5} منشورات أخرى</div>` : ''}
-            </div>
-        `;
-    }
-    
-    // 2. اللاعبين
-    if (results.players && results.players.length > 0 && (filter === 'all' || filter === 'players')) {
-        totalCount += results.players.length;
-        html += `
-            <div class="search-category">
-                <h4><i class="fas fa-users"></i> لاعبين (${results.players.length})</h4>
-                <div class="search-results-grid">
-                    ${results.players.slice(0, 6).map(p => `
-                        <div class="search-result-item player-result" onclick="App._showPlayerProfile('${p.id}')">
-                            <div class="result-avatar">${p.name?.charAt(0) || '⚽'}</div>
-                            <div class="result-info">
-                                <div class="result-name">${p.name}</div>
-                                <div class="result-sub">${p.club || 'لا يوجد'} • ${p.position || '—'}</div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-    
-    // 3. الأندية
-    if (results.clubs && results.clubs.length > 0 && (filter === 'all' || filter === 'clubs')) {
-        totalCount += results.clubs.length;
-        html += `
-            <div class="search-category">
-                <h4><i class="fas fa-trophy"></i> أندية (${results.clubs.length})</h4>
-                <div class="search-results-grid">
-                    ${results.clubs.slice(0, 6).map(c => `
-                        <div class="search-result-item club-result" onclick="App._showClubProfile('${c.id}')">
-                            <div class="result-avatar">${c.name?.charAt(0) || '🏆'}</div>
-                            <div class="result-info">
-                                <div class="result-name">${c.name}</div>
-                                <div class="result-sub">${c.city || '—'} • ${c.league || '—'}</div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
     
     // 4. المستخدمين
     if (results.users && results.users.length > 0 && (filter === 'all' || filter === 'users')) {
@@ -5238,9 +4968,6 @@ _clearSearch() {
     document.querySelectorAll('.filter-chip').forEach(c => {
         c.classList.toggle('active', c.dataset.filter === 'all');
     });
-    
-    // إعادة عرض المنشورات
-    this._renderPosts(DataManager.data.posts || []);
 },
 
 /**
@@ -5269,31 +4996,6 @@ _scrollToPost(postId) {
             post.style.boxShadow = '';
         }, 3000);
     }
-},
-
-/**
- * عرض ملف لاعب
- */
-_showPlayerProfile(playerId) {
-    const player = DataManager.data.players.find(p => p.id === playerId);
-    if (!player) {
-        showToast('اللاعب غير موجود', 'error');
-        return;
-    }
-    // يمكن فتح مودال لعرض تفاصيل اللاعب
-    showToast(`👤 ${player.name} - ${player.club || 'بدون نادي'}`, 'info');
-},
-
-/**
- * عرض ملف نادي
- */
-_showClubProfile(clubId) {
-    const club = DataManager.data.clubs.find(c => c.id === clubId);
-    if (!club) {
-        showToast('النادي غير موجود', 'error');
-        return;
-    }
-    showToast(`🏆 ${club.name} - ${club.city || 'مدينة غير محددة'}`, 'info');
 },
 
 /**
@@ -5559,134 +5261,6 @@ async _sendFriendRequest(userId) {
         showToast('❌ خطأ: ' + e.message, 'error');
     }
 },
-
-    _renderPlayersSection() {
-        return `
-            <div class="flex-between mb-2">
-                <h2 style="font-size:1.8rem;font-weight:800;"><i class="fas fa-users" style="color:var(--accent);"></i> إدارة اللاعبين</h2>
-                <button class="btn btn-primary" id="openAddPlayer"><i class="fas fa-plus"></i> إضافة لاعب</button>
-            </div>
-            <div class="card">
-                <div class="flex-between mb-1">
-                    <div class="flex-center gap-1" style="flex-wrap:wrap;">
-                        <i class="fas fa-search text-gray"></i>
-                        <input type="text" id="searchPlayer" placeholder="بحث..." style="background:transparent;border-bottom:2px solid var(--glass-border);padding:8px 4px;color:var(--light);width:200px;">
-                        <select id="filterPlayerPosition" style="background:transparent;border-bottom:2px solid var(--glass-border);padding:8px 4px;color:var(--light);">
-                            <option value="">كل المراكز</option>
-                            <option value="حارس مرمى">حارس مرمى</option>
-                            <option value="مدافع">مدافع</option>
-                            <option value="وسط">وسط</option>
-                            <option value="مهاجم">مهاجم</option>
-                        </select>
-                        <button class="btn btn-sm clear-filters-btn" data-section="players"><i class="fas fa-times"></i> مسح</button>
-                    </div>
-                    <span class="text-gray" id="playerCount">0</span>
-                </div>
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>#</th><th>الاسم</th><th>النادي</th><th>المركز</th><th>العمر</th><th>الأهداف</th><th>معدل التهديف</th><th>الصورة</th><th>الإجراءات</th></tr></thead>
-                        <tbody id="playersTableBody"><tr><td colspan="9" class="text-center text-gray">جاري التحميل...</td></tr></tbody>
-                    </table>
-                </div>
-                <div class="pagination" id="playerPagination"></div>
-            </div>
-        `;
-    },
-
-    _renderClubsSection() {
-        return `
-            <div class="flex-between mb-2">
-                <h2 style="font-size:1.8rem;font-weight:800;"><i class="fas fa-trophy" style="color:var(--accent);"></i> إدارة الأندية</h2>
-                <button class="btn btn-primary" id="openAddClub"><i class="fas fa-plus"></i> إضافة نادي</button>
-            </div>
-            <div class="card">
-                <div class="flex-between mb-1">
-                    <div class="flex-center gap-1" style="flex-wrap:wrap;">
-                        <i class="fas fa-search text-gray"></i>
-                        <input type="text" id="searchClub" placeholder="بحث..." style="background:transparent;border-bottom:2px solid var(--glass-border);padding:8px 4px;color:var(--light);width:200px;">
-                        <button class="btn btn-sm clear-filters-btn" data-section="clubs"><i class="fas fa-times"></i> مسح</button>
-                    </div>
-                    <span class="text-gray" id="clubCount">0</span>
-                </div>
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>#</th><th>الاسم</th><th>المدينة</th><th>الدوري</th><th>التأسيس</th><th>الشعار</th><th>الإجراءات</th></tr></thead>
-                        <tbody id="clubsTableBody"><tr><td colspan="7" class="text-center text-gray">جاري التحميل...</td></tr></tbody>
-                    </table>
-                </div>
-                <div class="pagination" id="clubPagination"></div>
-            </div>
-        `;
-    },
-
-    _renderMatchesSection() {
-        return `
-            <div class="flex-between mb-2">
-                <h2 style="font-size:1.8rem;font-weight:800;"><i class="fas fa-futbol" style="color:var(--accent);"></i> إدارة المباريات</h2>
-                <button class="btn btn-primary" id="openAddMatch"><i class="fas fa-plus"></i> إضافة مباراة</button>
-            </div>
-            <div class="card">
-                <div class="flex-between mb-1">
-                    <div class="flex-center gap-1" style="flex-wrap:wrap;">
-                        <i class="fas fa-search text-gray"></i>
-                        <input type="text" id="searchMatch" placeholder="بحث..." style="background:transparent;border-bottom:2px solid var(--glass-border);padding:8px 4px;color:var(--light);width:200px;">
-                        <button class="btn btn-sm clear-filters-btn" data-section="matches"><i class="fas fa-times"></i> مسح</button>
-                    </div>
-                    <span class="text-gray" id="matchCount">0</span>
-                </div>
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>#</th><th>الفريق الأول</th><th>الفريق الثاني</th><th>النتيجة</th><th>التاريخ</th><th>البطولة</th><th>التعليقات</th><th>الإجراءات</th></tr></thead>
-                        <tbody id="matchesTableBody"><tr><td colspan="8" class="text-center text-gray">جاري التحميل...</td></tr></tbody>
-                    </table>
-                </div>
-                <div class="pagination" id="matchPagination"></div>
-            </div>
-        `;
-    },
-
-    _renderTournamentsSection() {
-        return `
-            <div class="flex-between mb-2">
-                <h2 style="font-size:1.8rem;font-weight:800;"><i class="fas fa-medal" style="color:var(--accent);"></i> إدارة البطولات</h2>
-                <button class="btn btn-primary" id="openAddTournament"><i class="fas fa-plus"></i> إضافة بطولة</button>
-            </div>
-            <div class="card">
-                <div class="flex-between mb-1">
-                    <div class="flex-center gap-1" style="flex-wrap:wrap;">
-                        <i class="fas fa-search text-gray"></i>
-                        <input type="text" id="searchTournament" placeholder="بحث..." style="background:transparent;border-bottom:2px solid var(--glass-border);padding:8px 4px;color:var(--light);width:200px;">
-                        <button class="btn btn-sm clear-filters-btn" data-section="tournaments"><i class="fas fa-times"></i> مسح</button>
-                    </div>
-                    <span class="text-gray" id="tournamentCount">0</span>
-                </div>
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>#</th><th>الاسم</th><th>السنة</th><th>الفائز</th><th>الأندية المشاركة</th><th>الإجراءات</th></tr></thead>
-                        <tbody id="tournamentsTableBody"><tr><td colspan="6" class="text-center text-gray">جاري التحميل...</td></tr></tbody>
-                    </table>
-                </div>
-                <div class="pagination" id="tournamentPagination"></div>
-            </div>
-        `;
-    },
-
-    _renderLeagueSection() {
-        return `
-            <div class="flex-between mb-2">
-                <h2 style="font-size:1.8rem;font-weight:800;"><i class="fas fa-table" style="color:var(--accent);"></i> جدول ترتيب الدوري</h2>
-                <button class="btn btn-sm btn-outline" id="refreshLeagueBtn"><i class="fas fa-refresh"></i> تحديث</button>
-            </div>
-            <div class="card">
-                <div class="table-wrap league-table">
-                    <table>
-                        <thead><tr><th>#</th><th>الفريق</th><th>لعب</th><th>فوز</th><th>تعادل</th><th>خسارة</th><th>له</th><th>عليه</th><th>فارق</th><th>نقاط</th></tr></thead>
-                        <tbody id="leagueTableBody"><tr><td colspan="10" class="text-center text-gray">جاري التحميل...</td></tr></tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-    },
 
 // ============================================================
 // صفحة الأسئلة - تصميم متطور
@@ -6216,10 +5790,10 @@ _renderProfileSection() {
 <div class="profile-actions">
     <button class="btn btn-primary" id="editProfileBtn"><i class="fas fa-edit"></i> تعديل الملف</button>
     <button class="btn btn-outline" id="shareProfileBtn"><i class="fas fa-share-alt"></i> مشاركة</button>
-    <button class="btn btn-outline" id="profileFriendsBtn">
-        <i class="fas fa-user-friends"></i> الأصدقاء 
-        <span class="badge" id="friendsCount">0</span>
-    </button>
+<button class="btn btn-outline" id="profileFriendsBtn">
+    <i class="fas fa-user-friends"></i> الأصدقاء 
+    <span class="badge" id="friendsCount">0</span>
+</button>
     <!-- أزرار جديدة للقوائم -->
     <button class="btn btn-outline" id="showFollowersBtn">
         <i class="fas fa-user-plus"></i> المتابعين 
@@ -6269,7 +5843,6 @@ _renderProfileSection() {
 
             <!-- تبويبات المحتوى - المنشورات أولاً -->
             <div class="profile-tabs">
-                <button class="tab-btn active" data-tab="posts"><i class="fas fa-newspaper"></i> المنشورات</button>
                 <button class="tab-btn" data-tab="activity"><i class="fas fa-clock"></i> النشاطات</button>
                 <button class="tab-btn" data-tab="achievements"><i class="fas fa-medal"></i> الإنجازات</button>
                 <button class="tab-btn" data-tab="inventory"><i class="fas fa-box"></i> المخزون</button>
@@ -6279,14 +5852,6 @@ _renderProfileSection() {
 
             <!-- محتوى التبويبات -->
             <div class="profile-tab-content">
-                <!-- المنشورات -->
-                <div class="tab-panel active" id="tab-posts">
-                    <div class="card">
-                        <div class="card-title"><i class="fas fa-newspaper"></i> منشوراتي <span class="badge badge-primary" id="profilePostsCount">0</span></div>
-                        <button class="btn btn-primary btn-sm mb-1" id="profileAddPostBtn"><i class="fas fa-plus"></i> إنشاء منشور</button>
-                        <div id="profilePostsFeed"><div class="text-gray">لا توجد منشورات</div></div>
-                    </div>
-                </div>
 
                 <!-- النشاطات -->
                 <div class="tab-panel" id="tab-activity">
@@ -6353,7 +5918,6 @@ _renderProfileSection() {
 _updateProfileTabContent(user) {
     if (!user) return;
     this._updateProfileLevel(user);        // <- بدلاً من _updateLevelProgress
-    this._renderProfilePosts(user);
     this._updateProfileActivity(user);
     this._updateProfileAchievements(user);
     this._updateProfileInventory(user);
@@ -6805,90 +6369,6 @@ if (levelDisplay) {
         const nextMin = nextLevel * 1000; // 1000 نقطة لكل مستوى (مضروبة في 10)
         nextLabel.textContent = `المستوى ${nextLevel} (${nextMin} نقطة)`;
     }
-},
-
-// ============================================================
-// دالة عرض منشورات المستخدم في الملف الشخصي
-// ============================================================
-
-_renderProfilePosts(user) {
-    const container = document.getElementById('profilePostsFeed');
-    if (!container) return;
-    
-    const posts = DataManager.data.posts || [];
-    const userPosts = posts.filter(p => p.userId === user?.uid);
-    
-    document.getElementById('profilePostsCount').textContent = userPosts.length;
-    
-    if (userPosts.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-newspaper"></i>
-                <h3>لا توجد منشورات</h3>
-                <p class="text-gray">انشر أول منشور لك!</p>
-            </div>
-        `;
-        return;
-    }
-    
-    let html = '';
-    userPosts.forEach(post => {
-        const comments = DataManager.data.comments?.filter(c => c.postId === post.id) || [];
-        const isLiked = user && post.likes && post.likes.includes(user.uid);
-        
-        html += `
-            <div class="post-card" data-post-id="${post.id}">
-                <div class="post-header">
-                    <div class="post-avatar">${(post.userName || 'U').charAt(0).toUpperCase()}</div>
-                    <div>
-                        <div class="post-user">${post.userName || 'مجهول'}</div>
-                        <div class="post-time">${formatDate(post.createdAt)}</div>
-                    </div>
-                    ${user && post.userId === user.uid ? `
-                        <button class="btn btn-xs btn-danger" onclick="window.deletePost('${post.id}')" style="margin-right:auto;">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    ` : ''}
-                </div>
-                <div class="post-content">${post.content}</div>
-                ${post.image ? `<img src="${post.image}" class="post-image" alt="صورة المنشور">` : ''}
-                <div class="post-actions">
-                    <button class="${isLiked ? 'liked' : ''}" onclick="window.toggleLike('${post.id}')">
-                        <i class="fas fa-heart"></i> <span>${post.likes ? post.likes.length : 0}</span>
-                    </button>
-                    <button onclick="window.toggleComments('${post.id}')">
-                        <i class="fas fa-comment"></i> <span>${comments.length}</span>
-                    </button>
-                </div>
-                <div class="post-comments" id="comments-${post.id}" style="display:none;">
-                    ${comments.map(c => `
-                        <div class="post-comment">
-                            <span class="comment-user">${c.userName || 'مجهول'}:</span>
-                            <span class="comment-text">${c.text}</span>
-                            ${user && c.userId === user.uid ? `
-                                <button class="btn btn-xs btn-danger" onclick="window.deleteComment('${c.id}')" 
-                                    style="margin-right:auto;background:transparent;color:var(--secondary);font-size:0.6rem;">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            ` : ''}
-                        </div>
-                    `).join('')}
-                    ${user ? `
-                        <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
-                            <input type="text" id="commentInput-${post.id}" placeholder="اكتب تعليقاً..." 
-                                style="flex:1;padding:6px 12px;border-radius:40px;background:var(--glass);
-                                border:1px solid var(--glass-border);color:var(--light);font-size:0.85rem;">
-                            <button class="btn btn-sm btn-primary" onclick="window.addComment('${post.id}')">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
-                        </div>
-                    ` : ''}
-                </div>
-            </div>
-        `;
-    });
-    
-    container.innerHTML = html;
 },
 
 _updateProfileChart(user) {
@@ -7360,10 +6840,6 @@ shareProfile() {
 
 _setupAddButtons() {
     const addButtons = [
-        { id: 'openAddPlayer', modal: 'playerModal', title: 'إضافة لاعب' },
-        { id: 'openAddClub', modal: 'clubModal', title: 'إضافة نادي' },
-        { id: 'openAddMatch', modal: 'matchModal', title: 'إضافة مباراة' },
-        { id: 'openAddTournament', modal: 'tournamentModal', title: 'إضافة بطولة' },
         { id: 'openAddQuestion', modal: 'questionModal', title: 'إضافة سؤال' }
     ];
     
@@ -7404,10 +6880,6 @@ _setupAddButtons() {
                 
                 // تحديث العنوان
                 const titleMap = {
-                    playerModal: 'إضافة لاعب',
-                    clubModal: 'إضافة نادي',
-                    matchModal: 'إضافة مباراة',
-                    tournamentModal: 'إضافة بطولة',
                     questionModal: 'إضافة سؤال'
                 };
                 const titleEl = document.getElementById(`${modal.replace('Modal', '')}ModalTitle`);
@@ -7432,10 +6904,6 @@ _renderAnalyticsSection() {
         
         <!-- الإحصائيات السريعة -->
         <div class="grid-4 mb-2" id="statsGrid">
-            <div class="stat-card"><div class="stat-icon"><i class="fas fa-users"></i></div><div class="stat-number" id="statPlayers">0</div><div class="stat-label">اللاعبين</div></div>
-            <div class="stat-card"><div class="stat-icon"><i class="fas fa-trophy"></i></div><div class="stat-number" id="statClubs">0</div><div class="stat-label">الأندية</div></div>
-            <div class="stat-card"><div class="stat-icon"><i class="fas fa-futbol"></i></div><div class="stat-number" id="statMatches">0</div><div class="stat-label">المباريات</div></div>
-            <div class="stat-card"><div class="stat-icon"><i class="fas fa-medal"></i></div><div class="stat-number" id="statTournaments">0</div><div class="stat-label">البطولات</div></div>
             <div class="stat-card"><div class="stat-icon"><i class="fas fa-question-circle"></i></div><div class="stat-number" id="statQuestions">0</div><div class="stat-label">الأسئلة</div></div>
             <div class="stat-card"><div class="stat-icon"><i class="fas fa-gamepad"></i></div><div class="stat-number" id="statGamesPlayed">0</div><div class="stat-label">مرات اللعب</div></div>
             <div class="stat-card"><div class="stat-icon"><i class="fas fa-star"></i></div><div class="stat-number" id="statAchievements">0</div><div class="stat-label">الإنجازات</div></div>
@@ -7449,31 +6917,9 @@ _renderAnalyticsSection() {
         <!-- الرسوم البيانية الأساسية -->
         <div class="grid-2 mb-2">
             <div class="card">
-                <div class="card-title"><i class="fas fa-chart-pie"></i> توزيع اللاعبين حسب المركز</div>
-                <div class="chart-container"><canvas id="positionChart"></canvas></div>
-            </div>
-            <div class="card">
                 <div class="card-title"><i class="fas fa-chart-bar"></i> توزيع الأسئلة حسب الفئة</div>
                 <div class="chart-container"><canvas id="categoryChart"></canvas></div>
             </div>
-        </div>
-        
-        <!-- آخر اللاعبين والمباريات -->
-        <div class="grid-2 mb-2">
-            <div class="card">
-                <div class="card-title"><i class="fas fa-user-plus"></i> آخر اللاعبين</div>
-                <div id="recentPlayers">جاري التحميل...</div>
-            </div>
-            <div class="card">
-                <div class="card-title"><i class="fas fa-plus-circle"></i> آخر المباريات</div>
-                <div id="recentMatches">جاري التحميل...</div>
-            </div>
-        </div>
-        
-        <!-- أفضل اللاعبين -->
-        <div class="card mb-2">
-            <div class="card-title"><i class="fas fa-crown"></i> أفضل 5 لاعبين</div>
-            <div id="topScorers">جاري التحميل...</div>
         </div>
         
         <!-- تقدم المستوى -->
@@ -7492,30 +6938,6 @@ _renderAnalyticsSection() {
                 </div>
             </div>
         </div>
-        
-        <!-- التحليلات المتقدمة (سيتم تعبئتها بواسطة _renderAnalyticsCharts) -->
-        <div class="grid-2 mt-2">
-            <div class="card">
-                <div class="card-title"><i class="fas fa-chart-line"></i> أداء الفرق</div>
-                <div class="chart-container" style="height:280px;"><canvas id="teamPerformanceChart"></canvas></div>
-            </div>
-            <div class="card">
-                <div class="card-title"><i class="fas fa-bullseye"></i> التنبؤ بالنتائج</div>
-                <div id="predictionResults">جاري التحليل...</div>
-            </div>
-        </div>
-        <div class="card mt-2">
-            <div class="card-title"><i class="fas fa-calendar-alt"></i> المباريات القادمة</div>
-            <div id="upcomingMatches">جاري التحميل...</div>
-        </div>
-        <div class="card mt-2">
-            <div class="card-title"><i class="fas fa-chart-scatter"></i> إحصائيات إضافية</div>
-            <div class="grid-3">
-                <div class="stat-card"><div class="stat-number" id="analyticsTotalGoals">0</div><div class="stat-label">إجمالي الأهداف</div></div>
-                <div class="stat-card"><div class="stat-number" id="analyticsAvgGoals">0</div><div class="stat-label">متوسط الأهداف/مباراة</div></div>
-                <div class="stat-card"><div class="stat-number" id="analyticsTotalComments">0</div><div class="stat-label">إجمالي التعليقات</div></div>
-            </div>
-        </div>
     `;
 },
 
@@ -7529,16 +6951,31 @@ _isAdminUser() {
         console.warn('⚠️ No user logged in - admin check failed');
         return false;
     }
-    // التحقق من الأدوار
+    
+    // التحقق من الأدوار الرئيسية
     const adminRoles = ['admin', 'super_admin'];
     const isAdmin = adminRoles.includes(user.role);
-    const hasAdminRole = user.adminRole && user.adminRole !== '' && user.adminRole !== null;
-    return isAdmin || hasAdminRole;
+    
+    // التحقق من adminRole المخصص
+    const hasAdminRole = user.adminRole && 
+                         user.adminRole !== '' && 
+                         user.adminRole !== null &&
+                         user.adminRole !== 'null' &&
+                         user.adminRole !== 'none';
+    
+    const result = isAdmin || hasAdminRole;
+    console.log('🔍 _isAdminUser check:', { 
+        user: user.uid, 
+        role: user.role, 
+        adminRole: user.adminRole,
+        isAdmin, 
+        hasAdminRole,
+        result 
+    });
+    
+    return result;
 },
 
-/**
- * التحقق من صلاحية المشرف مع إمكانية تحديد الحد الأدنى للدور
- */
 _checkAdminLevel(minLevel = 'admin') {
     const user = AuthService.currentUser;
     if (!user) return false;
@@ -7557,8 +6994,9 @@ _checkAdminLevel(minLevel = 'admin') {
     const requiredLevel = levelMap[minLevel] || 0;
     
     // المشرفين المخصصين (adminRole) لهم صلاحيات admin على الأقل
-    if (user.adminRole && user.adminRole !== '') {
-        return userLevel >= 4 || requiredLevel <= 5;
+    if (user.adminRole && user.adminRole !== '' && user.adminRole !== null) {
+        // إذا كان لديه adminRole، نعتبره مشرفاً
+        return userLevel >= 3 || requiredLevel <= 4;
     }
     
     return userLevel >= requiredLevel;
@@ -7871,9 +7309,6 @@ _renderAdminDataContent() {
         <div class="card">
             <div class="card-title"><i class="fas fa-database"></i> إدارة البيانات</div>
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;">
-                <div class="stat-card"><div class="stat-number" id="adminDataPlayers">0</div><div class="stat-label">لاعبين</div><button class="btn btn-xs btn-outline" onclick="App._adminExportData('players')">تصدير</button></div>
-                <div class="stat-card"><div class="stat-number" id="adminDataClubs">0</div><div class="stat-label">أندية</div><button class="btn btn-xs btn-outline" onclick="App._adminExportData('clubs')">تصدير</button></div>
-                <div class="stat-card"><div class="stat-number" id="adminDataMatches">0</div><div class="stat-label">مباريات</div><button class="btn btn-xs btn-outline" onclick="App._adminExportData('matches')">تصدير</button></div>
                 <div class="stat-card"><div class="stat-number" id="adminDataQuestions">0</div><div class="stat-label">أسئلة</div><button class="btn btn-xs btn-outline" onclick="App._adminExportData('questions')">تصدير</button></div>
             </div>
             <div class="mt-2"><button class="btn btn-primary" onclick="App._adminExportAllData()">تصدير الكل</button> <button class="btn btn-danger" onclick="App._adminClearAllData()">مسح الكل</button></div>
@@ -7975,8 +7410,8 @@ async _executeReset() {
         showToast('⏳ جاري حذف جميع البيانات...', 'info', 5000);
 
         const collections = [
-            'players', 'clubs', 'matches', 'tournaments', 'questions',
-            'leaderboard', 'comments', 'posts', 'rooms', 'storeItems',
+            'questions',
+            'leaderboard', 'comments', 'storeItems',
             'transactions', 'notifications', 'follows', 'friendRequests',
             'roomMessages'
         ];
@@ -8002,9 +7437,7 @@ async _executeReset() {
 
         // إعادة تهيئة البيانات
         DataManager.data = {
-            players: [], clubs: [], matches: [], tournaments: [],
-            questions: [], leaderboard: [], comments: [], posts: [],
-            rooms: [], storeItems: [], transactions: []
+            questions: [], leaderboard: [], rooms: [], storeItems: [], transactions: []
         };
 
         await AuthService.logout();
@@ -8128,21 +7561,6 @@ _renderAdminDataPanel() {
         <div class="card">
             <div class="card-title"><i class="fas fa-database"></i> إدارة البيانات</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;">
-                <div class="stat-card" style="padding:0.8rem;text-align:center;">
-                    <div class="stat-number" style="font-size:1.4rem;" id="adminDataPlayers">0</div>
-                    <div class="stat-label">⚽ لاعبين</div>
-                    <button class="btn btn-xs btn-outline" onclick="App._adminExportData('players')">تصدير</button>
-                </div>
-                <div class="stat-card" style="padding:0.8rem;text-align:center;">
-                    <div class="stat-number" style="font-size:1.4rem;" id="adminDataClubs">0</div>
-                    <div class="stat-label">🏆 أندية</div>
-                    <button class="btn btn-xs btn-outline" onclick="App._adminExportData('clubs')">تصدير</button>
-                </div>
-                <div class="stat-card" style="padding:0.8rem;text-align:center;">
-                    <div class="stat-number" style="font-size:1.4rem;" id="adminDataMatches">0</div>
-                    <div class="stat-label">⚽ مباريات</div>
-                    <button class="btn btn-xs btn-outline" onclick="App._adminExportData('matches')">تصدير</button>
-                </div>
                 <div class="stat-card" style="padding:0.8rem;text-align:center;">
                     <div class="stat-number" style="font-size:1.4rem;" id="adminDataQuestions">0</div>
                     <div class="stat-label">❓ أسئلة</div>
@@ -9258,7 +8676,7 @@ async _restoreBackup(file) {
         if (!backup.data) { showToast('❌ تنسيق الملف غير صحيح', 'error'); return; }
         showToast('⏳ جاري استعادة البيانات...', 'info');
         for (const [collection, items] of Object.entries(backup.data)) {
-            if (Array.isArray(items) && ['players','clubs','matches','tournaments','questions','posts','rooms','storeItems'].includes(collection)) {
+            if (Array.isArray(items) && ['questions','rooms','storeItems'].includes(collection)) {
                 for (const item of items) {
                     const { id, ...rest } = item;
                     if (id) await FirestoreService.update(collection, id, rest);
@@ -9334,16 +8752,11 @@ async _restoreBackup(file) {
 
     // ===== دوال التحديث =====
 _updateStats(stats) {
-    document.getElementById('statPlayers').textContent = stats.players || 0;
-    document.getElementById('statClubs').textContent = stats.clubs || 0;
-    document.getElementById('statMatches').textContent = stats.matches || 0;
-    document.getElementById('statTournaments').textContent = stats.tournaments || 0;
     document.getElementById('statQuestions').textContent = stats.questions || 0;
     document.getElementById('statGamesPlayed').textContent = stats.gamesPlayed || 0;
     document.getElementById('statAchievements').textContent = stats.achievements || 0;
     document.getElementById('statTotalScore').textContent = stats.totalScore || 0;
     document.getElementById('statCoins').textContent = stats.coins || 0;
-    document.getElementById('statPosts').textContent = stats.posts || 0;
     document.getElementById('statRooms').textContent = stats.rooms || 0;
     document.getElementById('statStoreItems').textContent = stats.storeItems || 0;
 },
@@ -9724,19 +9137,38 @@ _getBadgeIcon(badgeId) {
 
 _activateSection(id) {
     this.currentSection = id;
-    // تحديث التنقل
-    this.navLinks.forEach(link => {
-        link.classList.toggle('active', link.dataset.section === id);
-    });
+    
+    // إظهار/إخفاء الأقسام
     document.querySelectorAll('.section').forEach(el => {
         el.classList.toggle('active', el.id === `section-${id}`);
     });
-    document.getElementById('sidebar').classList.remove('open');
-    document.querySelector('.mobile-nav')?.classList?.remove('open');
 
-    // ✅ معالجة قسم المشرفين
+    // ===== إظهار/إخفاء زر العودة =====
+    const backBtns = document.querySelectorAll('.back-to-home');
+    if (id === 'dashboard') {
+        backBtns.forEach(btn => btn.style.display = 'none');
+    } else {
+        backBtns.forEach(btn => btn.style.display = 'inline-flex');
+        // التأكد من ظهور الزر في القسم النشط فقط
+        document.querySelectorAll('.section').forEach(el => {
+            const backBtn = el.querySelector('.back-to-home');
+            if (backBtn) {
+                if (el.classList.contains('active')) {
+                    backBtn.style.display = 'inline-flex';
+                } else {
+                    backBtn.style.display = 'none';
+                }
+            }
+        });
+    }
+
+    // ===== معالجة الأقسام الخاصة =====
     if (id === 'admin') {
-        // انتظر حتى يتم تحميل العناصر ثم اعرض التبويب
+        if (!this._isAdminUser()) {
+            showToast('⚠️ ليس لديك صلاحية للدخول إلى لوحة المشرفين', 'error');
+            this._activateSection('dashboard');
+            return;
+        }
         const waitForContainer = () => {
             const container = document.getElementById('adminContentContainer');
             if (container) {
@@ -9749,25 +9181,29 @@ _activateSection(id) {
         return;
     }
 
-if (id === 'multiplayer') {
-    this._refreshMultiplayerGames();
-    const container = document.getElementById('multiplayerGameContainer');
-    if (container) container.innerHTML = '';
-    this._hideMultiplayerGamePage();
-    this._hideMultiplayerResultPage();
-}
+    if (id === 'multiplayer') {
+        this._refreshMultiplayerGames();
+        const container = document.getElementById('multiplayerGameContainer');
+        if (container) container.innerHTML = '';
+        this._hideMultiplayerGamePage();
+        this._hideMultiplayerResultPage();
+    }
 
-    // ✅ باقي الأقسام
+    // باقي الأقسام
     if (id === 'notifications') {
         this._renderNotificationsPage();
     }
     if (id === 'questions') {
         setTimeout(() => this._renderQuestionsAdvanced(), 100);
     }
-    if (id === 'players' || id === 'clubs' || id === 'matches' || id === 'tournaments' || id === 'league') {
-        this._renderAllTables(DataManager.data);
-        this._populateSelects(DataManager.data);
-        if (id === 'league') this._renderLeagueTable(DataManager.data);
+    if (id === 'friends') {
+        if (!AuthService.currentUser) {
+            showToast('⚠️ يجب تسجيل الدخول لعرض الأصدقاء', 'error');
+        } else {
+            setTimeout(() => {
+                this._loadFriendsPage();
+            }, 150);
+        }
     }
     if (id === 'store') {
         this._renderStore(DataManager.data.storeItems || []);
@@ -9869,6 +9305,84 @@ if (sortFilter) {
     });
 }
 
+// ===== القائمة المنسدلة (أيقونة ☰) =====
+const menuBtn = document.getElementById('dashboardMenuBtn');
+const dropdownMenu = document.getElementById('dashboardDropdownMenu');
+
+// فتح/إغلاق القائمة عند الضغط على الأيقونة
+menuBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    App._toggleDashboardMenu();
+});
+
+// إغلاق القائمة عند النقر خارجها
+document.addEventListener('click', (e) => {
+    const container = document.querySelector('.dashboard-menu-top');
+    if (container && !container.contains(e.target)) {
+        App._closeDashboardMenu();
+    }
+});
+
+// معالج اختيار عنصر من القائمة
+document.querySelectorAll('.dropdown-item[data-action]').forEach(item => {
+    item.addEventListener('click', (e) => {
+        const action = e.currentTarget.dataset.action;
+        App._handleDashboardMenuAction(action);
+    });
+});
+
+// ===== صفحة الأصدقاء =====
+document.getElementById('friendsRefreshBtn')?.addEventListener('click', () => {
+    App._loadFriendsPage();
+    showToast('✅ تم تحديث الأصدقاء', 'success');
+});
+
+document.getElementById('friendsAddFriendBtn')?.addEventListener('click', () => {
+    document.getElementById('friendsAddInput').focus();
+});
+
+document.getElementById('friendsAddSubmitBtn')?.addEventListener('click', async () => {
+    const input = document.getElementById('friendsAddInput');
+    const query = input.value.trim();
+    if (!query) {
+        showToast('يرجى إدخال اسم مستخدم أو بريد إلكتروني', 'error');
+        return;
+    }
+    await App._searchAndAddFriend(query);
+    input.value = '';
+});
+
+document.getElementById('friendsAddInput')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        document.getElementById('friendsAddSubmitBtn')?.click();
+    }
+});
+
+// تبويبات الأصدقاء
+document.querySelectorAll('.friends-tabs .tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.friends-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        App._loadFriendsPage();
+    });
+});
+
+// ===== زر تسجيل الخروج =====
+document.getElementById('dashboardLogoutBtn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (confirm('هل أنت متأكد من تسجيل الخروج؟')) {
+        AuthService.logout();
+        // إعادة تحميل الداشبورد
+        const dashboardSection = document.getElementById('section-dashboard');
+        if (dashboardSection) {
+            dashboardSection.innerHTML = App._renderDashboard();
+        }
+        showToast('✅ تم تسجيل الخروج', 'info');
+        // فتح نافذة تسجيل الدخول
+        document.getElementById('loginModal').classList.add('open');
+    }
+});
+
 // ===== أحداث لوحة المشرفين =====
 document.querySelectorAll('.admin-tab').forEach(tab => {
     tab.addEventListener('click', function(e) {
@@ -9908,6 +9422,46 @@ document.getElementById('adminRestoreFile')?.addEventListener('change', (e) => {
 
 document.getElementById('adminFilterStatus')?.addEventListener('change', () => {
     App._renderAdminUsers();
+});
+
+// ===== أزرار الداشبورد =====
+
+// ===== أزرار الداشبورد =====
+
+// زر الملف الشخصي (عند الضغط على بطاقة اللاعب)
+document.getElementById('dashboardProfileClick')?.addEventListener('click', () => {
+    App._activateSection('profile');
+});
+
+// زر اللعب
+document.getElementById('dashboardPlayBtn')?.addEventListener('click', () => {
+    App._activateSection('game');
+});
+
+// زر اللعب الجماعي
+document.getElementById('dashboardMultiplayerBtn')?.addEventListener('click', () => {
+    App._activateSection('multiplayer');
+});
+
+// زر المتجر - استخدم المعرف الجديد
+document.getElementById('dashboardStoreBtnNew')?.addEventListener('click', (e) => {
+    e.stopPropagation(); // منع انتشار الحدث
+    App._activateSection('store');
+});
+
+// زر الإنجازات
+document.getElementById('dashboardAchievementsBtn')?.addEventListener('click', () => {
+    App._activateSection('achievements');
+});
+
+// زر الإعدادات
+document.getElementById('dashboardSettingsBtn')?.addEventListener('click', () => {
+    App._activateSection('settings');
+});
+
+// زر الإشعارات
+document.getElementById('dashboardNotificationsBtn')?.addEventListener('click', () => {
+    App._showNotifications();
 });
 
 // أزرار النسخ الاحتياطي
@@ -10113,20 +9667,10 @@ document.getElementById('openAddQuestion')?.addEventListener('click', () => {
     App._openModal('questionModal');
 });
 
-    // ===== زر تحديث المنشورات =====
-    document.getElementById('refreshPostsBtn')?.addEventListener('click', () => {
-        this._renderPosts(DataManager.data.posts || []);
-        showToast('✅ تم تحديث المنشورات', 'success');
-    });
-
 document.getElementById('loginToPostBtn')?.addEventListener('click', () => {
     document.getElementById('loginModal').classList.add('open');
 });
 
-        // Menu toggle
-        document.getElementById('menuToggle')?.addEventListener('click', () => {
-            document.getElementById('sidebar').classList.toggle('open');
-        });
 
         // Sync button
         document.getElementById('syncDataBtn')?.addEventListener('click', async () => {
@@ -10148,35 +9692,19 @@ document.getElementById('loginToPostBtn')?.addEventListener('click', () => {
             showToast('✅ تم تحديث الإحصائيات', 'success');
         });
 
-        document.getElementById('refreshLeagueBtn')?.addEventListener('click', () => {
-            this._renderLeagueTable(DataManager.data);
-            showToast('✅ تم تحديث جدول الدوري', 'success');
-        });
-
         document.getElementById('refreshStoreBtn')?.addEventListener('click', () => {
             this._renderStore(DataManager.data.storeItems || []);
             showToast('✅ تم تحديث المتجر', 'success');
         });
 
         // Search filters
-        const searchFields = ['player', 'club', 'match', 'tournament', 'question'];
+        const searchFields = [ 'question'];
         searchFields.forEach(field => {
             const input = document.getElementById(`search${capitalize(field)}`);
-            if (input) {
-                input.addEventListener('input', debounce(() => {
-                    localStorage.setItem(`${field}Page`, '1');
-                    this._renderAllTables(DataManager.data);
-                }, 300));
-            }
         });
 
-        document.getElementById('filterPlayerPosition')?.addEventListener('change', () => {
-            localStorage.setItem('playerPage', '1');
-            this._renderAllTables(DataManager.data);
-        });
         document.getElementById('filterQuestionCategory')?.addEventListener('change', () => {
             localStorage.setItem('questionPage', '1');
-            this._renderAllTables(DataManager.data);
         });
 
    // فلاتر الإشعارات
@@ -10226,7 +9754,6 @@ document.getElementById('loginToPostBtn')?.addEventListener('click', () => {
                 const section = this.dataset.section;
                 const input = document.getElementById(`search${capitalize(section)}`);
                 if (input) input.value = '';
-                if (section === 'players') document.getElementById('filterPlayerPosition').value = '';
                 if (section === 'questions') document.getElementById('filterQuestionCategory').value = '';
                 localStorage.setItem(`${section}Page`, '1');
                 App._renderAllTables(DataManager.data);
@@ -10235,10 +9762,6 @@ document.getElementById('loginToPostBtn')?.addEventListener('click', () => {
 
     // ===== ربط أزرار الإضافة =====
     const addButtons = [
-        { id: 'openAddPlayer', modal: 'playerModal' },
-        { id: 'openAddClub', modal: 'clubModal' },
-        { id: 'openAddMatch', modal: 'matchModal' },
-        { id: 'openAddTournament', modal: 'tournamentModal' },
         { id: 'openAddQuestion', modal: 'questionModal' }
     ];
     
@@ -10264,10 +9787,6 @@ document.getElementById('loginToPostBtn')?.addEventListener('click', () => {
                     
                     // تحديث العنوان
                     const titleMap = {
-                        playerModal: 'إضافة لاعب',
-                        clubModal: 'إضافة نادي',
-                        matchModal: 'إضافة مباراة',
-                        tournamentModal: 'إضافة بطولة',
                         questionModal: 'إضافة سؤال'
                     };
                     const titleEl = document.getElementById(`${modal.replace('Modal', '')}ModalTitle`);
@@ -10284,7 +9803,6 @@ document.getElementById('loginToPostBtn')?.addEventListener('click', () => {
         this._setupAuthHandlers();
         this._setupSettingsHandlers();
         this._setupCRUDHandlers();
-        this._setupPostHandlers();
         this._setupStoreHandlers();
         this._setupAdminHandlers();
         this._setupProfileHandlers();
@@ -10362,156 +9880,6 @@ document.getElementById('closeEditPostModal')?.addEventListener('click', () => {
 document.getElementById('editPostModal')?.addEventListener('click', (e) => {
     if (e.target === e.currentTarget) {
         document.getElementById('editPostModal').classList.remove('open');
-    }
-});
-        // Player form
-document.getElementById('playerForm')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'player') {
-        showToast('ليس لديك صلاحية', 'error');
-        return;
-    }
-    const form = e.target;
-    const id = form.dataset.id || document.getElementById('playerFormId').value;
-    const data = {
-        name: document.getElementById('pName').value.trim(),
-        club: document.getElementById('pClub').value,
-        position: document.getElementById('pPosition').value,
-        age: parseInt(document.getElementById('pAge').value),
-        nationality: document.getElementById('pNationality').value.trim(),
-        number: parseInt(document.getElementById('pNumber').value) || 0,
-        goals: parseInt(document.getElementById('pGoals').value) || 0,
-        assists: parseInt(document.getElementById('pAssists').value) || 0,
-        image: document.getElementById('pImage').value.trim(),
-    };
-    if (!data.name || !data.club || !data.position || !data.age) {
-        return showToast('يرجى ملء الحقول المطلوبة (*)', 'error');
-    }
-    try {
-        if (id && form.dataset.mode === 'update') {
-            await DataManager.update('players', id, data);
-            showToast('✅ تم التحديث بنجاح', 'success');
-        } else {
-            await DataManager.add('players', data);
-            showToast('✅ تم الإضافة بنجاح', 'success');
-        }
-        document.getElementById('playerModal').classList.remove('open');
-        // ✅ تحديث الجداول
-        App._renderAllTables(DataManager.data);
-        App._populateSelects(DataManager.data);
-        App._updateStats(DataManager.getStats());
-    } catch (err) {
-        showToast('❌ خطأ: ' + err.message, 'error');
-    }
-});
-
-
-        // Club form
-document.getElementById('clubForm')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'club') {
-        showToast('ليس لديك صلاحية', 'error');
-        return;
-    }
-    const form = e.target;
-    const id = form.dataset.id || document.getElementById('clubFormId').value;
-    const data = {
-        name: document.getElementById('cName').value.trim(),
-        city: document.getElementById('cCity').value.trim(),
-        league: document.getElementById('cLeague').value.trim(),
-        founded: parseInt(document.getElementById('cFounded').value) || null,
-        logo: document.getElementById('cLogo').value.trim(),
-    };
-    if (!data.name) {
-        showToast('يرجى إدخال اسم النادي', 'error');
-        return;
-    }
-    try {
-        if (id && form.dataset.mode === 'update') {
-            await DataManager.update('clubs', id, data);
-            showToast('✅ تم تحديث النادي', 'success');
-        } else {
-            await DataManager.add('clubs', data);
-            showToast('✅ تم إضافة النادي', 'success');
-        }
-        App._closeModal('clubModal');
-        App._refreshAllData(); // ✅ تحديث جميع الجداول
-    } catch (err) {
-        showToast('❌ خطأ: ' + err.message, 'error');
-    }
-});
-
-// في _setupFormHandlers
-document.getElementById('matchForm')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'match') {
-        showToast('ليس لديك صلاحية', 'error');
-        return;
-    }
-    const form = e.target;
-    const id = form.dataset.id || document.getElementById('matchFormId').value;
-    const team1 = document.getElementById('mTeam1').value;
-    const team2 = document.getElementById('mTeam2').value;
-    if (team1 === team2) {
-        showToast('لا يمكن أن يكون الفريقان متطابقين', 'error');
-        return;
-    }
-    const data = {
-        team1: team1,
-        team2: team2,
-        score1: parseInt(document.getElementById('mScore1').value) || 0,
-        score2: parseInt(document.getElementById('mScore2').value) || 0,
-        date: document.getElementById('mDate').value,
-        tournament: document.getElementById('mTournament').value,
-    };
-    try {
-        if (id && form.dataset.mode === 'update') {
-            await DataManager.update('matches', id, data);
-            showToast('✅ تم تحديث المباراة', 'success');
-        } else {
-            await DataManager.add('matches', data);
-            showToast('✅ تم إضافة المباراة', 'success');
-        }
-        App._closeModal('matchModal');
-        App._refreshAllData(); // ✅ تحديث جميع الجداول
-    } catch (err) {
-        showToast('❌ خطأ: ' + err.message, 'error');
-    }
-});
-
-// في _setupFormHandlers
-document.getElementById('tournamentForm')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'tournament') {
-        showToast('ليس لديك صلاحية', 'error');
-        return;
-    }
-    const form = e.target;
-    const id = form.dataset.id || document.getElementById('tournamentFormId').value;
-    const clubsSelect = document.getElementById('tClubs');
-    const selectedClubs = Array.from(clubsSelect.selectedOptions).map(o => o.value);
-    const data = {
-        name: document.getElementById('tName').value.trim(),
-        year: parseInt(document.getElementById('tYear').value) || null,
-        winner: document.getElementById('tWinner').value || '',
-        clubs: selectedClubs,
-    };
-    if (!data.name) {
-        showToast('يرجى إدخال اسم البطولة', 'error');
-        return;
-    }
-    try {
-        if (id && form.dataset.mode === 'update') {
-            await DataManager.update('tournaments', id, data);
-            showToast('✅ تم تحديث البطولة', 'success');
-        } else {
-            await DataManager.add('tournaments', data);
-            showToast('✅ تم إضافة البطولة', 'success');
-        }
-        App._closeModal('tournamentModal');
-        App._refreshAllData(); // ✅ تحديث جميع الجداول
-    } catch (err) {
-        showToast('❌ خطأ: ' + err.message, 'error');
     }
 });
 
@@ -10629,51 +9997,6 @@ document.getElementById('questionForm')?.addEventListener('submit', async (e) =>
         showToast('❌ خطأ: ' + err.message, 'error');
     }
 });
-
-        // Comment form
-        document.getElementById('commentForm')?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (!AuthService.currentUser) return showToast('يجب تسجيل الدخول', 'error');
-            const data = {
-                matchId: document.getElementById('commentMatchId').value,
-                text: document.getElementById('commentText').value.trim(),
-                rating: parseInt(document.getElementById('commentRating').value) || 3,
-                userName: AuthService.currentUser.username || 'مجهول',
-                userId: AuthService.currentUser.uid,
-                date: new Date().toISOString()
-            };
-            if (!data.text) return showToast('يرجى إدخال نص التعليق', 'error');
-            try {
-                await DataManager.add('comments', data);
-                showToast('✅ تم إضافة التعليق', 'success');
-                document.getElementById('commentModal').classList.remove('open');
-            } catch (err) {
-                showToast('❌ خطأ: ' + err.message, 'error');
-            }
-        });
-
-        // Post form
-        document.getElementById('postForm')?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (!AuthService.currentUser) return showToast('يجب تسجيل الدخول', 'error');
-            const data = {
-                content: document.getElementById('postContent').value.trim(),
-                image: document.getElementById('postImage').value.trim(),
-                userId: AuthService.currentUser.uid,
-                userName: AuthService.currentUser.username || AuthService.currentUser.displayName || 'مجهول',
-                likes: [],
-                createdAt: new Date().toISOString()
-            };
-            if (!data.content) return showToast('يرجى إدخال محتوى المنشور', 'error');
-            try {
-                await DataManager.add('posts', data);
-                showToast('✅ تم نشر المنشور', 'success');
-                document.getElementById('postModal').classList.remove('open');
-                this._renderPosts(DataManager.data.posts || []);
-            } catch (err) {
-                showToast('❌ خطأ: ' + err.message, 'error');
-            }
-        });
 
         // Profile edit form
         document.getElementById('profileEditForm')?.addEventListener('submit', async (e) => {
@@ -11019,19 +10342,6 @@ if (registerForm) {
     });
 }
     
-    // ===== أزرار تسجيل الخروج =====
-    document.getElementById('logoutBtn')?.addEventListener('click', () => {
-        AuthService.logout();
-        document.getElementById('loginModal').classList.add('open');
-        showToast('تم تسجيل الخروج', 'info');
-    });
-    
-    document.getElementById('logoutBtn2')?.addEventListener('click', () => {
-        AuthService.logout();
-        document.getElementById('loginModal').classList.add('open');
-        showToast('تم تسجيل الخروج', 'info');
-    });
-    
     // ===== إغلاق المودال =====
     document.getElementById('closeLoginModal')?.addEventListener('click', () => {
         document.getElementById('loginModal').classList.remove('open');
@@ -11119,8 +10429,7 @@ if (registerForm) {
                 const text = await file.text();
                 const data = JSON.parse(text);
                 for (const [collection, items] of Object.entries(data)) {
-                    if (Array.isArray(items) && ['players', 'clubs', 'matches', 'tournaments',
-                            'questions', 'comments', 'posts', 'rooms', 'storeItems'
+                    if (Array.isArray(items) && ['questions', 'rooms', 'storeItems'
                         ].includes(collection)) {
                         for (const item of items) {
                             const { id, ...rest } = item;
@@ -11178,171 +10487,6 @@ if (registerForm) {
     },
 
     _setupCRUDHandlers() {
-window.editPlayer = async (id) => {
-    if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'player') {
-        showToast('ليس لديك صلاحية', 'error');
-        return;
-    }
-    const player = DataManager.data.players.find(p => p.id === id);
-    if (!player) {
-        showToast('اللاعب غير موجود', 'error');
-        return;
-    }
-    // تعبئة النموذج
-    document.getElementById('playerModalTitle').textContent = 'تعديل لاعب';
-    document.getElementById('playerFormId').value = id;
-    document.getElementById('pName').value = player.name || '';
-    document.getElementById('pClub').value = player.club || '';
-    document.getElementById('pPosition').value = player.position || '';
-    document.getElementById('pAge').value = player.age || '';
-    document.getElementById('pNationality').value = player.nationality || '';
-    document.getElementById('pNumber').value = player.number || '';
-    document.getElementById('pGoals').value = player.goals || 0;
-    document.getElementById('pAssists').value = player.assists || 0;
-    document.getElementById('pImage').value = player.image || '';
-    const form = document.getElementById('playerForm');
-    form.dataset.mode = 'update';
-    form.dataset.id = id;
-    App._openModal('playerModal');
-};
-
-window.deletePlayer = async (id) => {
-    if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'player') {
-        showToast('ليس لديك صلاحية', 'error');
-        return;
-    }
-    if (!confirm('حذف هذا اللاعب؟')) return;
-    try {
-        await DataManager.delete('players', id);
-        showToast('✅ تم الحذف', 'success');
-        // ✅ تحديث الجداول
-        App._renderAllTables(DataManager.data);
-        App._populateSelects(DataManager.data);
-        App._updateStats(DataManager.getStats());
-    } catch (e) {
-        showToast('❌ خطأ: ' + e.message, 'error');
-    }
-};
-
-
-window.editClub = async (id) => {
-    if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'club') {
-        showToast('ليس لديك صلاحية', 'error');
-        return;
-    }
-    const club = DataManager.data.clubs.find(c => c.id === id);
-    if (!club) {
-        showToast('النادي غير موجود', 'error');
-        return;
-    }
-    
-    // تعبئة النموذج
-    document.getElementById('clubModalTitle').textContent = 'تعديل نادي';
-    document.getElementById('clubFormId').value = id;
-    document.getElementById('cName').value = club.name || '';
-    document.getElementById('cCity').value = club.city || '';
-    document.getElementById('cLeague').value = club.league || '';
-    document.getElementById('cFounded').value = club.founded || '';
-    document.getElementById('cLogo').value = club.logo || '';
-    
-    const form = document.getElementById('clubForm');
-    form.dataset.mode = 'update';
-    form.dataset.id = id;
-    
-    App._openModal('clubModal');
-};
-
-window.deleteClub = async (id) => {
-    if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'club') {
-        showToast('ليس لديك صلاحية', 'error');
-        return;
-    }
-    if (!confirm('حذف هذا النادي؟')) return;
-    try {
-        await DataManager.delete('clubs', id);
-        showToast('✅ تم الحذف', 'success');
-        App._renderAllTables(DataManager.data);
-        App._populateSelects(DataManager.data);
-        App._renderLeagueTable(DataManager.data);
-        App._updateStats(DataManager.getStats());
-    } catch (e) {
-        showToast('❌ خطأ: ' + e.message, 'error');
-    }
-};
-
-        window.editMatch = async (id) => {
-            if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'match')
-                return showToast('ليس لديك صلاحية', 'error');
-            const match = DataManager.data.matches.find(m => m.id === id);
-            if (!match) return showToast('المباراة غير موجودة', 'error');
-            document.getElementById('matchModalTitle').textContent = 'تعديل مباراة';
-            document.getElementById('matchFormId').value = id;
-            document.getElementById('mTeam1').value = match.team1 || '';
-            document.getElementById('mTeam2').value = match.team2 || '';
-            document.getElementById('mScore1').value = match.score1 || 0;
-            document.getElementById('mScore2').value = match.score2 || 0;
-            document.getElementById('mDate').value = match.date || '';
-            document.getElementById('mTournament').value = match.tournament || '';
-            const form = document.getElementById('matchForm');
-            form.dataset.mode = 'update';
-            form.dataset.id = id;
-            document.getElementById('matchModal').classList.add('open');
-        };
-
-window.deleteMatch = async (id) => {
-    if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'match') {
-        showToast('ليس لديك صلاحية', 'error');
-        return;
-    }
-    if (!confirm('حذف هذه المباراة؟')) return;
-    try {
-        await DataManager.delete('matches', id);
-        showToast('✅ تم الحذف', 'success');
-        App._renderAllTables(DataManager.data);
-        App._populateSelects(DataManager.data);
-        App._renderLeagueTable(DataManager.data);
-        App._updateStats(DataManager.getStats());
-    } catch (e) {
-        showToast('❌ خطأ: ' + e.message, 'error');
-    }
-};
-
-        window.editTournament = async (id) => {
-            if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'tournament')
-                return showToast('ليس لديك صلاحية', 'error');
-            const t = DataManager.data.tournaments.find(t => t.id === id);
-            if (!t) return showToast('البطولة غير موجودة', 'error');
-            document.getElementById('tournamentModalTitle').textContent = 'تعديل بطولة';
-            document.getElementById('tournamentFormId').value = id;
-            document.getElementById('tName').value = t.name || '';
-            document.getElementById('tYear').value = t.year || '';
-            document.getElementById('tWinner').value = t.winner || '';
-            const clubsSelect = document.getElementById('tClubs');
-            Array.from(clubsSelect.options).forEach(opt => {
-                opt.selected = (t.clubs || []).includes(opt.value);
-            });
-            const form = document.getElementById('tournamentForm');
-            form.dataset.mode = 'update';
-            form.dataset.id = id;
-            document.getElementById('tournamentModal').classList.add('open');
-        };
-
-window.deleteTournament = async (id) => {
-    if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'tournament') {
-        showToast('ليس لديك صلاحية', 'error');
-        return;
-    }
-    if (!confirm('حذف هذه البطولة؟')) return;
-    try {
-        await DataManager.delete('tournaments', id);
-        showToast('✅ تم الحذف', 'success');
-        App._renderAllTables(DataManager.data);
-        App._populateSelects(DataManager.data);
-        App._updateStats(DataManager.getStats());
-    } catch (e) {
-        showToast('❌ خطأ: ' + e.message, 'error');
-    }
-};
 
 // ============================================================
 // تعديل السؤال - نسخة مصححة
@@ -11450,77 +10594,6 @@ window.deleteQuestion = async (id) => {
         showToast('❌ خطأ: ' + e.message, 'error');
     }
 };
-    },
-
-    _setupPostHandlers() {
-        window.toggleLike = async (postId) => {
-            if (!AuthService.currentUser) return showToast('يجب تسجيل الدخول', 'error');
-            const post = DataManager.data.posts.find(p => p.id === postId);
-            if (!post) return;
-            const likes = post.likes || [];
-            const idx = likes.indexOf(AuthService.currentUser.uid);
-            if (idx > -1) {
-                likes.splice(idx, 1);
-            } else {
-                likes.push(AuthService.currentUser.uid);
-            }
-            try {
-                await DataManager.update('posts', postId, { likes });
-                showToast(idx > -1 ? 'تم إزالة الإعجاب' : '✅ تم الإعجاب!', 'success');
-            } catch (e) {
-                showToast('❌ خطأ: ' + e.message, 'error');
-            }
-        };
-
-        window.toggleComments = (postId) => {
-            const el = document.getElementById(`comments-${postId}`);
-            if (el) {
-                el.style.display = el.style.display === 'none' ? 'block' : 'none';
-            }
-        };
-
-        window.addComment = async (postId) => {
-            if (!AuthService.currentUser) return showToast('يجب تسجيل الدخول', 'error');
-            const input = document.getElementById(`commentInput-${postId}`);
-            if (!input) return;
-            const text = input.value.trim();
-            if (!text) return showToast('يرجى إدخال نص التعليق', 'error');
-            try {
-                await DataManager.add('comments', {
-                    postId: postId,
-                    text: text,
-                    userId: AuthService.currentUser.uid,
-                    userName: AuthService.currentUser.username || AuthService.currentUser.displayName || 'مجهول',
-                    createdAt: new Date().toISOString()
-                });
-                input.value = '';
-                showToast('✅ تم إضافة التعليق', 'success');
-            } catch (e) {
-                showToast('❌ خطأ: ' + e.message, 'error');
-            }
-        };
-
-        window.deletePost = async (postId) => {
-            if (!AuthService.currentUser) return showToast('يجب تسجيل الدخول', 'error');
-            if (!confirm('حذف هذا المنشور؟')) return;
-            try {
-                await DataManager.delete('posts', postId);
-                showToast('✅ تم حذف المنشور', 'success');
-            } catch (e) {
-                showToast('❌ خطأ: ' + e.message, 'error');
-            }
-        };
-
-        window.deleteComment = async (commentId) => {
-            if (!AuthService.currentUser) return showToast('يجب تسجيل الدخول', 'error');
-            if (!confirm('حذف هذا التعليق؟')) return;
-            try {
-                await DataManager.delete('comments', commentId);
-                showToast('✅ تم حذف التعليق', 'success');
-            } catch (e) {
-                showToast('❌ خطأ: ' + e.message, 'error');
-            }
-        };
     },
 
     _setupStoreHandlers() {
@@ -11860,10 +10933,11 @@ _getDefaultStoreItems() {
         this._showFollowing();
     });
     
-    // ===== عرض الأصدقاء (تحديث) =====
-    document.getElementById('profileFriendsBtn')?.addEventListener('click', () => {
-        this._showFriends();
-    });
+document.getElementById('profileFriendsBtn')?.addEventListener('click', () => {
+    App._activateSection('friends');
+    setTimeout(() => App._loadFriendsPage(), 150);
+});
+
    // زر تغيير الصورة
     document.getElementById('changeAvatarBtn')?.addEventListener('click', (e) => {
         e.preventDefault();
@@ -11898,15 +10972,6 @@ _getDefaultStoreItems() {
 
         document.getElementById('removeAvatarBtn')?.addEventListener('click', () => {
         this._handleRemoveAvatar();
-    });
-
-    document.getElementById('profileAddPostBtn')?.addEventListener('click', () => {
-        if (!AuthService.currentUser) {
-            showToast('يجب تسجيل الدخول أولاً', 'error');
-            return;
-        }
-        document.getElementById('postForm').reset();
-        document.getElementById('postModal').classList.add('open');
     });
 
     // زر مشاركة الملف
@@ -11988,350 +11053,6 @@ async _fixBadgeIcons() {
     }
 },
 
-// ============================================================
-// عرض جميع الجداول
-// ============================================================
-
-_renderAllTables(data) {
-    // التأكد من وجود البيانات
-    if (!data) {
-        console.warn('⚠️ No data provided to _renderAllTables');
-        data = DataManager.data || {};
-    }
-    
-    // التأكد من أن كل مجموعة هي مصفوفة
-    const safeData = {
-        players: data.players || [],
-        clubs: data.clubs || [],
-        matches: data.matches || [],
-        tournaments: data.tournaments || [],
-        questions: data.questions || [],
-        leaderboard: data.leaderboard || [],
-        comments: data.comments || [],
-        posts: data.posts || [],
-        rooms: data.rooms || [],
-        storeItems: data.storeItems || [],
-        transactions: data.transactions || []
-    };
-    
-    this._renderPlayersTable(safeData);
-    this._renderClubsTable(safeData);
-    this._renderMatchesTable(safeData);
-    this._renderTournamentsTable(safeData);
-    this._renderQuestionsTable(safeData);
-    this._renderLeagueTable(safeData);
-},
-
-_renderPlayersTable(data) {
-    const tbody = document.getElementById('playersTableBody');
-    if (!tbody) {
-        console.warn('⚠️ playersTableBody not found');
-        return;
-    }
-    
-    const search = document.getElementById('searchPlayer')?.value?.toLowerCase() || '';
-    const posFilter = document.getElementById('filterPlayerPosition')?.value || '';
-    
-    // التأكد من وجود البيانات
-    let list = (data?.players || []).slice();
-    
-    if (search) {
-        list = list.filter(p => 
-            (p.name || '').toLowerCase().includes(search) || 
-            (p.club || '').toLowerCase().includes(search)
-        );
-    }
-    if (posFilter) {
-        list = list.filter(p => (p.position || '') === posFilter);
-    }
-    
-    const total = list.length;
-    const page = parseInt(localStorage.getItem('playerPage') || '1');
-    const size = 8;
-    const start = (page - 1) * size;
-    const paginated = list.slice(start, start + size);
-    
-    if (paginated.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-gray">${list.length === 0 ? 'لا يوجد لاعبين' : 'لا توجد نتائج مطابقة'}</td></tr>`;
-    } else {
-        let html = '';
-        const clubs = data?.clubs || [];
-        paginated.forEach((p, idx) => {
-            const clubName = clubs.find(c => c.name === p.club)?.name || p.club || '—';
-            const img = p.image ? `<img src="${p.image}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" alt="" loading="lazy">` : '—';
-            const rate = p.goals > 0 && p.age ? (p.goals / (2026 - p.age)).toFixed(1) : '0';
-            const canEdit = AuthService.checkPermission('editor') || AuthService.currentUser?.adminRole === 'player';
-            
-            html += `<tr>
-                <td>${start + idx + 1}</td>
-                <td><strong>${p.name || '—'}</strong></td>
-                <td>${clubName}</td>
-                <td><span class="badge badge-primary">${p.position || '—'}</span></td>
-                <td>${p.age || '—'}</td>
-                <td>⚽ ${p.goals || 0}</td>
-                <td>${rate}</td>
-                <td>${img}</td>
-                <td>
-                    <div class="table-actions" style="display:flex;gap:4px;flex-wrap:wrap;">
-                        ${canEdit ? `
-                            <button class="btn btn-xs btn-primary" onclick="window.editPlayer('${p.id}')"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-xs btn-danger" onclick="window.deletePlayer('${p.id}')"><i class="fas fa-trash"></i></button>
-                        ` : ''}
-                    </div>
-                </td>
-            </tr>`;
-        });
-        tbody.innerHTML = html;
-    }
-    
-    const countEl = document.getElementById('playerCount');
-    if (countEl) countEl.textContent = `${total} لاعب`;
-    
-    this._renderPagination('playerPagination', total, page, (p) => {
-        localStorage.setItem('playerPage', p);
-        this._renderPlayersTable(DataManager.data);
-    });
-},
-
-_renderClubsTable(data) {
-    const tbody = document.getElementById('clubsTableBody');
-    if (!tbody) {
-        console.warn('⚠️ clubsTableBody not found');
-        return;
-    }
-    
-    const search = document.getElementById('searchClub')?.value?.toLowerCase() || '';
-    let list = (data?.clubs || []).slice();
-    
-    if (search) {
-        list = list.filter(c => 
-            (c.name || '').toLowerCase().includes(search) || 
-            (c.city || '').toLowerCase().includes(search)
-        );
-    }
-    
-    const total = list.length;
-    const page = parseInt(localStorage.getItem('clubPage') || '1');
-    const size = 8;
-    const start = (page - 1) * size;
-    const paginated = list.slice(start, start + size);
-    
-    if (paginated.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-gray">${list.length === 0 ? 'لا يوجد أندية' : 'لا توجد نتائج مطابقة'}</td></tr>`;
-    } else {
-        let html = '';
-        paginated.forEach((c, idx) => {
-            const logo = c.logo ? `<img src="${c.logo}" style="width:32px;height:32px;object-fit:contain;" alt="" loading="lazy">` : '—';
-            const canEdit = AuthService.checkPermission('editor') || AuthService.currentUser?.adminRole === 'club';
-            
-            html += `<tr>
-                <td>${start + idx + 1}</td>
-                <td><strong>${c.name || '—'}</strong></td>
-                <td>${c.city || '—'}</td>
-                <td>${c.league || '—'}</td>
-                <td>${c.founded || '—'}</td>
-                <td>${logo}</td>
-                <td>
-                    <div class="table-actions" style="display:flex;gap:4px;flex-wrap:wrap;">
-                        ${canEdit ? `
-                            <button class="btn btn-xs btn-primary" onclick="window.editClub('${c.id}')"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-xs btn-danger" onclick="window.deleteClub('${c.id}')"><i class="fas fa-trash"></i></button>
-                        ` : ''}
-                    </div>
-                </td>
-            </tr>`;
-        });
-        tbody.innerHTML = html;
-    }
-    
-    const countEl = document.getElementById('clubCount');
-    if (countEl) countEl.textContent = `${total} نادي`;
-    
-    this._renderPagination('clubPagination', total, page, (p) => {
-        localStorage.setItem('clubPage', p);
-        this._renderClubsTable(DataManager.data);
-    });
-},
-
-_renderMatchesTable(data) {
-    const tbody = document.getElementById('matchesTableBody');
-    if (!tbody) {
-        console.warn('⚠️ matchesTableBody not found');
-        return;
-    }
-    
-    const search = document.getElementById('searchMatch')?.value?.toLowerCase() || '';
-    let list = (data?.matches || []).slice();
-    
-    if (search) {
-        list = list.filter(m => 
-            (m.team1 || '').toLowerCase().includes(search) || 
-            (m.team2 || '').toLowerCase().includes(search)
-        );
-    }
-    
-    const total = list.length;
-    const page = parseInt(localStorage.getItem('matchPage') || '1');
-    const size = 8;
-    const start = (page - 1) * size;
-    const paginated = list.slice(start, start + size);
-    
-    if (paginated.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-gray">${list.length === 0 ? 'لا يوجد مباريات' : 'لا توجد نتائج مطابقة'}</td></tr>`;
-    } else {
-        let html = '';
-        const comments = data?.comments || [];
-        paginated.forEach((m, idx) => {
-            const matchComments = comments.filter(c => c.matchId === m.id);
-            const canEdit = AuthService.checkPermission('editor') || AuthService.currentUser?.adminRole === 'match';
-            const result = (m.score1 !== undefined && m.score2 !== undefined) ? `${m.score1} - ${m.score2}` : '—';
-            
-            html += `<tr>
-                <td>${start + idx + 1}</td>
-                <td><strong>${m.team1 || '—'}</strong></td>
-                <td><strong>${m.team2 || '—'}</strong></td>
-                <td><span class="badge ${(m.score1 > m.score2) ? 'badge-success' : (m.score1 < m.score2) ? 'badge-danger' : 'badge-warning'}">${result}</span></td>
-                <td>${formatDate(m.date)}</td>
-                <td>${m.tournament || '—'}</td>
-                <td><span class="badge badge-primary">${matchComments.length}</span></td>
-                <td>
-                    <div class="table-actions" style="display:flex;gap:4px;flex-wrap:wrap;">
-                        <button class="btn btn-xs btn-info" onclick="window.openCommentModal('${m.id}')"><i class="fas fa-comment"></i></button>
-                        ${canEdit ? `
-                            <button class="btn btn-xs btn-primary" onclick="window.editMatch('${m.id}')"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-xs btn-danger" onclick="window.deleteMatch('${m.id}')"><i class="fas fa-trash"></i></button>
-                        ` : ''}
-                    </div>
-                </td>
-            </tr>`;
-        });
-        tbody.innerHTML = html;
-    }
-    
-    const countEl = document.getElementById('matchCount');
-    if (countEl) countEl.textContent = `${total} مباراة`;
-    
-    this._renderPagination('matchPagination', total, page, (p) => {
-        localStorage.setItem('matchPage', p);
-        this._renderMatchesTable(DataManager.data);
-    });
-},
-
-_renderTournamentsTable(data) {
-    const tbody = document.getElementById('tournamentsTableBody');
-    if (!tbody) {
-        console.warn('⚠️ tournamentsTableBody not found');
-        return;
-    }
-    
-    const search = document.getElementById('searchTournament')?.value?.toLowerCase() || '';
-    let list = (data?.tournaments || []).slice();
-    
-    if (search) {
-        list = list.filter(t => (t.name || '').toLowerCase().includes(search));
-    }
-    
-    const total = list.length;
-    const page = parseInt(localStorage.getItem('tournamentPage') || '1');
-    const size = 8;
-    const start = (page - 1) * size;
-    const paginated = list.slice(start, start + size);
-    
-    if (paginated.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-gray">${list.length === 0 ? 'لا يوجد بطولات' : 'لا توجد نتائج مطابقة'}</td></tr>`;
-    } else {
-        let html = '';
-        paginated.forEach((t, idx) => {
-            const canEdit = AuthService.checkPermission('editor') || AuthService.currentUser?.adminRole === 'tournament';
-            
-            html += `<tr>
-                <td>${start + idx + 1}</td>
-                <td><strong>${t.name || '—'}</strong></td>
-                <td>${t.year || '—'}</td>
-                <td>${t.winner ? `<span class="badge badge-gold">${t.winner}</span>` : '—'}</td>
-                <td>${(t.clubs || []).join('، ') || '—'}</td>
-                <td>
-                    <div class="table-actions" style="display:flex;gap:4px;flex-wrap:wrap;">
-                        ${canEdit ? `
-                            <button class="btn btn-xs btn-primary" onclick="window.editTournament('${t.id}')"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-xs btn-danger" onclick="window.deleteTournament('${t.id}')"><i class="fas fa-trash"></i></button>
-                        ` : ''}
-                    </div>
-                </td>
-            </tr>`;
-        });
-        tbody.innerHTML = html;
-    }
-    
-    const countEl = document.getElementById('tournamentCount');
-    if (countEl) countEl.textContent = `${total} بطولة`;
-    
-    this._renderPagination('tournamentPagination', total, page, (p) => {
-        localStorage.setItem('tournamentPage', p);
-        this._renderTournamentsTable(DataManager.data);
-    });
-},
-
-_renderQuestionsTable(data) {
-    const tbody = document.getElementById('questionsTableBody');
-    if (!tbody) {
-        // ✅ إذا لم يوجد الجدول، نستخدم نظام البطاقات بدلاً من ذلك
-        this._renderQuestionsAdvanced();
-        return;
-    }
-    
-    const search = document.getElementById('searchQuestion')?.value?.toLowerCase() || '';
-    const catFilter = document.getElementById('filterQuestionCategory')?.value || '';
-    let list = (data?.questions || []).slice();
-    
-    if (search) {
-        list = list.filter(q => (q.question || '').toLowerCase().includes(search));
-    }
-    if (catFilter) {
-        list = list.filter(q => (q.category || '') === catFilter);
-    }
-    
-    const total = list.length;
-    const page = parseInt(localStorage.getItem('questionPage') || '1');
-    const size = 8;
-    const start = (page - 1) * size;
-    const paginated = list.slice(start, start + size);
-    
-    if (paginated.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-gray">${list.length === 0 ? 'لا يوجد أسئلة' : 'لا توجد نتائج مطابقة'}</td></tr>`;
-    } else {
-        let html = '';
-        paginated.forEach((q, idx) => {
-            const diffColor = q.difficulty === 'سهل' ? 'badge-success' : q.difficulty === 'صعب' ? 'badge-danger' : 'badge-warning';
-            const canEdit = AuthService.checkPermission('editor') || AuthService.currentUser?.adminRole === 'question';
-            
-            html += `<tr>
-                <td>${start + idx + 1}</td>
-                <td>${truncateText(q.question, 40)}</td>
-                <td><span class="badge badge-primary">${q.category || 'عام'}</span></td>
-                <td><span class="badge ${diffColor}">${q.difficulty || 'متوسط'}</span></td>
-                <td>
-                    <div class="table-actions" style="display:flex;gap:4px;flex-wrap:wrap;">
-                        ${canEdit ? `
-                            <button class="btn btn-xs btn-primary" onclick="window.editQuestion('${q.id}')"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-xs btn-danger" onclick="window.deleteQuestion('${q.id}')"><i class="fas fa-trash"></i></button>
-                        ` : ''}
-                    </div>
-                </td>
-            </tr>`;
-        });
-        tbody.innerHTML = html;
-    }
-    
-    const countEl = document.getElementById('questionCount');
-    if (countEl) countEl.textContent = `${total} سؤال`;
-    
-    this._renderPagination('questionPagination', total, page, (p) => {
-        localStorage.setItem('questionPage', p);
-        this._renderQuestionsTable(DataManager.data);
-    });
-},
-
     _renderPagination(containerId, total, currentPage, callback) {
         const container = document.getElementById(containerId);
         if (!container) return;
@@ -12348,131 +11069,6 @@ _renderQuestionsTable(data) {
                 if (page !== currentPage) callback(page);
             });
         });
-    },
-
-_renderLeagueTable(data) {
-    const tbody = document.getElementById('leagueTableBody');
-    if (!tbody) {
-        console.warn('⚠️ leagueTableBody not found');
-        return;
-    }
-    
-    const matches = data?.matches || [];
-    const clubs = data?.clubs || [];
-
-    const stats = {};
-    clubs.forEach(c => {
-        stats[c.name] = { played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, points: 0 };
-    });
-
-    matches.forEach(m => {
-        const t1 = stats[m.team1];
-        const t2 = stats[m.team2];
-        if (t1 && t2) {
-            t1.played++;
-            t2.played++;
-            t1.goalsFor += m.score1 || 0;
-            t1.goalsAgainst += m.score2 || 0;
-            t2.goalsFor += m.score2 || 0;
-            t2.goalsAgainst += m.score1 || 0;
-            if ((m.score1 || 0) > (m.score2 || 0)) {
-                t1.wins++;
-                t1.points += 3;
-                t2.losses++;
-            } else if ((m.score1 || 0) < (m.score2 || 0)) {
-                t2.wins++;
-                t2.points += 3;
-                t1.losses++;
-            } else {
-                t1.draws++;
-                t2.draws++;
-                t1.points += 1;
-                t2.points += 1;
-            }
-        }
-    });
-
-    const sorted = Object.entries(stats)
-        .filter(([name]) => name && name !== 'undefined' && name !== 'null' && name !== '')
-        .sort((a, b) => {
-            if (b[1].points !== a[1].points) return b[1].points - a[1].points;
-            const diffA = a[1].goalsFor - a[1].goalsAgainst;
-            const diffB = b[1].goalsFor - b[1].goalsAgainst;
-            if (diffB !== diffA) return diffB - diffA;
-            return b[1].goalsFor - a[1].goalsFor;
-        });
-
-    if (sorted.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" class="text-center text-gray">${matches.length === 0 ? 'لا توجد مباريات لعرض الترتيب' : 'لا توجد فرق'}</td></tr>`;
-    } else {
-        let html = '';
-        sorted.forEach(([name, stat], idx) => {
-            const diff = stat.goalsFor - stat.goalsAgainst;
-            const rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : '';
-            html += `<tr class="${rankClass}">
-                <td><strong>${idx + 1}</strong></td>
-                <td><strong>${name}</strong></td>
-                <td>${stat.played}</td>
-                <td>${stat.wins}</td>
-                <td>${stat.draws}</td>
-                <td>${stat.losses}</td>
-                <td>${stat.goalsFor}</td>
-                <td>${stat.goalsAgainst}</td>
-                <td>${diff > 0 ? '+' + diff : diff}</td>
-                <td><strong style="color:var(--accent);">${stat.points}</strong></td>
-            </tr>`;
-        });
-        tbody.innerHTML = html;
-    }
-},
-
-    _renderRecent(data) {
-        const recentPlayers = document.getElementById('recentPlayers');
-        const recentMatches = document.getElementById('recentMatches');
-        const players = [...data.players].slice(-5).reverse();
-        const matches = [...data.matches].slice(-5).reverse();
-
-        if (recentPlayers) {
-            if (players.length === 0) {
-                recentPlayers.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><h3>لا يوجد لاعبين</h3></div>';
-            } else {
-                recentPlayers.innerHTML = players.map(p =>
-                    `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--glass-border);">
-                        <span><strong>${p.name}</strong></span>
-                        <span class="text-gray">${p.club || '—'}</span>
-                    </div>`
-                ).join('');
-            }
-        }
-
-        if (recentMatches) {
-            if (matches.length === 0) {
-                recentMatches.innerHTML = '<div class="empty-state"><i class="fas fa-futbol"></i><h3>لا يوجد مباريات</h3></div>';
-            } else {
-                recentMatches.innerHTML = matches.map(m =>
-                    `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--glass-border);">
-                        <span>${m.team1} 🆚 ${m.team2}</span>
-                        <span class="text-gray">${m.score1} - ${m.score2}</span>
-                    </div>`
-                ).join('');
-            }
-        }
-    },
-
-    _renderTopScorers(data) {
-        const container = document.getElementById('topScorers');
-        if (!container) return;
-        const sorted = [...data.players].sort((a, b) => (b.goals || 0) - (a.goals || 0)).slice(0, 5);
-        if (sorted.length === 0) {
-            container.innerHTML = '<div class="text-gray">لا يوجد لاعبين</div>';
-        } else {
-            container.innerHTML = sorted.map((p, idx) =>
-                `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--glass-border);">
-                    <span>${['🥇','🥈','🥉','4.','5.'][idx] || idx+1} ${p.name}</span>
-                    <span style="font-weight:700;color:var(--accent);">⚽ ${p.goals || 0}</span>
-                </div>`
-            ).join('');
-        }
     },
 
 _renderAchievements() {
@@ -12594,450 +11190,6 @@ _renderAchievements() {
         document.getElementById('analyticsAvgGoals').textContent = matches.length > 0 ? (totalGoals / matches.length).toFixed(1) : '0';
         document.getElementById('analyticsTotalComments').textContent = data.comments?.length || 0;
     },
-
-    _renderUpcomingMatches(data) {
-        const container = document.getElementById('upcomingMatches');
-        if (!container) return;
-        const matches = data.matches || [];
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const upcoming = matches.filter(m => m.date && new Date(m.date) >= today).sort((a, b) => new Date(a.date) - new Date(b.date)).slice(0, 5);
-
-        if (upcoming.length === 0) {
-            container.innerHTML = '<div class="text-gray">لا توجد مباريات قادمة</div>';
-        } else {
-            container.innerHTML = upcoming.map(m =>
-                `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--glass-border);align-items:center;flex-wrap:wrap;gap:4px;">
-                    <span><strong>${m.team1}</strong> 🆚 <strong>${m.team2}</strong></span>
-                    <span class="text-gray" style="font-size:0.85rem;">${formatDate(m.date)}</span>
-                    <span class="badge badge-primary badge-sm">${m.tournament || 'ودية'}</span>
-                </div>`
-            ).join('');
-        }
-    },
-
-_populateSelects(data) {
-    const clubs = data?.clubs || [];
-    const tournaments = data?.tournaments || [];
-    
-    // نادي اللاعب
-    const clubSelect = document.getElementById('pClub');
-    if (clubSelect) {
-        const curVal = clubSelect.value;
-        clubSelect.innerHTML = '<option value="">اختر النادي</option>';
-        clubs.forEach(c => {
-            clubSelect.innerHTML += `<option value="${c.name}">${c.name}</option>`;
-        });
-        clubSelect.value = curVal;
-    }
-
-    // فرق المباراة
-    const mTeam1 = document.getElementById('mTeam1');
-    const mTeam2 = document.getElementById('mTeam2');
-    const mTournament = document.getElementById('mTournament');
-    
-    [mTeam1, mTeam2].forEach(sel => {
-        if (sel) {
-            const cur = sel.value;
-            sel.innerHTML = '<option value="">اختر</option>';
-            clubs.forEach(c => {
-                sel.innerHTML += `<option value="${c.name}">${c.name}</option>`;
-            });
-            sel.value = cur;
-        }
-    });
-    
-    if (mTournament) {
-        const cur = mTournament.value;
-        mTournament.innerHTML = '<option value="">اختر</option>';
-        tournaments.forEach(t => {
-            mTournament.innerHTML += `<option value="${t.name}">${t.name}</option>`;
-        });
-        mTournament.value = cur;
-    }
-
-    // الفائز بالبطولة
-    const tWinner = document.getElementById('tWinner');
-    const tClubs = document.getElementById('tClubs');
-    
-    if (tWinner) {
-        const cur = tWinner.value;
-        tWinner.innerHTML = '<option value="">—</option>';
-        clubs.forEach(c => {
-            tWinner.innerHTML += `<option value="${c.name}">${c.name}</option>`;
-        });
-        tWinner.value = cur;
-    }
-    
-    if (tClubs) {
-        const selected = Array.from(tClubs.selectedOptions).map(o => o.value);
-        tClubs.innerHTML = '';
-        clubs.forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = c.name;
-            opt.textContent = c.name;
-            if (selected.includes(c.name)) opt.selected = true;
-            tClubs.appendChild(opt);
-        });
-    }
-},
-
-    _updateCharts(data) {
-        const positions = {};
-        data.players.forEach(p => {
-            const pos = p.position || 'غير محدد';
-            positions[pos] = (positions[pos] || 0) + 1;
-        });
-        const posLabels = Object.keys(positions);
-        const posData = Object.values(positions);
-        const ctx1 = document.getElementById('positionChart');
-        if (ctx1) {
-            const context = ctx1.getContext('2d');
-            if (window.positionChartInstance) window.positionChartInstance.destroy();
-            window.positionChartInstance = new Chart(context, {
-                type: 'doughnut',
-                data: {
-                    labels: posLabels.length ? posLabels : ['لا يوجد لاعبين'],
-                    datasets: [{
-                        data: posLabels.length ? posData : [1],
-                        backgroundColor: ['#6C63FF', '#FF6B6B', '#FFD93D', '#2ecc71', '#a29bfe'],
-                        borderColor: 'var(--dark)',
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            labels: { color: 'var(--light)', font: { size: 11 } }
-                        }
-                    }
-                }
-            });
-        }
-
-        const categories = {};
-        data.questions.forEach(q => {
-            const cat = q.category || 'عام';
-            categories[cat] = (categories[cat] || 0) + 1;
-        });
-        const catLabels = Object.keys(categories);
-        const catData = Object.values(categories);
-        const ctx2 = document.getElementById('categoryChart');
-        if (ctx2) {
-            const context = ctx2.getContext('2d');
-            if (window.categoryChartInstance) window.categoryChartInstance.destroy();
-            window.categoryChartInstance = new Chart(context, {
-                type: 'bar',
-                data: {
-                    labels: catLabels.length ? catLabels : ['لا يوجد أسئلة'],
-                    datasets: [{
-                        label: 'عدد الأسئلة',
-                        data: catLabels.length ? catData : [0],
-                        backgroundColor: '#6C63FF',
-                        borderRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, ticks: { color: 'var(--gray)' } },
-                        x: { ticks: { color: 'var(--gray)' } }
-                    }
-                }
-            });
-        }
-    },
-
-// ============================================================
-// دوال المنشورات المتقدمة
-// ============================================================
-
-/**
- * عرض جميع المنشورات في الصفحة الرئيسية
- */
-_renderPosts(posts) {
-    const container = document.getElementById('postsFeed');
-    if (!container) return;
-    
-    const user = AuthService.currentUser;
-    if (!posts || posts.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-newspaper"></i>
-                <h3>لا توجد منشورات</h3>
-                <p class="text-gray">كن أول من ينشر!</p>
-                ${user ? `
-                    <button class="btn btn-primary mt-1" id="emptyPostBtn">
-                        <i class="fas fa-plus"></i> أنشئ منشوراً
-                    </button>
-                ` : `
-                    <button class="btn btn-primary mt-1" id="loginToPostBtn">
-                        <i class="fas fa-sign-in-alt"></i> سجل دخول للنشر
-                    </button>
-                `}
-            </div>
-        `;
-        const emptyBtn = document.getElementById('emptyPostBtn');
-        if (emptyBtn) {
-            emptyBtn.addEventListener('click', () => {
-                if (!AuthService.currentUser) {
-                    showToast('يجب تسجيل الدخول أولاً', 'error');
-                    return;
-                }
-                document.getElementById('postForm').reset();
-                document.getElementById('postModal').classList.add('open');
-            });
-        }
-        const loginBtn = document.getElementById('loginToPostBtn');
-        if (loginBtn) {
-            loginBtn.addEventListener('click', () => {
-                document.getElementById('loginModal').classList.add('open');
-            });
-        }
-        return;
-    }
-    
-    // ترتيب المنشورات من الأحدث إلى الأقدم
-    const sortedPosts = [...posts].sort((a, b) => {
-        return new Date(b.createdAt) - new Date(a.createdAt);
-    });
-    
-    let html = '';
-    sortedPosts.forEach(post => {
-        const isLiked = user && post.likes && post.likes.includes(user.uid);
-        const comments = DataManager.data.comments?.filter(c => c.postId === post.id) || [];
-        const isOwner = user && post.userId === user.uid;
-        const avatarUrl = this._getUserAvatar(post.userId);
-        
-        // ✅ عرض الاسم الكامل بدلاً من اسم المستخدم
-        const userFullName = post.fullName || post.displayName || post.userName || 'مجهول';
-        const userUsername = post.username || 'guest';
-        
-        html += `
-            <div class="post-card">
-                <div class="post-header">
-                    <div class="post-avatar">${userFullName.charAt(0).toUpperCase()}</div>
-                    <div>
-                        <div class="post-user">${userFullName}</div>
-                        <div class="post-username">@${userUsername}</div>
-                        <div class="post-time">${formatDate(post.createdAt)}</div>
-                    </div>
-                    <div style="margin-right:auto;display:flex;gap:4px;">
-                        ${isOwner ? `
-                            <button class="btn btn-xs btn-primary" onclick="window.editPost('${post.id}')"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-xs btn-danger" onclick="window.deletePost('${post.id}')"><i class="fas fa-trash"></i></button>
-                        ` : ''}
-${user && !isOwner ? `
-    <button class="btn btn-xs btn-outline" onclick="window.toggleFollow('${post.userId}')" 
-            data-follow-user="${post.userId}" 
-            id="followBtn-${post.userId}">
-        <i class="fas fa-user-plus"></i> متابعة
-    </button>
-` : ''}
-                    </div>
-                </div>
-                <div class="post-content">${post.content}</div>
-                ${post.image ? `<img src="${post.image}" class="post-image" alt="صورة المنشور" loading="lazy">` : ''}
-                <div class="post-actions">
-                    <button class="${isLiked ? 'liked' : ''}" onclick="window.toggleLike('${post.id}')">
-                        <i class="fas fa-heart"></i> <span>${post.likes ? post.likes.length : 0}</span>
-                    </button>
-                    <button onclick="window.toggleComments('${post.id}')">
-                        <i class="fas fa-comment"></i> <span>${comments.length}</span>
-                    </button>
-                    <button onclick="window.sharePost('${post.id}')">
-                        <i class="fas fa-share-alt"></i>
-                    </button>
-                </div>
-                <div class="post-comments" id="comments-${post.id}" style="display:none;">
-                    ${comments.map(c => `
-                        <div class="post-comment">
-                            <span class="comment-avatar" style="display:inline-block;width:24px;height:24px;border-radius:50%;background:var(--primary);text-align:center;line-height:24px;font-size:0.6rem;color:#fff;flex-shrink:0;">
-                                ${(c.userName || 'U').charAt(0).toUpperCase()}
-                            </span>
-                            <span class="comment-user">${c.userName || 'مجهول'}:</span>
-                            <span class="comment-text">${c.text}</span>
-                            ${user && c.userId === user.uid ? `
-                                <button class="btn btn-xs btn-danger" onclick="window.deleteComment('${c.id}')" 
-                                    style="margin-right:auto;background:transparent;color:var(--secondary);font-size:0.6rem;">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            ` : ''}
-                        </div>
-                    `).join('')}
-                    ${user ? `
-                        <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
-                            <input type="text" id="commentInput-${post.id}" placeholder="اكتب تعليقاً..." 
-                                style="flex:1;padding:6px 12px;border-radius:40px;background:var(--glass);
-                                border:1px solid var(--glass-border);color:var(--light);font-size:0.85rem;">
-                            <button class="btn btn-sm btn-primary" onclick="window.addComment('${post.id}')">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
-                        </div>
-                    ` : ''}
-                </div>
-            </div>
-        `;
-    });
-    
-    container.innerHTML = html;
-},
-
-/**
- * الحصول على صورة المستخدم
- */
-_getUserAvatar(userId) {
-    // البحث عن المستخدم في DataManager (إذا كان مخزناً)
-    const user = AuthService.currentUser;
-    if (user && user.uid === userId && user.avatar) {
-        return user.avatar;
-    }
-    // محاولة البحث في قائمة المستخدمين (إذا كانت متوفرة)
-    // يمكن إضافة تخزين للمستخدمين في DataManager
-    return null;
-},
-
-/**
- * عرض منشورات المستخدم فقط (في مودال)
- */
-async _showMyPosts() {
-    const user = AuthService.currentUser;
-    if (!user) {
-        showToast('يجب تسجيل الدخول', 'error');
-        return;
-    }
-    
-    const posts = DataManager.data.posts || [];
-    const myPosts = posts.filter(p => p.userId === user.uid);
-    
-    if (myPosts.length === 0) {
-        showToast('📝 لا توجد منشورات لك. أنشئ منشوراً الآن!', 'info');
-        return;
-    }
-    
-    // إنشاء مودال لعرض منشوراتي
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay open';
-    modal.innerHTML = `
-        <div class="modal-card" style="max-width:700px;max-height:80vh;">
-            <div class="modal-header">
-                <h3><i class="fas fa-newspaper"></i> منشوراتي (${myPosts.length})</h3>
-                <button class="btn btn-sm" onclick="this.closest('.modal-overlay').remove()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div style="max-height:60vh;overflow-y:auto;padding:0.5rem 0;">
-                ${myPosts.map(p => `
-                    <div class="post-card" style="margin-bottom:0.8rem;padding:1rem;">
-                        <div class="post-header">
-                            <div class="post-avatar" style="background-image:url('${user.avatar || ''}'); background-size:cover; background-position:center;">
-                                ${!user.avatar ? (user.username || 'U').charAt(0).toUpperCase() : ''}
-                            </div>
-                            <div>
-                                <div class="post-user">${user.username || 'أنا'}</div>
-                                <div class="post-time">${formatDate(p.createdAt)}</div>
-                            </div>
-                            <div style="margin-right:auto;display:flex;gap:4px;">
-                                <button class="btn btn-xs btn-primary" onclick="window.editPost('${p.id}')"><i class="fas fa-edit"></i></button>
-                                <button class="btn btn-xs btn-danger" onclick="window.deletePost('${p.id}')"><i class="fas fa-trash"></i></button>
-                            </div>
-                        </div>
-                        <div class="post-content">${p.content}</div>
-                        ${p.image ? `<img src="${p.image}" class="post-image" alt="صورة المنشور" style="max-height:200px;">` : ''}
-                        <div class="post-actions">
-                            <span><i class="fas fa-heart" style="color:var(--secondary);"></i> ${p.likes ? p.likes.length : 0}</span>
-                            <span><i class="fas fa-comment"></i> ${DataManager.data.comments?.filter(c => c.postId === p.id).length || 0}</span>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) modal.remove();
-    });
-},
-
-// ============================================================
-// تعديل منشور
-// ============================================================
-
-async _editPost(postId, content, image) {
-    if (!AuthService.currentUser) {
-        showToast('يجب تسجيل الدخول', 'error');
-        return;
-    }
-    
-    try {
-        await DataManager.update('posts', postId, {
-            content: content.trim(),
-            image: image.trim() || null,
-            updatedAt: new Date().toISOString()
-        });
-        showToast('✅ تم تحديث المنشور', 'success');
-        document.getElementById('editPostModal').classList.remove('open');
-        // تحديث العرض
-        this._renderPosts(DataManager.data.posts || []);
-    } catch (e) {
-        showToast('❌ خطأ: ' + e.message, 'error');
-    }
-},
-
-// ============================================================
-// فتح مودال تعديل المنشور
-// ============================================================
-
-_openEditPostModal(postId) {
-    const post = DataManager.data.posts.find(p => p.id === postId);
-    if (!post) {
-        showToast('المنشور غير موجود', 'error');
-        return;
-    }
-    
-    // التحقق من أن المستخدم هو صاحب المنشور
-    const user = AuthService.currentUser;
-    if (!user || post.userId !== user.uid) {
-        showToast('ليس لديك صلاحية لتعديل هذا المنشور', 'error');
-        return;
-    }
-    
-    document.getElementById('editPostId').value = postId;
-    document.getElementById('editPostContent').value = post.content || '';
-    document.getElementById('editPostImage').value = post.image || '';
-    document.getElementById('editPostModal').classList.add('open');
-},
-
-/**
- * مشاركة منشور
- */
-_sharePost(postId) {
-    const post = DataManager.data.posts.find(p => p.id === postId);
-    if (!post) {
-        showToast('المنشور غير موجود', 'error');
-        return;
-    }
-    
-    const text = `📝 ${post.content.substring(0, 100)}...\n\n— ${post.userName || 'مجهول'}`;
-    if (navigator.share) {
-        navigator.share({
-            title: 'منشور',
-            text: text,
-            url: window.location.href
-        }).catch(() => {});
-    } else {
-        navigator.clipboard.writeText(text + '\n\n' + window.location.href).then(() => {
-            showToast('✅ تم نسخ المنشور إلى الحافظة', 'success');
-        }).catch(() => {
-            showToast('⚠️ لا يمكن نسخ النص تلقائياً', 'error');
-        });
-    }
-},
 
 // ============================================================
 // 3. عرض المتجر (نسخة متطورة)
@@ -13346,6 +11498,47 @@ _refreshActiveBoosts() {
     });
 
     container.innerHTML = html;
+},
+
+/**
+ * البحث عن مستخدم وإضافة صديق
+ */
+async _searchAndAddFriend(query) {
+    try {
+        const snapshot = await db.collection('users')
+            .where('username', '>=', query)
+            .where('username', '<=', query + '\uf8ff')
+            .limit(5)
+            .get();
+
+        const results = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (doc.id !== AuthService.currentUser.uid) {
+                results.push({ id: doc.id, ...data });
+            }
+        });
+
+        const container = document.getElementById('friendsSearchResults');
+        if (results.length === 0) {
+            container.style.display = 'block';
+            container.innerHTML = '<div class="text-gray">🔍 لا توجد نتائج</div>';
+            return;
+        }
+
+        container.style.display = 'block';
+        container.innerHTML = results.map(u => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem;border-bottom:1px solid var(--glass-border);">
+                <span><strong>${u.displayName || u.username}</strong> <span class="text-gray">@${u.username}</span></span>
+                <button class="btn btn-xs btn-success" onclick="App._sendFriendRequest('${u.id}')">
+                    <i class="fas fa-user-plus"></i> إضافة
+                </button>
+            </div>
+        `).join('');
+
+    } catch (e) {
+        showToast('❌ خطأ في البحث: ' + e.message, 'error');
+    }
 },
 
 /**
@@ -13807,9 +12000,7 @@ _renderAdminData() {
 
 _renderAdminStats(stats) {
     const elementIds = [
-        'adminTotalUsers', 'adminActiveUsers', 'adminTotalPosts',
-        'adminTotalRooms', 'adminTotalQuestions', 'adminTotalComments',
-        'adminTotalMatches', 'adminStorageUsed'
+        'adminTotalUsers', 'adminActiveUsers', 'adminTotalQuestions', 'adminStorageUsed'
     ];
     let anyFound = false;
     elementIds.forEach(id => {
@@ -13831,13 +12022,7 @@ _renderAdminStats(stats) {
         const stats = DataManager.getStats();
         container.innerHTML = `
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
-                <div class="text-gray">اللاعبين: <strong>${stats.players}</strong></div>
-                <div class="text-gray">الأندية: <strong>${stats.clubs}</strong></div>
-                <div class="text-gray">المباريات: <strong>${stats.matches}</strong></div>
-                <div class="text-gray">البطولات: <strong>${stats.tournaments}</strong></div>
                 <div class="text-gray">الأسئلة: <strong>${stats.questions}</strong></div>
-                <div class="text-gray">التعليقات: <strong>${stats.comments}</strong></div>
-                <div class="text-gray">المنشورات: <strong>${stats.posts}</strong></div>
                 <div class="text-gray">الغرف: <strong>${stats.rooms}</strong></div>
             </div>
         `;
@@ -13951,10 +12136,7 @@ _updateUI() {
         }).catch(() => {});
         return;
     }
-    
-    // تحديث المنشورات في الصفحة الرئيسية
-    this._renderPosts(data.posts || []);
-    
+
     // تحديث الإحصائيات في صفحة التحليلات
     const stats = DataManager.getStats();
     const achStats = AchievementSystem.getAchievementStats(user);
@@ -13969,23 +12151,15 @@ _updateUI() {
     });
     
     // ✅ تحديث جميع الجداول
-    this._renderAllTables(data);
-    this._populateSelects(data);
-    this._renderRecent(data);
-    this._renderLeagueTable(data);
-    this._updateCharts(data);
-    this._renderTopScorers(data);
     this._renderAchievements();
     GameEngine.renderLeaderboard();
-    this._renderAnalytics(data);
-    this._renderUpcomingMatches(data);
-    this._renderPosts(data.posts || []);
     this._renderStore(data.storeItems || []);
     
     if (user?.role === 'admin' || user?.role === 'super_admin' || user?.adminRole) {
         this._renderAdminData();
     }
     this._updateLastUpdateTime();
+    this._updateDashboardUI();
 },
 
     _updateLastUpdateTime() {
@@ -13996,9 +12170,7 @@ _updateUI() {
     },
 
 _onDataUpdate(data) {
-    // تحديث المنشورات في الصفحة الرئيسية
-    this._renderPosts(data.posts || []);
-    
+
     // تحديث الإحصائيات في صفحة التحليلات
     const stats = DataManager.getStats();
     const user = AuthService.currentUser;
@@ -14014,27 +12186,14 @@ _onDataUpdate(data) {
     });
     
     // تحديث العناصر الأخرى في صفحة التحليلات
-    this._updateCharts(data);
-    this._renderRecent(data);
-    this._renderTopScorers(data);
     this._updateLevelProgress(user);
-    this._renderAnalyticsCharts(data); // ✅ الدالة موجودة الآن
-    this._renderUpcomingMatches(data);
-    
-    // تحديث عدد منشوراتي
-    if (user) {
-        const countEl = document.getElementById('myPostsCount');
-        if (countEl) {
-            const posts = data.posts || [];
-            const count = posts.filter(p => p.userId === user.uid).length;
-            countEl.textContent = count;
-        }
-    }
+
         if (AuthService.currentUser) {
         this._updateFollowCounts();
         this._updateAllFollowButtons();
     }
     this._updateLastUpdateTime();
+        this._updateDashboardUI();
 },
 
 // ============================================================
@@ -14099,18 +12258,34 @@ _onUserUpdate(user) {
         // 1️⃣1️⃣ تحديث أزرار المتابعة (مرة أخرى للتأكد)
         this._updateAllFollowButtons();
 
+        // ✅ إضافة: تحديث قائمة الأصدقاء إذا كانت الصفحة الحالية هي friends
+        if (this.currentSection === 'friends') {
+            this._loadFriendsPage();
+        }
+
+        // ✅ إضافة: تحديث عنصر القائمة المنسدلة للمشرف
+        const isAdmin = this._isAdminUser();
+        const adminMenuItem = document.querySelector('.dropdown-item[data-action="admin"]');
+        if (adminMenuItem) {
+            adminMenuItem.style.display = isAdmin ? 'flex' : 'none';
+        }
+
+       // ✅ تحديث قائمة الأصدقاء إذا كانت الصفحة الحالية هي friends
+        if (this.currentSection === 'friends') {
+            setTimeout(() => this._loadFriendsPage(), 300);
+        }
+
+        // ✅ تحديث المضاعفات النشطة
+        this._refreshActiveBoosts();
+
     } else {
         // ❌ المستخدم سجل الخروج
         // 1️⃣ إعادة تعيين الملف الشخصي والشريط الجانبي
         this._updateUserUI(null);
-        
-        // 2️⃣ إخفاء أي محتوى خاص بالمستخدم
-        const adminNavLink = document.getElementById('adminNavLink');
-        if (adminNavLink) adminNavLink.style.display = 'none';
-        
-        // 3️⃣ إعادة تعيين شارة الإشعارات
-        const badge = document.getElementById('notificationBadge');
-        if (badge) badge.style.display = 'none';
+
+        // ✅ إخفاء عنصر القائمة المنسدلة للمشرف
+        const adminMenuItem = document.querySelector('.dropdown-item[data-action="admin"]');
+        if (adminMenuItem) adminMenuItem.style.display = 'none';
     }
 
     // 1️⃣2️⃣ إذا كان المستخدم مشرفاً، قم بتحديث بيانات المشرفين
@@ -14120,6 +12295,9 @@ _onUserUpdate(user) {
     if (user) {
         this._refreshActiveBoosts();
     }
+    
+    // تحديث لوحة التحكم الرئيسية
+    this._updateDashboardUI();
 },
 
     /**
@@ -14303,124 +12481,6 @@ async _handleRemoveAvatar() {
 // ============================================================
 // عرض الرسوم البيانية والتحليلات المتقدمة
 // ============================================================
-
-_renderAnalyticsCharts(data) {
-    // 1. رسم بياني أداء الفرق
-    const chartCanvas = document.getElementById('teamPerformanceChart');
-    if (chartCanvas) {
-        const matches = data.matches || [];
-        const teams = {};
-        matches.forEach(m => {
-            if (!teams[m.team1]) teams[m.team1] = { goals: 0, matches: 0, wins: 0 };
-            if (!teams[m.team2]) teams[m.team2] = { goals: 0, matches: 0, wins: 0 };
-            teams[m.team1].goals += m.score1 || 0;
-            teams[m.team1].matches++;
-            teams[m.team2].goals += m.score2 || 0;
-            teams[m.team2].matches++;
-            if ((m.score1 || 0) > (m.score2 || 0)) teams[m.team1].wins++;
-            else if ((m.score1 || 0) < (m.score2 || 0)) teams[m.team2].wins++;
-        });
-
-        const labels = Object.keys(teams);
-        const avgGoals = labels.map(name => teams[name].matches > 0 ? (teams[name].goals / teams[name].matches).toFixed(1) : 0);
-        const winRates = labels.map(name => teams[name].matches > 0 ? ((teams[name].wins / teams[name].matches) * 100).toFixed(0) : 0);
-
-        if (window.teamChartInstance) window.teamChartInstance.destroy();
-        window.teamChartInstance = new Chart(chartCanvas, {
-            type: 'bar',
-            data: {
-                labels: labels.length ? labels : ['لا توجد فرق'],
-                datasets: [
-                    { 
-                        label: 'متوسط الأهداف', 
-                        data: labels.length ? avgGoals : [0], 
-                        backgroundColor: '#6C63FF', 
-                        borderRadius: 6 
-                    },
-                    { 
-                        label: 'نسبة الفوز %', 
-                        data: labels.length ? winRates : [0], 
-                        backgroundColor: '#FFD93D', 
-                        borderRadius: 6 
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { 
-                    legend: { 
-                        labels: { color: 'var(--light)' } 
-                    } 
-                },
-                scales: {
-                    y: { 
-                        beginAtZero: true, 
-                        ticks: { color: 'var(--gray)' } 
-                    },
-                    x: { 
-                        ticks: { color: 'var(--gray)', maxRotation: 45 } 
-                    }
-                }
-            }
-        });
-    }
-
-    // 2. التنبؤ بالنتائج
-    const predContainer = document.getElementById('predictionResults');
-    if (predContainer) {
-        const matches = data.matches || [];
-        if (matches.length < 2) {
-            predContainer.innerHTML = '<div class="text-gray">لا توجد بيانات كافية للتنبؤ</div>';
-        } else {
-            const lastMatch = matches[matches.length - 1];
-            if (lastMatch) {
-                const teams = {};
-                matches.forEach(m => {
-                    if (!teams[m.team1]) teams[m.team1] = { goals: 0, matches: 0 };
-                    if (!teams[m.team2]) teams[m.team2] = { goals: 0, matches: 0 };
-                    teams[m.team1].goals += m.score1 || 0;
-                    teams[m.team1].matches++;
-                    teams[m.team2].goals += m.score2 || 0;
-                    teams[m.team2].matches++;
-                });
-                const t1Stats = teams[lastMatch.team1];
-                const t2Stats = teams[lastMatch.team2];
-                if (t1Stats && t2Stats) {
-                    const t1Avg = t1Stats.matches > 0 ? t1Stats.goals / t1Stats.matches : 0;
-                    const t2Avg = t2Stats.matches > 0 ? t2Stats.goals / t2Stats.matches : 0;
-                    const predScore1 = Math.round(t1Avg);
-                    const predScore2 = Math.round(t2Avg);
-                    predContainer.innerHTML = `
-                        <div style="padding:1rem;text-align:center;">
-                            <h4>${lastMatch.team1} 🆚 ${lastMatch.team2}</h4>
-                            <div style="font-size:2.5rem;font-weight:900;color:var(--accent);margin:0.5rem 0;">
-                                ${predScore1} - ${predScore2}
-                            </div>
-                            <div class="text-gray">نتيجة متوقعة بناءً على متوسط الأهداف</div>
-                            <div style="display:flex;justify-content:center;gap:2rem;margin-top:0.5rem;font-size:0.9rem;">
-                                <span>⚽ ${t1Avg.toFixed(1)}/مباراة</span>
-                                <span>⚽ ${t2Avg.toFixed(1)}/مباراة</span>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    predContainer.innerHTML = '<div class="text-gray">بيانات غير كافية للتنبؤ</div>';
-                }
-            }
-        }
-    }
-
-    // 3. إحصائيات إضافية
-    const matches = data.matches || [];
-    let totalGoals = 0;
-    matches.forEach(m => {
-        totalGoals += (m.score1 || 0) + (m.score2 || 0);
-    });
-    document.getElementById('analyticsTotalGoals').textContent = totalGoals;
-    document.getElementById('analyticsAvgGoals').textContent = matches.length > 0 ? (totalGoals / matches.length).toFixed(1) : '0';
-    document.getElementById('analyticsTotalComments').textContent = data.comments?.length || 0;
-},
 
 // ============================================================
 // نظام الإشعارات
@@ -14751,12 +12811,14 @@ async _updateNotificationBadge() {
     }
 },
 
-/**
- * تحديث واجهة شارة الإشعارات
- */
 _updateBadgeUI(count) {
+    // شارة الإشعارات في الشريط الجانبي
     const badge = document.getElementById('notificationBadge');
     const bell = document.getElementById('notificationBell');
+    
+    // شارة الإشعارات في القائمة المنسدلة (أيقونة ☰)
+    const menuBadge = document.getElementById('menuNotificationBadge');
+    const dropdownBadge = document.getElementById('dropdownNotifBadge');
     
     if (badge) {
         if (count > 0) {
@@ -14765,6 +12827,17 @@ _updateBadgeUI(count) {
         } else {
             badge.style.display = 'none';
         }
+    }
+    
+    // تحديث شارة أيقونة القائمة
+    if (menuBadge) {
+        menuBadge.style.display = count > 0 ? 'block' : 'none';
+    }
+    
+    // تحديث شارة الإشعارات داخل القائمة
+    if (dropdownBadge) {
+        dropdownBadge.style.display = count > 0 ? 'inline-block' : 'none';
+        if (count > 0) dropdownBadge.textContent = count > 9 ? '9+' : count;
     }
     
     if (bell) {
@@ -16459,6 +14532,372 @@ _renderQuestionsAdvanced() {
     this._updateSelectedCount();
 },
 
+_renderFriendsPage() {
+    // ✅ نستخدم AuthService.currentUser مباشرة
+    const user = AuthService.currentUser;
+    
+    console.log('👤 _renderFriendsPage - Current user:', user);
+
+    // إذا لم يكن هناك مستخدم، نعرض صفحة تسجيل الدخول
+    if (!user) {
+        return `
+            <div class="friends-page">
+                <div class="flex-between mb-2">
+                    <h2 style="font-size:1.8rem;font-weight:800;">
+                        <i class="fas fa-user-friends" style="color:var(--accent);"></i> 
+                        الأصدقاء
+                    </h2>
+                </div>
+                <div class="card empty-state" style="text-align:center;padding:3rem;">
+                    <i class="fas fa-user-friends" style="font-size:3rem;color:var(--gray-dark);"></i>
+                    <h3>سجل الدخول لعرض الأصدقاء</h3>
+                    <p class="text-gray">يجب تسجيل الدخول لتتمكن من رؤية أصدقائك</p>
+                    <button class="btn btn-primary mt-1" onclick="document.getElementById('loginModal').classList.add('open')">
+                        <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="friends-page">
+            <!-- رأس الصفحة -->
+            <div class="flex-between mb-2">
+                <div>
+                    <h2 style="font-size:1.8rem;font-weight:800;">
+                        <i class="fas fa-user-friends" style="color:var(--accent);"></i> 
+                        الأصدقاء
+                    </h2>
+                    <p class="text-gray" style="font-size:0.9rem;">تواصل مع أصدقائك وأضف أصدقاء جدد</p>
+                </div>
+                <div class="flex-center" style="flex-wrap:wrap;gap:8px;">
+                    <button class="btn btn-primary" id="friendsAddFriendBtn">
+                        <i class="fas fa-user-plus"></i> إضافة صديق
+                    </button>
+                    <button class="btn btn-sm btn-outline" id="friendsRefreshBtn">
+                        <i class="fas fa-sync"></i> تحديث
+                    </button>
+                </div>
+            </div>
+
+            <!-- إحصائيات الأصدقاء -->
+            <div class="friends-stats-grid grid-3 mb-2">
+                <div class="stat-card">
+                    <div class="stat-number" id="friendsTotalCount">0</div>
+                    <div class="stat-label">👥 إجمالي الأصدقاء</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="friendsOnlineCount">0</div>
+                    <div class="stat-label">🟢 متصلون الآن</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="friendsRequestsCount">0</div>
+                    <div class="stat-label">📩 طلبات صداقة</div>
+                </div>
+            </div>
+
+            <!-- تبويبات الأصدقاء -->
+            <div class="friends-tabs">
+                <button class="tab-btn active" data-tab="all">👥 الجميع</button>
+                <button class="tab-btn" data-tab="online">🟢 متصلون</button>
+                <button class="tab-btn" data-tab="pending">⏳ معلق</button>
+                <button class="tab-btn" data-tab="blocked">🚫 محظورون</button>
+            </div>
+
+            <!-- قائمة الأصدقاء -->
+            <div class="card" style="padding:0;">
+                <div id="friendsListContainer" style="padding:1rem;">
+                    <!-- ✅ سيتم عرض شاشة التحميل هنا فوراً -->
+                </div>
+            </div>
+
+            <!-- حقل إضافة صديق -->
+            <div class="card mt-2">
+                <div class="card-title"><i class="fas fa-user-plus"></i> إضافة صديق جديد</div>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                    <input type="text" id="friendsAddInput" placeholder="اسم المستخدم أو البريد الإلكتروني" 
+                           style="flex:1;min-width:200px;padding:10px 16px;border-radius:12px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                    <button class="btn btn-primary" id="friendsAddSubmitBtn"><i class="fas fa-search"></i> بحث وإضافة</button>
+                </div>
+                <div id="friendsSearchResults" style="margin-top:0.8rem;display:none;"></div>
+            </div>
+        </div>
+    `;
+},
+
+async _loadFriendsPage() {
+    const container = document.getElementById('friendsListContainer');
+    if (!container) {
+        console.warn('⚠️ friendsListContainer not found, retrying...');
+        setTimeout(() => this._loadFriendsPage(), 200);
+        return;
+    }
+
+    console.log('🔍 _loadFriendsPage called');
+    console.log('🔍 AuthService.currentUser:', AuthService.currentUser);
+    console.log('🔍 auth.currentUser:', auth.currentUser);
+
+    // ✅ عرض شاشة تحميل فورية مع دوران
+    container.innerHTML = `
+        <div style="text-align:center;padding:3rem 1rem;">
+            <div style="display:inline-block;width:50px;height:50px;border:4px solid var(--glass);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:1rem;"></div>
+            <h4 style="color:var(--gray);font-weight:400;">جاري تحميل الأصدقاء...</h4>
+            <p style="color:var(--gray-dark);font-size:0.85rem;">يرجى الانتظار</p>
+        </div>
+    `;
+
+    // 1. الحصول على المستخدم من Firebase Auth مباشرة
+    const firebaseUser = auth.currentUser;
+    
+    // 2. إذا لم يكن هناك مستخدم مصادق، نعرض رسالة تسجيل الدخول
+    if (!firebaseUser || !firebaseUser.uid) {
+        container.innerHTML = `
+            <div class="empty-state" style="text-align:center;padding:2rem;">
+                <i class="fas fa-user-friends" style="font-size:2.5rem;color:var(--gray-dark);"></i>
+                <h3>سجل الدخول لعرض الأصدقاء</h3>
+                <p class="text-gray">يجب تسجيل الدخول لتتمكن من رؤية أصدقائك</p>
+                <button class="btn btn-primary mt-1" onclick="document.getElementById('loginModal').classList.add('open')">
+                    <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
+                </button>
+            </div>
+        `;
+        return;
+    }
+
+    try {
+        // 3. جلب بيانات المستخدم من Firestore
+        const doc = await db.collection('users').doc(firebaseUser.uid).get();
+        if (!doc.exists) {
+            container.innerHTML = `
+                <div class="empty-state" style="text-align:center;padding:2rem;">
+                    <i class="fas fa-exclamation-circle" style="font-size:2.5rem;color:var(--secondary);"></i>
+                    <h3>المستخدم غير موجود</h3>
+                    <p class="text-gray">لم يتم العثور على بيانات حسابك</p>
+                    <button class="btn btn-primary mt-1" onclick="AuthService.logout(); location.reload();">
+                        <i class="fas fa-sync"></i> إعادة تحميل
+                    </button>
+                </div>
+            `;
+            return;
+        }
+
+        const userData = doc.data();
+
+        // 4. تحديث AuthService.currentUser
+        AuthService.currentUser = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName || userData.displayName,
+            username: userData.username || firebaseUser.displayName || firebaseUser.email,
+            role: userData.role || 'user',
+            totalScore: userData.totalScore || 0,
+            coins: userData.coins || 0,
+            achievements: userData.achievements || [],
+            inventory: userData.inventory || [],
+            bio: userData.bio || '',
+            location: userData.location || '',
+            avatar: userData.avatar || null,
+            createdAt: userData.createdAt || new Date().toISOString(),
+            adminRole: userData.adminRole || null,
+            friends: userData.friends || [],
+            blocked: userData.blocked || [],
+            rankPoints: userData.rankPoints || 0,
+            stats: userData.stats || { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 }
+        };
+        AuthService._notifyListeners();
+
+        const user = AuthService.currentUser;
+        const friends = userData.friends || [];
+
+        // 5. جلب طلبات الصداقة المعلقة
+        let requests = [];
+        try {
+            const requestsSnap = await db.collection('friendRequests')
+                .where('to', '==', firebaseUser.uid)
+                .where('status', '==', 'pending')
+                .get();
+            requestsSnap.forEach(doc => requests.push({ id: doc.id, ...doc.data() }));
+        } catch (e) {
+            console.warn('⚠️ Could not fetch friend requests:', e);
+        }
+
+        // 6. تحديث الإحصائيات
+        const totalEl = document.getElementById('friendsTotalCount');
+        const requestsEl = document.getElementById('friendsRequestsCount');
+        const onlineEl = document.getElementById('friendsOnlineCount');
+
+        if (totalEl) totalEl.textContent = friends.length;
+        if (requestsEl) requestsEl.textContent = requests.length;
+
+        // 7. جلب بيانات الأصدقاء
+        let friendsData = [];
+        if (friends.length > 0) {
+            const friendIds = friends.map(f => f.id || f);
+            const friendDocs = await Promise.all(
+                friendIds.map(id => db.collection('users').doc(id).get())
+            );
+            friendsData = friendDocs
+                .filter(doc => doc.exists)
+                .map(doc => ({ id: doc.id, ...doc.data() }));
+
+            // حساب عدد المتصلين
+            const now = Date.now();
+            const onlineCount = friendsData.filter(f => {
+                const lastActive = f.lastActive?.toDate?.() || new Date(f.lastActive);
+                return now - lastActive.getTime() < 5 * 60 * 1000;
+            }).length;
+            if (onlineEl) onlineEl.textContent = onlineCount;
+        } else {
+            if (onlineEl) onlineEl.textContent = '0';
+        }
+
+        // 8. عرض قائمة الأصدقاء (مع تأخير بسيط للشعور بالتحميل)
+        setTimeout(() => {
+            this._renderFriendsList(friendsData, requests, user);
+        }, 300);
+
+    } catch (error) {
+        console.error('❌ Error loading friends:', error);
+        container.innerHTML = `
+            <div class="empty-state" style="text-align:center;padding:2rem;">
+                <i class="fas fa-wifi-slash" style="font-size:2.5rem;color:var(--secondary);"></i>
+                <h3>تعذر تحميل الأصدقاء</h3>
+                <p class="text-gray">حدث خطأ في الاتصال بقاعدة البيانات</p>
+                <p class="text-gray" style="font-size:0.8rem;">${error.message || 'يرجى المحاولة مرة أخرى'}</p>
+                <button class="btn btn-primary mt-1" onclick="App._loadFriendsPage()">
+                    <i class="fas fa-sync"></i> إعادة المحاولة
+                </button>
+            </div>
+        `;
+    }
+},
+
+_renderFriendsList(friendsData, requests, user) {
+    const container = document.getElementById('friendsListContainer');
+    if (!container) return;
+
+    // التبويب النشط
+    const activeTab = document.querySelector('.friends-tabs .tab-btn.active')?.dataset?.tab || 'all';
+
+    let filteredFriends = [...friendsData];
+
+    // تطبيق الفلترة
+    switch(activeTab) {
+        case 'online':
+            const now = Date.now();
+            filteredFriends = filteredFriends.filter(f => {
+                const lastActive = f.lastActive?.toDate?.() || new Date(f.lastActive);
+                return now - lastActive.getTime() < 5 * 60 * 1000;
+            });
+            break;
+        case 'pending':
+            this._renderFriendRequests(requests);
+            return;
+        case 'blocked':
+            const blocked = user.blocked || [];
+            filteredFriends = filteredFriends.filter(f => blocked.includes(f.id));
+            break;
+        default:
+            break;
+    }
+
+    if (filteredFriends.length === 0 && activeTab !== 'pending') {
+        container.innerHTML = `
+            <div class="empty-state" style="text-align:center;padding:2rem;">
+                <i class="fas fa-user-friends" style="font-size:2.5rem;color:var(--gray-dark);"></i>
+                <h3>لا يوجد أصدقاء</h3>
+                <p class="text-gray">ابدأ بإضافة أصدقاء جدد!</p>
+                ${activeTab === 'online' ? '<p class="text-gray" style="font-size:0.8rem;">لا يوجد أصدقاء متصلون حالياً</p>' : ''}
+                ${activeTab === 'blocked' ? '<p class="text-gray" style="font-size:0.8rem;">ليس لديك مستخدمين محظورين</p>' : ''}
+            </div>
+        `;
+        return;
+    }
+
+    let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;">';
+    
+    filteredFriends.forEach(friend => {
+        const name = friend.displayName || friend.username || friend.email || 'مجهول';
+        const username = friend.username || 'guest';
+        const avatar = friend.avatar || null;
+        const isOnline = friend.lastActive && (Date.now() - (friend.lastActive.toDate?.() || new Date(friend.lastActive)).getTime() < 5 * 60 * 1000);
+        const isBlocked = (user.blocked || []).includes(friend.id);
+
+        html += `
+            <div class="friend-card" style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:1rem;display:flex;align-items:center;gap:1rem;transition:var(--transition);">
+                <div class="friend-avatar" style="width:56px;height:56px;border-radius:50%;background:${avatar ? `url('${avatar}') center/cover` : 'var(--primary)'};display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:#fff;flex-shrink:0;position:relative;">
+                    ${!avatar ? name.charAt(0).toUpperCase() : ''}
+                    <span style="position:absolute;bottom:2px;right:2px;width:12px;height:12px;border-radius:50%;background:${isOnline ? 'var(--success)' : 'var(--gray)'};border:2px solid var(--dark);"></span>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:1rem;">${name}</div>
+                    <div style="font-size:0.75rem;color:var(--gray);">@${username}</div>
+                    <div style="font-size:0.65rem;color:${isOnline ? 'var(--success)' : 'var(--gray)'};">${isOnline ? '🟢 متصل' : 'غير متصل'}</div>
+                </div>
+                <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
+                    <button class="btn btn-xs btn-primary" onclick="App._openUserProfileModal('${friend.id}')" title="عرض الملف">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    ${isBlocked ? `
+                        <button class="btn btn-xs btn-success" onclick="App._unblockUser('${friend.id}')" title="إلغاء الحظر">
+                            <i class="fas fa-unlock"></i>
+                        </button>
+                    ` : `
+                        <button class="btn btn-xs btn-danger" onclick="App._blockUser('${friend.id}')" title="حظر">
+                            <i class="fas fa-ban"></i>
+                        </button>
+                        <button class="btn btn-xs btn-danger" onclick="App._removeFriend('${friend.id}')" title="إزالة صديق">
+                            <i class="fas fa-user-minus"></i>
+                        </button>
+                    `}
+                </div>
+            </div>
+        `;
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
+},
+
+_renderFriendRequests(requests) {
+    const container = document.getElementById('friendsListContainer');
+    if (!container) return;
+
+    if (requests.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state" style="text-align:center;padding:2rem;">
+                <i class="fas fa-inbox" style="font-size:2.5rem;color:var(--gray-dark);"></i>
+                <h3>لا توجد طلبات صداقة</h3>
+                <p class="text-gray">ليس لديك طلبات صداقة معلقة</p>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '<div style="display:flex;flex-direction:column;gap:0.5rem;">';
+    requests.forEach(req => {
+        html += `
+            <div class="friend-request-item" style="display:flex;justify-content:space-between;align-items:center;padding:0.8rem 1rem;background:var(--glass);border-radius:var(--radius-sm);border:1px solid var(--glass-border);">
+                <div>
+                    <span style="font-weight:700;">${req.fromName || 'مجهول'}</span>
+                    <span style="font-size:0.7rem;color:var(--gray);">طلب صداقة</span>
+                </div>
+                <div style="display:flex;gap:0.3rem;">
+                    <button class="btn btn-xs btn-success" onclick="App._acceptFriendRequest('${req.id}')">
+                        <i class="fas fa-check"></i> قبول
+                    </button>
+                    <button class="btn btn-xs btn-danger" onclick="App._rejectFriendRequest('${req.id}')">
+                        <i class="fas fa-times"></i> رفض
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+},
+
 // ============================================================
 // دوال كشف الأسئلة المتكررة والمتشابهة
 // ============================================================
@@ -17308,7 +15747,6 @@ App._setupMultiplayerHandlers = function() {
     }
 };
 
-// ===== إظهار / إخفاء صفحات اللعب والنتائج =====
 App._showMultiplayerGamePage = function() {
     const section = document.getElementById('section-multiplayer-game');
     if (section) {
@@ -17323,6 +15761,11 @@ App._showMultiplayerGamePage = function() {
         section.style.overflowY = 'auto';
         section.style.padding = '1rem';
     }
+    
+    // ===== إظهار زر العودة في صفحة اللعب الجماعي =====
+    const backBtn = document.querySelector('#section-multiplayer-game .back-to-home');
+    if (backBtn) backBtn.style.display = 'inline-flex';
+    
     // إخفاء الأقسام الأخرى
     document.querySelectorAll('.section').forEach(s => {
         if (s.id !== 'section-multiplayer-game' && s.id !== 'section-multiplayer-result') {
@@ -18542,15 +16985,8 @@ window.getLevel = getLevel;
 window.addFriend = (username) => App.addFriend(username);
 window.removeFriend = (username) => App.removeFriend(username);
 window.shareProfile = () => App.shareProfile();
-window.sharePost = (postId) => App._sharePost(postId);
 window.acceptFriendRequest = (requestId) => App.acceptFriendRequest(requestId);
 window.rejectFriendRequest = (requestId) => App.rejectFriendRequest(requestId);
 window.toggleFollow = (userId) => App.toggleFollow(userId);
-window.toggleLike = (postId) => App.toggleLike(postId);
-window.toggleComments = (postId) => App.toggleComments(postId);
-window.addComment = (postId) => App.addComment(postId);
-window.editPost = (postId) => App._openEditPostModal(postId);
-window.deletePost = (postId) => App.deletePost(postId);
-window.deleteComment = (commentId) => App.deleteComment(commentId);
 window.previewQuestion = (id) => App._previewQuestion(id);
 window.duplicateQuestion = (id) => App._duplicateQuestion(id);
