@@ -8201,3 +8201,45 @@ body.light-theme .game-info-bar .badge-success {
         height: 25px !important;
     }
 }
+
+/* ============================================================
+   تأثيرات شريط التقدم المتعدد المستويات
+   ============================================================ */
+
+/* وميض عند تخطي المستوى */
+@keyframes levelUpFlash {
+    0% { background: linear-gradient(90deg, var(--primary), var(--accent)); }
+    50% { background: linear-gradient(90deg, var(--accent), var(--success)); }
+    100% { background: linear-gradient(90deg, var(--primary), var(--accent)); }
+}
+
+#levelProgressFillResult.level-up {
+    animation: levelUpFlash 0.6s ease 3;
+}
+
+/* علامات المستويات المتجاوزة */
+.level-marker {
+    position: absolute;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    animation: fadeUp 0.3s ease both;
+}
+
+.level-marker.completed {
+    background: var(--accent);
+    box-shadow: 0 0 10px rgba(255, 217, 61, 0.5);
+}
+
+/* تأثير النقاط المتجمعة */
+.points-burst {
+    animation: pointsBurst 0.5s ease forwards;
+}
+
+@keyframes pointsBurst {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.5); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 1; }
+}
