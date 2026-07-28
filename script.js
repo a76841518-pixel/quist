@@ -6893,6 +6893,25 @@ _renderDashboard() {
     const isAdmin = this._isAdminUser();
 
     return `
+    <div class="dashboard-container" style="
+        background-image: url('images/dashboard-bg.jpg');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        min-height: 100vh;
+        position: relative;
+    ">
+        <!-- طبقة التعتيم -->
+        <div style="
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 14, 23, 0.75);
+            z-index: 0;
+        "></div>
+        
     <div class="dashboard-container">
         <!-- خلفية -->
         <div class="dashboard-bg"></div>
