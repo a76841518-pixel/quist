@@ -202,6 +202,9 @@ const SoundSystem = {
         
         // 9. صوت نهاية اللعبة
         this._sounds.gameEnd = this._createGameEndSound();
+
+        this._sounds.progressTick = this._createProgressTickSound();
+        this._sounds.gameOpen = this._createGameOpenSound();
     },
 
 // ============================================================
@@ -437,6 +440,70 @@ playStatIncrease() {
             } catch (e) {}
         };
     },
+
+// داخل SoundSystem - إضافة أصوات جديدة
+
+// ===== صوت شريط التقدم (نغمة قصيرة متكررة) =====
+_createProgressTickSound() {
+    return () => {
+        if (!this._isEnabled) return;
+        try {
+            const ctx = this._audioContext;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = 600 + Math.random() * 200; // تردد عشوائي
+            osc.type = 'sine';
+            gain.gain.setValueAtTime(0.04 * this._volume, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.06);
+        } catch (e) {}
+    };
+},
+
+// ===== صوت فتح اللعبة (نغمة افتتاحية ملحمية) =====
+_createGameOpenSound() {
+    return () => {
+        if (!this._isEnabled) return;
+        try {
+            const ctx = this._audioContext;
+            const notes = [262, 330, 392, 523, 659, 784, 1047];
+            notes.forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.value = freq;
+                osc.type = 'sine';
+                const startTime = ctx.currentTime + i * 0.08;
+                const vol = i < 3 ? 0.05 : (i < 5 ? 0.08 : 0.12);
+                gain.gain.setValueAtTime(vol * this._volume, startTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.15);
+                osc.start(startTime);
+                osc.stop(startTime + 0.15);
+            });
+            // إضافة وتر bass
+            setTimeout(() => {
+                const osc2 = ctx.createOscillator();
+                const gain2 = ctx.createGain();
+                osc2.connect(gain2);
+                gain2.connect(ctx.destination);
+                osc2.frequency.value = 130;
+                osc2.type = 'sine';
+                gain2.gain.setValueAtTime(0.08 * this._volume, ctx.currentTime);
+                gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                osc2.start(ctx.currentTime);
+                osc2.stop(ctx.currentTime + 0.5);
+            }, 200);
+        } catch (e) {}
+    };
+},
+
+// ===== إضافة دوال التشغيل =====
+playProgressTick() { this.play('progressTick'); },
+playGameOpen() { this.play('gameOpen'); },
 
     // ===== دوال تشغيل الأصوات =====
     
@@ -3062,6 +3129,9 @@ getAchievementStats(user) {
  */
 checkAchievements(gameData) {
     try {
+                if (!Array.isArray(this._unlockedAchievements)) {
+            this._unlockedAchievements = [];
+        }
         // دمج بيانات اللعبة مع البيانات المخزنة
         const checkData = { ...this._data, ...gameData };
         const newAchievements = [];
@@ -3098,21 +3168,6 @@ checkAchievements(gameData) {
                 console.warn('⚠️ Error checking achievement:', ach.id, e);
             }
         });
-        
-        // حفظ البيانات في localStorage
-        if (newAchievements.length > 0) {
-            this._saveData();
-            
-            // تشغيل صوت الإنجاز
-            if (typeof SoundSystem !== 'undefined' && SoundSystem.playLevelUp) {
-                SoundSystem.playLevelUp();
-            }
-            
-            // عرض إشعار لكل إنجاز
-            newAchievements.forEach(ach => {
-                showToast(`🏆 إنجاز جديد: ${ach.name}! (+${ach.points} نقطة)`, 'success', 5000);
-            });
-        }
         
         return newAchievements;
         
@@ -4214,25 +4269,25 @@ startTimer() {
 _callAchievementManager(gameData) {
     try {
         console.log('🔍 _callAchievementManager called with gameData:', gameData);
-        
-        // ✅ التحقق من وجود الإنجازات في ACHIEVEMENTS_DATA
+
+        // ✅ التحقق من وجود ACHIEVEMENTS_DATA
         if (typeof ACHIEVEMENTS_DATA === 'undefined' || !Array.isArray(ACHIEVEMENTS_DATA)) {
             console.warn('⚠️ ACHIEVEMENTS_DATA is not defined or not an array');
             return [];
         }
-        
+
         const user = AuthService.currentUser;
         if (!user) {
             console.warn('⚠️ No user logged in');
             return [];
         }
-        
+
         // ✅ الحصول على الإنجازات المفتوحة حالياً
         const userAchievements = user.achievements || [];
         console.log('📌 Current user achievements:', userAchievements);
-        
+
         const newAchievements = [];
-        
+
         // ✅ التحقق من كل إنجاز
         ACHIEVEMENTS_DATA.forEach(ach => {
             // تخطي الإنجازات المفتوحة بالفعل
@@ -4240,13 +4295,13 @@ _callAchievementManager(gameData) {
                 console.log(`⏭️ Skipping already unlocked: ${ach.id}`);
                 return;
             }
-            
+
             try {
                 // التحقق من الشرط
                 if (ach.check && typeof ach.check === 'function') {
                     const isUnlocked = ach.check(gameData);
                     console.log(`🔍 Checking achievement ${ach.id}: ${isUnlocked ? '✅ UNLOCKED' : '❌ locked'}`);
-                    
+
                     if (isUnlocked) {
                         newAchievements.push({
                             id: ach.id,
@@ -4264,20 +4319,27 @@ _callAchievementManager(gameData) {
                 console.warn(`⚠️ Error checking achievement ${ach.id}:`, e);
             }
         });
-        
+
         console.log('✅ New achievements found:', newAchievements);
-        
-        // ✅ حفظ الإنجازات الجديدة في المستخدم
+
+        // ✅ حفظ الإنجازات الجديدة في المستخدم وتحديث AchievementManager فوراً
         if (newAchievements.length > 0) {
             const newIds = newAchievements.map(a => a.id);
             const updatedAchievements = [...userAchievements, ...newIds];
-            
-            // تحديث محلياً
+
+            // تحديث محلياً في AuthService
             if (AuthService.currentUser) {
                 AuthService.currentUser.achievements = updatedAchievements;
             }
-            
-            // تحديث في Firestore
+
+            // ✅ تحديث AchievementManager فوراً (المفتاح لحل المشكلة)
+            if (typeof AchievementManager !== 'undefined') {
+                AchievementManager._unlockedAchievements = updatedAchievements;
+                AchievementManager._saveData(); // حفظ في localStorage
+                console.log('✅ AchievementManager updated with new achievements:', newIds);
+            }
+
+            // تحديث في Firestore (غير متزامن)
             AuthService.updateUser({ achievements: updatedAchievements })
                 .then(() => {
                     console.log('✅ Achievements saved to Firestore:', newIds);
@@ -4285,10 +4347,22 @@ _callAchievementManager(gameData) {
                 .catch((err) => {
                     console.warn('⚠️ Failed to save achievements to Firestore:', err);
                 });
+
+            // عرض إشعار لكل إنجاز (مع تحقق من وجود الدالة)
+            newAchievements.forEach(ach => {
+                if (typeof showToast === 'function') {
+                    showToast(`🏆 إنجاز جديد: ${ach.name}! (+${ach.points} نقطة)`, 'success', 5000);
+                }
+            });
+
+            // تشغيل صوت الإنجاز إن وجد
+            if (typeof SoundSystem !== 'undefined' && SoundSystem.playLevelUp) {
+                SoundSystem.playLevelUp();
+            }
         }
-        
+
         return newAchievements;
-        
+
     } catch (e) {
         console.error('❌ Error in _callAchievementManager:', e);
         return [];
@@ -4389,7 +4463,7 @@ _finishGame() {
 _showLevelScreen(data) {
     console.log('📊 _showLevelScreen called with:', data);
     
-    const { pointsEarned, oldTotal, newTotal, oldLevel, newLevel, levelsGained } = data;
+    const { pointsEarned, oldTotal, newTotal, oldLevel, newLevel, levelsGained, onComplete } = data;
     
     // إزالة أي شاشة سابقة
     const oldScreen = document.getElementById('levelScreen');
@@ -4454,7 +4528,7 @@ _showLevelScreen(data) {
         }
     }, 300);
     
-    // ✅ ربط زر المتابعة بشكل آمن
+    // ربط زر المتابعة
     const attachButtonHandler = () => {
         const btn = document.getElementById('levelContinueBtn');
         if (btn) {
@@ -4466,7 +4540,6 @@ _showLevelScreen(data) {
                 e.preventDefault();
                 e.stopPropagation();
                 console.log('🔄 Level continue clicked');
-                console.log('📌 Pending achievements:', GameEngine._pendingAchievements);
                 
                 // إزالة شاشة المستوى
                 const screenToRemove = document.getElementById('levelScreen');
@@ -4475,23 +4548,15 @@ _showLevelScreen(data) {
                     console.log('🗑️ Removed level screen');
                 }
                 
-                // ✅ التحقق من وجود إنجازات معلقة
-                if (GameEngine._pendingAchievements && GameEngine._pendingAchievements.length > 0) {
-                    console.log('🏆 Showing achievements screen with', GameEngine._pendingAchievements.length, 'achievements');
-                    if (typeof GameEngine._showAchievementsScreen === 'function') {
-                        GameEngine._showAchievementsScreen(GameEngine._pendingAchievements);
-                    } else {
-                        console.error('❌ _showAchievementsScreen is not a function!');
-                        // ✅ حل بديل: عرض شاشة الإحصائيات مباشرة
-                        GameEngine._showStatsScreen(GameEngine._resultValues);
-                    }
+                // استدعاء onComplete
+                if (typeof onComplete === 'function') {
+                    onComplete();
                 } else {
-                    console.log('📊 No achievements, going to stats screen');
+                    // Fallback: عرض الإحصائيات مباشرة
+                    console.log('📊 No onComplete, showing stats');
                     if (typeof GameEngine._showStatsScreen === 'function') {
                         GameEngine._showStatsScreen(GameEngine._resultValues);
                     } else {
-                        console.error('❌ _showStatsScreen is not a function!');
-                        // ✅ حل بديل: عرض شاشة النتيجة مباشرة
                         document.getElementById('gameResultScreen').style.display = 'block';
                     }
                 }
@@ -4515,28 +4580,19 @@ _showLevelScreen(data) {
 _showAchievementsScreen(achievements) {
     console.log('📊 ===== _showAchievementsScreen START =====');
     console.log('📊 achievements:', achievements);
-    console.log('📊 Type:', typeof achievements);
-    console.log('📊 Is Array:', Array.isArray(achievements));
-    console.log('📊 Length:', achievements ? achievements.length : 0);
     
-    // ✅ التحقق من وجود إنجازات
+    // التحقق من صحة البيانات
     if (!achievements || !Array.isArray(achievements) || achievements.length === 0) {
         console.log('⚠️ No achievements to show, going directly to stats screen');
         this._pendingAchievements = [];
-        // ✅ الانتقال مباشرة إلى شاشة الإحصائيات
         if (typeof this._showStatsScreen === 'function') {
             this._showStatsScreen(this._resultValues);
-        } else {
-            console.error('❌ _showStatsScreen is not a function!');
         }
         return;
     }
     
-    // ✅ تنظيف الإنجازات
-    const validAchievements = achievements.filter(ach => {
-        return ach && typeof ach === 'object' && ach.id && ach.name;
-    });
-    
+    // تنظيف الإنجازات (ضمان وجود id و name)
+    const validAchievements = achievements.filter(ach => ach && typeof ach === 'object' && ach.id && ach.name);
     console.log('✅ Valid achievements count:', validAchievements.length);
     
     if (validAchievements.length === 0) {
@@ -4548,28 +4604,11 @@ _showAchievementsScreen(achievements) {
         return;
     }
     
-    // ✅ إزالة شاشة المستوى
-    const levelScreen = document.getElementById('levelScreen');
-    if (levelScreen) {
-        levelScreen.remove();
-        console.log('🗑️ Removed level screen');
-    }
-    
-    // ✅ إزالة أي شاشة إنجازات سابقة
+    // إزالة أي شاشة إنجازات سابقة
     const oldAchievementsScreen = document.getElementById('achievementsScreen');
-    if (oldAchievementsScreen) {
-        oldAchievementsScreen.remove();
-        console.log('🗑️ Removed old achievements screen');
-    }
+    if (oldAchievementsScreen) oldAchievementsScreen.remove();
     
-    // ✅ إزالة أي شاشة إحصائيات سابقة
-    const oldStatsScreen = document.getElementById('statsScreen');
-    if (oldStatsScreen) {
-        oldStatsScreen.remove();
-        console.log('🗑️ Removed old stats screen');
-    }
-    
-    // ✅ إنشاء شاشة الإنجازات
+    // إنشاء شاشة الإنجازات
     const screen = document.createElement('div');
     screen.id = 'achievementsScreen';
     screen.style.cssText = `
@@ -4589,11 +4628,11 @@ _showAchievementsScreen(achievements) {
         overflow-y: auto;
     `;
     
-    // ✅ بناء HTML لعرض الإنجازات
+    // بناء HTML للإنجازات
+    const totalPoints = validAchievements.reduce((sum, ach) => sum + (ach.points || 0), 0);
     let achievementsHtml = validAchievements.map((ach, index) => {
         const imageUrl = ach.image || ach.icon || '🏆';
         const isImage = imageUrl && (imageUrl.startsWith('http') || imageUrl.startsWith('/') || imageUrl.startsWith('images/'));
-        
         return `
             <div style="display:flex; align-items:center; gap:0.8rem; background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem 1rem; margin-bottom:0.5rem; width:100%; max-width:400px; animation: fadeUp 0.3s ease ${index * 0.1}s both; border:1px solid #FFD93D;">
                 <div style="width:45px; height:45px; border-radius:50%; overflow:hidden; flex-shrink:0; background:#6C63FF; display:flex; align-items:center; justify-content:center; font-size:1.5rem; border:2px solid #FFD93D;">
@@ -4607,8 +4646,6 @@ _showAchievementsScreen(achievements) {
             </div>
         `;
     }).join('');
-    
-    const totalPoints = validAchievements.reduce((sum, ach) => sum + (ach.points || 0), 0);
     
     screen.innerHTML = `
         <div style="text-align:center; max-width:500px; width:100%;">
@@ -4628,11 +4665,10 @@ _showAchievementsScreen(achievements) {
         </div>
     `;
     
-    // ✅ إضافة الشاشة إلى DOM
     document.body.appendChild(screen);
     console.log('✅ Achievements screen added to DOM');
     
-    // ✅ تشغيل صوت لكل إنجاز
+    // تشغيل صوت لكل إنجاز
     validAchievements.forEach((ach, index) => {
         setTimeout(() => {
             if (typeof SoundSystem !== 'undefined' && SoundSystem.playLevelUp) {
@@ -4641,43 +4677,36 @@ _showAchievementsScreen(achievements) {
         }, index * 500 + 300);
     });
     
-    // ✅ ربط زر المتابعة بشكل آمن
+    // ربط زر المتابعة
     const attachButtonHandler = () => {
         const btn = document.getElementById('achievementsContinueBtn');
         if (btn) {
             console.log('✅ Found achievementsContinueBtn, attaching handler');
-            
-            // ✅ إزالة جميع المستمعات القديمة
             const newBtn = btn.cloneNode(true);
             btn.parentNode.replaceChild(newBtn, btn);
             
-            // ✅ إضافة المستمع الجديد
             newBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
                 console.log('🔄 Achievements continue button clicked');
                 
-                // ✅ إزالة شاشة الإنجازات
+                // إزالة شاشة الإنجازات
                 const screenToRemove = document.getElementById('achievementsScreen');
                 if (screenToRemove) {
                     screenToRemove.remove();
                     console.log('🗑️ Removed achievements screen');
                 }
                 
-                // ✅ مسح الإنجازات المعلقة
-                if (typeof GameEngine !== 'undefined') {
-                    GameEngine._pendingAchievements = [];
-                }
+                // مسح الإنجازات المعلقة
+                GameEngine._pendingAchievements = [];
                 
-                // ✅ الانتقال إلى شاشة الإحصائيات
+                // الانتقال إلى شاشة الإحصائيات
                 console.log('📊 Navigating to stats screen');
-                console.log('📊 _resultValues:', GameEngine._resultValues);
-                
                 if (typeof GameEngine._showStatsScreen === 'function') {
                     GameEngine._showStatsScreen(GameEngine._resultValues);
                 } else {
                     console.error('❌ GameEngine._showStatsScreen is not a function');
-                    // ✅ حل بديل: عرض شاشة النتيجة مباشرة
+                    // حل بديل: عرض شاشة النتيجة مباشرة
                     document.getElementById('gameResultScreen').style.display = 'block';
                 }
             });
@@ -4685,153 +4714,185 @@ _showAchievementsScreen(achievements) {
             console.log('✅ Continue button handler attached');
         } else {
             console.error('❌ achievementsContinueBtn not found!');
-            // ✅ محاولة مرة أخرى بعد 100ms
             setTimeout(attachButtonHandler, 100);
         }
     };
     
-    // ✅ استدعاء ربط الزر
     setTimeout(attachButtonHandler, 50);
-    
-    console.log('📊 ===== _showAchievementsScreen END =====');
 },
 
 _showStatsScreen(data) {
     console.log('📊 ===== _showStatsScreen START =====');
-    console.log('📊 data:', data);
     
-    if (!data) {
-        console.warn('⚠️ No data for stats screen, using _resultValues');
-        data = this._resultValues;
-    }
-    
-    if (!data) {
-        console.error('❌ No data available for stats screen!');
-        // ✅ حل بديل: عرض شاشة النتيجة مباشرة
-        document.getElementById('gameResultScreen').style.display = 'block';
-        return;
-    }
-    
-    const { coins, points, streak, bestStreak, accuracy, correct, wrong, total } = data;
-    
-    // ✅ إزالة أي شاشات سابقة
-    const oldLevelScreen = document.getElementById('levelScreen');
-    if (oldLevelScreen) oldLevelScreen.remove();
-    
-    const oldAchievementsScreen = document.getElementById('achievementsScreen');
-    if (oldAchievementsScreen) oldAchievementsScreen.remove();
-    
-    const oldStatsScreen = document.getElementById('statsScreen');
-    if (oldStatsScreen) oldStatsScreen.remove();
-    
-    const screen = document.createElement('div');
-    screen.id = 'statsScreen';
-    screen.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 10001;
-        background: #0f0e17;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 2rem;
-        animation: fadeUp 0.5s ease;
-        overflow-y: auto;
-    `;
-    
-    screen.innerHTML = `
-        <div style="text-align:center; max-width:550px; width:100%;">
-            <div style="font-size:3rem; margin-bottom:0.5rem;">📊</div>
-            <h2 style="font-size:1.8rem; font-weight:900; color:#FFD93D; margin-bottom:1rem;">
-                إحصائيات المباراة
-            </h2>
-            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; margin-bottom:1rem;">
-                <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem;">
-                    <div style="font-size:1.5rem; font-weight:900; color:#2ecc71;">${correct || 0}</div>
-                    <div style="font-size:0.7rem; color:#a7a9be;">✅ صحيح</div>
-                </div>
-                <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem;">
-                    <div style="font-size:1.5rem; font-weight:900; color:#FF6B6B;">${wrong || 0}</div>
-                    <div style="font-size:0.7rem; color:#a7a9be;">❌ خاطئ</div>
-                </div>
-                <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem;">
-                    <div style="font-size:1.5rem; font-weight:900; color:#FFD93D;">${accuracy || 0}%</div>
-                    <div style="font-size:0.7rem; color:#a7a9be;">🎯 الدقة</div>
-                </div>
-            </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; margin-bottom:1.5rem;">
-                <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem;">
-                    <div style="font-size:1.2rem; font-weight:900; color:#FFD93D;">${points || 0}</div>
-                    <div style="font-size:0.7rem; color:#a7a9be;">⭐ نقاط</div>
-                </div>
-                <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem;">
-                    <div style="font-size:1.2rem; font-weight:900; color:#FFD93D;">${coins || 0}</div>
-                    <div style="font-size:0.7rem; color:#a7a9be;">🪙 عملات</div>
-                </div>
-                <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem;">
-                    <div style="font-size:1.2rem; font-weight:900; color:#FFD93D;">${streak || 0}</div>
-                    <div style="font-size:0.7rem; color:#a7a9be;">🔥 السلسلة</div>
-                </div>
-            </div>
-            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:center;">
-                <button id="statsShowDetailsBtn" style="display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:10px 24px; border-radius:40px; font-weight:600; font-size:0.9rem; background:#6C63FF; color:#fff; border:none; cursor:pointer; min-width:120px;">
-                    <i class="fas fa-eye"></i> عرض التفاصيل
-                </button>
-                <button id="statsFinishBtn" style="display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:10px 24px; border-radius:40px; font-weight:600; font-size:0.9rem; background:#2ecc71; color:#fff; border:none; cursor:pointer; min-width:120px;">
-                    <i class="fas fa-check"></i> إنهاء
-                </button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(screen);
-    console.log('✅ Stats screen added to DOM');
-    
-    // ✅ ربط أزرار شاشة الإحصائيات
-    const attachButtons = () => {
-        // زر عرض التفاصيل
-        const detailsBtn = document.getElementById('statsShowDetailsBtn');
-        if (detailsBtn) {
-            const newDetailsBtn = detailsBtn.cloneNode(true);
-            detailsBtn.parentNode.replaceChild(newDetailsBtn, detailsBtn);
-            
-            newDetailsBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                console.log('🔄 Show details clicked');
-                const screenToRemove = document.getElementById('statsScreen');
-                if (screenToRemove) screenToRemove.remove();
-                GameEngine._showDetailedResultScreen();
-            });
+    try {
+        if (!data) data = this._resultValues;
+        if (!data) {
+            console.error('❌ No data available for stats screen!');
+            document.getElementById('gameResultScreen').style.display = 'block';
+            return;
         }
         
-        // زر إنهاء
-        const finishBtn = document.getElementById('statsFinishBtn');
-        if (finishBtn) {
-            const newFinishBtn = finishBtn.cloneNode(true);
-            finishBtn.parentNode.replaceChild(newFinishBtn, finishBtn);
-            
-            newFinishBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                console.log('🔄 Finish clicked');
-                const screenToRemove = document.getElementById('statsScreen');
-                if (screenToRemove) screenToRemove.remove();
-                GameEngine._finishGame();
-            });
+        // إزالة أي شاشات سابقة
+        const oldAchievementsScreen = document.getElementById('achievementsScreen');
+        if (oldAchievementsScreen) oldAchievementsScreen.remove();
+        
+        const oldStatsScreen = document.getElementById('statsScreen');
+        if (oldStatsScreen) oldStatsScreen.remove();
+        
+        const screen = document.createElement('div');
+        screen.id = 'statsScreen';
+        screen.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 10001;
+            background: #0f0e17;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            animation: fadeUp 0.5s ease;
+            overflow-y: auto;
+        `;
+        
+        const { 
+            coins, 
+            points, 
+            streak, 
+            bestStreak, 
+            accuracy, 
+            correct, 
+            wrong, 
+            total,
+            achievementPoints = 0,
+            achievementCount = 0,
+            achievementDetails = []
+        } = data;
+        
+        // ✅ حساب النقاط الأساسية (بدون الإنجازات) للعرض التوضيحي
+        const basePoints = points - achievementPoints;
+        
+        screen.innerHTML = `
+            <div style="text-align:center; max-width:550px; width:100%;">
+                <div style="font-size:3rem; margin-bottom:0.5rem;">📊</div>
+                <h2 style="font-size:1.8rem; font-weight:900; color:#FFD93D; margin-bottom:1rem;">
+                    إحصائيات المباراة
+                </h2>
+                
+                <!-- ✅ عرض نقاط الإنجازات بشكل مميز -->
+                ${achievementCount > 0 ? `
+                    <div style="background:rgba(255,217,61,0.15); border:2px solid #FFD93D; border-radius:12px; padding:0.6rem; margin-bottom:0.8rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:0.9rem; color:#FFD93D; font-weight:700;">
+                                🏆 الإنجازات (${achievementCount})
+                            </span>
+                            <span style="font-size:1.3rem; font-weight:900; color:#FFD93D;">+${achievementPoints}</span>
+                        </div>
+                        <div style="display:flex; flex-wrap:wrap; gap:0.2rem; margin-top:0.3rem; justify-content:center;">
+                            ${achievementDetails.map((ach, idx) => `
+                                <span style="font-size:0.6rem; background:rgba(255,217,61,0.1); padding:0.1rem 0.5rem; border-radius:30px; border:1px solid rgba(255,217,61,0.2); color:#FFD93D;">
+                                    ${ach.label.replace('🏆 ', '')} (+${ach.value})
+                                </span>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <!-- الإحصائيات الأساسية -->
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; margin-bottom:1rem;">
+                    <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem;">
+                        <div style="font-size:1.5rem; font-weight:900; color:#2ecc71;">${correct || 0}</div>
+                        <div style="font-size:0.7rem; color:#a7a9be;">✅ صحيح</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem;">
+                        <div style="font-size:1.5rem; font-weight:900; color:#FF6B6B;">${wrong || 0}</div>
+                        <div style="font-size:0.7rem; color:#a7a9be;">❌ خاطئ</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem;">
+                        <div style="font-size:1.5rem; font-weight:900; color:#FFD93D;">${accuracy || 0}%</div>
+                        <div style="font-size:0.7rem; color:#a7a9be;">🎯 الدقة</div>
+                    </div>
+                </div>
+                
+                <!-- النقاط والعملات والسلسلة -->
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; margin-bottom:1.5rem;">
+                    <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem; border:${achievementCount > 0 ? '1px solid #FFD93D' : 'none'};">
+                        <div style="font-size:1.2rem; font-weight:900; color:#FFD93D;">${points || 0}</div>
+                        <div style="font-size:0.7rem; color:#a7a9be;">⭐ النقاط الكلية</div>
+                        ${achievementCount > 0 ? `
+                            <div style="font-size:0.55rem; color:#FFD93D; margin-top:2px;">
+                                (نقاط المباراة: ${basePoints} + إنجازات: ${achievementPoints})
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem;">
+                        <div style="font-size:1.2rem; font-weight:900; color:#FFD93D;">${coins || 0}</div>
+                        <div style="font-size:0.7rem; color:#a7a9be;">🪙 عملات</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem;">
+                        <div style="font-size:1.2rem; font-weight:900; color:#FFD93D;">${streak || 0}</div>
+                        <div style="font-size:0.7rem; color:#a7a9be;">🔥 السلسلة</div>
+                    </div>
+                </div>
+                
+                <!-- أزرار التحكم -->
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:center;">
+                    <button id="statsShowDetailsBtn" style="display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:10px 24px; border-radius:40px; font-weight:600; font-size:0.9rem; background:#6C63FF; color:#fff; border:none; cursor:pointer; min-width:120px;">
+                        <i class="fas fa-eye"></i> عرض التفاصيل
+                    </button>
+                    <button id="statsFinishBtn" style="display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:10px 24px; border-radius:40px; font-weight:600; font-size:0.9rem; background:#2ecc71; color:#fff; border:none; cursor:pointer; min-width:120px;">
+                        <i class="fas fa-check"></i> إنهاء
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(screen);
+        console.log('✅ Stats screen added to DOM');
+        
+        // تشغيل صوت الإحصائيات
+        if (typeof SoundSystem !== 'undefined') {
+            SoundSystem.playStatIncrease();
         }
-    };
-    
-    setTimeout(attachButtons, 50);
-    
-    // تشغيل صوت الإحصائيات
-    if (typeof SoundSystem !== 'undefined') {
-        SoundSystem.playStatIncrease();
+        
+        // ربط الأزرار
+        const attachButtons = () => {
+            const detailsBtn = document.getElementById('statsShowDetailsBtn');
+            if (detailsBtn) {
+                const newDetailsBtn = detailsBtn.cloneNode(true);
+                detailsBtn.parentNode.replaceChild(newDetailsBtn, detailsBtn);
+                newDetailsBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('🔄 Show details clicked');
+                    const screenToRemove = document.getElementById('statsScreen');
+                    if (screenToRemove) screenToRemove.remove();
+                    GameEngine._showDetailedResultScreen();
+                });
+            }
+            
+            const finishBtn = document.getElementById('statsFinishBtn');
+            if (finishBtn) {
+                const newFinishBtn = finishBtn.cloneNode(true);
+                finishBtn.parentNode.replaceChild(newFinishBtn, finishBtn);
+                newFinishBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('🔄 Finish clicked');
+                    const screenToRemove = document.getElementById('statsScreen');
+                    if (screenToRemove) screenToRemove.remove();
+                    GameEngine._finishGame();
+                });
+            }
+        };
+        
+        setTimeout(attachButtons, 50);
+        
+    } catch (error) {
+        console.error('❌ Error in _showStatsScreen:', error);
+        document.getElementById('gameResultScreen').style.display = 'block';
     }
-    
-    console.log('📊 ===== _showStatsScreen END =====');
 },
 
 /**
@@ -4876,7 +4937,6 @@ async endGame() {
     this.isPlaying = false;
     clearInterval(this.timer);
     document.getElementById('gamePlayScreen').style.display = 'none';
-    // لا نخفي شاشة النتيجة حتى نعرض عليها المحتوى
     document.getElementById('gameResultScreen').style.display = 'block';
 
     // ============================================================
@@ -4893,120 +4953,218 @@ async endGame() {
     let finalCoins = 0;
     const coinDetails = [];
 
-// النقود الأساسية
-const baseCoins = (this.correctCount * 2) + (this.wrongCount * 1);
-if (baseCoins > 0) {
-    coinDetails.push({ label: '💰 إجابات (صحيح +2 / خاطئ +1)', value: baseCoins });
-    finalCoins += baseCoins;
-}
-
-// ✅ مكافأة السرعة (تُحسب من وقت الإجابة)
-const speedCoinBonus = Math.floor(this.correctCount * 0.5);
-if (speedCoinBonus > 0) {
-    coinDetails.push({ label: '⚡ مكافأة السرعة', value: speedCoinBonus });
-    finalCoins += speedCoinBonus;
-}
-
-// ✅ مكافأة السلسلة (للنقود) - كل 5 إجابات متتالية تعطي مكافأة
-let streakCoinBonus = 0;
-if (this.streak >= 5) {
-    // كل 5 إجابات متتالية = مكافأة 3 عملات
-    streakCoinBonus = Math.floor(this.streak / 5) * 3;
-    if (streakCoinBonus > 0) {
-        coinDetails.push({ label: `🔥 مكافأة سلسلة (${this.streak})`, value: streakCoinBonus });
-        finalCoins += streakCoinBonus;
+    const baseCoins = (this.correctCount * 2) + (this.wrongCount * 1);
+    if (baseCoins > 0) {
+        coinDetails.push({ label: '💰 إجابات (صحيح +2 / خاطئ +1)', value: baseCoins });
+        finalCoins += baseCoins;
     }
-}
 
-// ✅ مكافأة الدقة (للنقود)
-let accuracyCoinBonus = 0;
-if (accuracy >= 80) {
-    accuracyCoinBonus = accuracy >= 90 ? (accuracy === 100 ? 20 : 10) : 5;
-    coinDetails.push({ label: `🎯 مكافأة دقة (${accuracy}%)`, value: accuracyCoinBonus });
-    finalCoins += accuracyCoinBonus;
-}
-
-// مضاعفات النقود
-const boosts = this._getActiveBoosts();
-if (boosts.coinMult > 1) {
-    const totalBeforeBoost = finalCoins;
-    const totalAfterBoost = Math.round(totalBeforeBoost * boosts.coinMult);
-    const coinMultiplierBonus = totalAfterBoost - totalBeforeBoost;
-    if (coinMultiplierBonus > 0) {
-        coinDetails.push({ label: `🪙 مضاعفة نقود ×${boosts.coinMult}`, value: coinMultiplierBonus });
-        finalCoins = totalAfterBoost;
+    const speedCoinBonus = Math.floor(this.correctCount * 0.5);
+    if (speedCoinBonus > 0) {
+        coinDetails.push({ label: '⚡ مكافأة السرعة', value: speedCoinBonus });
+        finalCoins += speedCoinBonus;
     }
-}
+
+    let streakCoinBonus = 0;
+    if (this.streak >= 5) {
+        streakCoinBonus = Math.floor(this.streak / 5) * 3;
+        if (streakCoinBonus > 0) {
+            coinDetails.push({ label: `🔥 مكافأة سلسلة (${this.streak})`, value: streakCoinBonus });
+            finalCoins += streakCoinBonus;
+        }
+    }
+
+    let accuracyCoinBonus = 0;
+    if (accuracy >= 80) {
+        accuracyCoinBonus = accuracy >= 90 ? (accuracy === 100 ? 20 : 10) : 5;
+        coinDetails.push({ label: `🎯 مكافأة دقة (${accuracy}%)`, value: accuracyCoinBonus });
+        finalCoins += accuracyCoinBonus;
+    }
+
+    const boosts = this._getActiveBoosts();
+    if (boosts.coinMult > 1) {
+        const totalBeforeBoost = finalCoins;
+        const totalAfterBoost = Math.round(totalBeforeBoost * boosts.coinMult);
+        const coinMultiplierBonus = totalAfterBoost - totalBeforeBoost;
+        if (coinMultiplierBonus > 0) {
+            coinDetails.push({ label: `🪙 مضاعفة نقود ×${boosts.coinMult}`, value: coinMultiplierBonus });
+            finalCoins = totalAfterBoost;
+        }
+    }
 
     // ============================================================
-    // 3. حساب النقاط النهائية
+    // 3. حساب النقاط النهائية (بدون الإنجازات حالياً)
     // ============================================================
     let finalPoints = 0;
     const pointDetails = [];
 
-// النقاط الأساسية
-const basePoints = this.score;
-if (basePoints > 0) {
-    pointDetails.push({ label: '⭐ نقاط الإجابات الصحيحة', value: basePoints });
-    finalPoints += basePoints;
-}
-
-// ✅ مكافأة السرعة (تُحسب من وقت الإجابة)
-const speedPointBonus = Math.floor(this.correctCount * 0.5);
-if (speedPointBonus > 0) {
-    pointDetails.push({ label: '⚡ مكافأة السرعة', value: speedPointBonus });
-    finalPoints += speedPointBonus;
-}
-
-// ✅ مكافأة السلسلة (للنقاط) - كل 5 إجابات متتالية تعطي مكافأة نقاط
-let streakPointBonus = 0;
-if (this.streak >= 5) {
-    // كل 5 إجابات متتالية = مكافأة نقطة واحدة لكل 5 إجابات
-    streakPointBonus = Math.floor(this.streak / 5);
-    if (streakPointBonus > 0) {
-        pointDetails.push({ label: `🔥 مكافأة سلسلة (${this.streak})`, value: streakPointBonus });
-        finalPoints += streakPointBonus;
+    const basePoints = this.score;
+    if (basePoints > 0) {
+        pointDetails.push({ label: '⭐ نقاط الإجابات الصحيحة', value: basePoints });
+        finalPoints += basePoints;
     }
-}
 
-// ✅ مكافأة الدقة (للنقاط)
-let accuracyPointBonus = 0;
-if (accuracy >= 80) {
-    accuracyPointBonus = accuracy >= 90 ? (accuracy === 100 ? 30 : 15) : 8;
-    if (accuracyPointBonus > 0) {
-        pointDetails.push({ label: `🎯 مكافأة دقة (${accuracy}%)`, value: accuracyPointBonus });
-        finalPoints += accuracyPointBonus;
+    const speedPointBonus = Math.floor(this.correctCount * 0.5);
+    if (speedPointBonus > 0) {
+        pointDetails.push({ label: '⚡ مكافأة السرعة', value: speedPointBonus });
+        finalPoints += speedPointBonus;
     }
-}
 
-// مكافأة الإكمال الكامل (جميع الأسئلة)
-if (totalQuestions > 0 && correctAnswers === totalQuestions) {
-    const perfectBonus = 50;
-    pointDetails.push({ label: '💯 إجابة كاملة', value: perfectBonus });
-    finalPoints += perfectBonus;
-}
-
-// مضاعفات النقاط
-if (boosts.pointMult > 1) {
-    const totalBeforeBoost = finalPoints;
-    const totalAfterBoost = Math.round(totalBeforeBoost * boosts.pointMult);
-    const pointMultiplierBonus = totalAfterBoost - totalBeforeBoost;
-    if (pointMultiplierBonus > 0) {
-        pointDetails.push({ label: `⭐ مضاعفة نقاط ×${boosts.pointMult}`, value: pointMultiplierBonus });
-        finalPoints = totalAfterBoost;
+    let streakPointBonus = 0;
+    if (this.streak >= 5) {
+        streakPointBonus = Math.floor(this.streak / 5);
+        if (streakPointBonus > 0) {
+            pointDetails.push({ label: `🔥 مكافأة سلسلة (${this.streak})`, value: streakPointBonus });
+            finalPoints += streakPointBonus;
+        }
     }
-}
+
+    let accuracyPointBonus = 0;
+    if (accuracy >= 80) {
+        accuracyPointBonus = accuracy >= 90 ? (accuracy === 100 ? 30 : 15) : 8;
+        if (accuracyPointBonus > 0) {
+            pointDetails.push({ label: `🎯 مكافأة دقة (${accuracy}%)`, value: accuracyPointBonus });
+            finalPoints += accuracyPointBonus;
+        }
+    }
+
+    if (totalQuestions > 0 && correctAnswers === totalQuestions) {
+        const perfectBonus = 50;
+        pointDetails.push({ label: '💯 إجابة كاملة', value: perfectBonus });
+        finalPoints += perfectBonus;
+    }
+
+    if (boosts.pointMult > 1) {
+        const totalBeforeBoost = finalPoints;
+        const totalAfterBoost = Math.round(totalBeforeBoost * boosts.pointMult);
+        const pointMultiplierBonus = totalAfterBoost - totalBeforeBoost;
+        if (pointMultiplierBonus > 0) {
+            pointDetails.push({ label: `⭐ مضاعفة نقاط ×${boosts.pointMult}`, value: pointMultiplierBonus });
+            finalPoints = totalAfterBoost;
+        }
+    }
 
     // ============================================================
-    // 4. حفظ جميع البيانات
+    // 4. التحقق من الإنجازات (يجب أن يكون قبل حساب newTotal)
     // ============================================================
     const user = AuthService.currentUser;
+    let achievementPoints = 0;
+    let achievementDetails = [];
+    let pendingAchievements = [];
+
+    if (user) {
+        // إعداد بيانات المباراة للتحقق من الإنجازات
+        const gameData = {
+            totalWins: (user.stats?.gamesWon || 0) + (this.correctCount > 0 && accuracy >= 70 ? 1 : 0),
+            winStreak: this.streak || 0,
+            correctStreak: this.correctCount || 0,
+            totalAnswers: (user.stats?.correctAnswers || 0) + this.correctCount,
+            gamesPlayed: (user.stats?.gamesPlayed || 0) + 1,
+            avgTime: this._answerTimes && this._answerTimes.length > 0 ? 
+                this._answerTimes.reduce((a, b) => a + b, 0) / this._answerTimes.length : 0,
+            answerIn1s: this._fastAnswers || 0,
+            allAnswersIn1s: this._allAnswersIn1s || false,
+            gameCorrectStreak: this.correctCount || 0,
+            boxesOpened: user.boxesOpened || 0,
+            totalPlayMinutes: Math.floor(((user.totalPlayTime || 0) + Math.round(timeTaken / 60)) / 60),
+            sameOpponentStreak: this._sameOpponentStreak || 0,
+            roundChampion: this._isRoundChampion || false,
+            rankSilverCount: user.rankSilverCount || 0,
+            rankGoldCount: user.rankGoldCount || 0,
+            rankPlatinumCount: user.rankPlatinumCount || 0,
+            rankDiamondCount: user.rankDiamondCount || 0,
+            rankProCount: user.rankProCount || 0,
+            rankLegendaryCount: user.rankLegendaryCount || 0,
+            rankChampionCount: user.rankChampionCount || 0,
+            currentScore: finalPoints,
+            currentCorrect: this.correctCount,
+            currentWrong: this.wrongCount,
+            currentStreak: this.streak,
+            currentQuestions: this.gameQuestions.length
+        };
+
+        // ✅ تحديث بيانات التتبع أولاً (لتشمل إحصائيات هذه المباراة)
+        if (typeof AchievementManager !== 'undefined' && typeof AchievementManager.updateData === 'function') {
+            AchievementManager.updateData(gameData);
+        }
+
+        // ✅ ثم التحقق من الإنجازات الجديدة
+        const previousAchievements = user.achievements || [];
+        let newAchievements = [];
+
+        if (typeof AchievementManager !== 'undefined' && AchievementManager.checkAchievements) {
+            AchievementManager.checkAchievements(gameData);
+            const currentUnlocked = AchievementManager._unlockedAchievements || [];
+            const newIds = currentUnlocked.filter(id => !previousAchievements.includes(id));
+            newAchievements = newIds.map(id => {
+                const ach = ACHIEVEMENTS_DATA.find(a => a.id === id);
+                if (ach) {
+                    return {
+                        id: ach.id,
+                        name: ach.name || 'إنجاز',
+                        description: ach.description || '',
+                        points: ach.points || 0,
+                        image: ach.image || '🏆',
+                        category: ach.category || 'عام',
+                        rarity: ach.rarity || 'common'
+                    };
+                }
+                return null;
+            }).filter(Boolean);
+
+            // تحديث إنجازات المستخدم في AuthService و Firebase
+            if (newAchievements.length > 0) {
+                const updatedAchievements = [...previousAchievements, ...newIds];
+                AuthService.updateUser({ achievements: updatedAchievements }).catch(err => {
+                    console.warn('⚠️ Failed to save achievements to Firestore:', err);
+                });
+                if (AuthService.currentUser) {
+                    AuthService.currentUser.achievements = updatedAchievements;
+                }
+                pendingAchievements = newAchievements;
+                console.log('🏆 New achievements detected:', newAchievements);
+            } else {
+                pendingAchievements = [];
+                console.log('📌 No new achievements');
+            }
+        } else {
+            // Fallback
+            const fallbackAchievements = this._callAchievementManager(gameData);
+            pendingAchievements = fallbackAchievements && fallbackAchievements.length > 0 ? fallbackAchievements : [];
+            console.log('⚠️ Using fallback achievement check, pending:', pendingAchievements);
+        }
+
+        // ✅ حساب نقاط الإنجازات وإضافتها إلى finalPoints
+        if (pendingAchievements.length > 0) {
+            achievementPoints = pendingAchievements.reduce((sum, ach) => sum + (ach.points || 0), 0);
+            pendingAchievements.forEach(ach => {
+                achievementDetails.push({
+                    label: `🏆 ${ach.name}`,
+                    value: ach.points || 0
+                });
+            });
+            // إضافة نقاط الإنجازات إلى المجموع الكلي
+            finalPoints += achievementPoints;
+            if (achievementPoints > 0) {
+                pointDetails.push({
+                    label: `🏆 نقاط الإنجازات (${pendingAchievements.length} إنجاز)`,
+                    value: achievementPoints
+                });
+            }
+            console.log(`🏆 نقاط الإنجازات المضافة: ${achievementPoints} نقطة من ${pendingAchievements.length} إنجاز`);
+        }
+    }
+
+    // ============================================================
+    // 5. حفظ جميع البيانات وعرض النتائج بالتسلسل
+    // ============================================================
     const oldTotal = user?.totalScore || 0;
     const newTotal = oldTotal + finalPoints;
     const oldLevel = getLevel(oldTotal);
     const newLevel = getLevel(newTotal);
     const levelsGained = newLevel.level - oldLevel.level;
 
+    // تخزين النتائج لعرضها في الشاشات
     this._resultValues = {
         coins: finalCoins,
         points: finalPoints,
@@ -5015,120 +5173,51 @@ if (boosts.pointMult > 1) {
         accuracy: accuracy,
         correct: correctAnswers,
         wrong: totalQuestions - correctAnswers,
-        total: totalQuestions
+        total: totalQuestions,
+        achievementPoints: achievementPoints,
+        achievementCount: pendingAchievements.length,
+        achievementDetails: achievementDetails
     };
+
     this._coinDetails = coinDetails;
     this._pointDetails = pointDetails;
     this._streaksHistory = this.streaksHistory || [];
-
-
-
-// ✅ ============================================================
-// ✅ التحقق من الإنجازات
-// ✅ ============================================================
-if (user) {
-    // جمع بيانات المباراة للتحقق من الإنجازات
-    const gameData = {
-        // ===== إنجازات الانتصارات =====
-        totalWins: (user.stats?.gamesWon || 0) + (this.correctCount > 0 && accuracy >= 70 ? 1 : 0),
-        
-        // ===== سلسلة الانتصارات =====
-        winStreak: this.streak || 0,
-        
-        // ===== الإجابات الصحيحة المتتالية =====
-        correctStreak: this.correctCount || 0,
-        
-        // ===== الإجابات الكلية =====
-        totalAnswers: (user.stats?.correctAnswers || 0) + this.correctCount,
-        
-        // ===== عدد المباريات =====
-        gamesPlayed: (user.stats?.gamesPlayed || 0) + 1,
-        
-        // ===== متوسط الوقت =====
-        avgTime: this._answerTimes && this._answerTimes.length > 0 ? 
-            this._answerTimes.reduce((a, b) => a + b, 0) / this._answerTimes.length : 0,
-        
-        // ===== الإجابات في أول ثانية =====
-        answerIn1s: this._fastAnswers || 0,
-        
-        // ===== جميع الإجابات في أول ثانية =====
-        allAnswersIn1s: this._allAnswersIn1s || false,
-        
-        // ===== الإجابات الصحيحة في المباراة الحالية =====
-        gameCorrectStreak: this.correctCount || 0,
-        
-        // ===== الصناديق المفتوحة =====
-        boxesOpened: user.boxesOpened || 0,
-        
-        // ===== وقت اللعب الإجمالي =====
-        totalPlayMinutes: Math.floor(((user.totalPlayTime || 0) + Math.round(timeTaken / 60)) / 60),
-        
-        // ===== هزيمة نفس اللاعب =====
-        sameOpponentStreak: this._sameOpponentStreak || 0,
-        
-        // ===== بطل الجولة =====
-        roundChampion: this._isRoundChampion || false,
-        
-        // ===== بيانات الرتب =====
-        rankSilverCount: user.rankSilverCount || 0,
-        rankGoldCount: user.rankGoldCount || 0,
-        rankPlatinumCount: user.rankPlatinumCount || 0,
-        rankDiamondCount: user.rankDiamondCount || 0,
-        rankProCount: user.rankProCount || 0,
-        rankLegendaryCount: user.rankLegendaryCount || 0,
-        rankChampionCount: user.rankChampionCount || 0
-    };
-    
-// ✅ التحقق من الإنجازات باستخدام الدالة الجديدة
-const newAchievements = this._callAchievementManager(gameData);
-console.log('🏆 New achievements found:', newAchievements);
-// ✅ تخزين الإنجازات المعلقة لعرضها لاحقاً
-if (newAchievements && newAchievements.length > 0) {
-    this._pendingAchievements = newAchievements;
-    console.log('📌 Pending achievements set:', this._pendingAchievements.length);
-} else {
-    this._pendingAchievements = [];
-    console.log('📌 No pending achievements');
-}    
-    // ✅ تحديث بيانات AchievementManager (للتخزين المحلي)
-    if (typeof AchievementManager !== 'undefined' && typeof AchievementManager.updateData === 'function') {
-        AchievementManager.updateData(gameData);
-    }
-    
-    // ✅ تحديث إنجازات المستخدم في Firestore
-    if (newAchievements.length > 0 && user) {
-        const userAchievements = user.achievements || [];
-        const newIds = newAchievements.map(a => a.id);
-        const updatedAchievements = [...userAchievements, ...newIds];
-        
-    // تحديث في Firestore
-    AuthService.updateUser({ achievements: updatedAchievements })
-        .then(() => {
-            console.log('✅ Achievements saved to Firestore:', newIds);
-        })
-        .catch((err) => {
-            console.warn('⚠️ Failed to save achievements to Firestore:', err);
-        });
-}
-}
+    this._pendingAchievements = pendingAchievements; // للاستخدام في الشاشات
 
     // ============================================================
-    // 5. عرض النتائج بالتسلسل (مع تأخير لضمان ظهور العناصر)
+    // 6. عرض الشاشات بالتسلسل (المستوى ← الإنجازات ← الإحصائيات)
     // ============================================================
-    
-    // ✅ إظهار شاشة المستوى أولاً
+
+    // ✅ الشاشة الأولى: المستوى
     console.log('📊 Showing level screen...');
+
     this._showLevelScreen({
         pointsEarned: finalPoints,
         oldTotal: oldTotal,
         newTotal: newTotal,
         oldLevel: oldLevel,
         newLevel: newLevel,
-        levelsGained: levelsGained
+        levelsGained: levelsGained,
+        onComplete: () => {
+            // بعد الضغط على "متابعة" في شاشة المستوى:
+            if (pendingAchievements.length > 0) {
+                // ✅ الشاشة الثانية: الإنجازات الجديدة
+                console.log('🏆 Showing achievements screen with', pendingAchievements.length, 'achievements');
+                this._showAchievementsScreen(pendingAchievements);
+            } else {
+                // لا توجد إنجازات جديدة، انتقل مباشرة إلى الإحصائيات
+                console.log('📊 No achievements, going to stats screen');
+                this._showStatsScreen(this._resultValues);
+            }
+        }
     });
 
+    // تعريف دالة يتم استدعاؤها بعد الانتهاء من شاشة الإنجازات (لتنتقل إلى الإحصائيات)
+    // سيتم ربطها داخل _showAchievementsScreen عبر زر "متابعة"
+    // (تم تعديل _showAchievementsScreen مسبقاً لتستدعي _showStatsScreen عند الضغط على متابعة)
+
     // ============================================================
-    // 6. تحديث بيانات المستخدم (في الخلفية)
+    // 7. تحديث بيانات المستخدم في الخلفية (غير متزامن)
     // ============================================================
     try {
         if (user) {
@@ -5172,7 +5261,7 @@ if (newAchievements && newAchievements.length > 0) {
     }
 
     // ============================================================
-    // 7. تحديث الواجهات الأخرى
+    // 8. تحديث الواجهات الأخرى
     // ============================================================
     this._updateGameStats();
     this.renderLeaderboard();
@@ -5185,7 +5274,7 @@ if (newAchievements && newAchievements.length > 0) {
         localStorage.setItem('bestGameScore', this.score.toString());
     }
 
-    // تحديث العناصر القديمة
+    // تحديث العناصر القديمة (للتوافق)
     const coinsEl = document.getElementById('resultCoins');
     const pointsEl = document.getElementById('resultPoints');
     const streakEl = document.getElementById('resultStreak');
@@ -5194,53 +5283,6 @@ if (newAchievements && newAchievements.length > 0) {
     if (streakEl) streakEl.textContent = this.streak;
 
     this._isEnding = false;
-},
-
-_displayNewAchievements(achievements) {
-    if (!achievements || achievements.length === 0) return;
-    
-    // إضافة قسم الإنجازات في شاشة النتيجة
-    const container = document.getElementById('resultDetailsContainer');
-    if (!container) return;
-    
-    let html = `
-        <div class="result-section" id="resultAchievementsSection" style="border-color: var(--accent);">
-            <div class="result-section-header" style="background: rgba(255, 217, 61, 0.1);">
-                <span>🏆 إنجازات جديدة!</span>
-                <span class="result-section-total" style="color: var(--accent);">+${achievements.reduce((sum, a) => sum + a.points, 0)}</span>
-                <span class="toggle-icon">▼</span>
-            </div>
-            <div class="result-section-details" id="resultAchievementsDetails">
-    `;
-    
-    achievements.forEach((ach, index) => {
-        html += `
-            <div class="result-detail-item" style="animation-delay: ${index * 0.1}s; background: rgba(255, 217, 61, 0.05); border-radius: 8px; padding: 0.3rem 0.5rem; margin: 0.2rem 0;">
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <img src="${ach.image}" alt="${ach.name}" style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover;">
-                    <span class="detail-label" style="font-weight: 700; color: var(--accent);">${ach.name}</span>
-                </div>
-                <span class="detail-value positive">+${ach.points} نقطة</span>
-            </div>
-        `;
-    });
-    
-    html += `
-            </div>
-        </div>
-    `;
-    
-    // إضافة القسم قبل أقسام النتائج الأخرى
-    container.insertAdjacentHTML('afterbegin', html);
-    
-    // تشغيل أصوات الإنجازات
-    achievements.forEach((ach, index) => {
-        setTimeout(() => {
-            if (typeof SoundSystem !== 'undefined') {
-                SoundSystem.playLevelUp();
-            }
-        }, index * 400 + 300);
-    });
 },
 
 _displayLevelAndProgress(pointsEarned) {
@@ -5472,10 +5514,13 @@ _displayResultDetails(details) {
         wrong = 0,
         total = 0,
         coinDetails = [],
-        pointDetails = []
+        pointDetails = [],
+        achievementPoints = 0,      // ✅ إضافة
+        achievementCount = 0,       // ✅ إضافة
+        achievementDetails = []     // ✅ إضافة
     } = details;
 
-    this._resultValues = { coins, points, streak, bestStreak, accuracy, correct, wrong, total };
+    this._resultValues = { coins, points, streak, bestStreak, accuracy, correct, wrong, total, achievementPoints, achievementCount, achievementDetails };
     this._coinDetails = coinDetails;
     this._pointDetails = pointDetails;
     this._streaksHistory = streaksHistory;
@@ -5504,7 +5549,7 @@ _displayResultDetails(details) {
     }
     html += `</div></div>`;
 
-    // ===== قسم النقاط =====
+    // ===== قسم النقاط (معدل ليشمل الإنجازات) =====
     html += `<div class="result-section" id="resultPointsSection">`;
     html += `<div class="result-section-header" onclick="App._toggleResultSection('points')">`;
     html += `<span>⭐ النقاط</span>`;
@@ -5512,6 +5557,8 @@ _displayResultDetails(details) {
     html += `<span class="toggle-icon">▼</span>`;
     html += `</div>`;
     html += `<div class="result-section-details" id="resultPointsDetails">`;
+    
+    // تفاصيل النقاط من المباراة
     if (pointDetails && pointDetails.length > 0) {
         pointDetails.forEach((item, idx) => {
             const sign = item.value > 0 ? '+' : '';
@@ -5521,9 +5568,27 @@ _displayResultDetails(details) {
             html += `<span class="detail-value ${cls}">${sign}<span class="detail-number" id="pointDetailNum-${idx}">0</span></span>`;
             html += `</div>`;
         });
-    } else {
-        html += `<div class="text-gray" style="font-size:0.8rem;text-align:center;padding:0.3rem;">لا توجد تفاصيل</div>`;
     }
+    
+    // ✅ تفاصيل الإنجازات (كجزء من النقاط)
+    if (achievementDetails && achievementDetails.length > 0) {
+        // خط فاصل
+        html += `<div style="border-top:1px solid rgba(255,217,61,0.2); margin:0.3rem 0;"></div>`;
+        
+        achievementDetails.forEach((item, idx) => {
+            html += `<div class="result-detail-item" style="border-right:2px solid #FFD93D; background:rgba(255,217,61,0.05); border-radius:4px; padding:0.2rem 0.4rem;" id="achievementDetail-${idx}">`;
+            html += `<span class="detail-label" style="color:#FFD93D;">${item.label}</span>`;
+            html += `<span class="detail-value positive">+<span class="detail-number" id="achievementDetailNum-${idx}">0</span></span>`;
+            html += `</div>`;
+        });
+        
+        // إجمالي نقاط الإنجازات
+        html += `<div class="result-detail-item" style="border-top:1px solid #FFD93D; margin-top:0.3rem; padding-top:0.3rem; border-bottom:1px solid rgba(255,217,61,0.2);">`;
+        html += `<span class="detail-label" style="color:#FFD93D; font-weight:700;">🏆 إجمالي نقاط الإنجازات (${achievementCount})</span>`;
+        html += `<span class="detail-value positive">+<span class="detail-number" id="achievementTotalNum">0</span></span>`;
+        html += `</div>`;
+    }
+    
     html += `</div></div>`;
 
     // ===== قسم السلسلة =====
@@ -5685,7 +5750,6 @@ _resetAllNumbersToZero() {
 },
 
 _startSequentialCounting() {
-    // التحقق من وجود العناصر الأساسية
     const coinsTotal = document.getElementById('resultCoinsTotal');
     const pointsTotal = document.getElementById('resultPointsTotal');
     if (!coinsTotal || !pointsTotal) {
@@ -5695,7 +5759,16 @@ _startSequentialCounting() {
 
     const coinDetails = this._coinDetails || [];
     const pointDetails = this._pointDetails || [];
+    const achievementDetails = this._resultValues?.achievementDetails || [];
+    const achievementPoints = this._resultValues?.achievementPoints || 0;
+    
     let step = 0;
+    let totalSteps = 4; // النقود، النقاط، السلسلة، الإحصائيات
+    
+    // إذا كانت هناك إنجازات، نضيف خطوة إضافية
+    if (achievementDetails && achievementDetails.length > 0) {
+        totalSteps = 5;
+    }
 
     const scrollToSection = (sectionId) => {
         const el = document.getElementById(sectionId);
@@ -5706,7 +5779,7 @@ _startSequentialCounting() {
 
     const processNext = () => {
         step++;
-        console.log(`📊 Step ${step}`);
+        console.log(`📊 Step ${step}/${totalSteps}`);
 
         // ===== الخطوة 1: تفاصيل النقود =====
         if (step === 1 && coinDetails.length > 0) {
@@ -5745,38 +5818,70 @@ _startSequentialCounting() {
         }
 
         // ===== الخطوة 3: تفاصيل النقاط =====
-        if (step === 2 && pointDetails.length > 0) {
+       // ===== الخطوة 2: تفاصيل النقاط والإنجازات =====
+        if (step === 2) {
             scrollToSection('resultPointsSection');
-            let pointIndex = 0;
-            const animatePointDetail = () => {
-                if (pointIndex >= pointDetails.length) {
+            
+            // جمع جميع تفاصيل النقاط (بما فيها الإنجازات)
+            let allItems = [];
+            let allEls = [];
+            
+            // تفاصيل النقاط العادية
+            if (pointDetails && pointDetails.length > 0) {
+                pointDetails.forEach((item, idx) => {
+                    allEls.push({
+                        id: `pointDetailNum-${idx}`,
+                        value: item.value
+                    });
+                });
+            }
+            
+            // تفاصيل الإنجازات
+            if (achievementDetails && achievementDetails.length > 0) {
+                achievementDetails.forEach((item, idx) => {
+                    allEls.push({
+                        id: `achievementDetailNum-${idx}`,
+                        value: item.value
+                    });
+                });
+                // إجمالي نقاط الإنجازات
+                allEls.push({
+                    id: 'achievementTotalNum',
+                    value: achievementPoints
+                });
+            }
+            
+            let index = 0;
+            const animateNext = () => {
+                if (index >= allEls.length) {
+                    // بعد انتهاء التفاصيل، نعرض المجموع الكلي
                     setTimeout(() => {
-                        this._animateNumberDynamic('resultPointsTotal', this._resultValues.points, 800, () => {
+                        this._animateNumberDynamic('resultPointsTotal', this._resultValues.points || 0, 800, () => {
                             setTimeout(processNext, 500);
                         });
                     }, 300);
                     return;
                 }
-                const el = document.getElementById(`pointDetailNum-${pointIndex}`);
+                const el = document.getElementById(allEls[index].id);
                 if (el) {
-                    this._animateNumberElement(el, pointDetails[pointIndex].value, 400, () => {
-                        pointIndex++;
-                        setTimeout(animatePointDetail, 150);
+                    this._animateNumberElement(el, allEls[index].value, 400, () => {
+                        index++;
+                        setTimeout(animateNext, 150);
                     });
                 } else {
-                    pointIndex++;
-                    setTimeout(animatePointDetail, 50);
+                    index++;
+                    setTimeout(animateNext, 50);
                 }
             };
-            animatePointDetail();
-            return;
-        }
-
-        // ===== الخطوة 4: إذا لم تكن هناك تفاصيل نقاط =====
-        if (step === 2 && pointDetails.length === 0) {
-            this._animateNumberDynamic('resultPointsTotal', this._resultValues.points, 800, () => {
-                setTimeout(processNext, 500);
-            });
+            
+            if (allEls.length === 0) {
+                // إذا لم تكن هناك تفاصيل، نعرض المجموع مباشرة
+                this._animateNumberDynamic('resultPointsTotal', this._resultValues.points || 0, 800, () => {
+                    setTimeout(processNext, 500);
+                });
+            } else {
+                animateNext();
+            }
             return;
         }
 
@@ -6088,80 +6193,37 @@ _animateTotalScores() {
     }, 300);
 },
 
-_showAchievementsScreen(newAchievements) {
-    return new Promise((resolve) => {
-        if (!newAchievements || newAchievements.length === 0) {
-            resolve();
-            return;
-        }
-
-        const container = document.createElement('div');
-        container.id = 'achievementsScreen';
-        container.style.cssText = 'margin-top:1rem; text-align:center;';
-
-        let html = `
-            <h3 style="font-size:1.3rem; margin-bottom:0.5rem; color:var(--accent);">
-                <i class="fas fa-trophy"></i> إنجازات جديدة!
-            </h3>
-            <div style="display:flex; flex-direction:column; gap:0.5rem; max-width:400px; margin:0 auto;">
-        `;
-
-        newAchievements.forEach((ach, index) => {
-            html += `
-                <div style="display:flex; align-items:center; gap:0.5rem; padding:0.3rem 0.8rem; background:var(--glass); border-radius:8px; border:1px solid var(--accent); animation: fadeUp 0.3s ease ${index * 0.15}s both;">
-                    <img src="${ach.image}" alt="${ach.name}" style="width:30px; height:30px; border-radius:50%; object-fit:cover;">
-                    <span style="flex:1; font-weight:700; font-size:0.9rem; text-align:right;">${ach.name}</span>
-                    <span style="color:var(--accent); font-weight:700;">+${ach.points}</span>
-                </div>
-            `;
-        });
-
-        html += `
-            </div>
-            <div style="margin-top:0.8rem;">
-                <button id="achievementsContinueBtn" class="btn btn-primary" style="justify-content:center; min-width:120px;">
-                    متابعة <i class="fas fa-arrow-left"></i>
-                </button>
-            </div>
-        `;
-
-        container.innerHTML = html;
-
-        const resultContainer = document.querySelector('.game-result .card');
-        if (resultContainer) {
-            const oldScreen = document.getElementById('achievementsScreen');
-            if (oldScreen) oldScreen.remove();
-            resultContainer.appendChild(container);
-        }
-
-        // ربط زر المتابعة
-        const continueBtn = document.getElementById('achievementsContinueBtn');
-        if (continueBtn) {
-            continueBtn.addEventListener('click', () => {
-                container.remove();
-                resolve();
-            });
-        }
-    });
-},
-
 _checkAchievements(data) {
     // استخدام AchievementManager للتحقق
     if (typeof AchievementManager !== 'undefined') {
-        const gameData = {
-            totalWins: (AuthService.currentUser?.stats?.gamesWon || 0) + (data.correct > 0 ? 1 : 0),
-            winStreak: data.streak || 0,
-            correctStreak: data.correct || 0,
-            totalAnswers: (AuthService.currentUser?.stats?.correctAnswers || 0) + data.correct,
-            gamesPlayed: (AuthService.currentUser?.stats?.gamesPlayed || 0) + 1,
-            avgTime: data.total > 0 ? (this._totalTime / data.total) : 0,
-            answerIn1s: this._fastAnswersCount || 0,
-            allAnswersIn1s: this._allAnswersIn1s || false,
-            gameCorrectStreak: data.correct || 0,
-            boxesOpened: AuthService.currentUser?.boxesOpened || 0,
-            totalPlayMinutes: Math.floor(((AuthService.currentUser?.totalPlayTime || 0) + this._gameDuration) / 60),
-            // ... باقي البيانات حسب الحاجة
-        };
+    const gameData = {
+        totalWins: (user.stats?.gamesWon || 0) + (this.correctCount > 0 && accuracy >= 70 ? 1 : 0),
+        winStreak: this.streak || 0,
+        correctStreak: this.correctCount || 0,
+        totalAnswers: (user.stats?.correctAnswers || 0) + this.correctCount,
+        gamesPlayed: (user.stats?.gamesPlayed || 0) + 1,
+        avgTime: this._answerTimes && this._answerTimes.length > 0 ? 
+            this._answerTimes.reduce((a, b) => a + b, 0) / this._answerTimes.length : 0,
+        answerIn1s: this._fastAnswers || 0,
+        allAnswersIn1s: this._allAnswersIn1s || false,
+        gameCorrectStreak: this.correctCount || 0,
+        boxesOpened: user.boxesOpened || 0,
+        totalPlayMinutes: Math.floor(((user.totalPlayTime || 0) + Math.round(timeTaken / 60)) / 60),
+        sameOpponentStreak: this._sameOpponentStreak || 0,
+        roundChampion: this._isRoundChampion || false,
+        rankSilverCount: user.rankSilverCount || 0,
+        rankGoldCount: user.rankGoldCount || 0,
+        rankPlatinumCount: user.rankPlatinumCount || 0,
+        rankDiamondCount: user.rankDiamondCount || 0,
+        rankProCount: user.rankProCount || 0,
+        rankLegendaryCount: user.rankLegendaryCount || 0,
+        rankChampionCount: user.rankChampionCount || 0,
+        currentScore: finalPoints,
+        currentCorrect: this.correctCount,
+        currentWrong: this.wrongCount,
+        currentStreak: this.streak,
+        currentQuestions: this.gameQuestions.length
+    };
         return AchievementManager.checkAchievements(gameData);
     }
     return [];
@@ -6199,6 +6261,117 @@ const App = {
 
 // في App.start()
 async start() {
+    // ============================================================
+// شاشة التحميل وتحديث التقدم - عبارات محفزة
+// ============================================================
+const loadingScreen = document.getElementById('loadingScreen');
+const progressBar = document.getElementById('loadingProgress');
+const statusText = document.getElementById('loadingStatus');
+const percentText = document.getElementById('loadingPercent');
+
+let lastProgressSound = 0;
+
+const updateProgress = (percent, status) => {
+    if (progressBar) progressBar.style.width = percent + '%';
+    if (percentText) percentText.textContent = percent + '%';
+    if (statusText) statusText.textContent = status;
+    
+    // ✅ تشغيل صوت شريط التقدم (كل 5%)
+    const progressStep = Math.floor(percent / 5);
+    if (progressStep > lastProgressSound && percent < 100) {
+        lastProgressSound = progressStep;
+        if (typeof SoundSystem !== 'undefined') {
+            SoundSystem.playProgressTick();
+        }
+    }
+};
+
+updateProgress(5, '⚡ شحن المحركات...');
+
+// ============================================================
+// 1. تهيئة Firebase
+// ============================================================
+try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    auth = firebase.auth();
+    isFirebaseReady = true;
+    updateFirebaseStatus(true);
+    updateProgress(15, '🔗 الاتصال بسحابة المعرفة...');
+} catch (e) {
+    console.error('❌ Firebase error:', e);
+    updateFirebaseStatus(false);
+    showToast('⚠️ فشل الاتصال بـ Firebase، يعمل في وضع غير متصل', 'error');
+    updateProgress(15, '⚠️ وضع الطيران بدون اتصال');
+}
+
+// ============================================================
+// 2. تهيئة AuthService
+// ============================================================
+updateProgress(20, '🔑 فتح بوابة المصادقة...');
+await AuthService.init();
+updateProgress(30, '✅ بوابات المصادقة مفتوحة');
+
+// ============================================================
+// 3. تحميل البيانات
+// ============================================================
+updateProgress(35, '📚 جلب ذاكرة المعرفة...');
+await DataManager.loadAll();
+DataManager.startListening();
+updateProgress(55, '📖 تم تحميل بنك الأسئلة');
+
+// ============================================================
+// 4. بناء واجهة المستخدم
+// ============================================================
+updateProgress(60, '🎮 تجهيز ساحة المعركة...');
+this._buildLayout();
+this._setupUI();
+updateProgress(75, '⚔️ ساحة المعركة جاهزة');
+
+// ============================================================
+// 5. تهيئة محرك اللعبة
+// ============================================================
+updateProgress(80, '🧠 تنشيط الذكاء الاصطناعي...');
+GameEngine.init();
+updateProgress(88, '✅ الذكاء الاصطناعي نشط');
+
+// ============================================================
+// 6. تهيئة الإنجازات
+// ============================================================
+updateProgress(90, '🏆 تحميل نظام المكافآت والإنجازات...');
+if (typeof AchievementManager !== 'undefined' && AchievementManager.init) {
+    AchievementManager.init();
+}
+updateProgress(94, '🏅 نظام المكافآت جاهز');
+
+// ============================================================
+// 7. تسجيل المستمعين
+// ============================================================
+updateProgress(95, '🔄 مزامنة البيانات الحية...');
+DataManager.addListener((data) => { this._onDataUpdate(data); });
+AuthService.addListener((user) => { this._onUserUpdate(user); });
+
+// ============================================================
+// 8. فتح نافذة الدخول إذا لم يكن مستخدم
+// ============================================================
+if (!AuthService.currentUser) {
+    setTimeout(() => {
+        document.getElementById('loginModal').classList.add('open');
+    }, 400);
+}
+
+// ============================================================
+// 9. إنهاء التحميل
+// ============================================================
+updateProgress(100, '🚀 جاهز للانطلاق!');
+setTimeout(() => {
+    if (loadingScreen) {
+        loadingScreen.style.opacity = '0';
+        setTimeout(() => {
+            loadingScreen.style.display = 'none';
+        }, 500);
+    }
+}, 400);
     this._buildLayout();
     await AuthService.init();
     await DataManager.loadAll();
@@ -6225,6 +6398,18 @@ async start() {
         setTimeout(() => {
             document.getElementById('loginModal').classList.add('open');
         }, 400);
+    }
+
+    // ============================================================
+    // 9. تهيئة نظام الصوتيات (يجب أن يكون هنا)
+    // ============================================================
+    SoundSystem.init();
+    
+    // ✅ تشغيل صوت فتح اللعبة بعد تهيئة الصوت مباشرة
+    if (typeof SoundSystem !== 'undefined') {
+        setTimeout(() => {
+            SoundSystem.playGameOpen();
+        }, 300);
     }
 
 window.addEventListener('online', () => {
@@ -6259,6 +6444,8 @@ window.addEventListener('offline', () => {
     this._updateDashboardUI();
     showToast('مرحباً بك في مدير كرة القدم المتطور! 🚀', 'success');
 },
+
+
 
     // ===== بناء الواجهة =====
     _buildLayout() {
