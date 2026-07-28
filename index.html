@@ -13,6 +13,75 @@
     <div class="glow-bg"></div>
     <div class="glow-bg glow-bg-2"></div>
 
+<!-- شريط تقدم التحميل مع خلفية -->
+<div id="loadingScreen" style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #0f0e17;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 999999;
+    transition: opacity 0.5s ease;
+">
+    <!-- ✅ طبقة الصورة كخلفية (باستخدام img بدلاً من background-image) -->
+    <img src="images/loading-bg.jpg" alt="خلفية التحميل" style="
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: 0;
+    " onerror="this.style.display='none'">
+    
+    <!-- ✅ طبقة التعتيم فوق الصورة -->
+    <div style="
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(15, 14, 23, 0.75);
+        backdrop-filter: blur(6px);
+        z-index: 1;
+    "></div>
+    
+    <!-- المحتوى فوق الخلفية -->
+    <div style="position: relative; z-index: 2; text-align:center;">
+        <div class="loading-logo" style="font-size:4rem; margin-bottom:0.5rem;">⚽</div>
+        <h2 style="color:#fffffe; font-weight:900; font-size:2rem; margin-bottom:0.3rem; text-shadow: 0 4px 30px rgba(0,0,0,0.5);">معركة العقول</h2>
+        <p style="color:#a7a9be; margin-bottom:1.5rem; font-size:1rem;">🏆 تحدي المعرفة وارتقِ إلى القمة</p>
+        
+        <div style="width:350px; max-width:85%; margin:0 auto;">
+            <div style="height:8px; background:rgba(255,255,255,0.1); border-radius:10px; overflow:hidden; box-shadow: 0 0 20px rgba(108,99,255,0.2);">
+                <div id="loadingProgress" style="height:100%; width:0%; background:linear-gradient(90deg, #6C63FF, #FFD93D, #6C63FF); background-size: 200% 100%; border-radius:10px; transition:width 0.4s ease; animation: shimmer 1.5s infinite;"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-top:0.5rem; font-size:0.85rem; color:#a7a9be;">
+                <span id="loadingStatus">⚡ شحن المحركات...</span>
+                <span id="loadingPercent">0%</span>
+            </div>
+        </div>
+        
+        <!-- تأثير جسيمات -->
+        <div style="margin-top:2rem; display:flex; gap:1rem; justify-content:center; opacity:0.5;">
+            <span style="width:8px; height:8px; border-radius:50%; background:#6C63FF; animation: dotPulse 1.2s infinite alternate;"></span>
+            <span style="width:8px; height:8px; border-radius:50%; background:#FFD93D; animation: dotPulse 1.2s infinite alternate 0.4s;"></span>
+            <span style="width:8px; height:8px; border-radius:50%; background:#6C63FF; animation: dotPulse 1.2s infinite alternate 0.8s;"></span>
+        </div>
+        
+        <!-- ✅ رسالة تفعيل الصوت -->
+        <div style="margin-top:1.5rem; font-size:0.8rem; color:#a7a9be; opacity:0.6; animation: pulse 2s infinite;">
+        </div>
+    </div>
+</div>
+
 
     <!-- Connection Status -->
     <div class="connection-status" id="connectionStatus">
