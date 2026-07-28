@@ -8358,3 +8358,17 @@ body.light-theme .game-info-bar .badge-success {
     from { opacity: 0; }
     to { opacity: 1; }
 }
+
+#loadingScreen {
+    background-image: url('images/loading-bg.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* للشاشات الصغيرة */
+@media (max-width: 768px) {
+    #loadingScreen {
+        background-size: contain; /* الصورة كاملة في الشاشات الصغيرة */
+    }
+}
