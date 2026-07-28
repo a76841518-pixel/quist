@@ -602,6 +602,437 @@ const RANKS = [
     { name: 'البطل', min: 10000, icon: '👑', color: '#ff4500', image: 'champion.png', lockedImage: 'champion_locked.png' },
 ];
 
+// ============================================================
+// نظام الإحصائيات المتطور
+// ============================================================
+
+const DEFAULT_STATS = {
+  general: {
+    totalMatches: 0,
+    completedMatches: 0,
+    withdrawnMatches: 0,
+    wins: 0,
+    draws: 0,
+    losses: 0,
+    firstPlace: 0,
+    thirdPlace: 0,
+    lastPlace: 0,
+  },
+  questions: {
+    answered: 0,
+    correct: 0,
+    wrong: 0,
+    skipped: 0,
+    timeout: 0,
+  },
+  speed: {
+    firstAnswer: 0,
+    lastAnswer: 0,
+    answersInFirstSecond: 0,
+    answersInLastSecond: 0,
+    fastestMatch: 0,
+    slowestMatch: 0,
+  },
+  performance: {
+    allCorrectMatches: 0,
+    allWrongMatches: 0,
+  },
+  averages: {
+    match: {
+      avgDuration: 0,
+      avgPosition: 0,
+      avgPoints: 0,
+      avgRankPoints: 0,
+      avgCoins: 0,
+    },
+    question: {
+      avgCorrectPerMatch: 0,
+      avgWrongPerMatch: 0,
+      avgSkippedPerMatch: 0,
+    },
+    speed: {
+      avgAnswerTime: 0,
+      avgCorrectAnswerTime: 0,
+      avgWrongAnswerTime: 0,
+      avgSpeedRank: 0,
+    },
+    performance: {
+      avgWinRate: 0,
+      avgFirstPlaceRate: 0,
+      avgCompletionRate: 0,
+      avgWithdrawalRate: 0,
+    }
+  },
+  records: {
+    highestStreak: 0,
+    fastestMatch: 0,
+    highestPointsMatch: 0,
+    highestCoinsMatch: 0,
+    longestWinStreak: 0,
+  },
+  currentSeason: {
+    matches: 0,
+    winRate: 0,
+    avgAccuracy: 0,
+    highestStreak: 0,
+    highestRank: 'برونزي 1',
+    seasonStartDate: new Date().toISOString(),
+  },
+  power: 0,
+  accuracy: 0,
+};
+
+// ============================================================
+// تعريف مسارات الصور لكل إحصائية
+// ============================================================
+
+const STAT_IMAGES = {
+    // الإحصائيات العامة
+    'totalMatches': { image: 'images/stats/total-matches.png', label: 'إجمالي المباريات', color: '#6C63FF' },
+    'completedMatches': { image: 'images/stats/completed-matches.png', label: 'مباريات مكتملة', color: '#2ecc71' },
+    'withdrawnMatches': { image: 'images/stats/withdrawn-matches.png', label: 'مباريات منسحب منها', color: '#FF6B6B' },
+    'wins': { image: 'images/stats/wins.png', label: 'انتصارات', color: '#FFD93D' },
+    'draws': { image: 'images/stats/draws.png', label: 'تعادلات', color: '#4fc3f7' },
+    'losses': { image: 'images/stats/losses.png', label: 'هزائم', color: '#FF6B6B' },
+    'firstPlace': { image: 'images/stats/first-place.png', label: 'المركز الأول', color: '#FFD93D' },
+    'thirdPlace': { image: 'images/stats/third-place.png', label: 'المركز الثالث', color: '#CD7F32' },
+    'lastPlace': { image: 'images/stats/last-place.png', label: 'المركز الأخير', color: '#FF6B6B' },
+    
+    // الأسئلة
+    'answered': { image: 'images/stats/answered.png', label: 'أسئلة مجاب عنها', color: '#6C63FF' },
+    'correct': { image: 'images/stats/correct.png', label: 'إجابات صحيحة', color: '#2ecc71' },
+    'wrong': { image: 'images/stats/wrong.png', label: 'إجابات خاطئة', color: '#FF6B6B' },
+    'skipped': { image: 'images/stats/skipped.png', label: 'أسئلة متخطاة', color: '#4fc3f7' },
+    'timeout': { image: 'images/stats/timeout.png', label: 'انتهاء الوقت', color: '#f39c12' },
+    
+    // السرعة
+    'firstAnswer': { image: 'images/stats/first-answer.png', label: 'أول لاعب يجيب', color: '#FFD93D' },
+    'lastAnswer': { image: 'images/stats/last-answer.png', label: 'آخر لاعب يجيب', color: '#FF6B6B' },
+    'answersInFirstSecond': { image: 'images/stats/answers-in-first-second.png', label: 'إجابات في أول ثانية', color: '#2ecc71' },
+    'answersInLastSecond': { image: 'images/stats/answers-in-last-second.png', label: 'إجابات في آخر ثانية', color: '#f39c12' },
+    'fastestMatch': { image: 'images/stats/fastest-match.png', label: 'أسرع مباراة', color: '#6C63FF' },
+    'slowestMatch': { image: 'images/stats/slowest-match.png', label: 'أبطأ مباراة', color: '#FF6B6B' },
+    
+    // الأداء
+    'allCorrectMatches': { image: 'images/stats/all-correct.png', label: 'كل الإجابات صحيحة', color: '#2ecc71' },
+    'allWrongMatches': { image: 'images/stats/all-wrong.png', label: 'كل الإجابات خاطئة', color: '#FF6B6B' },
+    
+    // المتوسطات
+    'avgDuration': { image: 'images/stats/avg-duration.png', label: 'متوسط المدة', color: '#6C63FF' },
+    'avgPosition': { image: 'images/stats/avg-position.png', label: 'متوسط المركز', color: '#4fc3f7' },
+    'avgPoints': { image: 'images/stats/avg-points.png', label: 'متوسط النقاط', color: '#FFD93D' },
+    'avgRankPoints': { image: 'images/stats/avg-rank-points.png', label: 'متوسط نقاط الرتبة', color: '#6C63FF' },
+    'avgCoins': { image: 'images/stats/avg-coins.png', label: 'متوسط العملات', color: '#FFD93D' },
+    'avgCorrectPerMatch': { image: 'images/stats/avg-correct-per-match.png', label: 'متوسط الصحيح بالمباراة', color: '#2ecc71' },
+    'avgWrongPerMatch': { image: 'images/stats/avg-wrong-per-match.png', label: 'متوسط الخاطئ بالمباراة', color: '#FF6B6B' },
+    'avgSkippedPerMatch': { image: 'images/stats/avg-skipped-per-match.png', label: 'متوسط المتخطي بالمباراة', color: '#4fc3f7' },
+    'avgAnswerTime': { image: 'images/stats/avg-answer-time.png', label: 'متوسط زمن الإجابة', color: '#6C63FF' },
+    'avgCorrectAnswerTime': { image: 'images/stats/avg-correct-answer-time.png', label: 'متوسط زمن الصحيح', color: '#2ecc71' },
+    'avgWrongAnswerTime': { image: 'images/stats/avg-wrong-answer-time.png', label: 'متوسط زمن الخاطئ', color: '#FF6B6B' },
+    'avgSpeedRank': { image: 'images/stats/avg-speed-rank.png', label: 'متوسط ترتيب السرعة', color: '#4fc3f7' },
+    'avgWinRate': { image: 'images/stats/avg-win-rate.png', label: 'متوسط نسبة الفوز', color: '#FFD93D' },
+    'avgFirstPlaceRate': { image: 'images/stats/avg-first-place-rate.png', label: 'متوسط نسبة المركز الأول', color: '#FFD93D' },
+    'avgCompletionRate': { image: 'images/stats/avg-completion-rate.png', label: 'متوسط نسبة الإكمال', color: '#2ecc71' },
+    'avgWithdrawalRate': { image: 'images/stats/avg-withdrawal-rate.png', label: 'متوسط نسبة الانسحاب', color: '#FF6B6B' },
+    
+    // الأرقام القياسية
+    'highestStreak': { image: 'images/stats/highest-streak.png', label: 'أعلى سلسلة إجابات', color: '#FFD93D' },
+    'fastestMatchRecord': { image: 'images/stats/fastest-match-record.png', label: 'أسرع مباراة', color: '#6C63FF' },
+    'highestPointsMatch': { image: 'images/stats/highest-points-match.png', label: 'أعلى نقاط مباراة', color: '#FFD93D' },
+    'highestCoinsMatch': { image: 'images/stats/highest-coins-match.png', label: 'أعلى عملات مباراة', color: '#FFD93D' },
+    'longestWinStreak': { image: 'images/stats/longest-win-streak.png', label: 'أطول سلسلة انتصارات', color: '#2ecc71' },
+    
+    // الموسم الحالي
+    'seasonMatches': { image: 'images/stats/season-matches.png', label: 'مباريات هذا الموسم', color: '#6C63FF' },
+    'seasonWinRate': { image: 'images/stats/season-win-rate.png', label: 'نسبة الفوز هذا الموسم', color: '#FFD93D' },
+    'seasonAvgAccuracy': { image: 'images/stats/season-avg-accuracy.png', label: 'متوسط الدقة هذا الموسم', color: '#2ecc71' },
+    'seasonHighestStreak': { image: 'images/stats/season-highest-streak.png', label: 'أعلى سلسلة هذا الموسم', color: '#FFD93D' },
+    'seasonHighestRank': { image: 'images/stats/season-highest-rank.png', label: 'أعلى رتبة هذا الموسم', color: '#FFD93D' },
+};
+
+// دوال مساعدة
+function getStatImage(statKey) {
+    const statInfo = STAT_IMAGES[statKey];
+    if (statInfo && statInfo.image) {
+        return statInfo.image;
+    }
+    return 'images/stats/default.png';
+}
+
+function getStatLabel(statKey) {
+    const statInfo = STAT_IMAGES[statKey];
+    return statInfo ? statInfo.label : statKey;
+}
+
+function getStatColor(statKey) {
+    const statInfo = STAT_IMAGES[statKey];
+    return statInfo ? statInfo.color : '#6C63FF';
+}
+
+/**
+ * تحديث إحصائيات المستخدم بعد المباراة
+ * @param {string} userId - معرف المستخدم
+ * @param {object} matchData - بيانات المباراة
+ */
+async function updateStatistics(userId, matchData) {
+    if (!userId || !matchData) return;
+    
+    try {
+        const userRef = db.collection('users').doc(userId);
+        const userDoc = await userRef.get();
+        if (!userDoc.exists) return;
+
+        const user = userDoc.data();
+        
+        // ===== التحقق من وجود stats وتعيين القيم الافتراضية =====
+        let stats = user.stats || {};
+        
+        // دالة مساعدة للحصول على قيمة مع افتراضي
+        const getStat = (obj, path, defaultValue = 0) => {
+            try {
+                const parts = path.split('.');
+                let current = obj;
+                for (const part of parts) {
+                    if (current === undefined || current === null) return defaultValue;
+                    current = current[part];
+                }
+                return current !== undefined && current !== null ? current : defaultValue;
+            } catch (e) {
+                return defaultValue;
+            }
+        };
+
+        // دالة مساعدة لتحديث قيمة
+        const setStat = (obj, path, value) => {
+            const parts = path.split('.');
+            let current = obj;
+            for (let i = 0; i < parts.length - 1; i++) {
+                if (current[parts[i]] === undefined || current[parts[i]] === null) {
+                    current[parts[i]] = {};
+                }
+                current = current[parts[i]];
+            }
+            current[parts[parts.length - 1]] = value;
+        };
+
+        // قراءة القيم الحالية مع افتراضي
+// --- تحديث الإحصائيات العامة ---
+const totalMatches = getStat(stats, 'general.totalMatches', 0) + 1;
+const completedMatches = getStat(stats, 'general.completedMatches', 0) + (matchData.completed !== false ? 1 : 0);
+const withdrawnMatches = getStat(stats, 'general.withdrawnMatches', 0) + (matchData.completed === false ? 1 : 0);
+const wins = getStat(stats, 'general.wins', 0) + (matchData.win ? 1 : 0);
+const draws = getStat(stats, 'general.draws', 0) + (matchData.draw ? 1 : 0);
+const losses = getStat(stats, 'general.losses', 0) + (!matchData.win && !matchData.draw ? 1 : 0);
+// ===== معالجة المركز في المباريات الفردية =====
+// إذا كانت المباراة فردية (totalPlayers === 1)، اللاعب يعتبر المركز الأول والأخير
+const isSinglePlayer = matchData.totalPlayers === 1;
+let firstPlace = getStat(stats, 'general.firstPlace', 0);
+let thirdPlace = getStat(stats, 'general.thirdPlace', 0);
+let lastPlace = getStat(stats, 'general.lastPlace', 0);
+
+if (isSinglePlayer) {
+    // في المباراة الفردية، اللاعب هو الأول والأخير
+    firstPlace += 1;
+    lastPlace += 1;
+    // لا يوجد مركز ثالث في المباراة الفردية
+} else {
+    // في المباراة الجماعية، نطبق القواعد العادية
+    if (matchData.position === 1) firstPlace += 1;
+    else if (matchData.position === 3) thirdPlace += 1;
+    else if (matchData.position === matchData.totalPlayers) lastPlace += 1;
+}
+
+setStat(stats, 'general.totalMatches', totalMatches);
+setStat(stats, 'general.completedMatches', completedMatches);
+setStat(stats, 'general.withdrawnMatches', withdrawnMatches);
+setStat(stats, 'general.wins', wins);
+setStat(stats, 'general.draws', draws);
+setStat(stats, 'general.losses', losses);
+setStat(stats, 'general.firstPlace', firstPlace);
+setStat(stats, 'general.thirdPlace', thirdPlace);
+setStat(stats, 'general.lastPlace', lastPlace);
+
+        // --- الأسئلة ---
+        const answered = getStat(stats, 'questions.answered', 0) + (matchData.answeredCount || 0);
+        const correct = getStat(stats, 'questions.correct', 0) + (matchData.correctCount || 0);
+        const wrong = getStat(stats, 'questions.wrong', 0) + (matchData.wrongCount || 0);
+        const skipped = getStat(stats, 'questions.skipped', 0) + (matchData.skippedCount || 0);
+        const timeout = getStat(stats, 'questions.timeout', 0) + (matchData.timeoutCount || 0);
+
+        setStat(stats, 'questions.answered', answered);
+        setStat(stats, 'questions.correct', correct);
+        setStat(stats, 'questions.wrong', wrong);
+        setStat(stats, 'questions.skipped', skipped);
+        setStat(stats, 'questions.timeout', timeout);
+
+        // --- السرعة ---
+        const firstAnswer = getStat(stats, 'speed.firstAnswer', 0) + (matchData.firstAnswer ? 1 : 0);
+        const lastAnswer = getStat(stats, 'speed.lastAnswer', 0) + (matchData.lastAnswer ? 1 : 0);
+        const answersInFirstSecond = getStat(stats, 'speed.answersInFirstSecond', 0) + (matchData.answersInFirstSecond || 0);
+        const answersInLastSecond = getStat(stats, 'speed.answersInLastSecond', 0) + (matchData.answersInLastSecond || 0);
+        
+        let fastestMatch = getStat(stats, 'speed.fastestMatch', 0);
+        if (matchData.fastestMatch && (fastestMatch === 0 || matchData.fastestMatch < fastestMatch)) {
+            fastestMatch = matchData.fastestMatch;
+        }
+        
+        let slowestMatch = getStat(stats, 'speed.slowestMatch', 0);
+        if (matchData.slowestMatch && matchData.slowestMatch > slowestMatch) {
+            slowestMatch = matchData.slowestMatch;
+        }
+
+        setStat(stats, 'speed.firstAnswer', firstAnswer);
+        setStat(stats, 'speed.lastAnswer', lastAnswer);
+        setStat(stats, 'speed.answersInFirstSecond', answersInFirstSecond);
+        setStat(stats, 'speed.answersInLastSecond', answersInLastSecond);
+        setStat(stats, 'speed.fastestMatch', fastestMatch);
+        setStat(stats, 'speed.slowestMatch', slowestMatch);
+
+        // --- الأداء ---
+        const allCorrectMatches = getStat(stats, 'performance.allCorrectMatches', 0) + (matchData.allCorrect ? 1 : 0);
+        const allWrongMatches = getStat(stats, 'performance.allWrongMatches', 0) + (matchData.allWrong ? 1 : 0);
+        setStat(stats, 'performance.allCorrectMatches', allCorrectMatches);
+        setStat(stats, 'performance.allWrongMatches', allWrongMatches);
+
+        // --- الأرقام القياسية ---
+        let highestStreak = getStat(stats, 'records.highestStreak', 0);
+        if (matchData.streak > highestStreak) highestStreak = matchData.streak;
+        setStat(stats, 'records.highestStreak', highestStreak);
+
+        let fastestMatchRecord = getStat(stats, 'records.fastestMatch', 0);
+        if (matchData.matchDuration && (fastestMatchRecord === 0 || matchData.matchDuration < fastestMatchRecord)) {
+            fastestMatchRecord = matchData.matchDuration;
+        }
+        setStat(stats, 'records.fastestMatch', fastestMatchRecord);
+
+        let highestPointsMatch = getStat(stats, 'records.highestPointsMatch', 0);
+        if (matchData.points > highestPointsMatch) highestPointsMatch = matchData.points;
+        setStat(stats, 'records.highestPointsMatch', highestPointsMatch);
+
+        let highestCoinsMatch = getStat(stats, 'records.highestCoinsMatch', 0);
+        if (matchData.coins > highestCoinsMatch) highestCoinsMatch = matchData.coins;
+        setStat(stats, 'records.highestCoinsMatch', highestCoinsMatch);
+
+        let longestWinStreak = getStat(stats, 'records.longestWinStreak', 0);
+        if (matchData.winStreak > longestWinStreak) longestWinStreak = matchData.winStreak;
+        setStat(stats, 'records.longestWinStreak', longestWinStreak);
+
+        // --- حساب الدقة ---
+        const totalAnswers = getStat(stats, 'questions.answered', 0);
+        const totalCorrect = getStat(stats, 'questions.correct', 0);
+        const accuracy = totalAnswers > 0 ? Math.round((totalCorrect / totalAnswers) * 100) : 0;
+        setStat(stats, 'accuracy', accuracy);
+
+        // --- حساب المتوسطات ---
+        if (totalMatches > 0) {
+            const avgDuration = Math.round((getStat(stats, 'averages.match.avgDuration', 0) * (totalMatches - 1) + (matchData.matchDuration || 0)) / totalMatches);
+            const avgPosition = Math.round((getStat(stats, 'averages.match.avgPosition', 0) * (totalMatches - 1) + (matchData.position || 0)) / totalMatches);
+            const avgPoints = Math.round((getStat(stats, 'averages.match.avgPoints', 0) * (totalMatches - 1) + (matchData.points || 0)) / totalMatches);
+            const avgRankPoints = Math.round((getStat(stats, 'averages.match.avgRankPoints', 0) * (totalMatches - 1) + (matchData.rankPoints || 0)) / totalMatches);
+            const avgCoins = Math.round((getStat(stats, 'averages.match.avgCoins', 0) * (totalMatches - 1) + (matchData.coins || 0)) / totalMatches);
+
+            setStat(stats, 'averages.match.avgDuration', avgDuration);
+            setStat(stats, 'averages.match.avgPosition', avgPosition);
+            setStat(stats, 'averages.match.avgPoints', avgPoints);
+            setStat(stats, 'averages.match.avgRankPoints', avgRankPoints);
+            setStat(stats, 'averages.match.avgCoins', avgCoins);
+
+            const avgCorrectPerMatch = Math.round((getStat(stats, 'averages.question.avgCorrectPerMatch', 0) * (totalMatches - 1) + (matchData.correctCount || 0)) / totalMatches);
+            const avgWrongPerMatch = Math.round((getStat(stats, 'averages.question.avgWrongPerMatch', 0) * (totalMatches - 1) + (matchData.wrongCount || 0)) / totalMatches);
+            const avgSkippedPerMatch = Math.round((getStat(stats, 'averages.question.avgSkippedPerMatch', 0) * (totalMatches - 1) + (matchData.skippedCount || 0)) / totalMatches);
+
+            setStat(stats, 'averages.question.avgCorrectPerMatch', avgCorrectPerMatch);
+            setStat(stats, 'averages.question.avgWrongPerMatch', avgWrongPerMatch);
+            setStat(stats, 'averages.question.avgSkippedPerMatch', avgSkippedPerMatch);
+
+            const avgAnswerTime = Math.round((getStat(stats, 'averages.speed.avgAnswerTime', 0) * (totalMatches - 1) + (matchData.avgAnswerTime || 0)) / totalMatches);
+            const avgCorrectAnswerTime = Math.round((getStat(stats, 'averages.speed.avgCorrectAnswerTime', 0) * (totalMatches - 1) + (matchData.avgCorrectAnswerTime || 0)) / totalMatches);
+            const avgWrongAnswerTime = Math.round((getStat(stats, 'averages.speed.avgWrongAnswerTime', 0) * (totalMatches - 1) + (matchData.avgWrongAnswerTime || 0)) / totalMatches);
+            const avgSpeedRank = Math.round((getStat(stats, 'averages.speed.avgSpeedRank', 0) * (totalMatches - 1) + (matchData.speedRank || 0)) / totalMatches);
+
+            setStat(stats, 'averages.speed.avgAnswerTime', avgAnswerTime);
+            setStat(stats, 'averages.speed.avgCorrectAnswerTime', avgCorrectAnswerTime);
+            setStat(stats, 'averages.speed.avgWrongAnswerTime', avgWrongAnswerTime);
+            setStat(stats, 'averages.speed.avgSpeedRank', avgSpeedRank);
+
+            // متوسطات الأداء
+            const winRate = Math.round((getStat(stats, 'general.wins', 0) / totalMatches) * 100);
+            const firstPlaceRate = Math.round((getStat(stats, 'general.firstPlace', 0) / totalMatches) * 100);
+            const completionRate = Math.round((getStat(stats, 'general.completedMatches', 0) / totalMatches) * 100);
+            const withdrawalRate = Math.round((getStat(stats, 'general.withdrawnMatches', 0) / totalMatches) * 100);
+
+            setStat(stats, 'averages.performance.avgWinRate', winRate);
+            setStat(stats, 'averages.performance.avgFirstPlaceRate', firstPlaceRate);
+            setStat(stats, 'averages.performance.avgCompletionRate', completionRate);
+            setStat(stats, 'averages.performance.avgWithdrawalRate', withdrawalRate);
+        }
+
+        // --- الموسم الحالي ---
+        const seasonStart = new Date(getStat(stats, 'currentSeason.seasonStartDate', new Date().toISOString()));
+        const now = new Date();
+        const daysDiff = (now - seasonStart) / (1000 * 60 * 60 * 24);
+        
+        let seasonMatches = getStat(stats, 'currentSeason.matches', 0);
+        let seasonWinRate = getStat(stats, 'currentSeason.winRate', 0);
+        let seasonAvgAccuracy = getStat(stats, 'currentSeason.avgAccuracy', 0);
+        let seasonHighestStreak = getStat(stats, 'currentSeason.highestStreak', 0);
+        let seasonHighestRank = getStat(stats, 'currentSeason.highestRank', 'برونزي 1');
+
+        if (daysDiff >= 30) {
+            // إعادة تعيين الموسم
+            seasonMatches = 0;
+            seasonWinRate = 0;
+            seasonAvgAccuracy = 0;
+            seasonHighestStreak = 0;
+            seasonHighestRank = 'برونزي 1';
+            setStat(stats, 'currentSeason.seasonStartDate', now.toISOString());
+        }
+
+        seasonMatches += 1;
+        // تحديث معدلات الموسم
+        const seasonWins = getStat(stats, 'general.wins', 0);
+        seasonWinRate = seasonMatches > 0 ? Math.round((seasonWins / seasonMatches) * 100) : 0;
+        seasonAvgAccuracy = accuracy;
+        if (matchData.streak > seasonHighestStreak) seasonHighestStreak = matchData.streak;
+        
+        // تحديث أعلى رتبة في الموسم
+        const rank = getRank(user.rankPoints || 0);
+        if (rank.name) {
+            const rankIndex = RANKS.findIndex(r => r.name === rank.name);
+            const currentIndex = RANKS.findIndex(r => r.name === seasonHighestRank);
+            if (rankIndex > currentIndex) seasonHighestRank = rank.name;
+        }
+
+        setStat(stats, 'currentSeason.matches', seasonMatches);
+        setStat(stats, 'currentSeason.winRate', seasonWinRate);
+        setStat(stats, 'currentSeason.avgAccuracy', seasonAvgAccuracy);
+        setStat(stats, 'currentSeason.highestStreak', seasonHighestStreak);
+        setStat(stats, 'currentSeason.highestRank', seasonHighestRank);
+
+        // --- حساب القوة ---
+        const maxPoints = 1000;
+        const maxStreak = 50;
+        const maxFirstPlace = 100;
+        const maxSpeed = 5;
+
+        const accuracyFactor = accuracy / 100;
+        const winRateFactor = getStat(stats, 'averages.performance.avgWinRate', 0) / 100;
+        const pointsFactor = Math.min(getStat(stats, 'averages.match.avgPoints', 0) / maxPoints, 1);
+        const streakFactor = Math.min(getStat(stats, 'records.highestStreak', 0) / maxStreak, 1);
+        const firstPlaceFactor = Math.min(getStat(stats, 'general.firstPlace', 0) / maxFirstPlace, 1);
+        const speedFactor = Math.max(0, 1 - (getStat(stats, 'averages.speed.avgAnswerTime', 0) / maxSpeed));
+
+        const power = Math.round((accuracyFactor * 0.25 + winRateFactor * 0.2 + pointsFactor * 0.2 + streakFactor * 0.15 + firstPlaceFactor * 0.1 + speedFactor * 0.1) * 100);
+        setStat(stats, 'power', Math.min(power, 100));
+
+        // حفظ التحديثات
+        await userRef.update({ stats });
+        console.log('✅ Statistics updated successfully for user:', userId);
+        
+    } catch (e) {
+        console.error('❌ Error updating statistics:', e);
+    }
+}
 
 // ============================================================
 // نظام المكافآت والعقوبات - عرض للمستخدم الحالي فقط
@@ -1627,6 +2058,61 @@ await db.collection('multiplayerGames').doc(gameId).update({
     },
 
     async endGame(gameId) {
+        // === تحديث إحصائيات كل لاعب ===
+for (const player of sorted) {
+  const uid = player.uid;
+  const playerStats = scoresData[uid] || {};
+  const totalQuestions = g.questions ? g.questions.length : 0;
+  const answeredCount = playerStats.answersCount || 0;
+  const correctCount = playerStats.correct || 0;
+  const wrongCount = playerStats.wrong || 0;
+  const skippedCount = totalQuestions - answeredCount;
+  const timeoutCount = 0; // يمكن حسابه من missed
+  const isWinner = player.uid === winner.uid;
+  const isLoser = player.uid === sorted[sorted.length - 1].uid;
+
+  const matchData = {
+    completed: true,
+    position: sorted.indexOf(player) + 1,
+    totalPlayers: sorted.length,
+    win: isWinner,
+    draw: false,
+    loss: !isWinner,
+    answeredCount: answeredCount,
+    correctCount: correctCount,
+    wrongCount: wrongCount,
+    skippedCount: skippedCount,
+    timeoutCount: timeoutCount,
+    firstAnswer: false, // يمكن حسابه من answers
+    lastAnswer: false,
+    answersInFirstSecond: 0, // يمكن حسابه
+    answersInLastSecond: 0,
+    fastestMatch: 0,
+    slowestMatch: 0,
+    allCorrect: (correctCount === totalQuestions && totalQuestions > 0),
+    allWrong: (wrongCount === totalQuestions && totalQuestions > 0),
+    streak: playerStats.bestStreak || 0,
+    matchDuration: Math.round((Date.now() - g.startTime) / 1000),
+    points: playerStats.score || 0,
+    coins: 0, // سيتم حسابه من المكافآت
+    rankPoints: 0, // سيتم حسابه من المكافآت
+    winStreak: 0, // يمكن حسابه
+    avgAnswerTime: playerStats.avgTime || 0,
+    avgCorrectAnswerTime: 0,
+    avgWrongAnswerTime: 0,
+    speedRank: 0,
+  };
+
+  // جلب المكافآت للاعب
+  const rewards = rewardsMap[uid];
+  if (rewards) {
+    matchData.coins = rewards.coins || 0;
+    matchData.rankPoints = rewards.rankPoints || 0;
+  }
+
+  // استدعاء تحديث الإحصائيات لكل لاعب
+  await updateStatistics(uid, matchData);
+}
         const doc = await db.collection('multiplayerGames').doc(gameId).get();
         if (!doc.exists) return;
         const game = doc.data();
@@ -1965,12 +2451,88 @@ async register(email, password, username, fullName) {
         // ✅ تحديث الاسم الظاهر (displayName) = الاسم الكامل
         await cred.user.updateProfile({ displayName: fullName });
         
-        // ✅ حفظ البيانات في Firestore
+        // ===== إنشاء كائن الإحصائيات الافتراضي =====
+        const defaultStats = {
+            general: {
+                totalMatches: 0,
+                completedMatches: 0,
+                withdrawnMatches: 0,
+                wins: 0,
+                draws: 0,
+                losses: 0,
+                firstPlace: 0,
+                thirdPlace: 0,
+                lastPlace: 0,
+            },
+            questions: {
+                answered: 0,
+                correct: 0,
+                wrong: 0,
+                skipped: 0,
+                timeout: 0,
+            },
+            speed: {
+                firstAnswer: 0,
+                lastAnswer: 0,
+                answersInFirstSecond: 0,
+                answersInLastSecond: 0,
+                fastestMatch: 0,
+                slowestMatch: 0,
+            },
+            performance: {
+                allCorrectMatches: 0,
+                allWrongMatches: 0,
+            },
+            averages: {
+                match: {
+                    avgDuration: 0,
+                    avgPosition: 0,
+                    avgPoints: 0,
+                    avgRankPoints: 0,
+                    avgCoins: 0,
+                },
+                question: {
+                    avgCorrectPerMatch: 0,
+                    avgWrongPerMatch: 0,
+                    avgSkippedPerMatch: 0,
+                },
+                speed: {
+                    avgAnswerTime: 0,
+                    avgCorrectAnswerTime: 0,
+                    avgWrongAnswerTime: 0,
+                    avgSpeedRank: 0,
+                },
+                performance: {
+                    avgWinRate: 0,
+                    avgFirstPlaceRate: 0,
+                    avgCompletionRate: 0,
+                    avgWithdrawalRate: 0,
+                }
+            },
+            records: {
+                highestStreak: 0,
+                fastestMatch: 0,
+                highestPointsMatch: 0,
+                highestCoinsMatch: 0,
+                longestWinStreak: 0,
+            },
+            currentSeason: {
+                matches: 0,
+                winRate: 0,
+                avgAccuracy: 0,
+                highestStreak: 0,
+                highestRank: 'برونزي 1',
+                seasonStartDate: new Date().toISOString(),
+            },
+            power: 0,
+            accuracy: 0,
+        };
+        
         await db.collection('users').doc(cred.user.uid).set({
             email: email,
-            username: username,          // @username (معرف فريد)
-            displayName: fullName,       // الاسم الذي يظهر في الموقع
-            fullName: fullName,          // نسخة احتياطية
+            username: username,
+            displayName: fullName,
+            fullName: fullName,
             role: 'user',
             totalScore: 0,
             coins: 100,
@@ -1983,11 +2545,10 @@ async register(email, password, username, fullName) {
             adminRole: null,
             friends: [],
             blocked: [],
-            stats: { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 },
-            rankPoints: 0  // ✅ إضافة rankPoints هنا
+            stats: defaultStats,  // ✅ إضافة الإحصائيات الافتراضية
+            rankPoints: 0
         });
         
-        // ✅ تحديث المستخدم الحالي
         this.currentUser = {
             uid: cred.user.uid,
             email: email,
@@ -2006,8 +2567,8 @@ async register(email, password, username, fullName) {
             adminRole: null,
             friends: [],
             blocked: [],
-            stats: { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 },
-            rankPoints: 0  // ✅ إضافة rankPoints هنا
+            stats: defaultStats,  // ✅ إضافة الإحصائيات الافتراضية
+            rankPoints: 0
         };
         
         localStorage.setItem('football_user_uid', cred.user.uid);
@@ -2028,13 +2589,32 @@ async register(email, password, username, fullName) {
     }
 },
 
-    async logout() {
-        if (!isFirebaseReady) return;
+async logout() {
+    if (!isFirebaseReady) return;
+    
+    try {
+        // تسجيل الخروج من Firebase
         await auth.signOut();
-        this.currentUser = null;
-        localStorage.removeItem('football_user_uid');
-        this._notifyListeners();
-    },
+    } catch (e) {
+        console.warn('⚠️ Firebase signOut error:', e);
+    }
+    
+    // مسح بيانات المستخدم
+    this.currentUser = null;
+    localStorage.removeItem('football_user_uid');
+    
+    // ✅ مسح جميع البيانات المخزنة في localStorage
+    localStorage.clear();
+    
+    // ✅ مسح sessionStorage أيضاً
+    sessionStorage.clear();
+    
+    // إعلام المستمعين
+    this._notifyListeners();
+
+    // ✅ إعادة تحميل الصفحة بالكامل
+    window.location.reload(true); // true = إعادة تحميل من الخادم (تجاوز الكاش)
+},
 
     async updateUser(data) {
         if (!isFirebaseReady || !this.currentUser) return;
@@ -4923,6 +5503,10 @@ _showDetailedResultScreen() {
 
     // ===== إنهاء اللعبة =====
 
+// ============================================================
+// إنهاء اللعبة - نسخة مصححة
+// ============================================================
+
 async endGame() {
     if (this._isEnding) return;
     this._isEnding = true;
@@ -5045,7 +5629,7 @@ async endGame() {
     }
 
     // ============================================================
-    // 4. التحقق من الإنجازات (يجب أن يكون قبل حساب newTotal)
+    // 4. التحقق من الإنجازات
     // ============================================================
     const user = AuthService.currentUser;
     let achievementPoints = 0;
@@ -5083,12 +5667,12 @@ async endGame() {
             currentQuestions: this.gameQuestions.length
         };
 
-        // ✅ تحديث بيانات التتبع أولاً (لتشمل إحصائيات هذه المباراة)
+        // تحديث بيانات التتبع أولاً
         if (typeof AchievementManager !== 'undefined' && typeof AchievementManager.updateData === 'function') {
             AchievementManager.updateData(gameData);
         }
 
-        // ✅ ثم التحقق من الإنجازات الجديدة
+        // التحقق من الإنجازات الجديدة
         const previousAchievements = user.achievements || [];
         let newAchievements = [];
 
@@ -5112,7 +5696,7 @@ async endGame() {
                 return null;
             }).filter(Boolean);
 
-            // تحديث إنجازات المستخدم في AuthService و Firebase
+            // تحديث إنجازات المستخدم
             if (newAchievements.length > 0) {
                 const updatedAchievements = [...previousAchievements, ...newIds];
                 AuthService.updateUser({ achievements: updatedAchievements }).catch(err => {
@@ -5122,19 +5706,10 @@ async endGame() {
                     AuthService.currentUser.achievements = updatedAchievements;
                 }
                 pendingAchievements = newAchievements;
-                console.log('🏆 New achievements detected:', newAchievements);
-            } else {
-                pendingAchievements = [];
-                console.log('📌 No new achievements');
             }
-        } else {
-            // Fallback
-            const fallbackAchievements = this._callAchievementManager(gameData);
-            pendingAchievements = fallbackAchievements && fallbackAchievements.length > 0 ? fallbackAchievements : [];
-            console.log('⚠️ Using fallback achievement check, pending:', pendingAchievements);
         }
 
-        // ✅ حساب نقاط الإنجازات وإضافتها إلى finalPoints
+        // حساب نقاط الإنجازات
         if (pendingAchievements.length > 0) {
             achievementPoints = pendingAchievements.reduce((sum, ach) => sum + (ach.points || 0), 0);
             pendingAchievements.forEach(ach => {
@@ -5143,7 +5718,6 @@ async endGame() {
                     value: ach.points || 0
                 });
             });
-            // إضافة نقاط الإنجازات إلى المجموع الكلي
             finalPoints += achievementPoints;
             if (achievementPoints > 0) {
                 pointDetails.push({
@@ -5151,7 +5725,6 @@ async endGame() {
                     value: achievementPoints
                 });
             }
-            console.log(`🏆 نقاط الإنجازات المضافة: ${achievementPoints} نقطة من ${pendingAchievements.length} إنجاز`);
         }
     }
 
@@ -5182,15 +5755,11 @@ async endGame() {
     this._coinDetails = coinDetails;
     this._pointDetails = pointDetails;
     this._streaksHistory = this.streaksHistory || [];
-    this._pendingAchievements = pendingAchievements; // للاستخدام في الشاشات
+    this._pendingAchievements = pendingAchievements;
 
     // ============================================================
-    // 6. عرض الشاشات بالتسلسل (المستوى ← الإنجازات ← الإحصائيات)
+    // 6. عرض الشاشات بالتسلسل
     // ============================================================
-
-    // ✅ الشاشة الأولى: المستوى
-    console.log('📊 Showing level screen...');
-
     this._showLevelScreen({
         pointsEarned: finalPoints,
         oldTotal: oldTotal,
@@ -5199,25 +5768,16 @@ async endGame() {
         newLevel: newLevel,
         levelsGained: levelsGained,
         onComplete: () => {
-            // بعد الضغط على "متابعة" في شاشة المستوى:
             if (pendingAchievements.length > 0) {
-                // ✅ الشاشة الثانية: الإنجازات الجديدة
-                console.log('🏆 Showing achievements screen with', pendingAchievements.length, 'achievements');
                 this._showAchievementsScreen(pendingAchievements);
             } else {
-                // لا توجد إنجازات جديدة، انتقل مباشرة إلى الإحصائيات
-                console.log('📊 No achievements, going to stats screen');
                 this._showStatsScreen(this._resultValues);
             }
         }
     });
 
-    // تعريف دالة يتم استدعاؤها بعد الانتهاء من شاشة الإنجازات (لتنتقل إلى الإحصائيات)
-    // سيتم ربطها داخل _showAchievementsScreen عبر زر "متابعة"
-    // (تم تعديل _showAchievementsScreen مسبقاً لتستدعي _showStatsScreen عند الضغط على متابعة)
-
     // ============================================================
-    // 7. تحديث بيانات المستخدم في الخلفية (غير متزامن)
+    // 7. تحديث بيانات المستخدم في الخلفية
     // ============================================================
     try {
         if (user) {
@@ -5252,6 +5812,50 @@ async endGame() {
                 streaksHistory: this.streaksHistory || []
             });
 
+            // ============================================================
+            // ✅ تحديث الإحصائيات المتقدمة
+            // ============================================================
+            try {
+                const matchData = {
+                    completed: true,
+                    position: 1,
+                    totalPlayers: 1,
+                    win: accuracy >= 70,
+                    draw: false,
+                    answeredCount: totalQuestions,
+                    correctCount: correctAnswers,
+                    wrongCount: totalQuestions - correctAnswers,
+                    skippedCount: 0,
+                    timeoutCount: 0,
+                    firstAnswer: false,
+                    lastAnswer: false,
+                    answersInFirstSecond: this._fastAnswers || 0,
+                    answersInLastSecond: 0,
+                    fastestMatch: 0,
+                    slowestMatch: 0,
+                    allCorrect: correctAnswers === totalQuestions && totalQuestions > 0,
+                    allWrong: correctAnswers === 0 && totalQuestions > 0,
+                    streak: this.streak || 0,
+                    matchDuration: timeTaken,
+                    points: finalPoints,
+                    coins: finalCoins,
+                    rankPoints: 0,
+                    winStreak: this.streak || 0,
+                    avgAnswerTime: this._answerTimes && this._answerTimes.length > 0 ? 
+                        this._answerTimes.reduce((a, b) => a + b, 0) / this._answerTimes.length : 0,
+                    avgCorrectAnswerTime: 0,
+                    avgWrongAnswerTime: 0,
+                    speedRank: 0,
+                };
+
+                if (typeof updateStatistics === 'function') {
+                    await updateStatistics(user.uid, matchData);
+                    console.log('✅ Statistics updated for user:', user.uid);
+                }
+            } catch (e) {
+                console.warn('⚠️ Failed to update statistics:', e);
+            }
+
             if (typeof App._updateUserUI === 'function') {
                 App._updateUserUI(AuthService.currentUser);
             }
@@ -5274,7 +5878,7 @@ async endGame() {
         localStorage.setItem('bestGameScore', this.score.toString());
     }
 
-    // تحديث العناصر القديمة (للتوافق)
+    // تحديث العناصر القديمة
     const coinsEl = document.getElementById('resultCoins');
     const pointsEl = document.getElementById('resultPoints');
     const streakEl = document.getElementById('resultStreak');
@@ -6259,8 +6863,433 @@ const App = {
     _isSendingMessage: false,
     _isOnline: navigator.onLine, // حالة الاتصال الحالية
 
-// في App.start()
 async start() {
+    // تهيئة Firebase (للاستخدام الفوري)
+    try {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        auth = firebase.auth();
+        isFirebaseReady = true;
+        updateFirebaseStatus(true);
+    } catch (e) {
+        console.error('❌ Firebase error:', e);
+        updateFirebaseStatus(false);
+        showToast('⚠️ فشل الاتصال بـ Firebase، يعمل في وضع غير متصل', 'error');
+    }
+
+    // ============================================================
+    // 1. عناصر الصفحة
+    // ============================================================
+    const splashScreen = document.getElementById('splashScreen');
+    const splashProgress = document.getElementById('splashProgress');
+    const splashStatus = document.getElementById('splashStatus');
+    const splashPercent = document.getElementById('splashPercent');
+
+    const authPage = document.getElementById('authPage');
+    const loadingScreen = document.getElementById('loadingScreen');
+    const mainContent = document.querySelector('.main-content');
+
+    // إخفاء كل شيء ما عدا شاشة التحقق
+    if (authPage) authPage.style.display = 'none';
+    if (loadingScreen) loadingScreen.style.display = 'none';
+    if (mainContent) mainContent.style.display = 'none';
+    if (splashScreen) splashScreen.style.display = 'flex';
+
+    // ============================================================
+    // 2. دالة تحديث شريط التقدم
+    // ============================================================
+    const updateSplashProgress = (percent, status) => {
+        if (splashProgress) splashProgress.style.width = percent + '%';
+        if (splashPercent) splashPercent.textContent = percent + '%';
+        if (splashStatus) splashStatus.textContent = status;
+    };
+
+    // ============================================================
+    // 3. تهيئة Firebase
+    // ============================================================
+    updateSplashProgress(10, '🔗 الاتصال بقاعدة البيانات...');
+    
+    try {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        auth = firebase.auth();
+        isFirebaseReady = true;
+        updateFirebaseStatus(true);
+        updateSplashProgress(30, '✅ تم الاتصال بقاعدة البيانات');
+    } catch (e) {
+        console.error('❌ Firebase error:', e);
+        updateFirebaseStatus(false);
+        updateSplashProgress(30, '⚠️ وضع غير متصل');
+    }
+
+    // ============================================================
+    // 4. التحقق من وجود مستخدم مسجل
+    // ============================================================
+    updateSplashProgress(40, '📚 جاري التحميل ...');
+
+    let isLoggedIn = false;
+    const savedUid = localStorage.getItem('football_user_uid');
+
+    if (savedUid && isFirebaseReady) {
+        updateSplashProgress(55, '📚 جاري التحميل ...');
+        
+        try {
+            const userDoc = await db.collection('users').doc(savedUid).get();
+            if (userDoc.exists) {
+                isLoggedIn = true;
+                const data = userDoc.data();
+                AuthService.currentUser = {
+                    uid: savedUid,
+                    email: data.email,
+                    displayName: data.displayName || data.username || data.email,
+                    username: data.username || data.displayName || data.email,
+                    role: data.role || 'user',
+                    totalScore: data.totalScore || 0,
+                    coins: data.coins || 0,
+                    achievements: data.achievements || [],
+                    inventory: data.inventory || [],
+                    bio: data.bio || '',
+                    location: data.location || '',
+                    avatar: data.avatar || null,
+                    createdAt: data.createdAt || new Date().toISOString(),
+                    adminRole: data.adminRole || null,
+                    friends: data.friends || [],
+                    blocked: data.blocked || [],
+                    rankPoints: data.rankPoints || 0,
+                    stats: data.stats || { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 }
+                };
+                AuthService._notifyListeners();
+                console.log('✅ User restored from localStorage');
+                updateSplashProgress(80, '📚 جاري التحميل ...');
+            } else {
+                updateSplashProgress(70, '⚠️ لم يتم العثور على المستخدم');
+            }
+        } catch (e) {
+            console.warn('⚠️ Could not verify user:', e);
+            isLoggedIn = false;
+            updateSplashProgress(70, '⚠️ خطأ في التحقق من الحساب');
+        }
+    } else {
+        updateSplashProgress(60, '📝 لا يوجد حساب مسجل');
+    }
+
+    // تأخير قصير لرؤية شريط التقدم (اختياري)
+    await new Promise(resolve => setTimeout(resolve, 400));
+
+    // ============================================================
+    // 5. إخفاء شاشة التحقق وعرض الشاشة المناسبة
+    // ============================================================
+    updateSplashProgress(100, isLoggedIn ? '📚 جاري التحميل ...' : '🔐 مرحباً بك!');
+
+    // تأخير بسيط قبل الإخفاء
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // إخفاء شاشة التحقق
+    if (splashScreen) {
+        splashScreen.style.opacity = '0';
+        setTimeout(() => {
+            splashScreen.style.display = 'none';
+        }, 500);
+    }
+
+    // ===== إذا لم يكن هناك مستخدم، اعرض شاشة الدخول =====
+    if (!isLoggedIn) {
+        console.log('🔐 No user found, showing auth page');
+        if (authPage) {
+            authPage.style.display = 'flex';
+            authPage.style.opacity = '1';
+        }
+        if (loadingScreen) loadingScreen.style.display = 'none';
+        if (mainContent) mainContent.style.display = 'none';
+        this._setupAuthPage();
+        return;
+    }
+
+    // ===== إذا كان هناك مستخدم، ابدأ التحميل =====
+    console.log('✅ User found, loading app...');
+    if (authPage) {
+        authPage.style.display = 'none';
+        authPage.style.opacity = '0';
+    }
+    if (loadingScreen) loadingScreen.style.display = 'flex';
+    if (mainContent) mainContent.style.display = 'block';
+
+    // تحميل التطبيق
+    this._loadApp();
+},
+
+// ============================================================
+// نظام المصادقة الجديد
+// ============================================================
+
+/**
+ * إعداد شاشة الدخول (ربط الأزرار والنماذج)
+ */
+_setupAuthPage() {
+    console.log('🔐 Setting up auth page...');
+
+    // ===== عناصر الصفحة =====
+    const mainBtns = document.getElementById('authMainButtons');
+    const loginForm = document.getElementById('authLoginForm');
+    const registerForm = document.getElementById('authRegisterForm');
+
+    const showLoginBtn = document.getElementById('authShowLoginBtn');
+    const showRegisterBtn = document.getElementById('authShowRegisterBtn');
+    const backBtn1 = document.getElementById('authBackToMainBtn');
+    const backBtn2 = document.getElementById('authBackToMainBtn2');
+
+    const loginBtn = document.getElementById('authLoginBtn');
+    const registerBtn = document.getElementById('authRegisterBtn');
+
+    // ===== 1. إظهار نموذج تسجيل الدخول =====
+    if (showLoginBtn) {
+        showLoginBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('🔐 Show login form clicked');
+            mainBtns.style.display = 'none';
+            loginForm.style.display = 'block';
+            registerForm.style.display = 'none';
+            // مسح الأخطاء السابقة
+            document.getElementById('authLoginError').style.display = 'none';
+        });
+    }
+
+    // ===== 2. إظهار نموذج التسجيل =====
+    if (showRegisterBtn) {
+        showRegisterBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('🔐 Show register form clicked');
+            mainBtns.style.display = 'none';
+            registerForm.style.display = 'block';
+            loginForm.style.display = 'none';
+            // مسح الأخطاء السابقة
+            document.getElementById('authRegError').style.display = 'none';
+        });
+    }
+
+    // ===== 3. العودة من نموذج الدخول =====
+    if (backBtn1) {
+        backBtn1.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('🔐 Back from login clicked');
+            mainBtns.style.display = 'flex';
+            loginForm.style.display = 'none';
+            registerForm.style.display = 'none';
+        });
+    }
+
+    // ===== 4. العودة من نموذج التسجيل =====
+    if (backBtn2) {
+        backBtn2.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('🔐 Back from register clicked');
+            mainBtns.style.display = 'flex';
+            registerForm.style.display = 'none';
+            loginForm.style.display = 'none';
+        });
+    }
+
+    // ===== 5. معالج تسجيل الدخول =====
+    if (loginBtn) {
+        loginBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            console.log('🔐 Login button clicked');
+
+            const email = document.getElementById('authLoginEmail').value.trim();
+            const password = document.getElementById('authLoginPassword').value.trim();
+            const errorEl = document.getElementById('authLoginError');
+
+            // التحقق من الحقول
+            if (!email || !password) {
+                errorEl.textContent = '❌ يرجى ملء جميع الحقول';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            // تعطيل الزر أثناء المعالجة
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري...';
+            errorEl.style.display = 'none';
+
+            try {
+                // محاولة تسجيل الدخول
+                await AuthService.login(email, password);
+                console.log('✅ Login successful!');
+
+                // بعد نجاح الدخول، استدعاء معالج النجاح
+                App._onAuthSuccess();
+
+            } catch (err) {
+                console.error('❌ Login error:', err);
+                errorEl.textContent = '❌ ' + err.message;
+                errorEl.style.display = 'block';
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> تسجيل الدخول';
+            }
+        });
+    }
+
+    // ===== 6. معالج التسجيل =====
+    if (registerBtn) {
+        registerBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            console.log('🔐 Register button clicked');
+
+            const fullName = document.getElementById('authRegFullName').value.trim();
+            const username = document.getElementById('authRegUsername').value.trim();
+            const email = document.getElementById('authRegEmail').value.trim();
+            const password = document.getElementById('authRegPassword').value;
+            const confirm = document.getElementById('authRegPasswordConfirm').value;
+            const errorEl = document.getElementById('authRegError');
+
+            // التحقق من الحقول
+            if (!fullName || !username || !email || !password || !confirm) {
+                errorEl.textContent = '❌ يرجى ملء جميع الحقول';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            // التحقق من تطابق كلمة المرور
+            if (password !== confirm) {
+                errorEl.textContent = '❌ كلمتا المرور غير متطابقتين';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            // التحقق من طول كلمة المرور
+            if (password.length < 6) {
+                errorEl.textContent = '❌ كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            // تعطيل الزر أثناء المعالجة
+            registerBtn.disabled = true;
+            registerBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري...';
+            errorEl.style.display = 'none';
+
+            try {
+                // محاولة إنشاء حساب
+                await AuthService.register(email, password, username, fullName);
+                console.log('✅ Registration successful!');
+
+                // بعد نجاح التسجيل، استدعاء معالج النجاح
+                App._onAuthSuccess();
+
+            } catch (err) {
+                console.error('❌ Register error:', err);
+                errorEl.textContent = '❌ ' + err.message;
+                errorEl.style.display = 'block';
+                registerBtn.disabled = false;
+                registerBtn.innerHTML = '<i class="fas fa-user-plus"></i> إنشاء حساب';
+            }
+        });
+    }
+
+    // التحقق من اسم المستخدم (فوري)
+    const usernameInput = document.getElementById('authRegUsername');
+    if (usernameInput) {
+        let timer;
+        usernameInput.addEventListener('input', function() {
+            clearTimeout(timer);
+            const username = this.value.trim();
+            const statusEl = document.getElementById('authRegUsernameStatus');
+
+            if (username.length < 3) {
+                statusEl.textContent = '⚠️ 3 أحرف على الأقل';
+                statusEl.style.color = '#a7a9be';
+                return;
+            }
+
+            if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+                statusEl.textContent = '⚠️ يسمح بالحروف والأرقام و _ فقط';
+                statusEl.style.color = '#FF6B6B';
+                return;
+            }
+
+            statusEl.textContent = '🔍 جاري التحقق...';
+            statusEl.style.color = '#a7a9be';
+
+            timer = setTimeout(async () => {
+                try {
+                    const result = await App._checkUsernameAvailability(username);
+                    if (result.available) {
+                        statusEl.textContent = '✅ متوفر';
+                        statusEl.style.color = '#2ecc71';
+                    } else {
+                        statusEl.textContent = '❌ غير متوفر';
+                        statusEl.style.color = '#FF6B6B';
+                    }
+                } catch (e) {
+                    statusEl.textContent = '⚠️ خطأ في التحقق';
+                    statusEl.style.color = '#a7a9be';
+                }
+            }, 400);
+        });
+    }
+
+    console.log('✅ Auth page setup complete');
+},
+
+/**
+ * عند نجاح تسجيل الدخول أو التسجيل
+ */
+_onAuthSuccess() {
+    console.log('🎉 Auth success! Loading app...');
+
+    // إخفاء شاشة الدخول
+    const authPage = document.getElementById('authPage');
+    if (authPage) {
+        authPage.style.display = 'none';
+        authPage.style.opacity = '0';
+    }
+
+    // إظهار شاشة التحميل
+    const loadingScreen = document.getElementById('loadingScreen');
+    if (loadingScreen) {
+        loadingScreen.style.display = 'flex';
+        loadingScreen.style.opacity = '1';
+    }
+
+    // إظهار المحتوى الرئيسي
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent) {
+        mainContent.style.display = 'block';
+    }
+
+    // تحميل التطبيق
+    this._loadApp();
+},
+
+/**
+ * التحقق من توفر اسم المستخدم
+ */
+async _checkUsernameAvailability(username) {
+    if (!username || username.length < 3) {
+        return { available: false, message: 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل' };
+    }
+
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+        return { available: false, message: 'يسمح بالحروف والأرقام و _ (3-20 حرف)' };
+    }
+
+    try {
+        const snapshot = await db.collection('users')
+            .where('username', '==', username)
+            .get();
+
+        if (!snapshot.empty) {
+            return { available: false, message: '⚠️ اسم المستخدم غير متوفر' };
+        }
+        return { available: true, message: '✅ اسم المستخدم متوفر' };
+    } catch (error) {
+        console.warn('⚠️ Could not check username:', error);
+        return { available: false, message: '⚠️ تعذر التحقق، حاول مرة أخرى' };
+    }
+},
+
+// في App.start()
+async _loadApp() {
     // ============================================================
 // شاشة التحميل وتحديث التقدم - عبارات محفزة
 // ============================================================
@@ -6268,6 +7297,26 @@ const loadingScreen = document.getElementById('loadingScreen');
 const progressBar = document.getElementById('loadingProgress');
 const statusText = document.getElementById('loadingStatus');
 const percentText = document.getElementById('loadingPercent');
+    const loadingWelcome = document.getElementById('loadingWelcome');
+    const loadingUserName = document.getElementById('loadingUserName');
+
+    // التأكد من ظهور شاشة التحميل
+    if (loadingScreen) {
+        loadingScreen.style.display = 'flex';
+        loadingScreen.style.opacity = '1';
+    }
+
+    // ============================================================
+    // 2. عرض رسالة ترحيب باسم المستخدم
+    // ============================================================
+    const user = AuthService.currentUser;
+    if (user && loadingWelcome && loadingUserName) {
+        const name = user.displayName || user.username || 'لاعب';
+        loadingUserName.textContent = name;
+        loadingWelcome.style.display = 'block';
+        console.log(`👋 Welcome back, ${name}!`);
+    }
+
 
 let lastProgressSound = 0;
 
@@ -6308,37 +7357,37 @@ try {
 // ============================================================
 // 2. تهيئة AuthService
 // ============================================================
-updateProgress(20, '🔑 فتح بوابة المصادقة...');
+updateProgress(20, '📚 جاري التحميل ...');
 await AuthService.init();
-updateProgress(30, '✅ بوابات المصادقة مفتوحة');
+updateProgress(30, '📚 جاري التحميل ...');
 
 // ============================================================
 // 3. تحميل البيانات
 // ============================================================
-updateProgress(35, '📚 جلب ذاكرة المعرفة...');
+updateProgress(35, '📚 جاري التحميل ...');
 await DataManager.loadAll();
 DataManager.startListening();
-updateProgress(55, '📖 تم تحميل بنك الأسئلة');
+updateProgress(55, '📚 جاري التحميل ...');
 
 // ============================================================
 // 4. بناء واجهة المستخدم
 // ============================================================
-updateProgress(60, '🎮 تجهيز ساحة المعركة...');
+updateProgress(60, '📚 جاري التحميل ...');
 this._buildLayout();
 this._setupUI();
-updateProgress(75, '⚔️ ساحة المعركة جاهزة');
+updateProgress(75, '📚 جاري التحميل ...');
 
 // ============================================================
 // 5. تهيئة محرك اللعبة
 // ============================================================
-updateProgress(80, '🧠 تنشيط الذكاء الاصطناعي...');
+updateProgress(80, '📚 جاري التحميل ...');
 GameEngine.init();
 updateProgress(88, '✅ الذكاء الاصطناعي نشط');
 
 // ============================================================
 // 6. تهيئة الإنجازات
 // ============================================================
-updateProgress(90, '🏆 تحميل نظام المكافآت والإنجازات...');
+updateProgress(90, '📚 جاري التحميل ...');
 if (typeof AchievementManager !== 'undefined' && AchievementManager.init) {
     AchievementManager.init();
 }
@@ -6347,7 +7396,7 @@ updateProgress(94, '🏅 نظام المكافآت جاهز');
 // ============================================================
 // 7. تسجيل المستمعين
 // ============================================================
-updateProgress(95, '🔄 مزامنة البيانات الحية...');
+updateProgress(95, '📚 جاري التحميل ...');
 DataManager.addListener((data) => { this._onDataUpdate(data); });
 AuthService.addListener((user) => { this._onUserUpdate(user); });
 
@@ -6363,7 +7412,7 @@ if (!AuthService.currentUser) {
 // ============================================================
 // 9. إنهاء التحميل
 // ============================================================
-updateProgress(100, '🚀 جاهز للانطلاق!');
+updateProgress(100, '📚 جاري التحميل ...');
 setTimeout(() => {
     if (loadingScreen) {
         loadingScreen.style.opacity = '0';
@@ -8362,22 +9411,18 @@ _renderProfileSection() {
                 <div class="profile-cover">
                     <div class="profile-avatar-wrapper">
                         <div class="profile-avatar" id="profileAvatar">👤</div>
-                        <!-- زر تغيير الصورة - يفتح نافذة اختيار ملف -->
                         <button class="btn btn-sm btn-primary avatar-edit-btn" id="changeAvatarBtn" title="تغيير الصورة">
                             <i class="fas fa-camera"></i>
                         </button>
-                        <!-- زر حذف الصورة -->
                         <button class="btn btn-sm btn-danger avatar-remove-btn" id="removeAvatarBtn" title="حذف الصورة" style="display:none;">
                             <i class="fas fa-trash"></i>
                         </button>
-                        <!-- شريط تقدم رفع الصورة -->
                         <div class="avatar-progress-container" id="avatarProgressContainer" style="display:none;">
                             <div class="progress-bar">
                                 <div class="fill" id="avatarProgressFill" style="width:0%;"></div>
                             </div>
                             <div class="progress-text" id="avatarProgressText">0%</div>
                         </div>
-                        <!-- Input مخفي لرفع الصورة -->
                         <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
                     </div>
                     <div class="profile-info">
@@ -8387,54 +9432,54 @@ _renderProfileSection() {
                         <div class="profile-location" id="profileLocation">📍 غير محدد</div>
                         <div class="profile-role" id="profileRole">👀 لاعب</div>
                         <div class="profile-join-date">انضم في: <span id="profileJoinDate">—</span></div>
-                        <!-- المستوى تحت تاريخ الانضمام مباشرة -->
                         <div class="profile-level-display" id="profileLevelDisplay">
                             <span class="level-emoji">🌟</span>
                             <span class="level-name">مبتدئ</span>
                             <span class="level-points-badge" id="profileLevelPoints">0 نقطة</span>
                         </div>
-<div class="profile-level-progress">
-    <div class="progress-bar" style="height:6px;">
-        <div class="fill" id="profileLevelProgress" style="width:0%;"></div>
-    </div>
-    <div class="progress-labels" style="display:flex;justify-content:space-between;font-size:0.65rem;color:var(--gray);">
-        <span id="levelCurrentLabel"></span>
-        <span id="levelNextLabel">مستوى 2 (100 نقطة)</span>
-    </div>
-</div>
-<!-- الرتبة -->
-<div class="profile-rank" style="margin:0.5rem 0;padding:0.5rem;background:var(--glass);border-radius:var(--radius-sm);cursor:pointer;" onclick="App._showRanksPage()">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-        <span id="profileRankDisplay">🏅 برونزي 1</span>
-        <span class="text-gray" style="font-size:0.8rem;">نقاط الرتبة: <span id="profileRankPoints">0</span></span>
-    </div>
-    <div class="progress-bar" style="height:6px;margin-top:0.3rem;">
-        <div id="rankProgressFill" style="height:100%;width:0%;border-radius:6px;"></div>
-    </div>
-    <div id="rankLabels" style="display:flex;justify-content:space-between;font-size:0.6rem;color:var(--gray);margin-top:0.1rem;">
-        <span>برونزي 1</span>
-        <span>برونزي 2 (100)</span>
-    </div>
-</div>
-
+                        <div class="profile-level-progress">
+                            <div class="progress-bar" style="height:6px;">
+                                <div class="fill" id="profileLevelProgress" style="width:0%;"></div>
+                            </div>
+                            <div class="progress-labels" style="display:flex;justify-content:space-between;font-size:0.65rem;color:var(--gray);">
+                                <span id="levelCurrentLabel"></span>
+                                <span id="levelNextLabel">مستوى 2 (100 نقطة)</span>
+                            </div>
+                        </div>
+                        <div class="profile-rank" style="margin:0.5rem 0;padding:0.5rem;background:var(--glass);border-radius:var(--radius-sm);cursor:pointer;" onclick="App._showRanksPage()">
+                            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                                <span id="profileRankDisplay">🏅 برونزي 1</span>
+                                <span class="text-gray" style="font-size:0.8rem;">نقاط الرتبة: <span id="profileRankPoints">0</span></span>
+                            </div>
+                            <div class="progress-bar" style="height:6px;margin-top:0.3rem;">
+                                <div id="rankProgressFill" style="height:100%;width:0%;border-radius:6px;"></div>
+                            </div>
+                            <div id="rankLabels" style="display:flex;justify-content:space-between;font-size:0.6rem;color:var(--gray);margin-top:0.1rem;">
+                                <span>برونزي 1</span>
+                                <span>برونزي 2 (100)</span>
+                            </div>
+                        </div>
                     </div>
-<div class="profile-actions">
-    <button class="btn btn-primary" id="editProfileBtn"><i class="fas fa-edit"></i> تعديل الملف</button>
-    <button class="btn btn-outline" id="shareProfileBtn"><i class="fas fa-share-alt"></i> مشاركة</button>
-<button class="btn btn-outline" id="profileFriendsBtn">
-    <i class="fas fa-user-friends"></i> الأصدقاء 
-    <span class="badge" id="friendsCount">0</span>
-</button>
-    <!-- أزرار جديدة للقوائم -->
-    <button class="btn btn-outline" id="showFollowersBtn">
-        <i class="fas fa-user-plus"></i> المتابعين 
-        <span class="badge" id="followersCount">0</span>
-    </button>
-    <button class="btn btn-outline" id="showFollowingBtn">
-        <i class="fas fa-user-check"></i> المتابَعين 
-        <span class="badge" id="followingCount">0</span>
-    </button>
-</div>
+                    <div class="profile-actions">
+                        <button class="btn btn-primary" id="editProfileBtn"><i class="fas fa-edit"></i> تعديل الملف</button>
+                        <button class="btn btn-outline" id="shareProfileBtn"><i class="fas fa-share-alt"></i> مشاركة</button>
+                        <button class="btn btn-outline" id="profileFriendsBtn">
+                            <i class="fas fa-user-friends"></i> الأصدقاء 
+                            <span class="badge" id="friendsCount">0</span>
+                        </button>
+                        <!-- ✅ زر الإحصائيات الجديد -->
+                        <button class="btn btn-outline" id="profileStatsBtn">
+                            <i class="fas fa-chart-line"></i> الإحصائيات
+                        </button>
+                        <button class="btn btn-outline" id="showFollowersBtn">
+                            <i class="fas fa-user-plus"></i> المتابعين 
+                            <span class="badge" id="followersCount">0</span>
+                        </button>
+                        <button class="btn btn-outline" id="showFollowingBtn">
+                            <i class="fas fa-user-check"></i> المتابَعين 
+                            <span class="badge" id="followingCount">0</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -8472,7 +9517,7 @@ _renderProfileSection() {
                 <!-- سيتم تعبئتها بـ JS -->
             </div>
 
-            <!-- تبويبات المحتوى - المنشورات أولاً -->
+            <!-- تبويبات المحتوى -->
             <div class="profile-tabs">
                 <button class="tab-btn" data-tab="activity"><i class="fas fa-clock"></i> النشاطات</button>
                 <button class="tab-btn" data-tab="achievements"><i class="fas fa-medal"></i> الإنجازات</button>
@@ -8483,7 +9528,6 @@ _renderProfileSection() {
 
             <!-- محتوى التبويبات -->
             <div class="profile-tab-content">
-
                 <!-- النشاطات -->
                 <div class="tab-panel" id="tab-activity">
                     <div class="card">
@@ -11616,19 +12660,58 @@ async _restoreBackup(file) {
         `;
     },
 
-    // ===== دوال التحديث =====
+// ============================================================
+// تحديث الإحصائيات في صفحة التحليلات
+// ============================================================
+
 _updateStats(stats) {
-    document.getElementById('statQuestions').textContent = stats.questions || 0;
-    document.getElementById('statGamesPlayed').textContent = stats.gamesPlayed || 0;
-    document.getElementById('statAchievements').textContent = stats.achievements || 0;
-    document.getElementById('statTotalScore').textContent = stats.totalScore || 0;
-    document.getElementById('statCoins').textContent = stats.coins || 0;
-    document.getElementById('statRooms').textContent = stats.rooms || 0;
-    document.getElementById('statStoreItems').textContent = stats.storeItems || 0;
-        // ✅ إضافة نقاط الإنجازات إذا كانت موجودة
-    const achPointsEl = document.getElementById('statAchievementPoints');
-    if (achPointsEl) {
-        achPointsEl.textContent = stats.achievementPoints || 0;
+    // دالة مساعدة آمنة لتحديث النص
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.textContent = value;
+        }
+    };
+    
+    // دالة مساعدة آمنة لتحديث النمط
+    const setStyle = (id, prop, value) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.style[prop] = value;
+        }
+    };
+
+    // تحديث العناصر الأساسية
+    setText('statQuestions', stats.questions || 0);
+    setText('statGamesPlayed', stats.gamesPlayed || 0);
+    setText('statAchievements', stats.achievements || 0);
+    setText('statTotalScore', stats.totalScore || 0);
+    setText('statCoins', stats.coins || 0);
+    setText('statRooms', stats.rooms || 0);
+    setText('statStoreItems', stats.storeItems || 0);
+    
+    // ✅ إضافة نقاط الإنجازات إذا كانت موجودة
+    setText('statAchievementPoints', stats.achievementPoints || 0);
+    
+    // تحديث عناصر إضافية (إذا كانت موجودة)
+    setText('statPosts', stats.posts || 0);
+    setText('statMatches', stats.matches || 0);
+    setText('statComments', stats.comments || 0);
+    
+    // تحديث إحصائيات المستخدم في الشريط الجانبي
+    const user = AuthService.currentUser;
+    if (user) {
+        setText('userScoreDisplay', `⭐ ${user.totalScore || 0}`);
+        setText('coinsAmount', user.coins || 0);
+        
+        // تحديث مستوى اللاعب
+        const level = getLevel(user.totalScore || 0);
+        setText('userLevelDisplay', `المستوى ${level.level}`);
+        
+        // تحديث شارة الإنجازات
+        const unlockedCount = AchievementManager.getUnlockedAchievements().length;
+        const totalCount = ACHIEVEMENTS_DATA ? ACHIEVEMENTS_DATA.length : 0;
+        setText('achievementBadge', `${unlockedCount}/${totalCount}`);
     }
 },
 
@@ -12020,7 +13103,6 @@ _activateSection(id) {
         backBtns.forEach(btn => btn.style.display = 'none');
     } else {
         backBtns.forEach(btn => btn.style.display = 'inline-flex');
-        // التأكد من ظهور الزر في القسم النشط فقط
         document.querySelectorAll('.section').forEach(el => {
             const backBtn = el.querySelector('.back-to-home');
             if (backBtn) {
@@ -12049,6 +13131,34 @@ _activateSection(id) {
             }
         };
         waitForContainer();
+        return;
+    }
+
+    // ===== قسم التحليلات =====
+    if (id === 'analytics') {
+        // تأكد من وجود القسم وعرض الإحصائيات
+        const section = document.getElementById('section-analytics');
+        if (section) {
+            // إعادة عرض الإحصائيات لتحديث البيانات
+            section.innerHTML = App._renderAnalyticsSection();
+        }
+        // تحديث بيانات المستخدم قبل العرض
+        const user = AuthService.currentUser;
+        if (user) {
+            db.collection('users').doc(user.uid).get().then(doc => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    Object.assign(user, data);
+                    AuthService._notifyListeners();
+                    // تحديث القسم مرة أخرى بعد جلب البيانات
+                    if (section) {
+                        section.innerHTML = App._renderAnalyticsSection();
+                    }
+                }
+            }).catch(err => {
+                console.warn('Could not refresh user data:', err);
+            });
+        }
         return;
     }
 
@@ -13780,6 +14890,15 @@ _getDefaultStoreItems() {
         document.getElementById('profileEditModal').classList.add('open');
     });
 
+    // ===== زر الإحصائيات =====
+    document.getElementById('profileStatsBtn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        // التوجيه إلى صفحة الإحصائيات
+        App._activateSection('analytics');
+        showToast('📊 جاري تحميل الإحصائيات المتقدمة...', 'info', 1500);
+    });
+
+
     // ===== عرض المتابعين =====
     document.getElementById('showFollowersBtn')?.addEventListener('click', () => {
         this._showFollowers();
@@ -15096,7 +16215,9 @@ _onDataUpdate(data) {
         posts: data.posts?.length || 0,
         rooms: data.rooms?.length || 0,
         storeItems: data.storeItems?.length || 0,
-        achievementPoints: achPoints
+        achievementPoints: achPoints,
+        matches: data.matches?.length || 0,
+        comments: data.comments?.length || 0
     });
     
     // تحديث العناصر الأخرى في صفحة التحليلات
@@ -15111,6 +16232,14 @@ _onDataUpdate(data) {
     if (this.currentSection === 'achievements') {
         this._renderAchievements();
     }
+    
+    // ✅ تحديث صفحة التحليلات إذا كانت مفتوحة
+    if (this.currentSection === 'analytics') {
+        const section = document.getElementById('section-analytics');
+        if (section) {
+            section.innerHTML = App._renderAnalyticsSection();
+        }
+    }
 },
 
 // ============================================================
@@ -15118,7 +16247,7 @@ _onDataUpdate(data) {
 // ============================================================
 
 _onUserUpdate(user) {
-    // 1️⃣ تحديث واجهة المستخدم الأساسية (الأزرار، الصور، الأسماء)
+    // 1️⃣ تحديث واجهة المستخدم الأساسية
     this._updateUserUI(user);
 
     if (user) {
@@ -15126,21 +16255,16 @@ _onUserUpdate(user) {
         if (typeof AchievementManager !== 'undefined' && AchievementManager.syncWithUser) {
             AchievementManager.syncWithUser(user);
         }
-                // 2️⃣ تحديث إحصائيات الملف الشخصي (المتابعين، الأصدقاء، إلخ)
+        
+        // 2️⃣ تحديث إحصائيات الملف الشخصي
         this._updateFollowCounts();
-        
-        // 3️⃣ تحديث شارة الإشعارات
         this._updateNotificationBadge();
-        
-        // 4️⃣ بدء الاستماع للإشعارات الجديدة
         this._listenNotifications(user.uid);
-        
-        // 5️⃣ تحديث أزرار المتابعة في جميع أنحاء التطبيق
         this._updateAllFollowButtons();
 
-        // 6️⃣ تحديث الإحصائيات العامة (اللاعبين، الأندية، إلخ)
+        // 3️⃣ تحديث الإحصائيات العامة
         const stats = DataManager.getStats();
-        const achStats = AchievementManager.getAchievementStats(user);  // ✅
+        const achStats = AchievementManager.getAchievementStats(user);
         this._updateStats({
             ...stats,
             achievements: achStats.unlocked,
@@ -15151,14 +16275,14 @@ _onUserUpdate(user) {
             storeItems: DataManager.data.storeItems?.length || 0
         });
 
-        // 7️⃣ تحديث صفحة الإنجازات والمتجر
+        // 4️⃣ تحديث صفحات الإنجازات والمتجر
         this._renderAchievements();
         this._renderStore(DataManager.data.storeItems || []);
 
-        // 8️⃣ تحديث محتوى الملف الشخصي (التبويبات)
+        // 5️⃣ تحديث محتوى الملف الشخصي
         this._updateProfileTabContent(user);
 
-        // تحديث شارة الإنجازات في القائمة
+        // 6️⃣ تحديث شارة الإنجازات
         const unlockedCount = AchievementManager.getUnlockedAchievements().length;
         const totalCount = ACHIEVEMENTS_DATA.length;
         const achievementBadge = document.getElementById('achievementBadge');
@@ -15166,69 +16290,54 @@ _onUserUpdate(user) {
             achievementBadge.textContent = `${unlockedCount}/${totalCount}`;
         }
 
-        // ✅ إذا كان القسم الحالي هو admin، أعد تحميله
+        // 7️⃣ إذا كان القسم الحالي هو admin، أعد تحميله
         if (this.currentSection === 'admin') {
-            // تأكد من أن المستخدم مشرف
             if (this._isAdminUser()) {
-                // إعادة تحميل التبويب النشط
                 const activeTab = document.querySelector('.admin-tab.active');
                 const tab = activeTab ? activeTab.dataset.tab : 'dashboard';
-                // تأخير صغير لضمان وجود العناصر
                 setTimeout(() => this._showAdminTab(tab), 150);
             } else {
                 this._activateSection('dashboard');
                 showToast('⚠️ تم تغيير صلاحياتك', 'info');
-       // تسجيل الخروج - مسح بيانات المستخدم من AchievementManager
-        if (typeof AchievementManager !== 'undefined' && typeof AchievementManager.setUserId === 'function') {
-            AchievementManager.setUserId(null);
-        }
-    }
+            }
         }
 
-        // 🔟 تحديث أعداد المتابعين والمتابَعين والأصدقاء
+        // 8️⃣ تحديث أعداد المتابعين
         this._updateFollowCounts();
 
-        // 1️⃣1️⃣ تحديث أزرار المتابعة (مرة أخرى للتأكد)
+        // 9️⃣ تحديث أزرار المتابعة
         this._updateAllFollowButtons();
 
-        // ✅ إضافة: تحديث قائمة الأصدقاء إذا كانت الصفحة الحالية هي friends
+        // 🔟 تحديث قائمة الأصدقاء إذا كانت الصفحة الحالية هي friends
         if (this.currentSection === 'friends') {
             this._loadFriendsPage();
         }
 
-        // ✅ إضافة: تحديث عنصر القائمة المنسدلة للمشرف
+        // 1️⃣1️⃣ تحديث عنصر القائمة المنسدلة للمشرف
         const isAdmin = this._isAdminUser();
         const adminMenuItem = document.querySelector('.dropdown-item[data-action="admin"]');
         if (adminMenuItem) {
             adminMenuItem.style.display = isAdmin ? 'flex' : 'none';
         }
 
-       // ✅ تحديث قائمة الأصدقاء إذا كانت الصفحة الحالية هي friends
-        if (this.currentSection === 'friends') {
-            setTimeout(() => this._loadFriendsPage(), 300);
-        }
-
-        // ✅ تحديث المضاعفات النشطة
+        // 1️⃣2️⃣ تحديث المضاعفات النشطة
         this._refreshActiveBoosts();
+
+        // 1️⃣3️⃣ ✅ إذا كان القسم الحالي هو analytics، قم بتحديثه
+        if (this.currentSection === 'analytics') {
+            const section = document.getElementById('section-analytics');
+            if (section) {
+                section.innerHTML = App._renderAnalyticsSection();
+            }
+        }
 
     } else {
         // ❌ المستخدم سجل الخروج
-        // 1️⃣ إعادة تعيين الملف الشخصي والشريط الجانبي
         this._updateUserUI(null);
-
-        // ✅ إخفاء عنصر القائمة المنسدلة للمشرف
         const adminMenuItem = document.querySelector('.dropdown-item[data-action="admin"]');
         if (adminMenuItem) adminMenuItem.style.display = 'none';
     }
 
-    // 1️⃣2️⃣ إذا كان المستخدم مشرفاً، قم بتحديث بيانات المشرفين
-    if (user?.role === 'admin' || user?.role === 'super_admin' || user?.adminRole) {
-        this._renderAdminData();
-    }
-    if (user) {
-        this._refreshActiveBoosts();
-    }
-    
     // تحديث لوحة التحكم الرئيسية
     this._updateDashboardUI();
 },
@@ -18318,39 +19427,6 @@ _toggleSound() {
     showToast(enabled ? '🔇 تم كتم الصوت' : '🔊 تم تشغيل الصوت', 'info');
 },
 
-// ============================================================
-// دوال التحقق الفوري لنموذج التسجيل
-// ============================================================
-
-/**
- * التحقق من توفر اسم المستخدم (فوري)
- */
-async _checkUsernameAvailability(username) {
-    if (!username || username.length < 3) {
-        return { available: false, message: 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل' };
-    }
-    
-    // التحقق من الصيغة (حروف وأرقام و_ فقط)
-    if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
-        return { available: false, message: 'يسمح فقط بالحروف والأرقام و_ (3-20 حرف)' };
-    }
-    
-    try {
-        // البحث في Firebase عن اسم المستخدم
-        const snapshot = await db.collection('users')
-            .where('username', '==', username)
-            .get();
-        
-        if (!snapshot.empty) {
-            return { available: false, message: '⚠️ اسم المستخدم غير متوفر' };
-        }
-        return { available: true, message: '✅ اسم المستخدم متوفر' };
-    } catch (error) {
-        console.warn('⚠️ Could not check username:', error);
-        return { available: false, message: '⚠️ تعذر التحقق، حاول مرة أخرى' };
-    }
-},
-
 /**
  * التحقق من صيغة البريد الإلكتروني
  */
@@ -19813,6 +20889,73 @@ App._shareMultiplayerResult = function(gameId) {
 };
 
 // ============================================================
+// عرض الإحصائيات المتقدمة في صفحة التحليلات
+// ============================================================
+// ============================================================
+// تحديث الإحصائيات يدوياً
+// ============================================================
+
+App._refreshStats = function() {
+    const user = AuthService.currentUser;
+    if (!user) {
+        showToast('⚠️ يجب تسجيل الدخول أولاً', 'error');
+        return;
+    }
+
+    showToast('⏳ جاري تحديث الإحصائيات...', 'info', 2000);
+    
+    // إعادة تحميل بيانات المستخدم من Firestore
+    db.collection('users').doc(user.uid).get().then(doc => {
+        if (doc.exists) {
+            const data = doc.data();
+            // تحديث بيانات المستخدم الحالي
+            Object.assign(user, data);
+            AuthService._notifyListeners();
+            
+            // إعادة عرض قسم التحليلات
+            const section = document.getElementById('section-analytics');
+            if (section) {
+                section.innerHTML = App._renderAnalyticsSection();
+            }
+            
+            showToast('✅ تم تحديث الإحصائيات بنجاح', 'success', 3000);
+        } else {
+            showToast('❌ لم يتم العثور على بيانات المستخدم', 'error');
+        }
+    }).catch(err => {
+        console.error('Error refreshing stats:', err);
+        showToast('❌ خطأ في تحديث الإحصائيات: ' + err.message, 'error');
+    });
+};
+
+// ============================================================
+// تصدير الدوال العامة
+// ============================================================
+
+// التأكد من أن App._refreshStats معرفة
+if (typeof App !== 'undefined' && App) {
+    App._refreshStats = App._refreshStats || function() {
+        console.warn('⚠️ _refreshStats called but not fully implemented');
+        showToast('⚠️ جاري تحديث الإحصائيات...', 'info');
+        const user = AuthService.currentUser;
+        if (user) {
+            db.collection('users').doc(user.uid).get().then(doc => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    Object.assign(user, data);
+                    AuthService._notifyListeners();
+                    const section = document.getElementById('section-analytics');
+                    if (section) {
+                        section.innerHTML = App._renderAnalyticsSection();
+                    }
+                    showToast('✅ تم تحديث الإحصائيات', 'success');
+                }
+            }).catch(() => {});
+        }
+    };
+}
+
+// ============================================================
 // نظام الرتبة للعبة الجماعية
 // ============================================================
 
@@ -19843,6 +20986,1786 @@ function getRank(rankPoints) {
         lockedImage: currentRank.lockedImage,
     };
 }
+
+// ============================================================
+// إصلاح عرض صور الإحصائيات
+// ============================================================
+
+// ============================================================
+// دالة عرض بطاقة إحصائية بدون إطار وبدون لون خلفية
+// ============================================================
+
+// ============================================================
+// دالة عرض بطاقة إحصائية كزر يعرض التفاصيل
+// ============================================================
+
+window._renderStatCard = function(statKey, value, sub = '', details = null) {
+    const statInfo = STAT_IMAGES[statKey] || { image: 'images/stats/default.png', label: statKey };
+    const imagePath = statInfo.image;
+    const label = statInfo.label || statKey;
+    const displayValue = (value !== undefined && value !== null && value !== '') ? value : '—';
+    
+    // توليد معرف فريد للزر
+    const uniqueId = 'stat_' + statKey + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+    
+    // بناء التفاصيل إذا كانت موجودة
+    let detailsHtml = '';
+    if (details && typeof details === 'object') {
+        detailsHtml = `
+            <div id="${uniqueId}_details" style="
+                display: none;
+                margin-top: 0.5rem;
+                padding: 0.5rem 0.8rem;
+                background: var(--glass);
+                border-radius: 8px;
+                border: 1px solid var(--border-color);
+                font-size: 0.8rem;
+                color: var(--gray);
+                text-align: right;
+                width: 100%;
+            ">
+                ${Object.entries(details).map(([key, val]) => `
+                    <div style="display:flex;justify-content:space-between;padding:0.1rem 0;border-bottom:1px solid var(--glass-border);">
+                        <span>${key}</span>
+                        <span style="font-weight:700;color:var(--light);">${val}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+    
+    return `
+        <div class="stat-item-card" style="
+            background: transparent;
+            border-radius: var(--radius-sm);
+            padding: 0.3rem 0.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.2rem;
+            transition: var(--transition);
+            cursor: pointer;
+            border: 1px solid transparent;
+            width: 100%;
+        " 
+        onclick="App._toggleStatDetails('${uniqueId}')"
+        onmouseover="this.style.borderColor='var(--accent)';this.style.background='var(--glass)';"
+        onmouseout="this.style.borderColor='transparent';this.style.background='transparent';">
+            
+            <div style="display:flex;align-items:center;gap:0.8rem;width:100%;">
+                <div style="
+                    width: 44px;
+                    height: 44px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-shrink: 0;
+                ">
+                    <img src="${imagePath}" alt="${label}" style="
+                        width: 38px;
+                        height: 38px;
+                        object-fit: contain;
+                        display: block;
+                    " onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:1.5rem;\\'>📊</span>'">
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:0.65rem;color:var(--gray);font-weight:600;">${label}</div>
+                    <div style="font-weight:800;font-size:1.1rem;color:var(--light);">${displayValue}</div>
+                    ${sub ? `<div style="font-size:0.55rem;color:var(--gray-dark);">${sub}</div>` : ''}
+                </div>
+                ${details ? `<span style="color:var(--gray);font-size:0.7rem;">▼</span>` : ''}
+            </div>
+            
+            ${detailsHtml}
+        </div>
+    `;
+};
+
+// ============================================================
+// دالة تبديل إظهار/إخفاء التفاصيل
+// ============================================================
+
+App._toggleStatDetails = function(uniqueId) {
+    const detailsEl = document.getElementById(uniqueId + '_details');
+    if (!detailsEl) return;
+    
+    // إغلاق جميع التفاصيل المفتوحة الأخرى
+    document.querySelectorAll('.stat-details-open').forEach(el => {
+        if (el.id !== uniqueId + '_details') {
+            el.style.display = 'none';
+            el.classList.remove('stat-details-open');
+            // تحديث السهم
+            const parent = el.closest('.stat-item-card');
+            if (parent) {
+                const arrow = parent.querySelector('.stat-arrow');
+                if (arrow) arrow.textContent = '▼';
+            }
+        }
+    });
+    
+    // تبديل حالة التفاصيل الحالية
+    const isOpen = detailsEl.style.display === 'block';
+    detailsEl.style.display = isOpen ? 'none' : 'block';
+    detailsEl.classList.toggle('stat-details-open');
+    
+    // تحديث السهم
+    const parent = detailsEl.closest('.stat-item-card');
+    if (parent) {
+        const arrow = parent.querySelector('.stat-arrow');
+        if (arrow) {
+            arrow.textContent = isOpen ? '▼' : '▲';
+        }
+    }
+};
+
+// ✅ تصحيح دالة renderSection لاستخدام الدالة المصححة
+window._renderStatsSection = function(title, icon, content) {
+    return `
+        <div class="stats-section" style="margin-bottom:1.5rem;">
+            <h3 style="font-size:1.2rem;font-weight:700;margin-bottom:0.8rem;color:var(--accent);border-bottom:2px solid var(--glass-border);padding-bottom:0.3rem;">
+                <i class="fas ${icon}" style="margin-left:0.5rem;"></i> ${title}
+            </h3>
+            <div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.6rem;">
+                ${content}
+            </div>
+        </div>
+    `;
+};
+
+// ============================================================
+// نظام عرض الإحصائيات بالأقسام القابلة للنقر (تبويبات)
+// ============================================================
+
+// ✅ إضافة متغير لتتبع القسم المفتوح
+App._openStatsSection = null;
+
+// ✅ دالة عرض قسم الإحصائيات مع زر للتبديل
+App._renderStatsSection = function(title, icon, content, sectionKey) {
+    const isOpen = App._openStatsSection === sectionKey;
+    
+    return `
+        <div class="stats-section-wrapper" style="
+            margin-bottom: 0.8rem;
+            border: 1px solid ${isOpen ? 'var(--accent)' : 'var(--border-color)'};
+            border-radius: var(--radius);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            background: ${isOpen ? 'var(--card-bg)' : 'transparent'};
+        ">
+            <!-- رأس القسم (قابل للنقر) -->
+            <div class="stats-section-header" 
+                 onclick="App._toggleStatsSection('${sectionKey}')"
+                 style="
+                     display: flex;
+                     justify-content: space-between;
+                     align-items: center;
+                     padding: 0.8rem 1.2rem;
+                     cursor: pointer;
+                     transition: all 0.3s ease;
+                     background: ${isOpen ? 'var(--glass)' : 'transparent'};
+                     border-bottom: ${isOpen ? '1px solid var(--border-color)' : 'none'};
+                 "
+                 onmouseover="this.style.background='var(--glass)'"
+                 onmouseout="this.style.background='${isOpen ? 'var(--glass)' : 'transparent'}'">
+                
+                <div style="display:flex;align-items:center;gap:0.8rem;">
+                    <span style="font-size:1.3rem;">${icon}</span>
+                    <span style="font-weight:700;font-size:1.05rem;color:var(--light);">${title}</span>
+                    <span style="font-size:0.7rem;color:var(--gray);background:var(--glass);padding:0.1rem 0.6rem;border-radius:30px;">
+                        ${isOpen ? 'مفتوح' : 'مغلق'}
+                    </span>
+                </div>
+                
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <span style="font-size:0.7rem;color:var(--gray);">
+                        ${isOpen ? '▲' : '▼'}
+                    </span>
+                </div>
+            </div>
+            
+            <!-- محتوى القسم (يظهر/يختفي) -->
+            <div class="stats-section-content" 
+                 id="statsContent_${sectionKey}"
+                 style="
+                     display: ${isOpen ? 'block' : 'none'};
+                     padding: ${isOpen ? '1rem 1.2rem' : '0'};
+                     transition: all 0.3s ease;
+                 ">
+                <div class="stats-grid" style="
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+                    gap: 0.6rem;
+                ">
+                    ${content}
+                </div>
+            </div>
+        </div>
+    `;
+};
+
+// ✅ دالة تبديل إظهار/إخفاء القسم
+App._toggleStatsSection = function(sectionKey) {
+    // إذا كان نفس القسم مفتوحاً، أغلقه
+    if (App._openStatsSection === sectionKey) {
+        App._openStatsSection = null;
+    } else {
+        App._openStatsSection = sectionKey;
+    }
+    
+    // إعادة تحميل صفحة الإحصائيات
+    const section = document.getElementById('section-analytics');
+    if (section) {
+        section.innerHTML = App._renderAnalyticsSection();
+        // إعادة ربط الأحداث بعد إعادة التحميل
+        App._bindStatsEvents();
+    }
+};
+
+// ✅ دالة ربط الأحداث (بعد إعادة التحميل)
+App._bindStatsEvents = function() {
+    // يمكن إضافة أي أحداث إضافية هنا
+    console.log('📊 Stats sections bound');
+};
+
+// ============================================================
+// إعادة تعريف دالة عرض الإحصائيات الرئيسية
+// ============================================================
+
+// ✅ استبدال دالة _renderAnalyticsSection بالنسخة المحدثة
+App._renderAnalyticsSection = function() {
+    const user = AuthService.currentUser;
+    if (!user) {
+        return `
+            <div class="analytics-page" style="max-width:1200px;margin:0 auto;">
+                <div class="empty-state" style="text-align:center;padding:3rem;">
+                    <i class="fas fa-chart-line" style="font-size:3rem;color:var(--gray-dark);"></i>
+                    <h3 style="margin-top:1rem;">سجل الدخول لعرض الإحصائيات</h3>
+                    <p class="text-gray">يجب تسجيل الدخول لتتمكن من رؤية إحصائياتك المتقدمة</p>
+                    <button class="btn btn-primary mt-1" onclick="document.getElementById('loginModal').classList.add('open')">
+                        <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    // جلب الإحصائيات من المستخدم
+    const userStats = user.stats || {};
+    
+    // دالة مساعدة للحصول على قيمة مع افتراضي
+    const getStat = (obj, path, defaultValue = 0) => {
+        try {
+            const parts = path.split('.');
+            let current = obj;
+            for (const part of parts) {
+                if (current === undefined || current === null) return defaultValue;
+                current = current[part];
+            }
+            return current !== undefined && current !== null ? current : defaultValue;
+        } catch (e) {
+            return defaultValue;
+        }
+    };
+
+    // بناء كائن الإحصائيات
+    const stats = {
+        general: {
+            totalMatches: getStat(userStats, 'general.totalMatches', 0),
+            completedMatches: getStat(userStats, 'general.completedMatches', 0),
+            withdrawnMatches: getStat(userStats, 'general.withdrawnMatches', 0),
+            wins: getStat(userStats, 'general.wins', 0),
+            draws: getStat(userStats, 'general.draws', 0),
+            losses: getStat(userStats, 'general.losses', 0),
+            firstPlace: getStat(userStats, 'general.firstPlace', 0),
+            thirdPlace: getStat(userStats, 'general.thirdPlace', 0),
+            lastPlace: getStat(userStats, 'general.lastPlace', 0),
+        },
+        questions: {
+            answered: getStat(userStats, 'questions.answered', 0),
+            correct: getStat(userStats, 'questions.correct', 0),
+            wrong: getStat(userStats, 'questions.wrong', 0),
+            skipped: getStat(userStats, 'questions.skipped', 0),
+            timeout: getStat(userStats, 'questions.timeout', 0),
+        },
+        speed: {
+            firstAnswer: getStat(userStats, 'speed.firstAnswer', 0),
+            lastAnswer: getStat(userStats, 'speed.lastAnswer', 0),
+            answersInFirstSecond: getStat(userStats, 'speed.answersInFirstSecond', 0),
+            answersInLastSecond: getStat(userStats, 'speed.answersInLastSecond', 0),
+            fastestMatch: getStat(userStats, 'speed.fastestMatch', 0),
+            slowestMatch: getStat(userStats, 'speed.slowestMatch', 0),
+        },
+        performance: {
+            allCorrectMatches: getStat(userStats, 'performance.allCorrectMatches', 0),
+            allWrongMatches: getStat(userStats, 'performance.allWrongMatches', 0),
+        },
+        averages: {
+            match: {
+                avgDuration: getStat(userStats, 'averages.match.avgDuration', 0),
+                avgPosition: getStat(userStats, 'averages.match.avgPosition', 0),
+                avgPoints: getStat(userStats, 'averages.match.avgPoints', 0),
+                avgRankPoints: getStat(userStats, 'averages.match.avgRankPoints', 0),
+                avgCoins: getStat(userStats, 'averages.match.avgCoins', 0),
+            },
+            question: {
+                avgCorrectPerMatch: getStat(userStats, 'averages.question.avgCorrectPerMatch', 0),
+                avgWrongPerMatch: getStat(userStats, 'averages.question.avgWrongPerMatch', 0),
+                avgSkippedPerMatch: getStat(userStats, 'averages.question.avgSkippedPerMatch', 0),
+            },
+            speed: {
+                avgAnswerTime: getStat(userStats, 'averages.speed.avgAnswerTime', 0),
+                avgCorrectAnswerTime: getStat(userStats, 'averages.speed.avgCorrectAnswerTime', 0),
+                avgWrongAnswerTime: getStat(userStats, 'averages.speed.avgWrongAnswerTime', 0),
+                avgSpeedRank: getStat(userStats, 'averages.speed.avgSpeedRank', 0),
+            },
+            performance: {
+                avgWinRate: getStat(userStats, 'averages.performance.avgWinRate', 0),
+                avgFirstPlaceRate: getStat(userStats, 'averages.performance.avgFirstPlaceRate', 0),
+                avgCompletionRate: getStat(userStats, 'averages.performance.avgCompletionRate', 0),
+                avgWithdrawalRate: getStat(userStats, 'averages.performance.avgWithdrawalRate', 0),
+            }
+        },
+        records: {
+            highestStreak: getStat(userStats, 'records.highestStreak', 0),
+            fastestMatch: getStat(userStats, 'records.fastestMatch', 0),
+            highestPointsMatch: getStat(userStats, 'records.highestPointsMatch', 0),
+            highestCoinsMatch: getStat(userStats, 'records.highestCoinsMatch', 0),
+            longestWinStreak: getStat(userStats, 'records.longestWinStreak', 0),
+        },
+        currentSeason: {
+            matches: getStat(userStats, 'currentSeason.matches', 0),
+            winRate: getStat(userStats, 'currentSeason.winRate', 0),
+            avgAccuracy: getStat(userStats, 'currentSeason.avgAccuracy', 0),
+            highestStreak: getStat(userStats, 'currentSeason.highestStreak', 0),
+            highestRank: getStat(userStats, 'currentSeason.highestRank', 'برونزي 1'),
+        },
+        power: getStat(userStats, 'power', 0),
+        accuracy: getStat(userStats, 'accuracy', 0),
+    };
+
+    // دالة عرض بطاقة إحصائية
+    const statCard = (statKey, value, sub = '') => {
+        const statInfo = STAT_IMAGES[statKey] || { image: 'images/stats/default.png', label: statKey };
+        const imagePath = statInfo.image;
+        const label = statInfo.label || statKey;
+        const displayValue = (value !== undefined && value !== null && value !== '') ? value : '—';
+        
+        return `
+            <div style="
+                display: flex;
+                align-items: center;
+                gap: 0.8rem;
+                padding: 0.5rem 0.8rem;
+                background: var(--glass);
+                border-radius: 8px;
+                border: 1px solid var(--border-color);
+                transition: 0.2s;
+            ">
+                <div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <img src="${imagePath}" alt="${label}" style="width:38px;height:38px;object-fit:contain;display:block;" 
+                         onerror="this.style.display='none';this.parentElement.innerHTML='📊'">
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:0.65rem;color:var(--gray);font-weight:600;">${label}</div>
+                    <div style="font-weight:800;font-size:1.1rem;color:var(--light);">${displayValue}</div>
+                    ${sub ? `<div style="font-size:0.55rem;color:var(--gray-dark);">${sub}</div>` : ''}
+                </div>
+            </div>
+        `;
+    };
+
+    // بناء محتوى كل قسم
+    const generalContent = `
+        ${statCard('totalMatches', stats.general.totalMatches)}
+        ${statCard('completedMatches', stats.general.completedMatches)}
+        ${statCard('withdrawnMatches', stats.general.withdrawnMatches)}
+        ${statCard('wins', stats.general.wins)}
+        ${statCard('draws', stats.general.draws)}
+        ${statCard('losses', stats.general.losses)}
+        ${statCard('firstPlace', stats.general.firstPlace)}
+        ${statCard('thirdPlace', stats.general.thirdPlace)}
+        ${statCard('lastPlace', stats.general.lastPlace)}
+    `;
+
+    const questionsContent = `
+        ${statCard('answered', stats.questions.answered)}
+        ${statCard('correct', stats.questions.correct)}
+        ${statCard('wrong', stats.questions.wrong)}
+        ${statCard('skipped', stats.questions.skipped)}
+        ${statCard('timeout', stats.questions.timeout)}
+    `;
+
+    const speedContent = `
+        ${statCard('firstAnswer', stats.speed.firstAnswer)}
+        ${statCard('lastAnswer', stats.speed.lastAnswer)}
+        ${statCard('answersInFirstSecond', stats.speed.answersInFirstSecond)}
+        ${statCard('answersInLastSecond', stats.speed.answersInLastSecond)}
+        ${statCard('fastestMatch', stats.speed.fastestMatch || '—')}
+        ${statCard('slowestMatch', stats.speed.slowestMatch || '—')}
+    `;
+
+    const performanceContent = `
+        ${statCard('allCorrectMatches', stats.performance.allCorrectMatches)}
+        ${statCard('allWrongMatches', stats.performance.allWrongMatches)}
+    `;
+
+    const avgMatchContent = `
+        <div style="grid-column:1/-1;">
+            <h4 style="font-size:0.85rem;color:var(--gray);margin-bottom:0.5rem;">📊 متوسطات المباريات</h4>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.6rem;">
+                ${statCard('avgDuration', stats.averages.match.avgDuration)}
+                ${statCard('avgPosition', stats.averages.match.avgPosition)}
+                ${statCard('avgPoints', stats.averages.match.avgPoints)}
+                ${statCard('avgRankPoints', stats.averages.match.avgRankPoints)}
+                ${statCard('avgCoins', stats.averages.match.avgCoins)}
+            </div>
+        </div>
+        <div style="grid-column:1/-1;margin-top:0.5rem;">
+            <h4 style="font-size:0.85rem;color:var(--gray);margin-bottom:0.5rem;">❓ متوسطات الأسئلة</h4>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.6rem;">
+                ${statCard('avgCorrectPerMatch', stats.averages.question.avgCorrectPerMatch)}
+                ${statCard('avgWrongPerMatch', stats.averages.question.avgWrongPerMatch)}
+                ${statCard('avgSkippedPerMatch', stats.averages.question.avgSkippedPerMatch)}
+            </div>
+        </div>
+        <div style="grid-column:1/-1;margin-top:0.5rem;">
+            <h4 style="font-size:0.85rem;color:var(--gray);margin-bottom:0.5rem;">⚡ متوسطات السرعة</h4>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.6rem;">
+                ${statCard('avgAnswerTime', stats.averages.speed.avgAnswerTime)}
+                ${statCard('avgCorrectAnswerTime', stats.averages.speed.avgCorrectAnswerTime)}
+                ${statCard('avgWrongAnswerTime', stats.averages.speed.avgWrongAnswerTime)}
+                ${statCard('avgSpeedRank', stats.averages.speed.avgSpeedRank)}
+            </div>
+        </div>
+        <div style="grid-column:1/-1;margin-top:0.5rem;">
+            <h4 style="font-size:0.85rem;color:var(--gray);margin-bottom:0.5rem;">🏆 متوسطات الأداء</h4>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.6rem;">
+                ${statCard('avgWinRate', stats.averages.performance.avgWinRate + '%')}
+                ${statCard('avgFirstPlaceRate', stats.averages.performance.avgFirstPlaceRate + '%')}
+                ${statCard('avgCompletionRate', stats.averages.performance.avgCompletionRate + '%')}
+                ${statCard('avgWithdrawalRate', stats.averages.performance.avgWithdrawalRate + '%')}
+            </div>
+        </div>
+    `;
+
+    const recordsContent = `
+        ${statCard('highestStreak', stats.records.highestStreak)}
+        ${statCard('fastestMatchRecord', stats.records.fastestMatch || '—')}
+        ${statCard('highestPointsMatch', stats.records.highestPointsMatch)}
+        ${statCard('highestCoinsMatch', stats.records.highestCoinsMatch)}
+        ${statCard('longestWinStreak', stats.records.longestWinStreak)}
+    `;
+
+    const seasonContent = `
+        ${statCard('seasonMatches', stats.currentSeason.matches)}
+        ${statCard('seasonWinRate', stats.currentSeason.winRate + '%')}
+        ${statCard('seasonAvgAccuracy', stats.currentSeason.avgAccuracy + '%')}
+        ${statCard('seasonHighestStreak', stats.currentSeason.highestStreak)}
+        ${statCard('seasonHighestRank', stats.currentSeason.highestRank)}
+    `;
+
+    // الدقة والقوة (عرض خاص)
+    const accuracy = stats.accuracy || 0;
+    const accuracyColor = accuracy >= 80 ? '#2ecc71' : accuracy >= 60 ? '#FFD93D' : accuracy >= 40 ? '#f39c12' : '#FF6B6B';
+    
+    const power = stats.power || 0;
+    const powerColor = power >= 80 ? '#2ecc71' : power >= 60 ? '#FFD93D' : power >= 40 ? '#f39c12' : '#FF6B6B';
+
+    const specialContent = `
+        <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;">
+            <div style="background:var(--card-bg);border-radius:var(--radius-sm);padding:1rem;border:1px solid var(--border-color);">
+                <div style="display:flex;align-items:center;gap:0.8rem;">
+                    <div style="width:48px;height:48px;border-radius:50%;background:${accuracyColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <span style="font-size:1.3rem;color:#fff;">🎯</span>
+                    </div>
+                    <div style="flex:1;">
+                        <div style="display:flex;justify-content:space-between;font-weight:700;">
+                            <span style="font-size:0.85rem;color:var(--gray);">الدقة</span>
+                            <span style="color:${accuracyColor};">${accuracy}%</span>
+                        </div>
+                        <div style="height:6px;background:var(--glass);border-radius:10px;overflow:hidden;margin-top:0.2rem;">
+                            <div style="height:100%;width:${accuracy}%;background:${accuracyColor};border-radius:10px;"></div>
+                        </div>
+                        <div style="font-size:0.6rem;color:var(--gray);margin-top:0.1rem;">${accuracy >= 80 ? '🎯 قناص خارق!' : accuracy >= 60 ? '🎯 دقة عالية' : '🎯 يحتاج إلى تحسين'}</div>
+                    </div>
+                </div>
+            </div>
+            <div style="background:var(--card-bg);border-radius:var(--radius-sm);padding:1rem;border:1px solid var(--border-color);">
+                <div style="display:flex;align-items:center;gap:0.8rem;">
+                    <div style="width:48px;height:48px;border-radius:50%;background:${powerColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <span style="font-size:1.3rem;color:#fff;">💪</span>
+                    </div>
+                    <div style="flex:1;">
+                        <div style="display:flex;justify-content:space-between;font-weight:700;">
+                            <span style="font-size:0.85rem;color:var(--gray);">القوة</span>
+                            <span style="color:${powerColor};">${power}%</span>
+                        </div>
+                        <div style="height:6px;background:var(--glass);border-radius:10px;overflow:hidden;margin-top:0.2rem;">
+                            <div style="height:100%;width:${power}%;background:${powerColor};border-radius:10px;"></div>
+                        </div>
+                        <div style="font-size:0.6rem;color:var(--gray);margin-top:0.1rem;">${power >= 80 ? '🏅 لاعب خارق!' : power >= 60 ? '🌟 لاعب محترف' : '🌱 لاعب مبتدئ'}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // تجميع الصفحة مع الأقسام القابلة للنقر
+    return `
+        <div class="analytics-page" style="max-width:1200px;margin:0 auto;padding:0.5rem;">
+            <div class="flex-between mb-2" style="flex-wrap:wrap;gap:0.5rem;">
+                <h2 style="font-size:1.8rem;font-weight:800;">
+                    <i class="fas fa-chart-pie" style="color:var(--accent);"></i> 
+                    لوحة الإحصائيات المتقدمة
+                </h2>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                    <button class="btn btn-sm btn-primary" onclick="App._openStatsSection = null; App._renderAnalyticsSection();">
+                        <i class="fas fa-expand"></i> عرض الكل
+                    </button>
+                    <button class="btn btn-sm btn-outline" onclick="App._refreshStats()">
+                        <i class="fas fa-sync"></i> تحديث
+                    </button>
+                    <button class="btn btn-sm btn-outline" onclick="App._activateSection('profile')">
+                        <i class="fas fa-user"></i> الملف الشخصي
+                    </button>
+                </div>
+            </div>
+            
+            <div style="display:flex;flex-direction:column;gap:0.3rem;">
+                ${App._renderStatsSection('الإحصائيات العامة', '🏆', generalContent, 'general')}
+                ${App._renderStatsSection('الأسئلة', '❓', questionsContent, 'questions')}
+                ${App._renderStatsSection('السرعة', '⚡', speedContent, 'speed')}
+                ${App._renderStatsSection('الأداء', '📈', performanceContent, 'performance')}
+                ${App._renderStatsSection('المتوسطات', '📊', avgMatchContent, 'averages')}
+                ${App._renderStatsSection('الأرقام القياسية', '👑', recordsContent, 'records')}
+                ${App._renderStatsSection('الموسم الحالي', '📅', seasonContent, 'season')}
+                ${App._renderStatsSection('الدقة والقوة', '🎯', specialContent, 'special')}
+            </div>
+            
+            <div style="text-align:center;margin-top:1rem;font-size:0.7rem;color:var(--gray);">
+                👆 اضغط على أي قسم لعرض أو إخفاء إحصائياته
+            </div>
+        </div>
+    `;
+};
+console.log('✅ تم تحديث نظام عرض الإحصائيات بالأقسام القابلة للنقر');
+console.log('✅ تم إصلاح عرض صور الإحصائيات');
+
+// ============================================================
+// نظام اللعب المباشر - النسخة النهائية مع إصلاح المطابقة
+// ============================================================
+
+const MatchmakingSystem = {
+    _currentMatchId: null,
+    _searching: false,
+    _searchInterval: null,
+    _currentUser: null,
+    _matchUnsubscribe: null,
+    _searchTimerInterval: null,
+    _searchStartTime: null,
+    _maxSearchTime: 120, // 120 ثانية
+    _isMatchCreated: false,
+    _matchId: null,
+
+    // بدء البحث عن لاعب
+    async startMatchmaking() {
+        if (!AuthService.currentUser) {
+            showToast('يجب تسجيل الدخول أولاً', 'error');
+            return;
+        }
+
+        if (this._searching) {
+            showToast('⚠️ أنت تبحث بالفعل عن لاعب', 'info');
+            return;
+        }
+
+        // تنظيف أي بحث سابق
+        await this._cleanup();
+
+        this._currentUser = AuthService.currentUser;
+        this._searching = true;
+        this._isMatchCreated = false;
+        this._searchStartTime = Date.now();
+
+        const searchSettings = {
+            userId: this._currentUser.uid,
+            userName: this._currentUser.username || this._currentUser.displayName || 'مجهول',
+            userLevel: getLevel(this._currentUser.totalScore || 0).level,
+            userRank: getRank(this._currentUser.rankPoints || 0).name,
+            status: 'searching',
+            matched: false,        // ✅ حقل جديد لمنع المطابقة المزدوجة
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            expiresAt: new Date(Date.now() + this._maxSearchTime * 1000).toISOString()
+        };
+
+        try {
+            const docRef = await db.collection('matchmaking').add(searchSettings);
+            this._currentMatchId = docRef.id;
+
+            showToast('🔍 جاري البحث عن لاعب...', 'info', 3000);
+            this._showSearchingUI();
+
+            // بدء البحث كل 2 ثانية
+            this._searchInterval = setInterval(() => {
+                this._findMatch();
+            }, 2000);
+
+            // بدء مؤقت انتهاء البحث
+            this._startSearchTimer();
+
+        } catch (e) {
+            console.error('Error starting matchmaking:', e);
+            showToast('❌ فشل بدء البحث', 'error');
+            this._searching = false;
+        }
+    },
+
+    // تنظيف البحث السابق
+    async _cleanup() {
+        if (this._searchInterval) {
+            clearInterval(this._searchInterval);
+            this._searchInterval = null;
+        }
+        if (this._searchTimerInterval) {
+            clearInterval(this._searchTimerInterval);
+            this._searchTimerInterval = null;
+        }
+        if (this._matchUnsubscribe) {
+            this._matchUnsubscribe();
+            this._matchUnsubscribe = null;
+        }
+        if (this._currentMatchId) {
+            try {
+                const doc = await db.collection('matchmaking').doc(this._currentMatchId).get();
+                if (doc.exists) {
+                    await db.collection('matchmaking').doc(this._currentMatchId).delete();
+                }
+            } catch (e) {}
+            this._currentMatchId = null;
+        }
+        this._searching = false;
+        this._isMatchCreated = false;
+    },
+
+    // بدء مؤقت البحث
+    _startSearchTimer() {
+        if (this._searchTimerInterval) {
+            clearInterval(this._searchTimerInterval);
+        }
+
+        this._searchTimerInterval = setInterval(() => {
+            if (!this._searching) {
+                clearInterval(this._searchTimerInterval);
+                this._searchTimerInterval = null;
+                return;
+            }
+
+            const elapsed = (Date.now() - this._searchStartTime) / 1000;
+            const remaining = Math.max(0, this._maxSearchTime - elapsed);
+
+            // تحديث العرض
+            const timerEl = document.getElementById('searchTimer');
+            if (timerEl) timerEl.textContent = Math.floor(elapsed);
+
+            const remainingEl = document.getElementById('searchRemaining');
+            if (remainingEl) {
+                const minutes = Math.floor(remaining / 60);
+                const seconds = Math.floor(remaining % 60);
+                remainingEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+
+            const progressEl = document.getElementById('searchProgress');
+            if (progressEl) {
+                const progress = (elapsed / this._maxSearchTime) * 100;
+                progressEl.style.width = `${Math.min(progress, 100)}%`;
+            }
+
+            // إذا انتهى الوقت ولم يتم العثور على لاعب
+            if (remaining <= 0 && !this._isMatchCreated) {
+                this._cancelSearch('⏰ لم يتم العثور على لاعب، حاول مرة أخرى');
+            }
+
+        }, 1000);
+    },
+
+    // ✅ البحث عن لاعب باستخدام معاملة (Transaction) مع فلتر `matched`
+async _findMatch() {
+    if (!this._searching || this._isMatchCreated) return;
+
+    try {
+        // ✅ استعلام بحقلين فقط (بدون matched)
+        const snapshot = await db.collection('matchmaking')
+            .where('status', '==', 'searching')
+            .where('userId', '!=', this._currentUser.uid)
+            .get();
+
+        if (snapshot.empty) return;
+
+        let candidates = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            // تجاهل الطلبات المنتهية أو المحجوزة يدويًا
+            if (data.expiresAt && new Date(data.expiresAt) < new Date()) {
+                db.collection('matchmaking').doc(doc.id).delete().catch(() => {});
+                return;
+            }
+            if (data.matched === true) {  // ✅ فلتر يدوي
+                return;
+            }
+            candidates.push({ id: doc.id, ...data });
+        });
+
+        if (candidates.length === 0) return;
+
+            // فلتر حسب المستوى
+            const currentLevel = getLevel(this._currentUser.totalScore || 0).level;
+            const matchedCandidates = candidates.filter(c => {
+                const cLevel = c.userLevel || 1;
+                return Math.abs(cLevel - currentLevel) <= 3;
+            });
+
+            if (matchedCandidates.length === 0) return;
+
+            // اختيار أول لاعب مناسب
+            const opponent = matchedCandidates[0];
+
+            // ✅ استخدام معاملة لتحديث طلب الخصم (منع المطابقة المزدوجة)
+            const success = await this._tryMatchOpponent(opponent.id);
+
+            if (success) {
+                // نجحنا في حجز الخصم، نقوم بإنشاء المباراة
+                await this._createMatch(opponent);
+            } else {
+                // فشلنا (ربما تم مطابقة الخصم من قبل لاعب آخر)، نعيد المحاولة لاحقاً
+                console.log('⚠️ فشل حجز الخصم، سيتم إعادة المحاولة');
+            }
+
+        } catch (e) {
+            console.warn('Match search error:', e);
+        }
+    },
+
+    // ✅ محاولة حجز الخصم باستخدام معاملة
+    async _tryMatchOpponent(opponentDocId) {
+        try {
+            const opponentRef = db.collection('matchmaking').doc(opponentDocId);
+
+            // استخدام transaction لتحديث شرطي
+            const result = await db.runTransaction(async (transaction) => {
+                const doc = await transaction.get(opponentRef);
+                if (!doc.exists) {
+                    return false;
+                }
+                const data = doc.data();
+                // إذا كان الخصم قد تم مطابقته بالفعل أو تغيرت حالته، نرفض
+                if (data.matched === true || data.status !== 'searching') {
+                    return false;
+                }
+                // تحديث حقل matched إلى true
+                transaction.update(opponentRef, { matched: true });
+                return true;
+            });
+
+            return result;
+        } catch (e) {
+            console.error('Transaction error:', e);
+            return false;
+        }
+    },
+
+    // ✅ إنشاء المباراة (بعد حجز الخصم)
+    async _createMatch(opponent) {
+        if (this._isMatchCreated) return;
+        this._isMatchCreated = true;
+
+        try {
+            // حذف طلب البحث الخاص بنا
+            if (this._currentMatchId) {
+                await db.collection('matchmaking').doc(this._currentMatchId).delete().catch(() => {});
+                this._currentMatchId = null;
+            }
+
+            // حذف طلب الخصم (تم حجزه بالفعل)
+            if (opponent.id) {
+                await db.collection('matchmaking').doc(opponent.id).delete().catch(() => {});
+            }
+
+            // تحضير بيانات المباراة
+            const matchData = {
+                players: [
+                    {
+                        uid: this._currentUser.uid,
+                        name: this._currentUser.username || this._currentUser.displayName || 'مجهول',
+                        level: getLevel(this._currentUser.totalScore || 0).level,
+                        rank: getRank(this._currentUser.rankPoints || 0).name,
+                        score: 0,
+                        correct: 0,
+                        wrong: 0,
+                        streak: 0,
+                        bestStreak: 0,
+                        answersCount: 0,
+                        totalTime: 0,
+                        avgTime: 0
+                    },
+                    {
+                        uid: opponent.userId,
+                        name: opponent.userName || 'مجهول',
+                        level: opponent.userLevel || 1,
+                        rank: opponent.userRank || 'برونزي 1',
+                        score: 0,
+                        correct: 0,
+                        wrong: 0,
+                        streak: 0,
+                        bestStreak: 0,
+                        answersCount: 0,
+                        totalTime: 0,
+                        avgTime: 0
+                    }
+                ],
+                status: 'waiting',
+                type: 'direct',
+                settings: {
+                    difficulty: 'medium',
+                    category: 'all',
+                    questionCount: 10,
+                    timeLimit: 15
+                },
+                questions: [],
+                currentQuestion: 0,
+                answers: {},
+                scores: {},
+                startTime: null,
+                questionStartTime: null,
+                winner: null,
+                finishedAt: null,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            // جلب الأسئلة
+            let pool = [...DataManager.data.questions];
+            if (pool.length === 0) {
+                showToast('لا توجد أسئلة كافية', 'error');
+                this._isMatchCreated = false;
+                this._searching = true;
+                this._searchInterval = setInterval(() => this._findMatch(), 2000);
+                return;
+            }
+
+            const shuffled = shuffleArray(pool);
+            const questionCount = Math.min(10, pool.length);
+            matchData.questions = shuffled.slice(0, questionCount);
+
+            // إضافة المباراة
+            const docRef = await db.collection('directMatches').add(matchData);
+            this._matchId = docRef.id;
+
+            // إيقاف البحث
+            this._searching = false;
+            if (this._searchInterval) {
+                clearInterval(this._searchInterval);
+                this._searchInterval = null;
+            }
+            if (this._searchTimerInterval) {
+                clearInterval(this._searchTimerInterval);
+                this._searchTimerInterval = null;
+            }
+            this._hideSearchingUI();
+
+            showToast(`🎮 تم العثور على لاعب!`, 'success', 3000);
+
+            this._showMatchUI(docRef.id);
+            this._listenToMatch(docRef.id);
+
+        } catch (e) {
+            console.error('Error creating match:', e);
+            showToast('❌ فشل إنشاء المباراة', 'error');
+            this._isMatchCreated = false;
+            // إعادة تشغيل البحث
+            this._searching = true;
+            if (!this._searchInterval) {
+                this._searchInterval = setInterval(() => this._findMatch(), 2000);
+            }
+        }
+    },
+
+    _listenToMatch(matchId) {
+        if (this._matchUnsubscribe) {
+            this._matchUnsubscribe();
+        }
+
+        this._matchUnsubscribe = db.collection('directMatches').doc(matchId)
+            .onSnapshot((doc) => {
+                if (!doc.exists) {
+                    App._exitDirectMatch();
+                    return;
+                }
+                const match = doc.data();
+                if (match.status === 'playing') {
+                    App._renderDirectMatch(matchId);
+                } else if (match.status === 'finished') {
+                    App._showDirectMatchResult(matchId);
+                } else if (match.status === 'waiting') {
+                    this._showWaitingUI(matchId);
+                }
+            }, (error) => {
+                console.error('Match listener error:', error);
+            });
+    },
+
+    _showWaitingUI(matchId) {
+        const container = document.getElementById('directMatchContainer');
+        if (!container) return;
+        container.style.display = 'block';
+        container.innerHTML = `
+            <div style="max-width:500px;margin:0 auto;text-align:center;padding:3rem 1rem;">
+                <div style="font-size:3rem;margin-bottom:1rem;">⏳</div>
+                <h2 style="font-size:1.5rem;font-weight:800;color:var(--accent);">جاري تجهيز المباراة...</h2>
+                <p style="color:var(--gray);">سيبدأ اللعب قريباً</p>
+                <div style="display:flex;gap:0.5rem;justify-content:center;margin:1rem 0;">
+                    <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--primary);animation:dotPulse 1.2s infinite alternate;"></div>
+                    <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--accent);animation:dotPulse 1.2s infinite alternate 0.4s;"></div>
+                    <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--primary);animation:dotPulse 1.2s infinite alternate 0.8s;"></div>
+                </div>
+                <button class="btn btn-danger" onclick="App._exitDirectMatch()">
+                    <i class="fas fa-times"></i> إلغاء
+                </button>
+            </div>
+        `;
+    },
+
+    async _cancelSearch(message) {
+        this._searching = false;
+        this._isMatchCreated = false;
+
+        if (this._searchInterval) {
+            clearInterval(this._searchInterval);
+            this._searchInterval = null;
+        }
+        if (this._searchTimerInterval) {
+            clearInterval(this._searchTimerInterval);
+            this._searchTimerInterval = null;
+        }
+        if (this._matchUnsubscribe) {
+            this._matchUnsubscribe();
+            this._matchUnsubscribe = null;
+        }
+        if (this._currentMatchId) {
+            try {
+                const doc = await db.collection('matchmaking').doc(this._currentMatchId).get();
+                if (doc.exists) {
+                    await db.collection('matchmaking').doc(this._currentMatchId).delete();
+                }
+            } catch (e) {}
+            this._currentMatchId = null;
+        }
+        this._hideSearchingUI();
+        if (message) {
+            showToast(message, 'info', 4000);
+        }
+    },
+
+    async cancelMatchmaking() {
+        await this._cancelSearch('⏹️ تم إلغاء البحث');
+    },
+
+    _showSearchingUI() {
+        const container = document.getElementById('directMatchContainer');
+        if (!container) {
+            const newContainer = document.createElement('div');
+            newContainer.id = 'directMatchContainer';
+            newContainer.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                z-index: 1050;
+                background: var(--dark);
+                padding: 1rem;
+                overflow-y: auto;
+                display: none;
+            `;
+            document.body.appendChild(newContainer);
+        }
+
+        const el = document.getElementById('directMatchContainer');
+        el.style.display = 'block';
+        el.innerHTML = `
+            <div style="max-width:500px;margin:0 auto;text-align:center;padding:3rem 1rem;">
+                <div style="font-size:3rem;margin-bottom:0.5rem;">🔍</div>
+                <h2 style="font-size:1.5rem;font-weight:800;color:var(--accent);">
+                    جاري البحث عن لاعب...
+                </h2>
+                <p style="color:var(--gray);margin:0.5rem 0;">
+                    ⏱ <span id="searchTimer">0</span> ثانية
+                    <span style="color:var(--gray-dark);font-size:0.8rem;margin-right:0.5rem;">
+                        (المتبقي: <span id="searchRemaining">2:00</span>)
+                    </span>
+                </p>
+                <div style="width:100%;max-width:300px;margin:0.5rem auto;">
+                    <div style="height:6px;background:var(--glass);border-radius:10px;overflow:hidden;">
+                        <div id="searchProgress" style="height:100%;width:0%;background:linear-gradient(90deg, var(--primary), var(--accent));border-radius:10px;transition:width 0.5s ease;"></div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:0.5rem;justify-content:center;margin:1rem 0;">
+                    <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--primary);animation:dotPulse 1.2s infinite alternate;"></div>
+                    <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--accent);animation:dotPulse 1.2s infinite alternate 0.4s;"></div>
+                    <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--primary);animation:dotPulse 1.2s infinite alternate 0.8s;"></div>
+                </div>
+                <button class="btn btn-danger" onclick="MatchmakingSystem.cancelMatchmaking()" style="margin-top:0.5rem;">
+                    <i class="fas fa-times"></i> إلغاء البحث
+                </button>
+                <div style="margin-top:1rem;font-size:0.7rem;color:var(--gray-dark);">
+                    🔍 سيتم إلغاء البحث تلقائياً بعد دقيقتين
+                </div>
+            </div>
+        `;
+    },
+
+    _hideSearchingUI() {
+        const el = document.getElementById('directMatchContainer');
+        if (el && !this._isMatchCreated) {
+            el.style.display = 'none';
+        }
+    },
+
+    _showMatchUI(matchId) {
+        const container = document.getElementById('directMatchContainer');
+        if (container) {
+            container.style.display = 'block';
+        }
+        App._renderDirectMatch(matchId);
+    },
+
+    // ✅ دوال إرسال الإجابة (نفس السابق مع تحسينات)
+    async submitAnswer(answer) {
+        if (!this._matchId) {
+            showToast('لا توجد مباراة نشطة', 'error');
+            return;
+        }
+
+        const user = AuthService.currentUser;
+        if (!user) return;
+
+        try {
+            const doc = await db.collection('directMatches').doc(this._matchId).get();
+            if (!doc.exists) {
+                showToast('المباراة غير موجودة', 'error');
+                return;
+            }
+
+            const match = doc.data();
+            if (match.status !== 'playing') {
+                showToast('المباراة لم تبدأ بعد', 'info');
+                return;
+            }
+
+            const currentQ = match.currentQuestion || 0;
+            const questions = match.questions || [];
+            if (currentQ >= questions.length) {
+                showToast('انتهت المباراة', 'info');
+                return;
+            }
+
+            const question = questions[currentQ];
+            const answers = match.answers || {};
+            if (answers[user.uid] && answers[user.uid][currentQ] !== undefined) {
+                showToast('لقد أجبت بالفعل', 'info');
+                return;
+            }
+
+            const elapsed = (Date.now() - match.questionStartTime) / 1000;
+            let isCorrect = false;
+            let answerValue = answer;
+
+            if (question.type === 'multiple_choice' || question.type === 'true_false') {
+                isCorrect = (answer === question.correct);
+            } else if (question.type === 'fill_blank') {
+                isCorrect = (answer.toLowerCase() === (question.correctAnswer || '').toLowerCase());
+            } else if (question.type === 'matching') {
+                const pairs = question.matchingPairs || [];
+                let correctCount = 0;
+                pairs.forEach(pair => {
+                    if (answer[pair.left] === pair.right) correctCount++;
+                });
+                isCorrect = (correctCount === pairs.length);
+            } else if (question.type === 'ordering') {
+                const correctOrder = question.orderedItems || [];
+                isCorrect = JSON.stringify(answer) === JSON.stringify(correctOrder);
+            }
+
+            const scores = match.scores || {};
+            const playerScore = scores[user.uid] || {
+                score: 0,
+                correct: 0,
+                wrong: 0,
+                streak: 0,
+                bestStreak: 0,
+                totalTime: 0,
+                avgTime: 0,
+                answersCount: 0
+            };
+
+            let pointsEarned = 0;
+            if (isCorrect) {
+                pointsEarned = 10 + (elapsed <= 3 ? 5 : 0);
+                playerScore.correct = (playerScore.correct || 0) + 1;
+                playerScore.streak = (playerScore.streak || 0) + 1;
+                if (playerScore.streak > (playerScore.bestStreak || 0)) {
+                    playerScore.bestStreak = playerScore.streak;
+                }
+            } else {
+                playerScore.wrong = (playerScore.wrong || 0) + 1;
+                playerScore.streak = 0;
+            }
+
+            playerScore.score = (playerScore.score || 0) + pointsEarned;
+            playerScore.totalTime = (playerScore.totalTime || 0) + elapsed;
+            playerScore.answersCount = (playerScore.answersCount || 0) + 1;
+            playerScore.avgTime = playerScore.totalTime / playerScore.answersCount;
+
+            if (!answers[user.uid]) answers[user.uid] = {};
+            answers[user.uid][currentQ] = { answer: answerValue, isCorrect, timeTaken: elapsed };
+
+            const players = match.players.map(p => {
+                if (p.uid === user.uid) {
+                    return { ...p, ...playerScore };
+                }
+                return p;
+            });
+
+            await db.collection('directMatches').doc(this._matchId).update({
+                answers: answers,
+                scores: { ...scores, [user.uid]: playerScore },
+                players: players
+            });
+
+            showToast(isCorrect ? '✅ صحيح!' : '❌ خاطئ', isCorrect ? 'success' : 'error');
+
+            const totalPlayers = match.players.length;
+            const answeredCount = Object.keys(answers).length;
+
+            if (answeredCount >= totalPlayers) {
+                setTimeout(() => {
+                    this._nextQuestion(this._matchId);
+                }, 1500);
+            }
+
+        } catch (e) {
+            console.error('Error submitting answer:', e);
+            showToast('❌ خطأ في إرسال الإجابة', 'error');
+        }
+    },
+
+    async _nextQuestion(matchId) {
+        try {
+            const doc = await db.collection('directMatches').doc(matchId).get();
+            if (!doc.exists) return;
+            const match = doc.data();
+            if (match.status !== 'playing') return;
+
+            const nextIndex = (match.currentQuestion || 0) + 1;
+            if (nextIndex >= match.questions.length) {
+                await this._endMatch(matchId);
+                return;
+            }
+
+            await db.collection('directMatches').doc(matchId).update({
+                currentQuestion: nextIndex,
+                answers: {},
+                questionStartTime: Date.now()
+            });
+
+        } catch (e) {
+            console.error('Error next question:', e);
+        }
+    },
+
+    async _endMatch(matchId) {
+        try {
+            const doc = await db.collection('directMatches').doc(matchId).get();
+            if (!doc.exists) return;
+            const match = doc.data();
+
+            const scores = match.scores || {};
+            const players = match.players || [];
+            const sorted = [...players].sort((a, b) => {
+                const scoreA = scores[a.uid]?.score || 0;
+                const scoreB = scores[b.uid]?.score || 0;
+                return scoreB - scoreA;
+            });
+
+            const winner = sorted[0] || null;
+
+            await db.collection('directMatches').doc(matchId).update({
+                status: 'finished',
+                winner: winner,
+                finishedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            showToast(`🏆 الفائز: ${winner?.name || 'لا يوجد'}`, 'success', 5000);
+
+        } catch (e) {
+            console.error('Error ending match:', e);
+        }
+    }
+};
+
+// ✅ تحديث دوال App المرتبطة بالمباراة المباشرة
+App._renderDirectMatch = function(matchId) {
+    const container = document.getElementById('directMatchContainer');
+    if (!container) return;
+
+    db.collection('directMatches').doc(matchId).get().then((doc) => {
+        if (!doc.exists) {
+            container.innerHTML = '<div class="text-gray">المباراة غير موجودة</div>';
+            return;
+        }
+
+        const match = doc.data();
+        if (match.status === 'finished') {
+            App._showDirectMatchResult(matchId);
+            return;
+        }
+
+        const user = AuthService.currentUser;
+        const currentQ = match.currentQuestion || 0;
+        const questions = match.questions || [];
+        if (currentQ >= questions.length) {
+            MatchmakingSystem._endMatch(matchId);
+            return;
+        }
+
+        const question = questions[currentQ];
+        const players = match.players || [];
+        const answers = match.answers || {};
+        const scores = match.scores || {};
+
+        const timeLimit = 15;
+        const elapsed = (Date.now() - match.questionStartTime) / 1000;
+        const timeLeft = Math.max(0, timeLimit - Math.floor(elapsed));
+
+        const sortedPlayers = [...players].sort((a, b) => {
+            const scoreA = scores[a.uid]?.score || 0;
+            const scoreB = scores[b.uid]?.score || 0;
+            return scoreB - scoreA;
+        });
+
+        const userAnswered = user && answers[user.uid] && answers[user.uid][currentQ] !== undefined;
+
+        let html = `
+            <div style="max-width:800px;margin:0 auto;">
+                <div class="game-header" style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 1rem;background:var(--card-bg);border-radius:var(--radius-sm);margin-bottom:1rem;">
+                    <div style="display:flex;gap:0.8rem;align-items:center;">
+                        <span class="badge badge-primary">⚡ ${currentQ+1}/${questions.length}</span>
+                        <span class="badge ${timeLeft <= 5 ? 'badge-danger' : 'badge-warning'}">⏱ ${timeLeft}s</span>
+                    </div>
+                    <button class="btn btn-sm btn-danger" onclick="App._exitDirectMatch()">
+                        <i class="fas fa-times"></i> خروج
+                    </button>
+                </div>
+
+                <div class="question-box" style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius);padding:2rem;text-align:center;margin-bottom:1rem;">
+                    <div class="q-category" style="display:inline-block;background:var(--primary);color:#fff;padding:4px 20px;border-radius:30px;font-size:0.8rem;font-weight:700;margin-bottom:0.5rem;">
+                        📚 ${question.category || 'عام'}
+                    </div>
+                    <div class="q-type-badge" style="display:inline-block;background:var(--glass);color:var(--gray);padding:2px 14px;border-radius:30px;font-size:0.7rem;margin-right:0.5rem;">
+                        ${GameEngine._getTypeLabel(question.type)}
+                    </div>
+                    <div class="q-text" style="font-size:1.3rem;font-weight:700;margin:0.5rem 0 1.5rem;line-height:1.8;">${question.question}</div>
+                    <div class="options-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;max-width:600px;margin:0 auto;">
+        `;
+
+        if (question.type === 'multiple_choice' || question.type === 'true_false') {
+            const opts = question.options || [];
+            opts.forEach((opt, idx) => {
+                const isSelected = userAnswered && answers[user.uid][currentQ].answer === idx;
+                const isCorrect = isSelected && answers[user.uid][currentQ].isCorrect;
+                const isWrong = isSelected && !isCorrect;
+                let btnClass = 'option-btn';
+                if (userAnswered) {
+                    btnClass += ' disabled';
+                    if (idx === question.correct) btnClass += ' show-correct';
+                    if (isWrong) btnClass += ' selected-wrong';
+                }
+                html += `
+                    <button class="${btnClass}" onclick="MatchmakingSystem.submitAnswer(${idx})" ${userAnswered ? 'disabled' : ''}>
+                        ${String.fromCharCode(65 + idx)}. ${opt}
+                    </button>
+                `;
+            });
+        } else if (question.type === 'fill_blank') {
+            html += `
+                <div style="grid-column:1/-1;display:flex;gap:0.5rem;justify-content:center;max-width:400px;margin:0 auto;">
+                    <input type="text" id="directFillBlankInput" placeholder="اكتب الإجابة..." 
+                           style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);color:var(--light);" 
+                           ${userAnswered ? 'disabled' : ''}>
+                    <button class="btn btn-primary" onclick="App._submitDirectFillBlank()" ${userAnswered ? 'disabled' : ''}>
+                        تأكيد
+                    </button>
+                </div>
+            `;
+        }
+
+        html += `
+                    </div>
+                </div>
+
+                <div class="card" style="padding:0.8rem;">
+                    <div class="card-title" style="font-size:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.3rem;">
+                        <span><i class="fas fa-crown" style="color:var(--accent);"></i> الترتيب</span>
+                        <span style="font-size:0.7rem;color:var(--gray);">
+                            ⭐ النقاط • ✅ الصحيح
+                        </span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.3rem;">
+        `;
+
+        sortedPlayers.forEach((p, i) => {
+            const isMe = p.uid === user?.uid;
+            const pScore = scores[p.uid]?.score || 0;
+            const pCorrect = scores[p.uid]?.correct || 0;
+            const pWrong = scores[p.uid]?.wrong || 0;
+            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
+            const isTop = i < 3;
+
+            html += `
+                <div class="player-rank-item ${isTop ? 'top' : ''} ${isMe ? 'me' : ''}" 
+                     style="background:${isTop ? 'var(--accent)' : (isMe ? 'var(--primary)' : 'var(--glass)')};
+                            ${isTop ? 'color:var(--dark);' : ''}
+                            ${isMe && !isTop ? 'color:#fff;' : ''}
+                            padding:0.3rem 0.6rem;border-radius:6px;
+                            display:flex;justify-content:space-between;align-items:center;
+                            border:${isMe ? '2px solid var(--accent)' : '1px solid var(--glass-border)'};">
+                    <div style="display:flex;align-items:center;gap:0.3rem;min-width:0;">
+                        <span style="font-weight:700;font-size:0.9rem;flex-shrink:0;">${medal}</span>
+                        <span style="font-weight:600;font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;">
+                            ${p.name} ${isMe ? '👈' : ''}
+                        </span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
+                        <span style="font-weight:700;font-size:0.9rem;color:${isTop ? 'var(--dark)' : 'var(--accent)'};">⭐ ${pScore}</span>
+                        <span style="font-size:0.6rem;color:${isTop ? 'rgba(0,0,0,0.5)' : 'var(--gray)'};">
+                            ✅${pCorrect}
+                        </span>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = html;
+    });
+};
+
+App._submitDirectFillBlank = function() {
+    const input = document.getElementById('directFillBlankInput');
+    if (!input) return;
+    const answer = input.value.trim();
+    if (!answer) {
+        showToast('يرجى كتابة الإجابة', 'info');
+        return;
+    }
+    MatchmakingSystem.submitAnswer(answer);
+};
+
+App._showDirectMatchResult = function(matchId) {
+    const container = document.getElementById('directMatchContainer');
+    if (!container) return;
+
+    db.collection('directMatches').doc(matchId).get().then((doc) => {
+        if (!doc.exists) return;
+        const match = doc.data();
+        const players = match.players || [];
+        const scores = match.scores || {};
+
+        const sorted = [...players].sort((a, b) => {
+            const scoreA = scores[a.uid]?.score || 0;
+            const scoreB = scores[b.uid]?.score || 0;
+            return scoreB - scoreA;
+        });
+
+        const winner = sorted[0];
+        const user = AuthService.currentUser;
+
+        let html = `
+            <div style="max-width:600px;margin:0 auto;text-align:center;padding:2rem;">
+                <div style="font-size:4rem;margin-bottom:0.5rem;">🏆</div>
+                <h2 style="font-size:2rem;font-weight:900;color:var(--accent);">انتهت المباراة!</h2>
+                <div style="font-size:1.3rem;font-weight:700;margin:0.5rem 0;">
+                    الفائز: ${winner?.name || 'لا يوجد'} (⭐ ${scores[winner?.uid]?.score || 0} نقطة)
+                </div>
+                <div style="display:grid;gap:0.5rem;margin:1rem 0;text-align:right;">
+        `;
+
+        sorted.forEach((p, i) => {
+            const isMe = p.uid === user?.uid;
+            const pScore = scores[p.uid]?.score || 0;
+            const pCorrect = scores[p.uid]?.correct || 0;
+            const pWrong = scores[p.uid]?.wrong || 0;
+            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
+
+            html += `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 1rem;background:${isMe ? 'var(--primary)' : 'var(--glass)'};border-radius:8px;border:1px solid ${isMe ? 'var(--accent)' : 'var(--glass-border)'};">
+                    <span>${medal} ${p.name} ${isMe ? '👈' : ''}</span>
+                    <span>⭐ ${pScore} | ✅ ${pCorrect} | ❌ ${pWrong}</span>
+                </div>
+            `;
+        });
+
+        html += `
+                </div>
+                <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;">
+                    <button class="btn btn-primary" onclick="App._exitDirectMatch()">
+                        <i class="fas fa-home"></i> العودة
+                    </button>
+                    <button class="btn btn-success" onclick="MatchmakingSystem.startMatchmaking()">
+                        <i class="fas fa-redo"></i> لعب مرة أخرى
+                    </button>
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = html;
+    });
+};
+
+App._exitDirectMatch = function() {
+    const container = document.getElementById('directMatchContainer');
+    if (container) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+    }
+    if (MatchmakingSystem._matchUnsubscribe) {
+        MatchmakingSystem._matchUnsubscribe();
+        MatchmakingSystem._matchUnsubscribe = null;
+    }
+    MatchmakingSystem._searching = false;
+    MatchmakingSystem._isMatchCreated = false;
+    if (MatchmakingSystem._searchInterval) {
+        clearInterval(MatchmakingSystem._searchInterval);
+        MatchmakingSystem._searchInterval = null;
+    }
+    if (MatchmakingSystem._searchTimerInterval) {
+        clearInterval(MatchmakingSystem._searchTimerInterval);
+        MatchmakingSystem._searchTimerInterval = null;
+    }
+    App._activateSection('dashboard');
+};
+
+// ============================================================
+// إضافة أزرار اللعب المباشر في الصفحة الرئيسية
+// ============================================================
+
+// ✅ تعديل دالة _renderDashboard لإضافة زر اللعب المباشر
+const originalRenderDashboard = App._renderDashboard;
+
+App._renderDashboard = function() {
+    const user = AuthService.currentUser;
+    const level = user ? getLevel(user.totalScore || 0) : { level: 1 };
+    const rank = user ? getRank(user.rankPoints || 0) : { name: 'برونزي 1', progress: 0, icon: '🥉', nextName: 'برونزي 2' };
+    const progress = user ? getLevelProgress(user.totalScore || 0) : { progress: 0, currentLevel: 1, nextMin: 1000 };
+    const stats = user?.stats || {};
+    const gamesPlayed = stats.gamesPlayed || 0;
+    const gamesWon = stats.gamesWon || 0;
+    const winRate = gamesPlayed > 0 ? Math.round((gamesWon / gamesPlayed) * 100) : 0;
+    const avatarHtml = user?.avatar ? `<img src="${user.avatar}" alt="avatar">` : '👤';
+    const isAdmin = this._isAdminUser();
+
+    return `
+    <div class="dashboard-container">
+        <!-- خلفية -->
+        <div class="dashboard-bg"></div>
+
+        <!-- المحتوى -->
+        <div class="dashboard-content">
+
+            <!-- الشريط العلوي: القائمة ☰ + النقود + المتجر -->
+            <div class="dashboard-top-bar">
+                <button class="menu-icon-btn" id="dashboardMenuBtn" title="القائمة">
+                    <i class="fas fa-bars"></i>
+                    <span class="notif-dot" id="menuNotificationBadge" style="display:none;"></span>
+                </button>
+                <div class="top-currencies">
+                    <span class="coin-display"><i class="fas fa-coins"></i> <span id="dashboardCoins">${user?.coins || 0}</span></span>
+                    <span class="gem-display"><i class="fas fa-gem"></i> <span id="dashboardGems">${user?.gems || 0}</span></span>
+                    <button class="store-btn" id="dashboardStoreBtnNew"><i class="fas fa-store"></i></button>
+                </div>
+            </div>
+
+            <!-- القائمة المنسدلة -->
+            <div class="dropdown-menu" id="dashboardDropdownMenu">
+                <div class="dropdown-item" data-action="notifications"><i class="fas fa-bell"></i> الإشعارات <span class="badge-dot" id="dropdownNotifBadge"></span></div>
+                <div class="dropdown-item" data-action="friends"><i class="fas fa-user-friends"></i> الأصدقاء</div>
+                <div class="dropdown-divider"></div>
+                <div class="dropdown-item" data-action="questions"><i class="fas fa-question-circle"></i> الأسئلة</div>
+                <div class="dropdown-item" data-action="admin" style="display:${isAdmin ? 'flex' : 'none'};">
+                    <i class="fas fa-shield-halved"></i>
+                    <span>لوحة المشرف</span>
+                </div>
+                <div class="dropdown-divider"></div>
+                <div class="dropdown-item" data-action="settings"><i class="fas fa-cog"></i> الإعدادات</div>
+                <div class="dropdown-divider"></div>
+                <div class="dropdown-item logout" id="dashboardLogoutBtn"><i class="fas fa-sign-out-alt"></i> تسجيل الخروج</div>
+            </div>
+
+            <!-- بطاقة الملف الشخصي -->
+            <div class="profile-card" id="dashboardProfileClick">
+                <div class="profile-left">
+                    <!-- المستوى -->
+                    <div class="level-box">
+                        <div class="level-header">
+                            <span>المستوى <strong id="dashboardLevelNum">${progress.currentLevel || 1}</strong></span>
+                            <span id="dashboardLevelPoints">${user?.totalScore || 0}</span>
+                        </div>
+                        <div class="progress-track"><div class="progress-fill" id="dashboardLevelProgress" style="width:${progress.progress}%;"></div></div>
+                        <div class="level-next">إلى المستوى التالي: <span id="dashboardLevelMax">${progress.nextMin || 1000}</span></div>
+                    </div>
+                    <!-- الرتبة -->
+                    <div class="rank-box">
+                        <div class="rank-header">
+                            <span><span class="rank-icon">${rank.icon || '🏅'}</span> <strong id="dashboardRankName">${rank.name}</strong></span>
+                            <span id="dashboardRankPoints">${user?.rankPoints || 0}</span>
+                        </div>
+                        <div class="rank-track"><div class="rank-fill" id="dashboardRankProgress" style="width:${rank.progress}%;"></div></div>
+                        <div class="rank-next">إلى الرتبة التالية: <span id="dashboardRankNext">${rank.nextName || 'مكتمل 🏆'}</span></div>
+                    </div>
+                </div>
+                <div class="profile-top">
+                    <div class="avatar-large" id="dashboardAvatar">${avatarHtml}</div>
+                    <div class="user-fullname" id="dashboardUserName">${user?.displayName || user?.username || 'زائر'}</div>
+                </div>
+            </div>
+
+            <!-- الباتل باس -->
+            <div class="battlepass-box">
+                <span>🎟️ الباتل باس قريباً...</span>
+            </div>
+
+<!-- ✅ أزرار الإجراءات (مع زر اللعب المباشر) -->
+<div class="action-buttons">
+    <button class="btn-action primary" id="dashboardPlayBtn"><i class="fas fa-play"></i> العب الآن</button>
+    <button class="btn-action direct-match" id="dashboardDirectMatchBtn">
+        <i class="fas fa-bolt"></i> لعب مباشر 🎯
+    </button>
+    <button class="btn-action secondary" id="dashboardMultiplayerBtn"><i class="fas fa-users"></i> لعب جماعي</button>
+    <button class="btn-action" id="dashboardAchievementsBtn"><i class="fas fa-star"></i> الإنجازات</button>
+</div>
+
+        </div>
+    </div>
+    `;
+};
+
+// ============================================================
+// ربط زر اللعب المباشر
+// ============================================================
+
+// ✅ ربط زر اللعب المباشر
+document.addEventListener('click', function(e) {
+    const target = e.target.closest('#dashboardDirectMatchBtn');
+    if (target) {
+        e.preventDefault();
+        // بدء البحث مباشرة بدون إعدادات
+        MatchmakingSystem.startMatchmaking();
+    }
+});
+
+// ✅ دالة بدء اللعب المباشر (بدون إعدادات)
+App._startDirectMatch = function() {
+    if (!AuthService.currentUser) {
+        showToast('يجب تسجيل الدخول أولاً', 'error');
+        return;
+    }
+    MatchmakingSystem.startMatchmaking();
+};
+
+// ============================================================
+// عرض مباراة مباشرة
+// ============================================================
+
+App._showDirectMatchGame = function(matchId) {
+    // استخدام واجهة اللعب الجماعي الحالية
+    const container = document.getElementById('directMatchContainer');
+    if (!container) {
+        // إنشاء حاوية إذا لم تكن موجودة
+        const newContainer = document.createElement('div');
+        newContainer.id = 'directMatchContainer';
+        newContainer.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1050;
+            background: var(--dark);
+            padding: 1rem;
+            overflow-y: auto;
+            display: none;
+        `;
+        document.body.appendChild(newContainer);
+    }
+
+    // عرض المباراة باستخدام واجهة MultiplayerManager المعدلة
+    const containerEl = document.getElementById('directMatchContainer');
+    containerEl.style.display = 'block';
+    
+    // جلب بيانات المباراة
+    db.collection('directMatches').doc(matchId).get().then((doc) => {
+        if (!doc.exists) {
+            containerEl.innerHTML = '<div class="text-gray">المباراة غير موجودة</div>';
+            return;
+        }
+        const match = doc.data();
+        App._renderDirectMatch(matchId, match);
+    });
+};
+
+App._renderDirectMatch = function(matchId, match) {
+    const container = document.getElementById('directMatchContainer');
+    if (!container) return;
+
+    const user = AuthService.currentUser;
+    const currentQ = match.currentQuestion || 0;
+    const questions = match.questions || [];
+    if (currentQ >= questions.length) {
+        // انتهت المباراة
+        return;
+    }
+
+    const question = questions[currentQ];
+    const players = match.players || [];
+    const answers = match.answers || {};
+    const scores = match.scores || {};
+
+    const timeLimit = match.settings?.timeLimit || 15;
+    const elapsed = (Date.now() - match.questionStartTime) / 1000;
+    const timeLeft = Math.max(0, timeLimit - Math.floor(elapsed));
+
+    // عرض اللاعبين
+    const sortedPlayers = [...players].sort((a, b) => {
+        const scoreA = scores[a.uid]?.score || 0;
+        const scoreB = scores[b.uid]?.score || 0;
+        return scoreB - scoreA;
+    });
+
+    const userAnswered = user && answers[user.uid] && answers[user.uid][currentQ] !== undefined;
+
+    // بناء HTML
+    let html = `
+        <div style="max-width:800px;margin:0 auto;">
+            <div class="game-header" style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 1rem;background:var(--card-bg);border-radius:var(--radius-sm);margin-bottom:1rem;">
+                <div style="display:flex;gap:0.8rem;align-items:center;">
+                    <span class="badge badge-primary">⚡ ${currentQ+1}/${questions.length}</span>
+                    <span class="badge ${timeLeft <= 5 ? 'badge-danger' : 'badge-warning'}">⏱ ${timeLeft}s</span>
+                </div>
+                <button class="btn btn-sm btn-danger" onclick="App._exitDirectMatch()">
+                    <i class="fas fa-times"></i> خروج
+                </button>
+            </div>
+
+            <div class="question-box" style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius);padding:2rem;text-align:center;margin-bottom:1rem;">
+                <div class="q-category" style="display:inline-block;background:var(--primary);color:#fff;padding:4px 20px;border-radius:30px;font-size:0.8rem;font-weight:700;margin-bottom:0.5rem;">
+                    📚 ${question.category || 'عام'}
+                </div>
+                <div class="q-type-badge" style="display:inline-block;background:var(--glass);color:var(--gray);padding:2px 14px;border-radius:30px;font-size:0.7rem;margin-right:0.5rem;">
+                    ${GameEngine._getTypeLabel(question.type)}
+                </div>
+                <div class="q-text" style="font-size:1.3rem;font-weight:700;margin:0.5rem 0 1.5rem;line-height:1.8;">${question.question}</div>
+                <div class="options-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;max-width:600px;margin:0 auto;">
+    `;
+
+    // عرض الخيارات حسب نوع السؤال
+    if (question.type === 'multiple_choice' || question.type === 'true_false') {
+        const opts = question.options || [];
+        opts.forEach((opt, idx) => {
+            const isSelected = userAnswered && answers[user.uid][currentQ].answer === idx;
+            const isCorrect = isSelected && answers[user.uid][currentQ].isCorrect;
+            const isWrong = isSelected && !isCorrect;
+            let btnClass = 'option-btn';
+            if (userAnswered) {
+                btnClass += ' disabled';
+                if (idx === question.correct) btnClass += ' show-correct';
+                if (isWrong) btnClass += ' selected-wrong';
+            }
+            html += `
+                <button class="${btnClass}" onclick="MatchmakingSystem.submitAnswer(${idx})" ${userAnswered ? 'disabled' : ''}>
+                    ${String.fromCharCode(65 + idx)}. ${opt}
+                </button>
+            `;
+        });
+    } else if (question.type === 'fill_blank') {
+        html += `
+            <div style="grid-column:1/-1;display:flex;gap:0.5rem;justify-content:center;max-width:400px;margin:0 auto;">
+                <input type="text" id="directFillBlankInput" placeholder="اكتب الإجابة..." 
+                       style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);color:var(--light);" 
+                       ${userAnswered ? 'disabled' : ''}>
+                <button class="btn btn-primary" onclick="App._submitDirectFillBlank()" ${userAnswered ? 'disabled' : ''}>
+                    تأكيد
+                </button>
+            </div>
+        `;
+    }
+
+    html += `
+                </div>
+            </div>
+
+            <div class="card" style="padding:0.8rem;">
+                <div class="card-title" style="font-size:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.3rem;">
+                    <span><i class="fas fa-crown" style="color:var(--accent);"></i> الترتيب</span>
+                    <span style="font-size:0.7rem;color:var(--gray);">
+                        ⭐ النقاط • ✅ الصحيح
+                    </span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.3rem;">
+    `;
+
+    sortedPlayers.forEach((p, i) => {
+        const isMe = p.uid === user?.uid;
+        const pScore = scores[p.uid]?.score || 0;
+        const pCorrect = scores[p.uid]?.correct || 0;
+        const pWrong = scores[p.uid]?.wrong || 0;
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
+        const isTop = i < 3;
+
+        html += `
+            <div class="player-rank-item ${isTop ? 'top' : ''} ${isMe ? 'me' : ''}" 
+                 style="background:${isTop ? 'var(--accent)' : (isMe ? 'var(--primary)' : 'var(--glass)')};
+                        ${isTop ? 'color:var(--dark);' : ''}
+                        ${isMe && !isTop ? 'color:#fff;' : ''}
+                        padding:0.3rem 0.6rem;border-radius:6px;
+                        display:flex;justify-content:space-between;align-items:center;
+                        border:${isMe ? '2px solid var(--accent)' : '1px solid var(--glass-border)'};">
+                <div style="display:flex;align-items:center;gap:0.3rem;min-width:0;">
+                    <span style="font-weight:700;font-size:0.9rem;flex-shrink:0;">${medal}</span>
+                    <span style="font-weight:600;font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;">
+                        ${p.name} ${isMe ? '👈' : ''}
+                    </span>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
+                    <span style="font-weight:700;font-size:0.9rem;color:${isTop ? 'var(--dark)' : 'var(--accent)'};">⭐ ${pScore}</span>
+                    <span style="font-size:0.6rem;color:${isTop ? 'rgba(0,0,0,0.5)' : 'var(--gray)'};">
+                        ✅${pCorrect}
+                    </span>
+                </div>
+            </div>
+        `;
+    });
+
+    html += `
+                </div>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+};
 
 // ============================================================
 // 9. تشغيل التطبيق
