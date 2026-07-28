@@ -6713,7 +6713,6 @@ body.light-theme .dashboard-menu-icon {
 .dashboard-container {
     position: relative;
     min-height: 100vh;
-    background: linear-gradient(135deg, #0f0e17, #1a1a2e);
     padding: 0.8rem 0.6rem;
     overflow-x: hidden;
 }
@@ -7441,24 +7440,6 @@ body.light-theme #registerForm .form-group select option {
     color: #1a1a2e !important;
 }
 
-/* ============================================================
-   إصلاح خلفية الصفحة الرئيسية في الوضع الفاتح
-   ============================================================ */
-
-/* تعديل خلفية الصفحة الرئيسية لتتغير مع الثيم */
-.dashboard-container {
-    position: relative;
-    min-height: 100vh;
-    background: linear-gradient(135deg, #0f0e17, #1a1a2e); /* الوضع الداكن */
-    padding: 0.8rem 0.6rem;
-    overflow-x: hidden;
-    transition: background 0.4s ease;
-}
-
-/* خلفية الصفحة الرئيسية في الوضع الفاتح */
-body.light-theme .dashboard-container {
-    background: linear-gradient(135deg, #f5f7fa, #e8ecf1) !important;
-}
 
 /* تعديل خلفية عناصر الصفحة الرئيسية في الوضع الفاتح */
 body.light-theme .dashboard-container .profile-card {
@@ -8371,4 +8352,36 @@ body.light-theme .game-info-bar .badge-success {
     #loadingScreen {
         background-size: contain; /* الصورة كاملة في الشاشات الصغيرة */
     }
+}
+
+/* ============================================================
+   خلفية الصفحة الرئيسية
+   ============================================================ */
+
+/* ✅ خلفية الصفحة الرئيسية فقط */
+#section-dashboard {
+    background-image: url('images/dashboard-bg.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    min-height: 100vh;
+}
+
+/* ✅ طبقة تعتيم فوق الخلفية لضمان وضوح النص */
+#section-dashboard::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 14, 23, 0.75);
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* ✅ التأكد من أن المحتوى فوق الخلفية */
+.dashboard-container {
+    position: relative;
+    z-index: 1;
 }
