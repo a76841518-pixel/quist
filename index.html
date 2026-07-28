@@ -13,7 +13,7 @@
     <div class="glow-bg"></div>
     <div class="glow-bg glow-bg-2"></div>
 
-<!-- شريط تقدم التحميل مع خلفية -->
+<!-- شاشة التحميل -->
 <div id="loadingScreen" style="
     position: fixed;
     top: 0;
@@ -27,21 +27,12 @@
     justify-content: center;
     z-index: 999999;
     transition: opacity 0.5s ease;
+    background-image: url('images/loading-bg.jpg');
+    background-size: contain;    /* ✅ تظهر الصورة كاملة داخل الشاشة */
+    background-position: center;
+    background-repeat: no-repeat;
 ">
-    <!-- ✅ طبقة الصورة كخلفية (باستخدام img بدلاً من background-image) -->
-    <img src="images/loading-bg.jpg" alt="خلفية التحميل" style="
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        z-index: 0;
-    " onerror="this.style.display='none'">
-    
-    <!-- ✅ طبقة التعتيم فوق الصورة -->
+    <!-- طبقة التعتيم -->
     <div style="
         position: absolute;
         top: 0;
@@ -52,6 +43,19 @@
         backdrop-filter: blur(6px);
         z-index: 1;
     "></div>
+
+<img src="images/loading-bg.jpg" alt="خلفية التحميل" style="
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;      /* ✅ تغطي الشاشة بالكامل */
+    object-position: center; /* ✅ تتمركز في المنتصف */
+    z-index: 0;
+" onerror="this.style.display='none'">
     
     <!-- المحتوى فوق الخلفية -->
     <div style="position: relative; z-index: 2; text-align:center;">
