@@ -9,12 +9,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet" />
 </head>
 <body>
-    <!-- Background Effects -->
-    <div class="glow-bg"></div>
-    <div class="glow-bg glow-bg-2"></div>
-
-<!-- شاشة التحميل -->
-<div id="loadingScreen" style="
+    
+<!-- ============================================================
+     شاشة التحقق من المستخدم
+     ============================================================ -->
+<div id="splashScreen" style="
     position: fixed;
     top: 0;
     left: 0;
@@ -22,66 +21,465 @@
     bottom: 0;
     background: #0f0e17;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    z-index: 999999;
+    z-index: 99999999;
+    flex-direction: column;
     transition: opacity 0.5s ease;
-    background-image: url('images/loading-bg.jpg');
-    background-size: contain;    /* ✅ تظهر الصورة كاملة داخل الشاشة */
-    background-position: center;
-    background-repeat: no-repeat;
 ">
-    <!-- طبقة التعتيم -->
+    <!-- الصورة كخلفية -->
+    <img src="images/loading-bg.jpg" alt="خلفية" style="
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: 0;
+    " onerror="this.style.display='none'">
+
+    <!-- طبقة تعتيم -->
     <div style="
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(15, 14, 23, 0.75);
+        background: rgba(15, 14, 23, 0.85);
         backdrop-filter: blur(6px);
         z-index: 1;
     "></div>
 
-<img src="images/loading-bg.jpg" alt="خلفية التحميل" style="
-    position: absolute;
+    <!-- المحتوى -->
+    <div style="position: relative; z-index: 2; text-align: center; width: 100%; max-width: 400px; padding: 1rem;">
+        
+        <!-- ✅ صورة الشعار (نفس مكان الكرة تماماً) -->
+        <div style="font-size: 4rem; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: center;">
+            <img src="images/logo.png" alt="شعار اللعبة" style="
+                width: 90px;
+                height: 90px;
+                object-fit: contain;
+                display: block;
+            " onerror="this.style.display='none'; this.parentElement.textContent='⚽'">
+        </div>
+
+        <h1 style="color: #fffffe; font-size: 2rem; font-weight: 900; margin-bottom: 0.3rem;">معركة العقول</h1>
+        <p style="color: #a7a9be; margin-bottom: 0.5rem; font-size: 0.95rem;">🏆 تحدي المعرفة وارتقِ إلى القمة</p>
+
+        <!-- رسالة ترحيب -->
+        <div id="splashWelcome" style="
+            display: none;
+            color: #FFD93D;
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 0.8rem;
+            padding: 0.5rem 1rem;
+            background: rgba(255, 217, 61, 0.1);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 217, 61, 0.2);
+        ">
+            👋 مرحباً بعودتك، <span id="splashUserName"></span>!
+        </div>
+
+        <!-- شريط التقدم -->
+        <div style="width: 100%; max-width: 350px; margin: 0 auto;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #a7a9be; margin-bottom: 0.3rem;">
+                <span id="splashStatus">🔍 جاري التحقق من الحساب...</span>
+                <span id="splashPercent">0%</span>
+            </div>
+            <div style="height: 8px; background: rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden;">
+                <div id="splashProgress" style="
+                    height: 100%;
+                    width: 0%;
+                    background: linear-gradient(90deg, #6C63FF, #FFD93D, #6C63FF);
+                    background-size: 200% 100%;
+                    border-radius: 10px;
+                    transition: width 0.5s ease;
+                    animation: shimmer 1.5s infinite;
+                "></div>
+            </div>
+        </div>
+
+        <!-- نقاط متحركة -->
+        <div style="margin-top: 1.5rem; display: flex; gap: 0.6rem; justify-content: center;">
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: #6C63FF; animation: dotPulse 1.2s infinite alternate;"></span>
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: #FFD93D; animation: dotPulse 1.2s infinite alternate 0.4s;"></span>
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: #6C63FF; animation: dotPulse 1.2s infinite alternate 0.8s;"></span>
+        </div>
+    </div>
+</div>
+
+    <!-- Background Effects -->
+    <div class="glow-bg"></div>
+    <div class="glow-bg glow-bg-2"></div>
+
+<!-- ============================================================
+     شاشة الدخول / التسجيل
+     ============================================================ -->
+<div id="authPage" style="
+    position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;      /* ✅ تغطي الشاشة بالكامل */
-    object-position: center; /* ✅ تتمركز في المنتصف */
-    z-index: 0;
-" onerror="this.style.display='none'">
-    
-    <!-- المحتوى فوق الخلفية -->
-    <div style="position: relative; z-index: 2; text-align:center;">
-        <div class="loading-logo" style="font-size:4rem; margin-bottom:0.5rem;">⚽</div>
-        <h2 style="color:#fffffe; font-weight:900; font-size:2rem; margin-bottom:0.3rem; text-shadow: 0 4px 30px rgba(0,0,0,0.5);">معركة العقول</h2>
-        <p style="color:#a7a9be; margin-bottom:1.5rem; font-size:1rem;">🏆 تحدي المعرفة وارتقِ إلى القمة</p>
-        
-        <div style="width:350px; max-width:85%; margin:0 auto;">
-            <div style="height:8px; background:rgba(255,255,255,0.1); border-radius:10px; overflow:hidden; box-shadow: 0 0 20px rgba(108,99,255,0.2);">
-                <div id="loadingProgress" style="height:100%; width:0%; background:linear-gradient(90deg, #6C63FF, #FFD93D, #6C63FF); background-size: 200% 100%; border-radius:10px; transition:width 0.4s ease; animation: shimmer 1.5s infinite;"></div>
+    background: #0f0e17;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999999;
+    padding: 1rem;
+">
+    <!-- الصورة كخلفية -->
+    <img src="images/loading-bg.jpg" alt="خلفية" style="
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: 0;
+    " onerror="this.style.display='none'">
+
+    <!-- طبقة تعتيم -->
+    <div style="
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(15, 14, 23, 0.88);
+        backdrop-filter: blur(8px);
+        z-index: 1;
+    "></div>
+
+    <!-- المحتوى -->
+    <div style="position: relative; z-index: 2; width: 100%; max-width: 400px;">
+
+        <!-- الشعار -->
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <!-- ✅ صورة الشعار (أكبر قليلاً) -->
+            <div style="font-size: 4rem; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: center;">
+                <img src="images/logo.png" alt="شعار اللعبة" style="
+                    width: 90px;
+                    height: 90px;
+                    object-fit: contain;
+                    display: block;
+                " onerror="this.style.display='none'; this.parentElement.textContent='⚽'">
             </div>
-            <div style="display:flex; justify-content:space-between; margin-top:0.5rem; font-size:0.85rem; color:#a7a9be;">
+            <h1 style="color: #fffffe; font-size: 2rem; font-weight: 900; margin-bottom: 0.3rem;">معركة العقول</h1>
+            <p style="color: #a7a9be; font-size: 0.95rem;">🏆 تحدي المعرفة وارتقِ إلى القمة</p>
+        </div>
+
+        <!-- ===== الأزرار الرئيسية ===== -->
+        <div id="authMainButtons" style="display: flex; flex-direction: column; gap: 1rem;">
+            <button id="authShowLoginBtn" style="
+                width: 100%;
+                padding: 16px;
+                border-radius: 40px;
+                border: none;
+                background: #6C63FF;
+                color: #fff;
+                font-weight: 700;
+                font-size: 1.1rem;
+                cursor: pointer;
+                box-shadow: 0 4px 20px rgba(108, 99, 255, 0.3);
+                transition: all 0.3s ease;
+            ">
+                <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
+            </button>
+            <button id="authShowRegisterBtn" style="
+                width: 100%;
+                padding: 16px;
+                border-radius: 40px;
+                border: 2px solid #6C63FF;
+                background: transparent;
+                color: #fffffe;
+                font-weight: 700;
+                font-size: 1.1rem;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            ">
+                <i class="fas fa-user-plus"></i> إنشاء حساب
+            </button>
+        </div>
+
+        <!-- ===== نموذج تسجيل الدخول (مخفي) ===== -->
+        <div id="authLoginForm" style="display: none;">
+            <button id="authBackToMainBtn" style="
+                background: transparent;
+                border: none;
+                color: #a7a9be;
+                font-size: 0.85rem;
+                cursor: pointer;
+                margin-bottom: 1rem;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            ">
+                <i class="fas fa-arrow-right"></i> العودة
+            </button>
+
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; color: #a7a9be; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">البريد الإلكتروني</label>
+                <input type="email" id="authLoginEmail" placeholder="example@mail.com" style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border-radius: 12px;
+                    border: 1px solid rgba(255,255,255,0.1);
+                    background: rgba(255,255,255,0.05);
+                    color: #fffffe;
+                    font-size: 1rem;
+                ">
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: block; color: #a7a9be; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">كلمة المرور</label>
+                <input type="password" id="authLoginPassword" placeholder="••••••••" style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border-radius: 12px;
+                    border: 1px solid rgba(255,255,255,0.1);
+                    background: rgba(255,255,255,0.05);
+                    color: #fffffe;
+                    font-size: 1rem;
+                ">
+            </div>
+
+            <div id="authLoginError" style="display: none; color: #FF6B6B; font-size: 0.85rem; margin-bottom: 1rem; text-align: center;"></div>
+
+            <button type="submit" id="authLoginBtn" style="
+                width: 100%;
+                padding: 14px;
+                border-radius: 40px;
+                border: none;
+                background: #6C63FF;
+                color: #fff;
+                font-weight: 700;
+                font-size: 1rem;
+                cursor: pointer;
+                box-shadow: 0 4px 20px rgba(108, 99, 255, 0.3);
+                transition: all 0.3s ease;
+            ">
+                <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
+            </button>
+        </div>
+
+        <!-- ===== نموذج التسجيل (مخفي) ===== -->
+        <div id="authRegisterForm" style="display: none;">
+            <button id="authBackToMainBtn2" style="
+                background: transparent;
+                border: none;
+                color: #a7a9be;
+                font-size: 0.85rem;
+                cursor: pointer;
+                margin-bottom: 1rem;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            ">
+                <i class="fas fa-arrow-right"></i> العودة
+            </button>
+
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; color: #a7a9be; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">الاسم الكامل</label>
+                <input type="text" id="authRegFullName" placeholder="اسم اللاعب" style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border-radius: 12px;
+                    border: 1px solid rgba(255,255,255,0.1);
+                    background: rgba(255,255,255,0.05);
+                    color: #fffffe;
+                    font-size: 1rem;
+                ">
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; color: #a7a9be; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">اسم المستخدم</label>
+                <input type="text" id="authRegUsername" placeholder="ahmad_2024" style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border-radius: 12px;
+                    border: 1px solid rgba(255,255,255,0.1);
+                    background: rgba(255,255,255,0.05);
+                    color: #fffffe;
+                    font-size: 1rem;
+                ">
+                <div id="authRegUsernameStatus" style="font-size: 0.75rem; margin-top: 0.3rem; color: #a7a9be;"></div>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; color: #a7a9be; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">البريد الإلكتروني</label>
+                <input type="email" id="authRegEmail" placeholder="example@gmail.com" style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border-radius: 12px;
+                    border: 1px solid rgba(255,255,255,0.1);
+                    background: rgba(255,255,255,0.05);
+                    color: #fffffe;
+                    font-size: 1rem;
+                ">
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; color: #a7a9be; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">كلمة المرور</label>
+                <input type="password" id="authRegPassword" placeholder="••••••••" style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border-radius: 12px;
+                    border: 1px solid rgba(255,255,255,0.1);
+                    background: rgba(255,255,255,0.05);
+                    color: #fffffe;
+                    font-size: 1rem;
+                ">
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: block; color: #a7a9be; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">تأكيد كلمة المرور</label>
+                <input type="password" id="authRegPasswordConfirm" placeholder="••••••••" style="
+                    width: 100%;
+                    padding: 12px 16px;
+                    border-radius: 12px;
+                    border: 1px solid rgba(255,255,255,0.1);
+                    background: rgba(255,255,255,0.05);
+                    color: #fffffe;
+                    font-size: 1rem;
+                ">
+            </div>
+
+            <div id="authRegError" style="display: none; color: #FF6B6B; font-size: 0.85rem; margin-bottom: 1rem; text-align: center;"></div>
+
+            <button type="submit" id="authRegisterBtn" style="
+                width: 100%;
+                padding: 14px;
+                border-radius: 40px;
+                border: none;
+                background: #2ecc71;
+                color: #fff;
+                font-weight: 700;
+                font-size: 1rem;
+                cursor: pointer;
+                box-shadow: 0 4px 20px rgba(46, 204, 113, 0.3);
+                transition: all 0.3s ease;
+            ">
+                <i class="fas fa-user-plus"></i> إنشاء حساب
+            </button>
+        </div>
+
+        <!-- ===== رسالة أسفل الشاشة ===== -->
+        <div style="text-align: center; margin-top: 1.5rem; color: #a7a9be; font-size: 0.8rem;">
+            🔒 بياناتك آمنة ومشفرة
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     شاشة التحميل الرئيسية
+     ============================================================ -->
+<div id="loadingScreen" style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #0f0e17;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 999999;
+    flex-direction: column;
+    transition: opacity 0.5s ease;
+">
+    <!-- الصورة كخلفية -->
+    <img src="images/loading-bg.jpg" alt="خلفية" style="
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: 0;
+    " onerror="this.style.display='none'">
+
+    <!-- طبقة تعتيم -->
+    <div style="
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(15, 14, 23, 0.85);
+        backdrop-filter: blur(6px);
+        z-index: 1;
+    "></div>
+
+    <!-- ✅ رسالة ترحيب مثبتة في الأعلى (لا تؤثر على باقي العناصر) -->
+    <div id="loadingWelcome" style="
+        display: none;
+        position: absolute;
+        top: 40px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 3;
+        color: #FFD93D;
+        font-size: 1.1rem;
+        font-weight: 700;
+        padding: 0.5rem 1.5rem;
+        background: rgba(255, 217, 61, 0.1);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 217, 61, 0.2);
+        white-space: nowrap;
+        max-width: 90%;
+        text-align: center;
+        animation: fadeUp 0.5s ease;
+    ">
+        👋 مرحباً بك، <span id="loadingUserName"></span>!
+    </div>
+
+    <!-- المحتوى -->
+    <div style="position: relative; z-index: 2; text-align: center; width: 100%; max-width: 400px; padding: 1rem;">
+        <!-- ✅ صورة الشعار (نفس مكان الكرة تماماً) -->
+        <div style="font-size: 4rem; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: center;">
+            <img src="images/logo.png" alt="شعار اللعبة" style="
+                width: 90px;
+                height: 90px;
+                object-fit: contain;
+                display: block;
+            " onerror="this.style.display='none'; this.parentElement.textContent='⚽'">
+        </div>
+
+        <h1 style="color: #fffffe; font-size: 2rem; font-weight: 900; margin-bottom: 0.3rem;">معركة العقول</h1>
+        <p style="color: #a7a9be; margin-bottom: 0.5rem; font-size: 0.95rem;">🏆 تحدي المعرفة وارتقِ إلى القمة</p>
+
+        <!-- شريط التقدم -->
+        <div style="width: 100%; max-width: 350px; margin: 0 auto;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #a7a9be; margin-bottom: 0.3rem;">
                 <span id="loadingStatus">⚡ شحن المحركات...</span>
                 <span id="loadingPercent">0%</span>
             </div>
+            <div style="height: 8px; background: rgba(255,255,255,0.08); border-radius: 10px; overflow: hidden;">
+                <div id="loadingProgress" style="
+                    height: 100%;
+                    width: 0%;
+                    background: linear-gradient(90deg, #6C63FF, #FFD93D, #6C63FF);
+                    background-size: 200% 100%;
+                    border-radius: 10px;
+                    transition: width 0.5s ease;
+                    animation: shimmer 1.5s infinite;
+                "></div>
+            </div>
         </div>
-        
-        <!-- تأثير جسيمات -->
-        <div style="margin-top:2rem; display:flex; gap:1rem; justify-content:center; opacity:0.5;">
-            <span style="width:8px; height:8px; border-radius:50%; background:#6C63FF; animation: dotPulse 1.2s infinite alternate;"></span>
-            <span style="width:8px; height:8px; border-radius:50%; background:#FFD93D; animation: dotPulse 1.2s infinite alternate 0.4s;"></span>
-            <span style="width:8px; height:8px; border-radius:50%; background:#6C63FF; animation: dotPulse 1.2s infinite alternate 0.8s;"></span>
-        </div>
-        
-        <!-- ✅ رسالة تفعيل الصوت -->
-        <div style="margin-top:1.5rem; font-size:0.8rem; color:#a7a9be; opacity:0.6; animation: pulse 2s infinite;">
+
+        <!-- نقاط متحركة -->
+        <div style="margin-top: 1.5rem; display: flex; gap: 0.6rem; justify-content: center;">
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: #6C63FF; animation: dotPulse 1.2s infinite alternate;"></span>
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: #FFD93D; animation: dotPulse 1.2s infinite alternate 0.4s;"></span>
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: #6C63FF; animation: dotPulse 1.2s infinite alternate 0.8s;"></span>
         </div>
     </div>
 </div>
