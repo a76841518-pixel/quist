@@ -9686,3 +9686,188 @@ html, body {
         font-size: 1rem !important;
     }
 }
+
+/* ===== العد التنازلي ===== */
+@keyframes countPulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+#countdownNumber {
+    animation: countPulse 1s ease infinite;
+    font-family: 'Tajawal', sans-serif;
+}
+
+/* ===== شاشة انتظار الخصم ===== */
+.match-found-animation {
+    animation: matchFound 0.5s ease;
+}
+
+@keyframes matchFound {
+    0% { transform: scale(0.8); opacity: 0; }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* ===== نقاط التحميل ===== */
+.search-dot {
+    transition: all 0.3s ease;
+}
+
+/* ===== العد التنازلي في المباراة ===== */
+.countdown-container {
+    background: radial-gradient(circle at center, rgba(108, 99, 255, 0.1), transparent 70%);
+    border-radius: 50%;
+    padding: 2rem;
+    margin: 0 auto;
+    max-width: 300px;
+}
+
+/* ============================================================
+   أنماط اللعب المباشر المتطورة
+   ============================================================ */
+
+/* تأثير التوهج للاعب المتصدر */
+.player-leading {
+    animation: leaderGlow 2s ease-in-out infinite;
+}
+
+@keyframes leaderGlow {
+    0%, 100% { box-shadow: 0 0 20px rgba(255, 217, 61, 0.1); }
+    50% { box-shadow: 0 0 40px rgba(255, 217, 61, 0.3); }
+}
+
+/* تأثير النبض للمؤقت */
+@keyframes timerPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+/* تأثير ظهور الخيارات */
+.option-btn {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.option-btn:hover:not(.disabled) {
+    transform: translateY(-2px);
+    border-color: var(--primary) !important;
+    box-shadow: 0 4px 20px rgba(108, 99, 255, 0.15);
+}
+
+.option-btn:active:not(.disabled) {
+    transform: scale(0.97);
+}
+
+.option-btn.show-correct {
+    animation: correctPulse 0.6s ease;
+}
+
+@keyframes correctPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+}
+
+.option-btn.selected-wrong {
+    animation: wrongShake 0.4s ease;
+}
+
+@keyframes wrongShake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+}
+
+/* ===== بطاقات اللاعبين ===== */
+.player-card {
+    transition: all 0.3s ease;
+}
+
+.player-card:hover {
+    transform: translateY(-2px);
+}
+
+.player-card .player-avatar {
+    transition: all 0.3s ease;
+}
+
+.player-card .player-avatar:hover {
+    transform: scale(1.05);
+}
+
+/* ===== شاشة العد التنازلي ===== */
+.countdown-number {
+    font-size: 7rem;
+    font-weight: 900;
+    color: var(--primary);
+    text-shadow: 0 0 60px rgba(108, 99, 255, 0.3);
+    animation: countPulse 1s ease infinite;
+}
+
+@keyframes countPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.15); opacity: 0.8; }
+}
+
+/* ===== حاوية المباراة ===== */
+#directMatchContainer {
+    background: radial-gradient(ellipse at 50% 0%, rgba(108, 99, 255, 0.05), var(--dark) 70%);
+}
+
+/* ===== تحسين عرض المباراة على الهواتف ===== */
+@media (max-width: 768px) {
+    #directMatchContainer {
+        padding: 0.5rem !important;
+    }
+    
+    #matchOptionsContainer {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .player-card {
+        padding: 0.4rem 0.6rem !important;
+    }
+    
+    .player-card .player-avatar {
+        width: 36px !important;
+        height: 36px !important;
+    }
+    
+    .player-card .player-name {
+        font-size: 0.75rem !important;
+    }
+    
+    .player-card .player-stats {
+        font-size: 0.6rem !important;
+    }
+    
+    .match-header {
+        padding: 0.5rem 0.8rem !important;
+    }
+    
+    .match-header .badge {
+        font-size: 0.65rem !important;
+        padding: 2px 10px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    #directMatchContainer {
+        padding: 0.3rem !important;
+    }
+    
+    .question-text {
+        font-size: 0.95rem !important;
+    }
+    
+    .option-btn {
+        font-size: 0.8rem !important;
+        padding: 8px 10px !important;
+    }
+    
+    .match-stats {
+        font-size: 0.6rem !important;
+        flex-wrap: wrap !important;
+        gap: 0.2rem !important;
+    }
+}
