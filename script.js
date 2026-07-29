@@ -5,7 +5,6 @@
 // ============================================================
 // 1. إعدادات Firebase
 // ============================================================
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyCuuiGi5XhEojPKgmWBGWJTG1sQHj630aQ",
   authDomain: "football-808ec.firebaseapp.com",
@@ -20,11 +19,29 @@ const firebaseConfig = {
 let db = null;
 let auth = null;
 let isFirebaseReady = false;
+let rtdb = null;
 
+// ✅ تهيئة Firebase بشكل صحيح
 try {
-    firebase.initializeApp(firebaseConfig);
+    // التحقق من عدم وجود تطبيق مكرر
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+        console.log('✅ Firebase initialized successfully');
+    } else {
+        console.log('✅ Firebase already initialized');
+    }
+    
     db = firebase.firestore();
     auth = firebase.auth();
+    
+    // ✅ تهيئة Realtime Database
+    if (typeof firebase.database === 'function') {
+        rtdb = firebase.database();
+        console.log('✅ Realtime Database initialized');
+    } else {
+        console.warn('⚠️ firebase.database is not available');
+    }
+    
     isFirebaseReady = true;
     updateFirebaseStatus(true);
 } catch (e) {
@@ -46,22 +63,63 @@ function updateFirebaseStatus(online) {
     }
 }
 
+// ============================================================
+// دالة مساعدة للحصول على TIMESTAMP
+// ============================================================
+function getRealtimeTimestamp() {
+    if (rtdb && rtdb.ServerValue && rtdb.ServerValue.TIMESTAMP) {
+        return rtdb.ServerValue.TIMESTAMP;
+    }
+    // ✅ البديل: استخدام وقت الخادم المحلي
+    return Date.now();
+}
+
+// ============================================================
+// Realtime Service - نسخة محسنة
+// ============================================================
 const RealtimeService = {
     _refs: {},
+    _isReady: false,
+
+    checkReady() {
+        if (!rtdb) {
+            console.warn('⚠️ Realtime Database not ready, attempting re-init...');
+            try {
+                if (typeof firebase !== 'undefined' && firebase.database) {
+                    rtdb = firebase.database();
+                    console.log('✅ Realtime Database re-initialized');
+                }
+            } catch (e) {
+                console.error('❌ Failed to re-initialize Realtime Database:', e);
+            }
+        }
+        return !!rtdb;
+    },
 
     getRef(path) {
+        if (!this.checkReady()) {
+            throw new Error('Realtime Database not initialized');
+        }
         if (!this._refs[path]) {
-            this._refs[path] = firebase.database().ref(path);
+            this._refs[path] = rtdb.ref(path);
         }
         return this._refs[path];
+    },
+
+    // ✅ دالة جديدة لجلب بيانات مرة واحدة
+    async getOnce(path) {
+        const ref = this.getRef(path);
+        const snapshot = await ref.once('value');
+        return snapshot.val();
     },
 
     async add(path, data) {
         const ref = this.getRef(path);
         const newRef = ref.push();
+        const timestamp = getRealtimeTimestamp();
         await newRef.set({
             ...data,
-            createdAt: firebase.database.ServerValue.TIMESTAMP
+            createdAt: timestamp
         });
         return { id: newRef.key, ...data };
     },
@@ -87,32 +145,39 @@ const RealtimeService = {
         const listener = ref.on('value', (snapshot) => {
             const data = snapshot.val();
             if (!data) {
-                callback([]);
+                callback(null);
                 return;
             }
-            const results = Object.keys(data).map(key => ({ id: key, ...data[key] }));
-            callback(results);
+            if (typeof data === 'object' && !Array.isArray(data) && data !== null) {
+                const results = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+                callback(results);
+            } else {
+                callback(data);
+            }
         });
         return () => ref.off('value', listener);
     },
 
-    listenWhere(path, field, operator, value, callback) {
+    listenDoc(path, callback) {
         const ref = this.getRef(path);
         const listener = ref.on('value', (snapshot) => {
             const data = snapshot.val();
             if (!data) {
-                callback([]);
+                callback(null);
                 return;
             }
-            const results = Object.keys(data)
-                .map(key => ({ id: key, ...data[key] }))
-                .filter(item => item[field] === value);
-            callback(results);
+            callback(data);
         });
         return () => ref.off('value', listener);
+    },
+
+    getRawRef(path) {
+        if (!this.checkReady()) {
+            throw new Error('Realtime Database not initialized');
+        }
+        return rtdb.ref(path);
     }
 };
-
 const GENERAL_CATEGORIES = [
     { id: 'عام', icon: '🌍', label: 'عام' },
     { id: 'تاريخ', icon: '📜', label: 'تاريخ عام' },
@@ -7698,6 +7763,50 @@ _buildModals() {
             </div>
         </div>
 
+<!-- Match Settings Modal -->
+<div class="modal-overlay" id="matchSettingsModal">
+    <div class="modal-card" style="max-width:500px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-sliders-h"></i> إعدادات المباراة المباشرة</h3>
+            <button class="modal-close-btn" onclick="App._closeModal('matchSettingsModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div style="padding:0.5rem 0;">
+            <p class="text-gray" style="margin-bottom:1rem;">اختر الطور الذي ترغب في اللعب به</p>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.8rem;">
+                <button class="btn btn-outline mode-option active" data-mode="normal_1v1" onclick="App._selectMatchMode('normal_1v1')" style="flex-direction:column; padding:1rem; border-color:var(--primary);">
+                    <span style="font-size:2rem;">⚔️</span>
+                    <span style="font-weight:700;">عادي 1 ضد 1</span>
+                    <span style="font-size:0.7rem;color:var(--gray);">متاح الآن</span>
+                </button>
+                <button class="btn btn-outline mode-option" data-mode="normal_2v2" onclick="App._selectMatchMode('normal_2v2')" style="flex-direction:column; padding:1rem; opacity:0.5; cursor:not-allowed;" disabled>
+                    <span style="font-size:2rem;">👥</span>
+                    <span style="font-weight:700;">عادي 2 ضد 2</span>
+                    <span style="font-size:0.7rem;color:var(--gray);">قريباً</span>
+                </button>
+                <button class="btn btn-outline mode-option" data-mode="crossword_1v1" onclick="App._selectMatchMode('crossword_1v1')" style="flex-direction:column; padding:1rem; opacity:0.5; cursor:not-allowed;" disabled>
+                    <span style="font-size:2rem;">🔤</span>
+                    <span style="font-weight:700;">كلمات متقاطعة 1 ضد 1</span>
+                    <span style="font-size:0.7rem;color:var(--gray);">قريباً</span>
+                </button>
+                <button class="btn btn-outline mode-option" data-mode="crossword_2v2" onclick="App._selectMatchMode('crossword_2v2')" style="flex-direction:column; padding:1rem; opacity:0.5; cursor:not-allowed;" disabled>
+                    <span style="font-size:2rem;">🔤👥</span>
+                    <span style="font-weight:700;">كلمات متقاطعة 2 ضد 2</span>
+                    <span style="font-size:0.7rem;color:var(--gray);">قريباً</span>
+                </button>
+            </div>
+            <div style="margin-top:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">
+                الطور المختار حالياً: <strong id="selectedModeDisplay">عادي 1 ضد 1</strong>
+            </div>
+            <div style="display:flex; gap:0.5rem; justify-content:center; margin-top:1rem;">
+                <button class="btn btn-primary" onclick="App._startMatchWithCurrentMode()">
+                    <i class="fas fa-bolt"></i> ابدأ البحث
+                </button>
+                <button class="btn btn-outline" onclick="App._closeModal('matchSettingsModal')">إلغاء</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Question Modal - نسخة متطورة -->
 <div class="modal-overlay" id="questionModal">
     <div class="modal-card" style="max-width:700px;">
@@ -13489,6 +13598,15 @@ document.getElementById('checkDuplicatesBtn')?.addEventListener('click', () => {
         
         App._showDuplicateReport(questions, duplicates, similar);
     }, 100);
+});
+
+// داخل _setupUI
+document.getElementById('dashboardDirectMatchBtn')?.addEventListener('click', () => {
+    MatchmakingSystem.startMatchmaking(App._selectedMatchMode || 'normal_1v1');
+});
+
+document.getElementById('dashboardMatchSettingsBtn')?.addEventListener('click', () => {
+    App._openModal('matchSettingsModal');
 });
 
 // في _setupUI - أضف هذه الأحداث
@@ -20383,6 +20501,32 @@ App._submitMultiplayerOrdering = async function(gameId) {
     MultiplayerManager.submitAnswer(gameId, order);
 };
 
+App._selectedMatchMode = 'normal_1v1';
+
+App._selectMatchMode = function(mode) {
+    const modeNames = {
+        'normal_1v1': 'عادي 1 ضد 1',
+        'normal_2v2': 'عادي 2 ضد 2',
+        'crossword_1v1': 'كلمات متقاطعة 1 ضد 1',
+        'crossword_2v2': 'كلمات متقاطعة 2 ضد 2'
+    };
+    this._selectedMatchMode = mode;
+    document.getElementById('selectedModeDisplay').textContent = modeNames[mode] || mode;
+    document.querySelectorAll('.mode-option').forEach(btn => {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline');
+        if (btn.dataset.mode === mode) {
+            btn.classList.remove('btn-outline');
+            btn.classList.add('btn-primary');
+        }
+    });
+};
+
+App._startMatchWithCurrentMode = function() {
+    this._closeModal('matchSettingsModal');
+    MatchmakingSystem.startMatchmaking(this._selectedMatchMode);
+};
+
 App._renderMultiplayerResult = function(gameId) {
     const container = document.getElementById('multiplayerResultContent');
     if (!container) {
@@ -21552,391 +21696,359 @@ console.log('✅ تم تحديث نظام عرض الإحصائيات بالأق
 console.log('✅ تم إصلاح عرض صور الإحصائيات');
 
 // ============================================================
-// نظام اللعب المباشر - النسخة النهائية مع إصلاح المطابقة
+// نظام اللعب المباشر - النسخة المصححة مع المزامنة الكاملة
 // ============================================================
 
+// ============================================================
+// MatchmakingSystem – النسخة المُصحَّحة والمُطوَّرة
+// ============================================================
 const MatchmakingSystem = {
     _currentMatchId: null,
     _searching: false,
     _searchInterval: null,
     _currentUser: null,
     _matchUnsubscribe: null,
+    _matchmakingUnsubscribe: null,
     _searchTimerInterval: null,
     _searchStartTime: null,
-    _maxSearchTime: 120, // 120 ثانية
+    _maxSearchTime: 120,
     _isMatchCreated: false,
     _matchId: null,
+    _mode: 'normal_1v1',
+    _countdownInterval: null,
+    _isCountdownActive: false,
+    _playerReady: false,
+    _questionTimerInterval: null,
+    _questionTimeLeft: 0,
+    _questionTotalTime: 15,
+    _matchStatus: null,
+    _isEnding: false,
+    _matchFoundHandled: false, // ✅ منع معالجة المباراة مرتين
 
-    // بدء البحث عن لاعب
-    async startMatchmaking() {
+// ===== تنظيف شامل قبل بدء البحث =====
+async _cleanup() {
+    // إلغاء أي بحث سابق
+    if (this._searchInterval) {
+        clearInterval(this._searchInterval);
+        this._searchInterval = null;
+    }
+    if (this._searchTimerInterval) {
+        clearInterval(this._searchTimerInterval);
+        this._searchTimerInterval = null;
+    }
+    if (this._countdownInterval) {
+        clearInterval(this._countdownInterval);
+        this._countdownInterval = null;
+    }
+    if (this._questionTimerInterval) {
+        clearInterval(this._questionTimerInterval);
+        this._questionTimerInterval = null;
+    }
+    this._isCountdownActive = false;
+
+    // إلغاء المستمعين
+    if (this._matchUnsubscribe) {
+        this._matchUnsubscribe();
+        this._matchUnsubscribe = null;
+    }
+    if (this._matchmakingUnsubscribe) {
+        this._matchmakingUnsubscribe();
+        this._matchmakingUnsubscribe = null;
+    }
+
+    // حذف طلب البحث القديم إذا كان موجوداً
+    if (this._currentMatchId) {
+        try {
+            await RealtimeService.delete(`matchmaking/${this._mode}`, this._currentMatchId);
+        } catch (e) {
+            // تجاهل الأخطاء
+        }
+        this._currentMatchId = null;
+    }
+
+    // إعادة تعيين الحالة
+    this._searching = false;
+    this._isMatchCreated = false;
+    this._matchId = null;
+    this._matchStatus = null;
+    this._playerReady = false;
+},
+
+    // ===== بدء البحث =====
+    async startMatchmaking(mode = 'normal_1v1') {
         if (!AuthService.currentUser) {
             showToast('يجب تسجيل الدخول أولاً', 'error');
             return;
         }
-
         if (this._searching) {
             showToast('⚠️ أنت تبحث بالفعل عن لاعب', 'info');
             return;
         }
 
-        // تنظيف أي بحث سابق
+        if (!RealtimeService.checkReady()) {
+            showToast('⚠️ قاعدة البيانات غير جاهزة، حاول مرة أخرى', 'error');
+            return;
+        }
+
         await this._cleanup();
 
         this._currentUser = AuthService.currentUser;
         this._searching = true;
         this._isMatchCreated = false;
         this._searchStartTime = Date.now();
+        this._mode = mode;
+        this._playerReady = false;
 
-        const searchSettings = {
+        const timestamp = getRealtimeTimestamp();
+
+        const searchData = {
             userId: this._currentUser.uid,
             userName: this._currentUser.username || this._currentUser.displayName || 'مجهول',
             userLevel: getLevel(this._currentUser.totalScore || 0).level,
             userRank: getRank(this._currentUser.rankPoints || 0).name,
+            mode: mode,
             status: 'searching',
-            matched: false,        // ✅ حقل جديد لمنع المطابقة المزدوجة
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            expiresAt: new Date(Date.now() + this._maxSearchTime * 1000).toISOString()
+            matched: false,
+            createdAt: timestamp,
+            expiresAt: Date.now() + this._maxSearchTime * 1000,
+            matchId: null
         };
 
         try {
-            const docRef = await db.collection('matchmaking').add(searchSettings);
-            this._currentMatchId = docRef.id;
-
+            const result = await RealtimeService.add(`matchmaking/${mode}`, searchData);
+            this._currentMatchId = result.id;
+            this._listenToMyMatchmaking(result.id);
             showToast('🔍 جاري البحث عن لاعب...', 'info', 3000);
             this._showSearchingUI();
 
-            // بدء البحث كل 2 ثانية
             this._searchInterval = setInterval(() => {
                 this._findMatch();
             }, 2000);
 
-            // بدء مؤقت انتهاء البحث
             this._startSearchTimer();
 
         } catch (e) {
             console.error('Error starting matchmaking:', e);
-            showToast('❌ فشل بدء البحث', 'error');
+            showToast('❌ فشل بدء البحث: ' + e.message, 'error');
             this._searching = false;
         }
     },
 
-    // تنظيف البحث السابق
-    async _cleanup() {
-        if (this._searchInterval) {
-            clearInterval(this._searchInterval);
-            this._searchInterval = null;
-        }
-        if (this._searchTimerInterval) {
-            clearInterval(this._searchTimerInterval);
-            this._searchTimerInterval = null;
-        }
-        if (this._matchUnsubscribe) {
-            this._matchUnsubscribe();
-            this._matchUnsubscribe = null;
-        }
-        if (this._currentMatchId) {
-            try {
-                const doc = await db.collection('matchmaking').doc(this._currentMatchId).get();
-                if (doc.exists) {
-                    await db.collection('matchmaking').doc(this._currentMatchId).delete();
-                }
-            } catch (e) {}
-            this._currentMatchId = null;
-        }
-        this._searching = false;
-        this._isMatchCreated = false;
-    },
+// ===== الاستماع لطلب البحث الخاص بي =====
+_listenToMyMatchmaking(matchmakingId) {
+    if (this._matchmakingUnsubscribe) {
+        this._matchmakingUnsubscribe();
+        this._matchmakingUnsubscribe = null;
+    }
 
-    // بدء مؤقت البحث
-    _startSearchTimer() {
-        if (this._searchTimerInterval) {
-            clearInterval(this._searchTimerInterval);
-        }
+    this._matchmakingUnsubscribe = RealtimeService.listenDoc(
+        `matchmaking/${this._mode}/${matchmakingId}`,
+        async (data) => {
+            if (!data) return;
 
-        this._searchTimerInterval = setInterval(() => {
-            if (!this._searching) {
-                clearInterval(this._searchTimerInterval);
-                this._searchTimerInterval = null;
+            // ✅ منع المعالجة المزدوجة
+            if (this._matchFoundHandled) {
+                console.log('⏳ Match already handled, skipping...');
                 return;
             }
 
-            const elapsed = (Date.now() - this._searchStartTime) / 1000;
-            const remaining = Math.max(0, this._maxSearchTime - elapsed);
+            if (data.matchId && data.matched === true) {
+                this._matchFoundHandled = true;
+                
+                // إذا كنا لا نزال في حالة بحث، أوقفها
+                if (this._searching) {
+                    this._searching = false;
+                    if (this._searchInterval) {
+                        clearInterval(this._searchInterval);
+                        this._searchInterval = null;
+                    }
+                    if (this._searchTimerInterval) {
+                        clearInterval(this._searchTimerInterval);
+                        this._searchTimerInterval = null;
+                    }
+                    this._hideSearchingUI();
+                }
 
-            // تحديث العرض
-            const timerEl = document.getElementById('searchTimer');
-            if (timerEl) timerEl.textContent = Math.floor(elapsed);
+                // ✅ تعيين معرف المباراة
+                this._matchId = data.matchId;
+                this._isMatchCreated = true;
 
-            const remainingEl = document.getElementById('searchRemaining');
-            if (remainingEl) {
-                const minutes = Math.floor(remaining / 60);
-                const seconds = Math.floor(remaining % 60);
-                remainingEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                // ✅ إلغاء مستمع البحث لأننا وجدنا مباراة
+                if (this._matchmakingUnsubscribe) {
+                    this._matchmakingUnsubscribe();
+                    this._matchmakingUnsubscribe = null;
+                }
+
+                // ✅ إظهار واجهة المباراة
+                this._showMatchFoundUI(this._matchId);
+                this._listenToMatch(this._matchId);
+
+                // ✅ التأكد من أن اللاعب جاهز
+                const user = AuthService.currentUser;
+                if (user) {
+                    // انتظر قليلاً ثم تأكد من جاهزية اللاعب
+                    setTimeout(async () => {
+                        const gameData = await RealtimeService.getOnce(`directMatches/${this._matchId}`);
+                        if (gameData) {
+                            const currentPlayer = gameData.players.find(p => p.uid === user.uid);
+                            if (currentPlayer && !currentPlayer.ready) {
+                                await this._setPlayerReady(this._matchId, user.uid);
+                            }
+                        }
+                    }, 500);
+                }
             }
+        }
+    );
+},
 
-            const progressEl = document.getElementById('searchProgress');
-            if (progressEl) {
-                const progress = (elapsed / this._maxSearchTime) * 100;
-                progressEl.style.width = `${Math.min(progress, 100)}%`;
-            }
-
-            // إذا انتهى الوقت ولم يتم العثور على لاعب
-            if (remaining <= 0 && !this._isMatchCreated) {
-                this._cancelSearch('⏰ لم يتم العثور على لاعب، حاول مرة أخرى');
-            }
-
-        }, 1000);
-    },
-
-    // ✅ البحث عن لاعب باستخدام معاملة (Transaction) مع فلتر `matched`
+// ===== البحث عن خصم (مع عمليات ذرية) =====
 async _findMatch() {
     if (!this._searching || this._isMatchCreated) return;
 
     try {
-        // ✅ استعلام بحقلين فقط (بدون matched)
-        const snapshot = await db.collection('matchmaking')
-            .where('status', '==', 'searching')
-            .where('userId', '!=', this._currentUser.uid)
-            .get();
+        const candidates = await RealtimeService.getAll(`matchmaking/${this._mode}`);
+        if (!candidates || candidates.length === 0) return;
 
-        if (snapshot.empty) return;
+        const now = Date.now();
+        const filtered = candidates.filter(c =>
+            c.userId !== this._currentUser.uid &&
+            c.status === 'searching' &&
+            !c.matched &&
+            c.expiresAt > now
+        );
 
-        let candidates = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            // تجاهل الطلبات المنتهية أو المحجوزة يدويًا
-            if (data.expiresAt && new Date(data.expiresAt) < new Date()) {
-                db.collection('matchmaking').doc(doc.id).delete().catch(() => {});
-                return;
-            }
-            if (data.matched === true) {  // ✅ فلتر يدوي
-                return;
-            }
-            candidates.push({ id: doc.id, ...data });
-        });
+        if (filtered.length === 0) return;
 
-        if (candidates.length === 0) return;
+        // اختيار أول مرشح
+        const opponent = filtered[0];
 
-            // فلتر حسب المستوى
-            const currentLevel = getLevel(this._currentUser.totalScore || 0).level;
-            const matchedCandidates = candidates.filter(c => {
-                const cLevel = c.userLevel || 1;
-                return Math.abs(cLevel - currentLevel) <= 3;
-            });
-
-            if (matchedCandidates.length === 0) return;
-
-            // اختيار أول لاعب مناسب
-            const opponent = matchedCandidates[0];
-
-            // ✅ استخدام معاملة لتحديث طلب الخصم (منع المطابقة المزدوجة)
-            const success = await this._tryMatchOpponent(opponent.id);
-
-            if (success) {
-                // نجحنا في حجز الخصم، نقوم بإنشاء المباراة
-                await this._createMatch(opponent);
-            } else {
-                // فشلنا (ربما تم مطابقة الخصم من قبل لاعب آخر)، نعيد المحاولة لاحقاً
-                console.log('⚠️ فشل حجز الخصم، سيتم إعادة المحاولة');
-            }
-
-        } catch (e) {
-            console.warn('Match search error:', e);
+        // ✅ التحقق الذري: محاولة حجز الخصم
+        const oppRef = RealtimeService.getRawRef(`matchmaking/${this._mode}/${opponent.id}`);
+        const oppData = await oppRef.once('value');
+        const currentOppData = oppData.val();
+        
+        if (!currentOppData || currentOppData.matched === true) {
+            // الخصم تم حجبه بالفعل
+            console.log('⏳ Opponent already matched, skipping...');
+            return;
         }
-    },
 
-    // ✅ محاولة حجز الخصم باستخدام معاملة
-    async _tryMatchOpponent(opponentDocId) {
-        try {
-            const opponentRef = db.collection('matchmaking').doc(opponentDocId);
-
-            // استخدام transaction لتحديث شرطي
-            const result = await db.runTransaction(async (transaction) => {
-                const doc = await transaction.get(opponentRef);
-                if (!doc.exists) {
-                    return false;
-                }
-                const data = doc.data();
-                // إذا كان الخصم قد تم مطابقته بالفعل أو تغيرت حالته، نرفض
-                if (data.matched === true || data.status !== 'searching') {
-                    return false;
-                }
-                // تحديث حقل matched إلى true
-                transaction.update(opponentRef, { matched: true });
-                return true;
-            });
-
-            return result;
-        } catch (e) {
-            console.error('Transaction error:', e);
-            return false;
+        // ✅ التحقق من أن الخصم لا يزال في حالة بحث
+        if (currentOppData.status !== 'searching') {
+            console.log('⏳ Opponent no longer searching, skipping...');
+            return;
         }
-    },
 
-    // ✅ إنشاء المباراة (بعد حجز الخصم)
-    async _createMatch(opponent) {
-        if (this._isMatchCreated) return;
-        this._isMatchCreated = true;
+        // ✅ إنشاء المباراة وإشعار الخصم
+        await this._createMatchAndNotify(opponent);
 
-        try {
-            // حذف طلب البحث الخاص بنا
-            if (this._currentMatchId) {
-                await db.collection('matchmaking').doc(this._currentMatchId).delete().catch(() => {});
-                this._currentMatchId = null;
-            }
+    } catch (e) {
+        console.warn('Match search error:', e);
+    }
+},
 
-            // حذف طلب الخصم (تم حجزه بالفعل)
-            if (opponent.id) {
-                await db.collection('matchmaking').doc(opponent.id).delete().catch(() => {});
-            }
+// ===== إنشاء المباراة (مع تحديث طلبي البحث) =====
+async _createMatchAndNotify(opponent) {
+    if (this._isMatchCreated) return;
+    this._isMatchCreated = true;
 
-            // تحضير بيانات المباراة
-            const matchData = {
-                players: [
-                    {
-                        uid: this._currentUser.uid,
-                        name: this._currentUser.username || this._currentUser.displayName || 'مجهول',
-                        level: getLevel(this._currentUser.totalScore || 0).level,
-                        rank: getRank(this._currentUser.rankPoints || 0).name,
-                        score: 0,
-                        correct: 0,
-                        wrong: 0,
-                        streak: 0,
-                        bestStreak: 0,
-                        answersCount: 0,
-                        totalTime: 0,
-                        avgTime: 0
-                    },
-                    {
-                        uid: opponent.userId,
-                        name: opponent.userName || 'مجهول',
-                        level: opponent.userLevel || 1,
-                        rank: opponent.userRank || 'برونزي 1',
-                        score: 0,
-                        correct: 0,
-                        wrong: 0,
-                        streak: 0,
-                        bestStreak: 0,
-                        answersCount: 0,
-                        totalTime: 0,
-                        avgTime: 0
-                    }
-                ],
-                status: 'waiting',
-                type: 'direct',
-                settings: {
-                    difficulty: 'medium',
-                    category: 'all',
-                    questionCount: 10,
-                    timeLimit: 15
+    try {
+        const timestamp = getRealtimeTimestamp();
+
+        // تحضير بيانات المباراة
+        const matchData = {
+            players: [
+                {
+                    uid: this._currentUser.uid,
+                    name: this._currentUser.username || this._currentUser.displayName || 'مجهول',
+                    avatar: this._currentUser.avatar || '',
+                    level: getLevel(this._currentUser.totalScore || 0).level,
+                    rankPoints: this._currentUser.rankPoints || 0,
+                    score: 0,
+                    correct: 0,
+                    wrong: 0,
+                    streak: 0,
+                    bestStreak: 0,
+                    answersCount: 0,
+                    totalTime: 0,
+                    avgTime: 0,
+                    ready: true
                 },
-                questions: [],
-                currentQuestion: 0,
-                answers: {},
-                scores: {},
-                startTime: null,
-                questionStartTime: null,
-                winner: null,
-                finishedAt: null,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            };
+                {
+                    uid: opponent.userId,
+                    name: opponent.userName || 'مجهول',
+                    avatar: opponent.avatar || '',
+                    level: opponent.userLevel || 1,
+                    rankPoints: opponent.rankPoints || 0,
+                    score: 0,
+                    correct: 0,
+                    wrong: 0,
+                    streak: 0,
+                    bestStreak: 0,
+                    answersCount: 0,
+                    totalTime: 0,
+                    avgTime: 0,
+                    ready: false
+                }
+            ],
+            status: 'waiting',
+            type: 'direct',
+            mode: this._mode,
+            settings: {
+                difficulty: 'medium',
+                category: 'all',
+                questionCount: 10,
+                timeLimit: 15,
+                countdownSeconds: 5
+            },
+            questions: [],
+            currentQuestion: 0,
+            answers: {},
+            scores: {},
+            startTime: null,
+            questionStartTime: null,
+            winner: null,
+            finishedAt: null,
+            createdAt: timestamp,
+            countdown: 5,
+            countdownStarted: false,
+            matchmakingIds: [this._currentMatchId, opponent.id]
+        };
 
-            // جلب الأسئلة
-            let pool = [...DataManager.data.questions];
-            if (pool.length === 0) {
-                showToast('لا توجد أسئلة كافية', 'error');
-                this._isMatchCreated = false;
-                this._searching = true;
-                this._searchInterval = setInterval(() => this._findMatch(), 2000);
-                return;
-            }
-
-            const shuffled = shuffleArray(pool);
-            const questionCount = Math.min(10, pool.length);
-            matchData.questions = shuffled.slice(0, questionCount);
-
-            // إضافة المباراة
-            const docRef = await db.collection('directMatches').add(matchData);
-            this._matchId = docRef.id;
-
-            // إيقاف البحث
-            this._searching = false;
-            if (this._searchInterval) {
-                clearInterval(this._searchInterval);
-                this._searchInterval = null;
-            }
-            if (this._searchTimerInterval) {
-                clearInterval(this._searchTimerInterval);
-                this._searchTimerInterval = null;
-            }
-            this._hideSearchingUI();
-
-            showToast(`🎮 تم العثور على لاعب!`, 'success', 3000);
-
-            this._showMatchUI(docRef.id);
-            this._listenToMatch(docRef.id);
-
-        } catch (e) {
-            console.error('Error creating match:', e);
-            showToast('❌ فشل إنشاء المباراة', 'error');
+        // جلب الأسئلة
+        let pool = [...DataManager.data.questions];
+        if (pool.length === 0) {
+            showToast('لا توجد أسئلة كافية', 'error');
             this._isMatchCreated = false;
-            // إعادة تشغيل البحث
             this._searching = true;
-            if (!this._searchInterval) {
-                this._searchInterval = setInterval(() => this._findMatch(), 2000);
-            }
+            this._searchInterval = setInterval(() => this._findMatch(), 2000);
+            return;
         }
-    },
+        const shuffled = shuffleArray(pool);
+        const questionCount = Math.min(10, pool.length);
+        matchData.questions = shuffled.slice(0, questionCount);
 
-    _listenToMatch(matchId) {
-        if (this._matchUnsubscribe) {
-            this._matchUnsubscribe();
-        }
+        // حفظ المباراة
+        const matchResult = await RealtimeService.add('directMatches', matchData);
+        this._matchId = matchResult.id;
 
-        this._matchUnsubscribe = db.collection('directMatches').doc(matchId)
-            .onSnapshot((doc) => {
-                if (!doc.exists) {
-                    App._exitDirectMatch();
-                    return;
-                }
-                const match = doc.data();
-                if (match.status === 'playing') {
-                    App._renderDirectMatch(matchId);
-                } else if (match.status === 'finished') {
-                    App._showDirectMatchResult(matchId);
-                } else if (match.status === 'waiting') {
-                    this._showWaitingUI(matchId);
-                }
-            }, (error) => {
-                console.error('Match listener error:', error);
-            });
-    },
+        // ✅ تحديث طلبي البحث (بدلاً من حذفها)
+        const updates = {};
+        updates[`matchmaking/${this._mode}/${this._currentMatchId}/matched`] = true;
+        updates[`matchmaking/${this._mode}/${this._currentMatchId}/matchId`] = this._matchId;
+        updates[`matchmaking/${this._mode}/${this._currentMatchId}/status`] = 'matched';
+        updates[`matchmaking/${this._mode}/${opponent.id}/matched`] = true;
+        updates[`matchmaking/${this._mode}/${opponent.id}/matchId`] = this._matchId;
+        updates[`matchmaking/${this._mode}/${opponent.id}/status`] = 'matched';
 
-    _showWaitingUI(matchId) {
-        const container = document.getElementById('directMatchContainer');
-        if (!container) return;
-        container.style.display = 'block';
-        container.innerHTML = `
-            <div style="max-width:500px;margin:0 auto;text-align:center;padding:3rem 1rem;">
-                <div style="font-size:3rem;margin-bottom:1rem;">⏳</div>
-                <h2 style="font-size:1.5rem;font-weight:800;color:var(--accent);">جاري تجهيز المباراة...</h2>
-                <p style="color:var(--gray);">سيبدأ اللعب قريباً</p>
-                <div style="display:flex;gap:0.5rem;justify-content:center;margin:1rem 0;">
-                    <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--primary);animation:dotPulse 1.2s infinite alternate;"></div>
-                    <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--accent);animation:dotPulse 1.2s infinite alternate 0.4s;"></div>
-                    <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--primary);animation:dotPulse 1.2s infinite alternate 0.8s;"></div>
-                </div>
-                <button class="btn btn-danger" onclick="App._exitDirectMatch()">
-                    <i class="fas fa-times"></i> إلغاء
-                </button>
-            </div>
-        `;
-    },
+        // تنفيذ التحديثات دفعة واحدة
+        const dbRef = RealtimeService.getRawRef('/');
+        await dbRef.update(updates);
+        console.log('✅ Both matchmaking requests updated with matchId');
 
-    async _cancelSearch(message) {
+        // إيقاف البحث
         this._searching = false;
-        this._isMatchCreated = false;
-
         if (this._searchInterval) {
             clearInterval(this._searchInterval);
             this._searchInterval = null;
@@ -21945,156 +22057,326 @@ async _findMatch() {
             clearInterval(this._searchTimerInterval);
             this._searchTimerInterval = null;
         }
+        this._hideSearchingUI();
+
+        // ✅ ننتظر حتى يتلقى كلا اللاعبين التحديث
+        // المستمع (_listenToMyMatchmaking) سيتعامل مع الباقي
+
+    } catch (e) {
+        console.error('Error creating match:', e);
+        showToast('❌ فشل إنشاء المباراة: ' + e.message, 'error');
+        this._isMatchCreated = false;
+        this._searching = true;
+        if (!this._searchInterval) {
+            this._searchInterval = setInterval(() => this._findMatch(), 2000);
+        }
+    }
+},
+
+    // ===== الاستماع للمباراة =====
+    _listenToMatch(matchId) {
         if (this._matchUnsubscribe) {
             this._matchUnsubscribe();
             this._matchUnsubscribe = null;
         }
-        if (this._currentMatchId) {
-            try {
-                const doc = await db.collection('matchmaking').doc(this._currentMatchId).get();
-                if (doc.exists) {
-                    await db.collection('matchmaking').doc(this._currentMatchId).delete();
-                }
-            } catch (e) {}
-            this._currentMatchId = null;
-        }
-        this._hideSearchingUI();
-        if (message) {
-            showToast(message, 'info', 4000);
-        }
-    },
 
-    async cancelMatchmaking() {
-        await this._cancelSearch('⏹️ تم إلغاء البحث');
-    },
-
-    _showSearchingUI() {
-        const container = document.getElementById('directMatchContainer');
-        if (!container) {
-            const newContainer = document.createElement('div');
-            newContainer.id = 'directMatchContainer';
-            newContainer.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                z-index: 1050;
-                background: var(--dark);
-                padding: 1rem;
-                overflow-y: auto;
-                display: none;
-            `;
-            document.body.appendChild(newContainer);
-        }
-
-        const el = document.getElementById('directMatchContainer');
-        el.style.display = 'block';
-        el.innerHTML = `
-            <div style="max-width:500px;margin:0 auto;text-align:center;padding:3rem 1rem;">
-                <div style="font-size:3rem;margin-bottom:0.5rem;">🔍</div>
-                <h2 style="font-size:1.5rem;font-weight:800;color:var(--accent);">
-                    جاري البحث عن لاعب...
-                </h2>
-                <p style="color:var(--gray);margin:0.5rem 0;">
-                    ⏱ <span id="searchTimer">0</span> ثانية
-                    <span style="color:var(--gray-dark);font-size:0.8rem;margin-right:0.5rem;">
-                        (المتبقي: <span id="searchRemaining">2:00</span>)
-                    </span>
-                </p>
-                <div style="width:100%;max-width:300px;margin:0.5rem auto;">
-                    <div style="height:6px;background:var(--glass);border-radius:10px;overflow:hidden;">
-                        <div id="searchProgress" style="height:100%;width:0%;background:linear-gradient(90deg, var(--primary), var(--accent));border-radius:10px;transition:width 0.5s ease;"></div>
-                    </div>
-                </div>
-                <div style="display:flex;gap:0.5rem;justify-content:center;margin:1rem 0;">
-                    <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--primary);animation:dotPulse 1.2s infinite alternate;"></div>
-                    <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--accent);animation:dotPulse 1.2s infinite alternate 0.4s;"></div>
-                    <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--primary);animation:dotPulse 1.2s infinite alternate 0.8s;"></div>
-                </div>
-                <button class="btn btn-danger" onclick="MatchmakingSystem.cancelMatchmaking()" style="margin-top:0.5rem;">
-                    <i class="fas fa-times"></i> إلغاء البحث
-                </button>
-                <div style="margin-top:1rem;font-size:0.7rem;color:var(--gray-dark);">
-                    🔍 سيتم إلغاء البحث تلقائياً بعد دقيقتين
-                </div>
-            </div>
-        `;
-    },
-
-    _hideSearchingUI() {
-        const el = document.getElementById('directMatchContainer');
-        if (el && !this._isMatchCreated) {
-            el.style.display = 'none';
-        }
-    },
-
-    _showMatchUI(matchId) {
-        const container = document.getElementById('directMatchContainer');
-        if (container) {
-            container.style.display = 'block';
-        }
-        App._renderDirectMatch(matchId);
-    },
-
-    // ✅ دوال إرسال الإجابة (نفس السابق مع تحسينات)
-    async submitAnswer(answer) {
-        if (!this._matchId) {
-            showToast('لا توجد مباراة نشطة', 'error');
-            return;
-        }
-
-        const user = AuthService.currentUser;
-        if (!user) return;
-
-        try {
-            const doc = await db.collection('directMatches').doc(this._matchId).get();
-            if (!doc.exists) {
-                showToast('المباراة غير موجودة', 'error');
+        this._matchUnsubscribe = RealtimeService.listenDoc(`directMatches/${matchId}`, async (gameData) => {
+            if (!gameData) {
+                this._cleanupAfterMatch();
+                App._exitDirectMatchClean();
                 return;
             }
 
-            const match = doc.data();
-            if (match.status !== 'playing') {
+            const user = AuthService.currentUser;
+            if (!user) return;
+
+            this._matchStatus = gameData.status;
+            console.log('📡 Match update:', gameData.status);
+
+            if (gameData.status === 'waiting' || gameData.status === 'waiting_for_players') {
+                const players = gameData.players || [];
+                const totalPlayers = 2;
+                const allPresent = players.length === totalPlayers;
+                const allReady = players.every(p => p.ready === true);
+
+                // تحديث واجهة الانتظار
+                this._updateMatchFoundUI(gameData);
+
+                // إضافة اللاعب الحالي إذا لم يكن موجوداً
+                const currentPlayer = players.find(p => p.uid === user.uid);
+                if (!currentPlayer) {
+                    const newPlayer = {
+                        uid: user.uid,
+                        name: user.username || user.displayName || 'مجهول',
+                        avatar: user.avatar || '',
+                        level: getLevel(user.totalScore || 0).level,
+                        rankPoints: user.rankPoints || 0,
+                        score: 0,
+                        correct: 0,
+                        wrong: 0,
+                        streak: 0,
+                        bestStreak: 0,
+                        answersCount: 0,
+                        totalTime: 0,
+                        avgTime: 0,
+                        ready: true
+                    };
+                    const updatedPlayers = [...players, newPlayer];
+                    await RealtimeService.update('directMatches', matchId, { players: updatedPlayers });
+                    return;
+                }
+
+                // إذا كان اللاعب الحالي ليس جاهزاً، اجعله جاهزاً
+                if (!currentPlayer.ready) {
+                    await this._setPlayerReady(matchId, user.uid);
+                    return;
+                }
+
+                // إذا كان الجميع حاضرين وجاهزين ولم يبدأ العد التنازلي
+                if (allPresent && allReady && !gameData.countdownStarted) {
+                    this._startCountdown(matchId);
+                }
+                return;
+            }
+
+            if (gameData.status === 'countdown') {
+                this._showCountdownUI(matchId, gameData.countdown || 5);
+                return;
+            }
+
+            if (gameData.status === 'playing') {
+                App._renderDirectMatch(matchId);
+                return;
+            }
+
+            if (gameData.status === 'finished') {
+                App._showDirectMatchResult(matchId);
+                return;
+            }
+        });
+    },
+
+    // ===== تعيين جاهزية اللاعب =====
+    async _setPlayerReady(matchId, uid) {
+        try {
+            const gameData = await RealtimeService.getOnce(`directMatches/${matchId}`);
+            if (!gameData) return;
+
+            const players = gameData.players.map(p => {
+                if (p.uid === uid) return { ...p, ready: true };
+                return p;
+            });
+
+            await RealtimeService.update('directMatches', matchId, { players });
+
+            // تحقق سريع لبدء العد التنازلي
+            setTimeout(async () => {
+                const updated = await RealtimeService.getOnce(`directMatches/${matchId}`);
+                if (!updated) return;
+                if (updated.status === 'waiting' || updated.status === 'waiting_for_players') {
+                    const allPresent = updated.players.length === 2;
+                    const allReady = updated.players.every(p => p.ready === true);
+                    if (allPresent && allReady && !updated.countdownStarted) {
+                        this._startCountdown(matchId);
+                    }
+                }
+            }, 500);
+
+        } catch (e) {
+            console.error('Error setting player ready:', e);
+        }
+    },
+
+    // ===== العد التنازلي =====
+    async _startCountdown(matchId) {
+        if (this._isCountdownActive) return;
+        this._isCountdownActive = true;
+
+        try {
+            await RealtimeService.update('directMatches', matchId, {
+                status: 'countdown',
+                countdown: 5,
+                countdownStarted: true
+            });
+
+            let count = 5;
+            this._showCountdownUI(matchId, count);
+
+            this._countdownInterval = setInterval(async () => {
+                count--;
+                await RealtimeService.update('directMatches', matchId, { countdown: count });
+
+                const numEl = document.getElementById('countdownNumber');
+                if (numEl) {
+                    numEl.textContent = count;
+                    numEl.style.animation = 'none';
+                    setTimeout(() => {
+                        numEl.style.animation = 'countPulse 0.5s ease';
+                    }, 10);
+                }
+
+                if (count <= 0) {
+                    clearInterval(this._countdownInterval);
+                    this._countdownInterval = null;
+                    this._isCountdownActive = false;
+                    await this._startMatch(matchId);
+                }
+            }, 1000);
+
+        } catch (e) {
+            console.error('Error starting countdown:', e);
+            this._isCountdownActive = false;
+        }
+    },
+
+    // ===== بدء المباراة =====
+    async _startMatch(matchId) {
+        try {
+            await RealtimeService.update('directMatches', matchId, {
+                status: 'playing',
+                startTime: Date.now(),
+                questionStartTime: Date.now()
+            });
+
+            showToast('🎮 بدأت المباراة!', 'success', 2000);
+            App._renderDirectMatch(matchId);
+
+            // ✅ بدء مؤقت السؤال الأول
+            const gameData = await RealtimeService.getOnce(`directMatches/${matchId}`);
+            if (gameData) {
+                this._questionTotalTime = gameData.settings?.timeLimit || 15;
+                this._startQuestionTimer(matchId);
+            }
+
+        } catch (e) {
+            console.error('Error starting match:', e);
+            showToast('❌ فشل بدء المباراة', 'error');
+        }
+    },
+
+    // ===== مؤقت السؤال =====
+    _startQuestionTimer(matchId) {
+        if (this._questionTimerInterval) {
+            clearInterval(this._questionTimerInterval);
+            this._questionTimerInterval = null;
+        }
+
+        this._questionTimeLeft = this._questionTotalTime;
+
+        this._questionTimerInterval = setInterval(async () => {
+            this._questionTimeLeft--;
+            // تحديث واجهة المؤقت
+            const timerEl = document.getElementById('matchTimerDisplay');
+            if (timerEl) {
+                timerEl.textContent = `⏱ ${this._questionTimeLeft}s`;
+                timerEl.className = `badge ${this._questionTimeLeft <= 5 ? 'badge-danger' : 'badge-warning'}`;
+            }
+
+            // تحديث شريط التقدم
+            const progressEl = document.getElementById('matchProgressFill');
+            if (progressEl) {
+                const gameData = await RealtimeService.getOnce(`directMatches/${matchId}`);
+                if (gameData) {
+                    const total = gameData.questions?.length || 1;
+                    const current = gameData.currentQuestion || 0;
+                    const elapsed = this._questionTotalTime - this._questionTimeLeft;
+                    const progress = ((current + (elapsed / this._questionTotalTime)) / total) * 100;
+                    progressEl.style.width = `${Math.min(progress, 100)}%`;
+                }
+            }
+
+            if (this._questionTimeLeft <= 0) {
+                clearInterval(this._questionTimerInterval);
+                this._questionTimerInterval = null;
+
+                // التحقق من إجابة المستخدم
+                const user = AuthService.currentUser;
+                if (user) {
+                    const gameData = await RealtimeService.getOnce(`directMatches/${matchId}`);
+                    if (gameData) {
+                        const answers = gameData.answers || {};
+                        const currentQ = gameData.currentQuestion || 0;
+                        if (!answers[user.uid] || answers[user.uid][currentQ] === undefined) {
+                            showToast('⏰ انتهى الوقت!', 'error');
+                            await this.submitAnswer(matchId, -1);
+                        }
+                    }
+                }
+            }
+        }, 1000);
+    },
+
+    // ===== إرسال الإجابة =====
+    async submitAnswer(matchId, answer) {
+        const user = AuthService.currentUser;
+        if (!user) {
+            showToast('يجب تسجيل الدخول', 'error');
+            return;
+        }
+
+        try {
+            const gameData = await RealtimeService.getOnce(`directMatches/${matchId}`);
+            if (!gameData) {
+                showToast('المباراة غير موجودة', 'error');
+                return;
+            }
+            if (gameData.status !== 'playing') {
                 showToast('المباراة لم تبدأ بعد', 'info');
                 return;
             }
 
-            const currentQ = match.currentQuestion || 0;
-            const questions = match.questions || [];
+            const currentQ = gameData.currentQuestion || 0;
+            const questions = gameData.questions || [];
             if (currentQ >= questions.length) {
                 showToast('انتهت المباراة', 'info');
                 return;
             }
 
             const question = questions[currentQ];
-            const answers = match.answers || {};
+            const answers = gameData.answers || {};
+
+            // منع الإجابة المكررة
             if (answers[user.uid] && answers[user.uid][currentQ] !== undefined) {
                 showToast('لقد أجبت بالفعل', 'info');
                 return;
             }
 
-            const elapsed = (Date.now() - match.questionStartTime) / 1000;
+            const elapsed = (Date.now() - gameData.questionStartTime) / 1000;
             let isCorrect = false;
             let answerValue = answer;
 
-            if (question.type === 'multiple_choice' || question.type === 'true_false') {
-                isCorrect = (answer === question.correct);
-            } else if (question.type === 'fill_blank') {
-                isCorrect = (answer.toLowerCase() === (question.correctAnswer || '').toLowerCase());
-            } else if (question.type === 'matching') {
-                const pairs = question.matchingPairs || [];
-                let correctCount = 0;
-                pairs.forEach(pair => {
-                    if (answer[pair.left] === pair.right) correctCount++;
-                });
-                isCorrect = (correctCount === pairs.length);
-            } else if (question.type === 'ordering') {
-                const correctOrder = question.orderedItems || [];
-                isCorrect = JSON.stringify(answer) === JSON.stringify(correctOrder);
+            // معالجة الإجابة حسب نوع السؤال
+            if (answer === -1) {
+                isCorrect = false;
+                answerValue = null;
+            } else {
+                switch (question.type) {
+                    case 'multiple_choice':
+                    case 'true_false':
+                        isCorrect = (answer === question.correct);
+                        break;
+                    case 'fill_blank':
+                        isCorrect = (answer.toLowerCase() === (question.correctAnswer || '').toLowerCase());
+                        break;
+                    case 'matching':
+                        const pairs = question.matchingPairs || [];
+                        let correctCount = 0;
+                        pairs.forEach(pair => {
+                            if (answer[pair.left] === pair.right) correctCount++;
+                        });
+                        isCorrect = (correctCount === pairs.length);
+                        break;
+                    case 'ordering':
+                        const correctOrder = question.orderedItems || [];
+                        isCorrect = JSON.stringify(answer) === JSON.stringify(correctOrder);
+                        break;
+                    default:
+                        isCorrect = false;
+                }
             }
 
-            const scores = match.scores || {};
+            // تحديث النقاط والإحصائيات
+            const scores = gameData.scores || {};
             const playerScore = scores[user.uid] || {
                 score: 0,
                 correct: 0,
@@ -22109,45 +22391,57 @@ async _findMatch() {
             let pointsEarned = 0;
             if (isCorrect) {
                 pointsEarned = 10 + (elapsed <= 3 ? 5 : 0);
-                playerScore.correct = (playerScore.correct || 0) + 1;
-                playerScore.streak = (playerScore.streak || 0) + 1;
-                if (playerScore.streak > (playerScore.bestStreak || 0)) {
+                playerScore.correct++;
+                playerScore.streak++;
+                if (playerScore.streak > playerScore.bestStreak) {
                     playerScore.bestStreak = playerScore.streak;
                 }
             } else {
-                playerScore.wrong = (playerScore.wrong || 0) + 1;
+                playerScore.wrong++;
                 playerScore.streak = 0;
             }
 
-            playerScore.score = (playerScore.score || 0) + pointsEarned;
-            playerScore.totalTime = (playerScore.totalTime || 0) + elapsed;
-            playerScore.answersCount = (playerScore.answersCount || 0) + 1;
+            playerScore.score += pointsEarned;
+            playerScore.totalTime += elapsed;
+            playerScore.answersCount++;
             playerScore.avgTime = playerScore.totalTime / playerScore.answersCount;
 
+            // حفظ الإجابة
             if (!answers[user.uid]) answers[user.uid] = {};
             answers[user.uid][currentQ] = { answer: answerValue, isCorrect, timeTaken: elapsed };
 
-            const players = match.players.map(p => {
+            // تحديث اللاعبين
+            const players = gameData.players.map(p => {
                 if (p.uid === user.uid) {
                     return { ...p, ...playerScore };
                 }
                 return p;
             });
 
-            await db.collection('directMatches').doc(this._matchId).update({
+            await RealtimeService.update('directMatches', matchId, {
                 answers: answers,
                 scores: { ...scores, [user.uid]: playerScore },
                 players: players
             });
 
-            showToast(isCorrect ? '✅ صحيح!' : '❌ خاطئ', isCorrect ? 'success' : 'error');
+            // عرض النتيجة
+            if (answer !== -1) {
+                showToast(isCorrect ? '✅ صحيح!' : '❌ خاطئ', isCorrect ? 'success' : 'error');
+            }
 
-            const totalPlayers = match.players.length;
+            // التحقق من إجابة جميع اللاعبين
+            const totalPlayers = gameData.players.length;
             const answeredCount = Object.keys(answers).length;
 
             if (answeredCount >= totalPlayers) {
+                // إيقاف المؤقت
+                if (this._questionTimerInterval) {
+                    clearInterval(this._questionTimerInterval);
+                    this._questionTimerInterval = null;
+                }
+                // الانتقال للسؤال التالي بعد 1.5 ثانية
                 setTimeout(() => {
-                    this._nextQuestion(this._matchId);
+                    this._nextQuestion(matchId);
                 }, 1500);
             }
 
@@ -22157,212 +22451,1013 @@ async _findMatch() {
         }
     },
 
-    async _nextQuestion(matchId) {
-        try {
-            const doc = await db.collection('directMatches').doc(matchId).get();
-            if (!doc.exists) return;
-            const match = doc.data();
-            if (match.status !== 'playing') return;
+async _nextQuestion(matchId) {
+    // ✅ منع التكرار
+    if (this._isEnding) return;
 
-            const nextIndex = (match.currentQuestion || 0) + 1;
-            if (nextIndex >= match.questions.length) {
-                await this._endMatch(matchId);
-                return;
-            }
+    try {
+        const gameData = await RealtimeService.getOnce(`directMatches/${matchId}`);
+        if (!gameData || gameData.status !== 'playing') return;
 
-            await db.collection('directMatches').doc(matchId).update({
-                currentQuestion: nextIndex,
-                answers: {},
-                questionStartTime: Date.now()
-            });
+        const nextIndex = (gameData.currentQuestion || 0) + 1;
+        if (nextIndex >= gameData.questions.length) {
+            // ✅ إنهاء المباراة
+            await this._endMatch(matchId);
+            return;
+        }
 
-        } catch (e) {
-            console.error('Error next question:', e);
+        // إعادة تعيين الإجابات ووقت السؤال
+        await RealtimeService.update('directMatches', matchId, {
+            currentQuestion: nextIndex,
+            answers: {},
+            questionStartTime: Date.now()
+        });
+
+        // إعادة تشغيل المؤقت
+        this._startQuestionTimer(matchId);
+
+    } catch (e) {
+        console.error('❌ Error next question:', e);
+    }
+},
+
+// ===== إنهاء المباراة (بدون حذف فوري) =====
+async _endMatch(matchId) {
+    if (this._isEnding) {
+        console.log('⏳ Match ending already in progress, skipping...');
+        return;
+    }
+    this._isEnding = true;
+
+    try {
+        console.log('🏁 Ending match:', matchId);
+        
+        const gameData = await RealtimeService.getOnce(`directMatches/${matchId}`);
+        if (!gameData) {
+            console.warn('⚠️ Match not found when ending');
+            this._cleanupAfterMatch();
+            return;
+        }
+
+        if (gameData.status === 'finished') {
+            console.log('⏳ Match already finished');
+            this._cleanupAfterMatch();
+            return;
+        }
+
+        const scores = gameData.scores || {};
+        const players = gameData.players || [];
+        const totalQuestions = gameData.questions?.length || 0;
+
+        const sorted = [...players].sort((a, b) => {
+            const scoreA = scores[a.uid]?.score || 0;
+            const scoreB = scores[b.uid]?.score || 0;
+            return scoreB - scoreA;
+        });
+
+        const winner = sorted[0] || null;
+
+        // تحديث إحصائيات كل لاعب
+        const updatePromises = sorted.map((player, index) => {
+            const uid = player.uid;
+            const stats = scores[uid] || {};
+            const answeredCount = stats.answersCount || 0;
+            const correctCount = stats.correct || 0;
+            const wrongCount = stats.wrong || 0;
+            const skippedCount = totalQuestions - answeredCount;
+            const isWinner = uid === winner?.uid;
+
+            const matchData = {
+                completed: true,
+                position: index + 1,
+                totalPlayers: sorted.length,
+                win: isWinner,
+                draw: false,
+                loss: !isWinner,
+                answeredCount: answeredCount,
+                correctCount: correctCount,
+                wrongCount: wrongCount,
+                skippedCount: skippedCount,
+                timeoutCount: 0,
+                firstAnswer: false,
+                lastAnswer: false,
+                answersInFirstSecond: 0,
+                answersInLastSecond: 0,
+                fastestMatch: 0,
+                slowestMatch: 0,
+                allCorrect: (correctCount === totalQuestions && totalQuestions > 0),
+                allWrong: (wrongCount === totalQuestions && totalQuestions > 0),
+                streak: stats.bestStreak || 0,
+                matchDuration: Math.round((Date.now() - (gameData.startTime || Date.now())) / 1000),
+                points: stats.score || 0,
+                coins: isWinner ? 20 : 10,
+                rankPoints: isWinner ? 15 : 0,
+                winStreak: 0,
+                avgAnswerTime: stats.avgTime || 0,
+                avgCorrectAnswerTime: 0,
+                avgWrongAnswerTime: 0,
+                speedRank: 0
+            };
+
+            return updateStatistics(uid, matchData);
+        });
+
+        await Promise.all(updatePromises);
+        console.log('✅ Player statistics updated');
+
+        // ✅ تحديث حالة المباراة إلى finished
+        await RealtimeService.update('directMatches', matchId, {
+            status: 'finished',
+            winner: winner,
+            finishedAt: Date.now()
+        });
+
+        console.log('✅ Match status updated to finished');
+
+        // عرض رسالة النتيجة
+        showToast(`🏆 انتهت المباراة! الفائز: ${winner?.name || 'لا يوجد'}`, 'success', 5000);
+
+        // ✅ فقط ننظف المؤقتات والمستمعين، ولا نحذف المباراة
+        // سيتم حذفها عند الضغط على زر العودة أو المتابعة
+        this._cleanupAfterMatch();
+
+    } catch (e) {
+        console.error('❌ Error ending match:', e);
+        showToast('❌ حدث خطأ في إنهاء المباراة', 'error');
+        this._cleanupAfterMatch();
+    } finally {
+        this._isEnding = false;
+    }
+},
+
+// ===== حذف المباراة نهائياً (عند العودة) =====
+async deleteMatch(matchId) {
+    if (!matchId) return;
+    try {
+        await RealtimeService.delete('directMatches', matchId);
+        console.log('🗑️ Match deleted permanently:', matchId);
+    } catch (e) {
+        console.warn('⚠️ Could not delete match:', e);
+    }
+},
+
+    // ===== إلغاء البحث =====
+    async cancelMatchmaking() {
+        await this._cancelSearch('⏹️ تم إلغاء البحث');
+    },
+
+    async _cancelSearch(message) {
+        this._searching = false;
+        this._isMatchCreated = false;
+
+        if (this._searchInterval) {
+            clearInterval(this._searchInterval);
+            this._searchInterval = null;
+        }
+        if (this._searchTimerInterval) {
+            clearInterval(this._searchTimerInterval);
+            this._searchTimerInterval = null;
+        }
+        if (this._countdownInterval) {
+            clearInterval(this._countdownInterval);
+            this._countdownInterval = null;
+        }
+        if (this._questionTimerInterval) {
+            clearInterval(this._questionTimerInterval);
+            this._questionTimerInterval = null;
+        }
+        this._isCountdownActive = false;
+        if (this._matchUnsubscribe) {
+            this._matchUnsubscribe();
+            this._matchUnsubscribe = null;
+        }
+        if (this._matchmakingUnsubscribe) {
+            this._matchmakingUnsubscribe();
+            this._matchmakingUnsubscribe = null;
+        }
+        if (this._currentMatchId) {
+            try {
+                await RealtimeService.delete(`matchmaking/${this._mode}`, this._currentMatchId);
+            } catch (e) {}
+            this._currentMatchId = null;
+        }
+        this._hideSearchingUI();
+        if (message) {
+            showToast(message, 'info', 4000);
         }
     },
 
-    async _endMatch(matchId) {
-        try {
-            const doc = await db.collection('directMatches').doc(matchId).get();
-            if (!doc.exists) return;
-            const match = doc.data();
+_cleanupAfterMatch() {
+    if (this._matchUnsubscribe) {
+        this._matchUnsubscribe();
+        this._matchUnsubscribe = null;
+    }
+    if (this._matchmakingUnsubscribe) {
+        this._matchmakingUnsubscribe();
+        this._matchmakingUnsubscribe = null;
+    }
+    if (this._countdownInterval) {
+        clearInterval(this._countdownInterval);
+        this._countdownInterval = null;
+    }
+    if (this._questionTimerInterval) {
+        clearInterval(this._questionTimerInterval);
+        this._questionTimerInterval = null;
+    }
+    this._isCountdownActive = false;
+    this._searching = false;
+    this._isMatchCreated = false;
+    this._matchId = null;
+    this._matchStatus = null;
+    this._playerReady = false;
+    this._matchFoundHandled = false;
+    // ✅ إعادة تعيين العلم
+    this._isEnding = false;
+    // إخفاء واجهة المباراة
+    if (typeof App._exitDirectMatchClean === 'function') {
+        App._exitDirectMatchClean();
+    }
+},
 
-            const scores = match.scores || {};
-            const players = match.players || [];
-            const sorted = [...players].sort((a, b) => {
-                const scoreA = scores[a.uid]?.score || 0;
-                const scoreB = scores[b.uid]?.score || 0;
-                return scoreB - scoreA;
-            });
+    // ===== دوال واجهة المستخدم =====
+    _showSearchingUI() {
+        let container = document.getElementById('directMatchContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'directMatchContainer';
+            container.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                z-index: 1050;
+                background: var(--dark);
+                padding: 1rem;
+                overflow-y: auto;
+                display: none;
+            `;
+            document.body.appendChild(container);
+        }
+        container.style.display = 'block';
+        container.innerHTML = `
+            <div style="max-width:500px;margin:0 auto;text-align:center;padding:2rem 1rem;">
+                <div style="font-size:3rem;margin-bottom:0.5rem;">🔍</div>
+                <h2 style="font-size:1.5rem;font-weight:800;color:var(--accent);">
+                    جاري البحث عن لاعب...
+                </h2>
+                <p style="color:var(--gray);margin:0.5rem 0;">
+                    ⏱ <span id="searchTimer">0</span> ثانية
+                </p>
+                <div style="width:100%;max-width:300px;margin:0.5rem auto;">
+                    <div style="height:6px;background:var(--glass);border-radius:10px;overflow:hidden;">
+                        <div id="searchProgress" style="height:100%;width:0%;background:linear-gradient(90deg, var(--primary), var(--accent));border-radius:10px;transition:width 0.5s ease;"></div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:0.5rem;justify-content:center;margin:1rem 0;">
+                    <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--primary);animation:dotPulse 1.2s infinite alternate;"></div>
+                    <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--accent);animation:dotPulse 1.2s infinite alternate 0.4s;"></div>
+                    <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--primary);animation:dotPulse 1.2s infinite alternate 0.8s;"></div>
+                </div>
+                <div style="font-size:0.85rem;color:var(--gray);">
+                    الوضع: <strong>${this._getModeLabel(this._mode)}</strong>
+                </div>
+                <button class="btn btn-danger mt-2" onclick="MatchmakingSystem.cancelMatchmaking()" style="margin-top:1rem;">
+                    <i class="fas fa-times"></i> إلغاء البحث
+                </button>
+                <div style="margin-top:0.5rem;font-size:0.7rem;color:var(--gray-dark);">
+                    🔍 سيتم إلغاء البحث تلقائياً بعد دقيقتين
+                </div>
+            </div>
+        `;
+    },
 
-            const winner = sorted[0] || null;
+    _hideSearchingUI() {
+        const el = document.getElementById('directMatchContainer');
+        if (el && !this._isMatchCreated) {
+            el.style.display = 'none';
+        }
+    },
 
-            await db.collection('directMatches').doc(matchId).update({
-                status: 'finished',
-                winner: winner,
-                finishedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+_showMatchFoundUI(matchId) {
+    const container = document.getElementById('directMatchContainer');
+    if (!container) return;
+    container.style.display = 'block';
 
-            showToast(`🏆 الفائز: ${winner?.name || 'لا يوجد'}`, 'success', 5000);
+    // عرض واجهة تحميل مؤقتة
+    container.innerHTML = `
+        <div style="max-width:550px;margin:0 auto;text-align:center;padding:2rem 1rem;">
+            <div style="font-size:3rem;margin-bottom:0.5rem;">🔄</div>
+            <h2 style="font-size:1.5rem;font-weight:800;color:var(--accent);">تم العثور على مباراة!</h2>
+            <div style="display:flex;gap:0.5rem;justify-content:center;margin:1rem 0;">
+                <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--primary);animation:dotPulse 1.2s infinite alternate;"></div>
+                <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--accent);animation:dotPulse 1.2s infinite alternate 0.4s;"></div>
+                <div class="search-dot" style="width:12px;height:12px;border-radius:50%;background:var(--primary);animation:dotPulse 1.2s infinite alternate 0.8s;"></div>
+            </div>
+            <p style="color:var(--gray);">جاري تجهيز المباراة...</p>
+        </div>
+    `;
 
-        } catch (e) {
-            console.error('Error ending match:', e);
+    // جلب بيانات المباراة وعرضها
+    RealtimeService.getOnce(`directMatches/${matchId}`).then((gameData) => {
+        if (!gameData) return;
+        this._updateMatchFoundUI(gameData);
+    }).catch(console.error);
+},
+
+    _updateMatchFoundUI(gameData) {
+        const container = document.getElementById('directMatchContainer');
+        if (!container) return;
+
+        const players = gameData.players || [];
+        const totalPlayers = 2;
+        const readyCount = players.filter(p => p.ready === true).length;
+        const allPresent = players.length === totalPlayers;
+
+        let playersHtml = players.map((p, index) => {
+            const isMe = p.uid === AuthService.currentUser?.uid;
+            const rank = getRank(p.rankPoints || 0);
+            const level = getLevel(p.totalScore || 0);
+            const avatar = p.avatar || '';
+            return `
+                <div style="display:flex;flex-direction:column;align-items:center;gap:0.2rem;padding:0.5rem 1rem;background:var(--glass);border-radius:var(--radius-sm);border:2px solid ${isMe ? 'var(--accent)' : 'var(--glass-border)'};min-width:120px;flex:1;">
+                    <div style="width:60px;height:60px;border-radius:50%;overflow:hidden;border:3px solid ${rank.color || 'var(--accent)'};">
+                        ${avatar ? `<img src="${avatar}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.8rem;background:var(--primary);color:#fff;">${p.name?.charAt(0) || '👤'}</div>`}
+                    </div>
+                    <div style="font-weight:700;font-size:0.9rem;">${p.name} ${isMe ? '👈' : ''}</div>
+                    <div style="display:flex;gap:0.3rem;font-size:0.65rem;color:var(--gray);">
+                        <span>🏅 ${level.level}</span>
+                        <span>•</span>
+                        <span>${rank.icon || '🏅'} ${rank.name}</span>
+                    </div>
+                    <div style="font-size:0.7rem;font-weight:700;color:${p.ready ? 'var(--success)' : 'var(--gray)'};margin-top:0.2rem;">
+                        ${p.ready ? '✅ جاهز' : '⏳ ينتظر...'}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        if (players.length === 0) {
+            playersHtml = `<div style="color:var(--gray);font-size:0.9rem;padding:1rem;"><i class="fas fa-spinner fa-spin"></i> في انتظار اللاعبين...</div>`;
+        }
+
+        container.innerHTML = `
+            <div style="max-width:550px;margin:0 auto;text-align:center;padding:1.5rem 1rem;">
+                <div style="font-size:3.5rem;margin-bottom:0.3rem;">🎯</div>
+                <h2 style="font-size:1.6rem;font-weight:900;color:var(--accent);">تم العثور على مباراة!</h2>
+                <p style="color:var(--gray);font-size:1rem;margin:0.3rem 0;">
+                    ⏳ جاري انتظار تجهيز اللاعبين...
+                </p>
+                <div style="display:flex;gap:1rem;justify-content:center;margin:1rem 0;flex-wrap:wrap;">
+                    ${playersHtml}
+                </div>
+                <div id="matchPlayersStatus" style="color:var(--gray);font-size:0.9rem;margin-top:0.5rem;padding:0.3rem;background:var(--glass);border-radius:8px;">
+                    👥 ${readyCount}/${totalPlayers} لاعب جاهز ${readyCount === totalPlayers && allPresent ? '✅' : '...'}
+                </div>
+                ${!allPresent ? `<div style="color:var(--gray);font-size:0.8rem;margin-top:0.3rem;">🔄 في انتظار دخول اللاعب الآخر...</div>` : ''}
+                <button class="btn btn-danger mt-2" onclick="App._exitDirectMatch()" style="margin-top:0.8rem;">
+                    <i class="fas fa-times"></i> إلغاء المباراة
+                </button>
+            </div>
+        `;
+    },
+
+    _showCountdownUI(matchId, seconds) {
+        const container = document.getElementById('directMatchContainer');
+        if (!container) return;
+
+        // جلب أسماء اللاعبين للعرض
+        RealtimeService.getOnce(`directMatches/${matchId}`).then((gameData) => {
+            if (!gameData) return;
+            const p1 = gameData.players?.[0]?.name || 'لاعب 1';
+            const p2 = gameData.players?.[1]?.name || 'لاعب 2';
+
+            container.innerHTML = `
+                <div style="max-width:500px;margin:0 auto;text-align:center;padding:2rem 1rem;">
+                    <div style="font-size:4rem;margin-bottom:0.5rem;">⏳</div>
+                    <h2 style="font-size:2rem;font-weight:900;color:var(--accent);">استعد!</h2>
+                    <p style="color:var(--gray);font-size:1.1rem;">المباراة ستبدأ خلال</p>
+                    <div id="countdownNumber" style="font-size:7rem;font-weight:900;color:var(--primary);margin:0.3rem 0;line-height:1;text-shadow:0 0 60px rgba(108,99,255,0.3);">
+                        ${seconds}
+                    </div>
+                    <div style="display:flex;gap:0.5rem;justify-content:center;margin-top:0.5rem;font-size:0.9rem;">
+                        <span style="color:var(--gray);">⚔️ ${p1}</span>
+                        <span style="color:var(--accent);">🆚</span>
+                        <span style="color:var(--gray);">${p2}</span>
+                    </div>
+                    <button class="btn btn-danger mt-2" onclick="MatchmakingSystem.leaveGame()" style="margin-top:1rem;">
+                        <i class="fas fa-times"></i> إلغاء
+                    </button>
+                </div>
+            `;
+        });
+    },
+
+    _getModeLabel(mode) {
+        const labels = {
+            'normal_1v1': 'عادي 1 ضد 1',
+            'normal_2v2': 'عادي 2 ضد 2',
+            'crossword_1v1': 'كلمات متقاطعة 1 ضد 1',
+            'crossword_2v2': 'كلمات متقاطعة 2 ضد 2'
+        };
+        return labels[mode] || mode;
+    },
+
+    _startSearchTimer() {
+        if (this._searchTimerInterval) {
+            clearInterval(this._searchTimerInterval);
+            this._searchTimerInterval = null;
+        }
+
+        this._searchTimerInterval = setInterval(() => {
+            if (!this._searching) {
+                clearInterval(this._searchTimerInterval);
+                this._searchTimerInterval = null;
+                return;
+            }
+
+            const elapsed = (Date.now() - this._searchStartTime) / 1000;
+            const remaining = Math.max(0, this._maxSearchTime - elapsed);
+
+            const timerEl = document.getElementById('searchTimer');
+            if (timerEl) timerEl.textContent = Math.floor(elapsed);
+
+            const progressEl = document.getElementById('searchProgress');
+            if (progressEl) {
+                const progress = (elapsed / this._maxSearchTime) * 100;
+                progressEl.style.width = `${Math.min(progress, 100)}%`;
+            }
+
+            if (remaining <= 0 && !this._isMatchCreated) {
+                this._cancelSearch('⏰ لم يتم العثور على لاعب، حاول مرة أخرى');
+            }
+
+        }, 1000);
+    },
+
+    // ===== الخروج من المباراة (تنظيف فقط) =====
+    leaveGame() {
+        this._cleanupAfterMatch();
+        App._exitDirectMatchClean();
+    },
+
+    // ===== الخروج الآمن (يستدعي عند الضغط على زر الخروج) =====
+    async safeExit() {
+        if (this._matchStatus === 'finished' || !this._matchId) {
+            this._cleanupAfterMatch();
+            App._exitDirectMatchClean();
+            return;
+        }
+
+        if (this._matchStatus === 'playing') {
+            if (confirm('⚠️ هل أنت متأكد من الانسحاب من المباراة؟\nسيتم خصم 20 نقطة من رتبتك!')) {
+                // تطبيق عقوبة الانسحاب
+                const user = AuthService.currentUser;
+                if (user) {
+                    const newRankPoints = Math.max(0, (user.rankPoints || 0) - 20);
+                    await AuthService.updateUser({ rankPoints: newRankPoints });
+                    showToast('💔 تم خصم 20 نقطة رتبة', 'error');
+                }
+                this._cleanupAfterMatch();
+                App._exitDirectMatchClean();
+            }
+        } else {
+            // في حالات أخرى (waiting, countdown) نخرج بدون عقوبة
+            this._cleanupAfterMatch();
+            App._exitDirectMatchClean();
+            showToast('تم إلغاء المباراة', 'info');
         }
     }
 };
 
-// ✅ تحديث دوال App المرتبطة بالمباراة المباشرة
-App._renderDirectMatch = function(matchId) {
+// ===== عرض خيارات السؤال حسب النوع =====
+App._renderQuestionOptions = function(question, userAnswered, answers, user, currentQ) {
+    if (!question) return '<div class="text-gray">سؤال غير صالح</div>';
+    
+    const qType = question.type || 'multiple_choice';
+    const userAnswer = userAnswered ? answers[user.uid]?.[currentQ] : null;
+    
+    switch(qType) {
+        case 'multiple_choice':
+        case 'true_false':
+            return this._renderMultipleChoice(question, userAnswered, userAnswer);
+        case 'fill_blank':
+            return this._renderFillBlank(question, userAnswered, userAnswer);
+        case 'matching':
+            return this._renderMatching(question, userAnswered, userAnswer);
+        case 'ordering':
+            return this._renderOrdering(question, userAnswered, userAnswer);
+        default:
+            return '<div class="text-gray">نوع السؤال غير مدعوم</div>';
+    }
+};
+
+App._renderMultipleChoice = function(question, userAnswered, userAnswer) {
+    const opts = question.options || [];
+    return opts.map((opt, idx) => {
+        const isSelected = userAnswered && userAnswer?.answer === idx;
+        const isCorrect = isSelected && userAnswer?.isCorrect;
+        const isWrong = isSelected && !isCorrect;
+        let btnClass = 'option-btn';
+        if (userAnswered) {
+            btnClass += ' disabled';
+            if (idx === question.correct) btnClass += ' show-correct';
+            if (isWrong) btnClass += ' selected-wrong';
+        }
+        return `<button class="${btnClass}" onclick="MatchmakingSystem.submitAnswer(${idx})" ${userAnswered ? 'disabled' : ''}>
+            ${String.fromCharCode(65 + idx)}. ${opt}
+        </button>`;
+    }).join('');
+};
+
+App._renderFillBlank = function(question, userAnswered, userAnswer) {
+    if (userAnswered) {
+        const isCorrect = userAnswer?.isCorrect;
+        return `
+            <div style="grid-column:1/-1;display:flex;flex-direction:column;align-items:center;gap:0.5rem;">
+                <div style="font-size:1.1rem;color:${isCorrect ? 'var(--success)' : 'var(--secondary)'};">
+                    ${isCorrect ? '✅ إجابة صحيحة!' : '❌ إجابة خاطئة'}
+                </div>
+                <div style="color:var(--gray);font-size:0.9rem;">
+                    إجابتك: <strong>${userAnswer?.answer || '—'}</strong>
+                    ${!isCorrect ? `<span style="color:var(--accent);"> | الصحيح: ${question.correctAnswer || '—'}</span>` : ''}
+                </div>
+            </div>
+        `;
+    }
+    return `
+        <div style="grid-column:1/-1;display:flex;gap:0.5rem;justify-content:center;max-width:400px;margin:0 auto;">
+            <input type="text" id="directFillBlankInput" placeholder="اكتب الإجابة..." 
+                   style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);color:var(--light);">
+            <button class="btn btn-primary" onclick="App._submitDirectFillBlank()">
+                تأكيد
+            </button>
+        </div>
+    `;
+};
+
+App._renderMatching = function(question, userAnswered, userAnswer) {
+    const pairs = question.matchingPairs || [];
+    if (userAnswered) {
+        const userMatch = userAnswer?.answer || {};
+        return pairs.map(pair => {
+            const isMatch = userMatch[pair.left] === pair.right;
+            return `
+                <div style="grid-column:1/-1;display:flex;justify-content:center;gap:1rem;padding:0.2rem;font-size:0.9rem;">
+                    <span>${pair.left} ↔ </span>
+                    <span style="color:${isMatch ? 'var(--success)' : 'var(--secondary)'};">${userMatch[pair.left] || '(لم يختر)'}</span>
+                    ${!isMatch ? `<span style="color:var(--gray);font-size:0.8rem;">(الصحيح: ${pair.right})</span>` : ''}
+                </div>
+            `;
+        }).join('');
+    }
+    const rightOptions = pairs.map(p => p.right);
+    return pairs.map((pair, idx) => `
+        <div style="grid-column:1/-1;display:flex;align-items:center;gap:0.5rem;justify-content:center;margin-bottom:0.3rem;">
+            <span>${pair.left} ↔ </span>
+            <select id="mpMatchSelect_${idx}" style="padding:4px 8px;border-radius:6px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                <option value="">--- اختر ---</option>
+                ${rightOptions.map(r => `<option value="${r}">${r}</option>`).join('')}
+            </select>
+        </div>
+    `).join('') + `
+        <div style="grid-column:1/-1;">
+            <button class="btn btn-primary" onclick="App._submitDirectMatching()">تأكيد المطابقة</button>
+        </div>
+    `;
+};
+
+App._renderOrdering = function(question, userAnswered, userAnswer) {
+    const items = question.orderedItems || [];
+    if (userAnswered) {
+        const userOrder = userAnswer?.answer || [];
+        const isCorrect = JSON.stringify(userOrder) === JSON.stringify(items);
+        return userOrder.map((item, idx) => `
+            <div style="grid-column:1/-1;display:flex;gap:0.5rem;justify-content:center;padding:0.2rem;">
+                <span>${idx+1}</span>
+                <span style="color:${isCorrect ? 'var(--success)' : 'var(--gray)'};">${item}</span>
+                ${!isCorrect ? `<span style="color:var(--secondary);font-size:0.8rem;">(الصحيح: ${items[idx]})</span>` : ''}
+            </div>
+        `).join('');
+    }
+    // ترتيب عشوائي
+    const orderKey = `mpOrder_${Date.now()}`;
+    if (!window[orderKey]) {
+        window[orderKey] = shuffleArray([...items]);
+    }
+    const currentOrder = window[orderKey];
+    return currentOrder.map((item, idx) => `
+        <div style="grid-column:1/-1;display:flex;align-items:center;gap:0.5rem;justify-content:center;margin:0.2rem 0;">
+            <span style="min-width:30px;">${idx+1}</span>
+            <span>${item}</span>
+            <button class="btn btn-xs btn-outline" onclick="App._moveOrderingItem(${idx}, -1, '${orderKey}')">▲</button>
+            <button class="btn btn-xs btn-outline" onclick="App._moveOrderingItem(${idx}, 1, '${orderKey}')">▼</button>
+        </div>
+    `).join('') + `
+        <div style="grid-column:1/-1;">
+            <button class="btn btn-primary" onclick="App._submitDirectOrdering('${orderKey}')">تأكيد الترتيب</button>
+        </div>
+    `;
+};
+
+// ============================================================
+// دوال العرض للمباراة المباشرة – نسخة مُصحَّحة
+// ============================================================
+
+App._renderDirectMatch = async function(matchId) {
     const container = document.getElementById('directMatchContainer');
     if (!container) return;
 
-    db.collection('directMatches').doc(matchId).get().then((doc) => {
-        if (!doc.exists) {
-            container.innerHTML = '<div class="text-gray">المباراة غير موجودة</div>';
-            return;
-        }
+    // عرض شاشة تحميل
+    container.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;text-align:center;padding:2rem;">
+            <div style="position:relative;width:80px;height:80px;margin-bottom:1.5rem;">
+                <div style="position:absolute;top:0;left:0;right:0;bottom:0;border:4px solid var(--glass);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:2rem;">⚽</div>
+            </div>
+            <h3 style="color:var(--light);font-weight:700;margin-bottom:0.3rem;">جاري تحميل المباراة...</h3>
+            <p style="color:var(--gray);font-size:0.9rem;">يرجى الانتظار</p>
+        </div>
+    `;
 
-        const match = doc.data();
-        if (match.status === 'finished') {
-            App._showDirectMatchResult(matchId);
+    try {
+        const gameData = await RealtimeService.getOnce(`directMatches/${matchId}`);
+        if (!gameData) {
+            container.innerHTML = this._renderMatchError('المباراة غير موجودة');
             return;
         }
 
         const user = AuthService.currentUser;
-        const currentQ = match.currentQuestion || 0;
-        const questions = match.questions || [];
+        if (!user) {
+            container.innerHTML = this._renderMatchError('يجب تسجيل الدخول');
+            return;
+        }
+
+        const currentQ = gameData.currentQuestion || 0;
+        const questions = gameData.questions || [];
         if (currentQ >= questions.length) {
             MatchmakingSystem._endMatch(matchId);
             return;
         }
 
         const question = questions[currentQ];
-        const players = match.players || [];
-        const answers = match.answers || {};
-        const scores = match.scores || {};
+        if (!question) {
+            container.innerHTML = this._renderMatchError('السؤال غير موجود');
+            return;
+        }
 
-        const timeLimit = 15;
-        const elapsed = (Date.now() - match.questionStartTime) / 1000;
+        const players = gameData.players || [];
+        const answers = gameData.answers || {};
+        const scores = gameData.scores || {};
+        const userAnswered = user && answers[user.uid] && answers[user.uid][currentQ] !== undefined;
+
+        const timeLimit = gameData.settings?.timeLimit || 15;
+        const elapsed = (Date.now() - (gameData.questionStartTime || Date.now())) / 1000;
         const timeLeft = Math.max(0, timeLimit - Math.floor(elapsed));
+        const progress = Math.min(((currentQ) / questions.length) * 100, 100);
 
+        // ترتيب اللاعبين حسب النقاط
         const sortedPlayers = [...players].sort((a, b) => {
             const scoreA = scores[a.uid]?.score || 0;
             const scoreB = scores[b.uid]?.score || 0;
             return scoreB - scoreA;
         });
 
-        const userAnswered = user && answers[user.uid] && answers[user.uid][currentQ] !== undefined;
-
-        let html = `
-            <div style="max-width:800px;margin:0 auto;">
-                <div class="game-header" style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 1rem;background:var(--card-bg);border-radius:var(--radius-sm);margin-bottom:1rem;">
-                    <div style="display:flex;gap:0.8rem;align-items:center;">
-                        <span class="badge badge-primary">⚡ ${currentQ+1}/${questions.length}</span>
-                        <span class="badge ${timeLeft <= 5 ? 'badge-danger' : 'badge-warning'}">⏱ ${timeLeft}s</span>
-                    </div>
-                    <button class="btn btn-sm btn-danger" onclick="App._exitDirectMatch()">
-                        <i class="fas fa-times"></i> خروج
-                    </button>
-                </div>
-
-                <div class="question-box" style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius);padding:2rem;text-align:center;margin-bottom:1rem;">
-                    <div class="q-category" style="display:inline-block;background:var(--primary);color:#fff;padding:4px 20px;border-radius:30px;font-size:0.8rem;font-weight:700;margin-bottom:0.5rem;">
-                        📚 ${question.category || 'عام'}
-                    </div>
-                    <div class="q-type-badge" style="display:inline-block;background:var(--glass);color:var(--gray);padding:2px 14px;border-radius:30px;font-size:0.7rem;margin-right:0.5rem;">
-                        ${GameEngine._getTypeLabel(question.type)}
-                    </div>
-                    <div class="q-text" style="font-size:1.3rem;font-weight:700;margin:0.5rem 0 1.5rem;line-height:1.8;">${question.question}</div>
-                    <div class="options-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;max-width:600px;margin:0 auto;">
-        `;
-
-        if (question.type === 'multiple_choice' || question.type === 'true_false') {
-            const opts = question.options || [];
-            opts.forEach((opt, idx) => {
-                const isSelected = userAnswered && answers[user.uid][currentQ].answer === idx;
-                const isCorrect = isSelected && answers[user.uid][currentQ].isCorrect;
-                const isWrong = isSelected && !isCorrect;
-                let btnClass = 'option-btn';
-                if (userAnswered) {
-                    btnClass += ' disabled';
-                    if (idx === question.correct) btnClass += ' show-correct';
-                    if (isWrong) btnClass += ' selected-wrong';
-                }
-                html += `
-                    <button class="${btnClass}" onclick="MatchmakingSystem.submitAnswer(${idx})" ${userAnswered ? 'disabled' : ''}>
-                        ${String.fromCharCode(65 + idx)}. ${opt}
-                    </button>
-                `;
-            });
-        } else if (question.type === 'fill_blank') {
-            html += `
-                <div style="grid-column:1/-1;display:flex;gap:0.5rem;justify-content:center;max-width:400px;margin:0 auto;">
-                    <input type="text" id="directFillBlankInput" placeholder="اكتب الإجابة..." 
-                           style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);color:var(--light);" 
-                           ${userAnswered ? 'disabled' : ''}>
-                    <button class="btn btn-primary" onclick="App._submitDirectFillBlank()" ${userAnswered ? 'disabled' : ''}>
-                        تأكيد
-                    </button>
-                </div>
-            `;
-        }
-
-        html += `
-                    </div>
-                </div>
-
-                <div class="card" style="padding:0.8rem;">
-                    <div class="card-title" style="font-size:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.3rem;">
-                        <span><i class="fas fa-crown" style="color:var(--accent);"></i> الترتيب</span>
-                        <span style="font-size:0.7rem;color:var(--gray);">
-                            ⭐ النقاط • ✅ الصحيح
-                        </span>
-                    </div>
-                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.3rem;">
-        `;
-
-        sortedPlayers.forEach((p, i) => {
-            const isMe = p.uid === user?.uid;
-            const pScore = scores[p.uid]?.score || 0;
-            const pCorrect = scores[p.uid]?.correct || 0;
-            const pWrong = scores[p.uid]?.wrong || 0;
-            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
-            const isTop = i < 3;
-
-            html += `
-                <div class="player-rank-item ${isTop ? 'top' : ''} ${isMe ? 'me' : ''}" 
-                     style="background:${isTop ? 'var(--accent)' : (isMe ? 'var(--primary)' : 'var(--glass)')};
-                            ${isTop ? 'color:var(--dark);' : ''}
-                            ${isMe && !isTop ? 'color:#fff;' : ''}
-                            padding:0.3rem 0.6rem;border-radius:6px;
-                            display:flex;justify-content:space-between;align-items:center;
-                            border:${isMe ? '2px solid var(--accent)' : '1px solid var(--glass-border)'};">
-                    <div style="display:flex;align-items:center;gap:0.3rem;min-width:0;">
-                        <span style="font-weight:700;font-size:0.9rem;flex-shrink:0;">${medal}</span>
-                        <span style="font-weight:600;font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;">
-                            ${p.name} ${isMe ? '👈' : ''}
-                        </span>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
-                        <span style="font-weight:700;font-size:0.9rem;color:${isTop ? 'var(--dark)' : 'var(--accent)'};">⭐ ${pScore}</span>
-                        <span style="font-size:0.6rem;color:${isTop ? 'rgba(0,0,0,0.5)' : 'var(--gray)'};">
-                            ✅${pCorrect}
-                        </span>
-                    </div>
-                </div>
-            `;
-        });
-
-        html += `
-                    </div>
-                </div>
+        // بناء واجهة المباراة
+        container.innerHTML = `
+            <div style="max-width:900px;margin:0 auto;padding:0.5rem;">
+                ${this._renderMatchHeader(gameData, currentQ, questions.length, timeLeft, progress)}
+                ${this._renderPlayersSection(sortedPlayers, scores, user)}
+                ${this._renderQuestionSection(question, userAnswered, answers, user, currentQ)}
+                ${this._renderMatchStats(sortedPlayers, scores)}
             </div>
         `;
 
-        container.innerHTML = html;
-    });
+        // ربط أحداث الإجابة
+        this._bindMatchEvents();
+
+    } catch (error) {
+        console.error('❌ Error rendering direct match:', error);
+        container.innerHTML = this._renderMatchError(error.message || 'حدث خطأ غير متوقع');
+    }
 };
 
+// ===== رأس المباراة =====
+App._renderMatchHeader = function(gameData, currentQ, totalQuestions, timeLeft, progress) {
+    const isTimeLow = timeLeft <= 5;
+    const modeLabels = {
+        'normal_1v1': '⚔️ 1v1',
+        'normal_2v2': '👥 2v2',
+        'crossword_1v1': '🔤 1v1',
+        'crossword_2v2': '🔤 2v2'
+    };
+    const modeLabel = modeLabels[gameData.mode] || '🎯 مباشر';
+
+    return `
+        <div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius);padding:0.8rem 1.2rem;margin-bottom:0.8rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                <div style="display:flex;align-items:center;gap:0.8rem;flex-wrap:wrap;">
+                    <span class="badge badge-primary" style="font-size:0.8rem;padding:4px 14px;">
+                        <i class="fas fa-question-circle"></i> ${currentQ + 1}/${totalQuestions}
+                    </span>
+                    <span class="badge ${isTimeLow ? 'badge-danger' : 'badge-warning'}" style="font-size:0.8rem;padding:4px 14px;transition:all 0.3s ease;" id="matchTimerDisplay">
+                        <i class="fas fa-clock"></i> ${timeLeft}s
+                    </span>
+                    <span class="badge badge-info" style="font-size:0.8rem;padding:4px 14px;">
+                        <i class="fas fa-users"></i> ${gameData.players?.length || 0}
+                    </span>
+                    <span class="badge" style="font-size:0.7rem;padding:2px 10px;background:var(--glass);">
+                        ${modeLabel}
+                    </span>
+                </div>
+                <button class="btn btn-sm btn-danger" onclick="MatchmakingSystem.safeExit()" style="padding:4px 14px;font-size:0.75rem;">
+                    <i class="fas fa-sign-out-alt"></i> انسحاب (-20 رتبة)
+                </button>
+            </div>
+            <!-- شريط التقدم -->
+            <div style="margin-top:0.5rem;">
+                <div style="height:4px;background:var(--glass);border-radius:10px;overflow:hidden;position:relative;">
+                    <div id="matchProgressFill" style="height:100%;width:${Math.min(progress, 100)}%;background:linear-gradient(90deg, var(--primary), var(--accent));border-radius:10px;transition:width 0.5s ease;"></div>
+                </div>
+            </div>
+        </div>
+    `;
+};
+
+// ===== قسم اللاعبين =====
+App._renderPlayersSection = function(sortedPlayers, scores, user) {
+    if (sortedPlayers.length < 2) {
+        return `<div style="text-align:center;color:var(--gray);padding:0.5rem;"><i class="fas fa-spinner fa-spin"></i> في انتظار اللاعب الآخر...</div>`;
+    }
+
+    return `
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:0.5rem;margin-bottom:0.8rem;align-items:stretch;">
+            ${sortedPlayers.map((p, index) => {
+                const isMe = p.uid === user?.uid;
+                const pScore = scores[p.uid]?.score || 0;
+                const pCorrect = scores[p.uid]?.correct || 0;
+                const pWrong = scores[p.uid]?.wrong || 0;
+                const pStreak = scores[p.uid]?.streak || 0;
+                const rank = getRank(p.rankPoints || 0);
+                const level = getLevel(p.totalScore || 0);
+                const avatar = p.avatar || '';
+                const isWinner = index === 0 && sortedPlayers.length > 1;
+
+                return `
+                    <div style="background:${isMe ? 'var(--primary)' : 'var(--card-bg)'};border:2px solid ${isWinner ? 'var(--accent)' : (isMe ? 'var(--accent)' : 'var(--border-color)')};border-radius:var(--radius-sm);padding:0.6rem 0.8rem;text-align:center;position:relative;${isWinner ? 'box-shadow:0 0 30px rgba(255,217,61,0.15);' : ''}">
+                        ${isWinner ? '<span style="position:absolute;top:-8px;right:-8px;font-size:1.5rem;">👑</span>' : ''}
+                        ${isMe ? '<span style="position:absolute;top:-6px;left:-6px;font-size:0.6rem;background:var(--accent);color:var(--dark);padding:0.1rem 0.5rem;border-radius:30px;font-weight:700;">أنت</span>' : ''}
+                        <div style="display:flex;align-items:center;gap:0.5rem;justify-content:center;">
+                            <div style="position:relative;">
+                                <div style="width:48px;height:48px;border-radius:50%;overflow:hidden;border:2px solid ${rank.color || 'var(--accent)'};background:var(--glass);">
+                                    ${avatar ? `<img src="${avatar}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.4rem;background:var(--primary);color:#fff;">${p.name?.charAt(0) || '👤'}</div>`}
+                                </div>
+                                <div style="position:absolute;bottom:-4px;right:-4px;font-size:0.55rem;background:var(--dark);padding:0.1rem 0.3rem;border-radius:30px;border:1px solid var(--border-color);">
+                                    ${rank.icon || '🏅'}
+                                </div>
+                            </div>
+                            <div style="text-align:right;flex:1;min-width:0;">
+                                <div style="font-weight:700;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                    ${p.name}
+                                </div>
+                                <div style="display:flex;gap:0.3rem;font-size:0.55rem;color:var(--gray);flex-wrap:wrap;justify-content:center;">
+                                    <span>🏅 ${level.level}</span>
+                                    <span>•</span>
+                                    <span style="color:${rank.color || 'var(--gray)'};">${rank.name}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:0.5rem;justify-content:center;margin-top:0.3rem;font-size:0.7rem;flex-wrap:wrap;">
+                            <span style="font-weight:900;color:var(--accent);">⭐ ${pScore}</span>
+                            <span style="color:var(--success);">✅ ${pCorrect}</span>
+                            <span style="color:var(--secondary);">❌ ${pWrong}</span>
+                            ${pStreak >= 3 ? `<span style="color:var(--accent);font-weight:700;">🔥${pStreak}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+};
+
+// ===== عرض السؤال =====
+App._renderQuestionSection = function(question, userAnswered, answers, user, currentQ) {
+    const qType = question.type || 'multiple_choice';
+    const userAnswer = userAnswered ? answers[user.uid]?.[currentQ] : null;
+    const isCorrect = userAnswer?.isCorrect;
+
+    let optionsHtml = '';
+    switch(qType) {
+        case 'multiple_choice':
+        case 'true_false':
+            optionsHtml = this._renderMultipleChoiceOptions(question, userAnswered, userAnswer);
+            break;
+        case 'fill_blank':
+            optionsHtml = this._renderFillBlankOptions(question, userAnswered, userAnswer);
+            break;
+        case 'matching':
+            optionsHtml = this._renderMatchingOptions(question, userAnswered, userAnswer);
+            break;
+        case 'ordering':
+            optionsHtml = this._renderOrderingOptions(question, userAnswered, userAnswer);
+            break;
+        default:
+            optionsHtml = '<div class="text-gray">نوع السؤال غير مدعوم</div>';
+    }
+
+    const typeLabels = {
+        'multiple_choice': '📝 اختيار من متعدد',
+        'true_false': '✅ صح/خطأ',
+        'fill_blank': '✏️ ملء الفراغ',
+        'matching': '🔗 مطابقة',
+        'ordering': '🔢 ترتيب'
+    };
+
+    return `
+        <div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius);padding:1.2rem;margin-bottom:0.8rem;position:relative;overflow:hidden;">
+            <div style="position:relative;z-index:1;">
+                <div style="display:flex;justify-content:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem;">
+                    <span class="badge badge-primary" style="background:var(--primary);">📚 ${question.category || 'عام'}</span>
+                    <span class="badge" style="background:var(--glass);">${typeLabels[qType] || '📝 اختيار من متعدد'}</span>
+                    ${userAnswered ? `
+                        <span class="badge" style="background:${isCorrect ? 'var(--success)' : 'var(--secondary)'};color:#fff;">
+                            ${isCorrect ? '✅ صحيح!' : '❌ خاطئ'}
+                        </span>
+                    ` : ''}
+                </div>
+                <div style="font-size:1.15rem;font-weight:700;text-align:center;line-height:1.8;margin-bottom:1rem;padding:0 0.5rem;">
+                    ${question.question}
+                </div>
+                <div id="matchOptionsContainer" style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;max-width:650px;margin:0 auto;">
+                    ${optionsHtml}
+                </div>
+                ${userAnswered && !isCorrect && question.correctAnswer ? `
+                    <div style="text-align:center;margin-top:0.5rem;padding:0.3rem;background:rgba(255,217,61,0.05);border-radius:8px;border:1px solid var(--accent);">
+                        <span style="color:var(--accent);font-size:0.85rem;">
+                            💡 الإجابة الصحيحة: <strong>${question.correctAnswer}</strong>
+                        </span>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+};
+
+// ===== خيارات الاختيار من متعدد =====
+App._renderMultipleChoiceOptions = function(question, userAnswered, userAnswer) {
+    const opts = question.options || [];
+    return opts.map((opt, idx) => {
+        const isSelected = userAnswered && userAnswer?.answer === idx;
+        const isCorrect = isSelected && userAnswer?.isCorrect;
+        const isWrong = isSelected && !isCorrect;
+        let btnClass = 'option-btn';
+        let styles = '';
+        if (userAnswered) {
+            btnClass += ' disabled';
+            if (idx === question.correct) {
+                btnClass += ' show-correct';
+                styles = 'border-color:var(--success);background:rgba(46,204,113,0.15);';
+            }
+            if (isWrong) {
+                btnClass += ' selected-wrong';
+                styles = 'border-color:var(--secondary);background:rgba(255,107,107,0.15);';
+            }
+        }
+        return `
+            <button class="${btnClass}" onclick="MatchmakingSystem.submitAnswer(MatchmakingSystem._matchId, ${idx})" ${userAnswered ? 'disabled' : ''} style="${styles}padding:10px 14px;border-radius:10px;background:var(--glass);border:2px solid ${isSelected ? (isCorrect ? 'var(--success)' : 'var(--secondary)') : 'var(--glass-border)'};color:var(--light);font-size:0.9rem;transition:all 0.2s ease;cursor:${userAnswered ? 'default' : 'pointer'};text-align:right;">
+                <span style="font-weight:700;color:var(--gray);margin-left:0.5rem;">${String.fromCharCode(65 + idx)}.</span>
+                ${opt}
+                ${isSelected ? (isCorrect ? ' ✅' : ' ❌') : ''}
+                ${idx === question.correct && userAnswered ? ' ✓' : ''}
+            </button>
+        `;
+    }).join('');
+};
+
+// ===== خيارات ملء الفراغ =====
+App._renderFillBlankOptions = function(question, userAnswered, userAnswer) {
+    if (userAnswered) {
+        const isCorrect = userAnswer?.isCorrect;
+        return `
+            <div style="grid-column:1/-1;display:flex;flex-direction:column;align-items:center;gap:0.5rem;padding:0.5rem;">
+                <div style="font-size:1.1rem;font-weight:700;color:${isCorrect ? 'var(--success)' : 'var(--secondary)'};">
+                    ${isCorrect ? '✅ إجابة صحيحة!' : '❌ إجابة خاطئة'}
+                </div>
+                <div style="color:var(--gray);font-size:0.9rem;">
+                    إجابتك: <strong style="color:var(--light);">${userAnswer?.answer || '—'}</strong>
+                    ${!isCorrect ? `<span style="color:var(--accent);margin-right:0.5rem;">| الصحيح: ${question.correctAnswer || '—'}</span>` : ''}
+                </div>
+            </div>
+        `;
+    }
+    return `
+        <div style="grid-column:1/-1;display:flex;gap:0.5rem;justify-content:center;max-width:400px;margin:0 auto;">
+            <input type="text" id="directFillBlankInput" placeholder="اكتب الإجابة..." 
+                   style="flex:1;padding:10px 14px;border-radius:10px;border:2px solid var(--glass-border);background:var(--glass);color:var(--light);font-size:0.95rem;text-align:right;">
+            <button class="btn btn-primary" onclick="App._submitDirectFillBlank()" style="padding:10px 20px;font-size:0.9rem;">
+                <i class="fas fa-check"></i> تأكيد
+            </button>
+        </div>
+    `;
+};
+
+// ===== خيارات المطابقة =====
+App._renderMatchingOptions = function(question, userAnswered, userAnswer) {
+    const pairs = question.matchingPairs || [];
+    if (userAnswered) {
+        const userMatch = userAnswer?.answer || {};
+        return pairs.map(pair => {
+            const isMatch = userMatch[pair.left] === pair.right;
+            return `
+                <div style="grid-column:1/-1;display:flex;justify-content:center;align-items:center;gap:0.8rem;padding:0.3rem;border-bottom:1px solid var(--glass-border);">
+                    <span style="font-weight:600;">${pair.left}</span>
+                    <span style="color:var(--gray);">↔</span>
+                    <span style="color:${isMatch ? 'var(--success)' : 'var(--secondary)'};font-weight:${isMatch ? '700' : '400'};">
+                        ${userMatch[pair.left] || '—'}
+                    </span>
+                    ${!isMatch ? `<span style="color:var(--gray);font-size:0.75rem;">(الصحيح: ${pair.right})</span>` : '✅'}
+                </div>
+            `;
+        }).join('');
+    }
+    const rightOptions = pairs.map(p => p.right);
+    return pairs.map((pair, idx) => `
+        <div style="grid-column:1/-1;display:flex;align-items:center;gap:0.5rem;justify-content:center;margin-bottom:0.3rem;flex-wrap:wrap;">
+            <span style="font-weight:600;min-width:60px;">${pair.left}</span>
+            <span style="color:var(--gray);">↔</span>
+            <select id="mpMatchSelect_${idx}" style="padding:6px 10px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);font-size:0.85rem;min-width:120px;">
+                <option value="">--- اختر ---</option>
+                ${rightOptions.map(r => `<option value="${r}">${r}</option>`).join('')}
+            </select>
+        </div>
+    `).join('') + `
+        <div style="grid-column:1/-1;text-align:center;margin-top:0.3rem;">
+            <button class="btn btn-primary" onclick="App._submitDirectMatching()" style="padding:8px 24px;">
+                <i class="fas fa-check"></i> تأكيد المطابقة
+            </button>
+        </div>
+    `;
+};
+
+// ===== خيارات الترتيب =====
+App._renderOrderingOptions = function(question, userAnswered, userAnswer) {
+    const items = question.orderedItems || [];
+    if (userAnswered) {
+        const userOrder = userAnswer?.answer || [];
+        const isCorrect = JSON.stringify(userOrder) === JSON.stringify(items);
+        return userOrder.map((item, idx) => `
+            <div style="grid-column:1/-1;display:flex;align-items:center;gap:0.5rem;justify-content:center;padding:0.2rem;border-bottom:1px solid var(--glass-border);">
+                <span style="font-weight:700;color:var(--gray);min-width:30px;">${idx + 1}</span>
+                <span style="color:${isCorrect ? 'var(--success)' : 'var(--gray)'};">${item}</span>
+                ${!isCorrect ? `<span style="color:var(--secondary);font-size:0.75rem;">(الصحيح: ${items[idx]})</span>` : ''}
+            </div>
+        `).join('');
+    }
+    const orderKey = `mpOrder_${Date.now()}`;
+    if (!window[orderKey]) {
+        window[orderKey] = shuffleArray([...items]);
+    }
+    const currentOrder = window[orderKey];
+    return currentOrder.map((item, idx) => `
+        <div style="grid-column:1/-1;display:flex;align-items:center;gap:0.5rem;justify-content:center;margin:0.15rem 0;padding:0.2rem 0.5rem;background:var(--glass);border-radius:8px;">
+            <span style="font-weight:700;color:var(--gray);min-width:30px;">${idx + 1}</span>
+            <span style="flex:1;text-align:right;">${item}</span>
+            <button class="btn btn-xs btn-outline" onclick="App._moveOrderingItem(${idx}, -1, '${orderKey}')" style="padding:2px 6px;font-size:0.65rem;">▲</button>
+            <button class="btn btn-xs btn-outline" onclick="App._moveOrderingItem(${idx}, 1, '${orderKey}')" style="padding:2px 6px;font-size:0.65rem;">▼</button>
+        </div>
+    `).join('') + `
+        <div style="grid-column:1/-1;text-align:center;margin-top:0.3rem;">
+            <button class="btn btn-primary" onclick="App._submitDirectOrdering('${orderKey}')" style="padding:8px 24px;">
+                <i class="fas fa-check"></i> تأكيد الترتيب
+            </button>
+        </div>
+    `;
+};
+
+// ===== إحصائيات المباراة =====
+App._renderMatchStats = function(sortedPlayers, scores) {
+    let totalCorrect = 0, totalAnswers = 0, maxStreak = 0, totalTime = 0, timeCount = 0;
+    sortedPlayers.forEach(p => {
+        const s = scores[p.uid] || {};
+        totalCorrect += s.correct || 0;
+        totalAnswers += s.answersCount || 0;
+        maxStreak = Math.max(maxStreak, s.bestStreak || 0);
+        if (s.avgTime) { totalTime += s.avgTime; timeCount++; }
+    });
+    const accuracy = totalAnswers > 0 ? Math.round((totalCorrect / totalAnswers) * 100) : 0;
+    const avgTime = timeCount > 0 ? (totalTime / timeCount).toFixed(1) : '0';
+
+    return `
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:0.3rem;padding:0.4rem 0.8rem;background:var(--glass);border-radius:var(--radius-sm);border:1px solid var(--border-color);font-size:0.7rem;color:var(--gray);">
+            <span>🎯 الدقة: <strong style="color:var(--light);">${accuracy}%</strong></span>
+            <span>🔥 أفضل سلسلة: <strong style="color:var(--accent);">${maxStreak}</strong></span>
+            <span>⏱ متوسط الوقت: <strong style="color:var(--info);">${avgTime}s</strong></span>
+            <span>📊 الإجابات: <strong style="color:var(--primary);">${totalAnswers}</strong></span>
+        </div>
+    `;
+};
+
+// ===== دوال إرسال الإجابات =====
 App._submitDirectFillBlank = function() {
     const input = document.getElementById('directFillBlankInput');
     if (!input) return;
@@ -22371,25 +23466,65 @@ App._submitDirectFillBlank = function() {
         showToast('يرجى كتابة الإجابة', 'info');
         return;
     }
-    MatchmakingSystem.submitAnswer(answer);
+    input.disabled = true;
+    MatchmakingSystem.submitAnswer(MatchmakingSystem._matchId, answer);
 };
 
-App._showDirectMatchResult = function(matchId) {
+App._submitDirectMatching = function() {
+    const selects = document.querySelectorAll('[id^="mpMatchSelect_"]');
+    const result = {};
+    selects.forEach(select => {
+        const container = select.closest('div');
+        const leftSpan = container ? container.querySelector('span') : null;
+        if (leftSpan) {
+            const left = leftSpan.textContent.trim().replace('↔', '').trim();
+            result[left] = select.value;
+        }
+    });
+    const allSelected = Object.values(result).every(v => v !== '');
+    if (!allSelected) {
+        showToast('يرجى اختيار جميع المطابقات', 'info');
+        return;
+    }
+    MatchmakingSystem.submitAnswer(MatchmakingSystem._matchId, result);
+};
+
+App._moveOrderingItem = function(index, direction, orderKey) {
+    if (!window[orderKey]) return;
+    const arr = window[orderKey];
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= arr.length) return;
+    [arr[index], arr[newIndex]] = [arr[newIndex], arr[index]];
+    // إعادة عرض السؤال
+    if (MatchmakingSystem._matchId) {
+        App._renderDirectMatch(MatchmakingSystem._matchId);
+    }
+};
+
+App._submitDirectOrdering = function(orderKey) {
+    if (!window[orderKey]) return;
+    const order = window[orderKey];
+    MatchmakingSystem.submitAnswer(MatchmakingSystem._matchId, order);
+};
+
+App._showDirectMatchResult = async function(matchId) {
     const container = document.getElementById('directMatchContainer');
     if (!container) return;
 
-    db.collection('directMatches').doc(matchId).get().then((doc) => {
-        if (!doc.exists) return;
-        const match = doc.data();
-        const players = match.players || [];
-        const scores = match.scores || {};
+    try {
+        const gameData = await RealtimeService.getOnce(`directMatches/${matchId}`);
+        if (!gameData) {
+            container.innerHTML = '<div class="text-gray text-center" style="padding:2rem;">المباراة غير موجودة</div>';
+            return;
+        }
 
+        const players = gameData.players || [];
+        const scores = gameData.scores || {};
         const sorted = [...players].sort((a, b) => {
             const scoreA = scores[a.uid]?.score || 0;
             const scoreB = scores[b.uid]?.score || 0;
             return scoreB - scoreA;
         });
-
         const winner = sorted[0];
         const user = AuthService.currentUser;
 
@@ -22409,7 +23544,6 @@ App._showDirectMatchResult = function(matchId) {
             const pCorrect = scores[p.uid]?.correct || 0;
             const pWrong = scores[p.uid]?.wrong || 0;
             const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
-
             html += `
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 1rem;background:${isMe ? 'var(--primary)' : 'var(--glass)'};border-radius:8px;border:1px solid ${isMe ? 'var(--accent)' : 'var(--glass-border)'};">
                     <span>${medal} ${p.name} ${isMe ? '👈' : ''}</span>
@@ -22421,43 +23555,226 @@ App._showDirectMatchResult = function(matchId) {
         html += `
                 </div>
                 <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;">
-                    <button class="btn btn-primary" onclick="App._exitDirectMatch()">
-                        <i class="fas fa-home"></i> العودة
+                    <!-- ✅ زر العودة مع حذف المباراة -->
+                    <button class="btn btn-primary" onclick="App._exitDirectMatchClean()">
+                        <i class="fas fa-home"></i> العودة للرئيسية
                     </button>
-                    <button class="btn btn-success" onclick="MatchmakingSystem.startMatchmaking()">
+                    <button class="btn btn-success" onclick="MatchmakingSystem.startMatchmaking('${gameData.mode || 'normal_1v1'}')">
                         <i class="fas fa-redo"></i> لعب مرة أخرى
                     </button>
+                </div>
+                <div style="margin-top:0.5rem;font-size:0.7rem;color:var(--gray-dark);">
+                    سيتم حذف المباراة عند العودة
                 </div>
             </div>
         `;
 
         container.innerHTML = html;
-    });
+
+    } catch (error) {
+        console.error('❌ Error showing direct match result:', error);
+        container.innerHTML = `
+            <div class="card" style="text-align:center;padding:2rem;color:var(--secondary);">
+                <i class="fas fa-exclamation-circle" style="font-size:3rem;"></i>
+                <h3>حدث خطأ في عرض النتيجة</h3>
+                <p class="text-gray">${error.message}</p>
+                <button class="btn btn-primary mt-1" onclick="App._exitDirectMatchClean();">
+                    <i class="fas fa-home"></i> العودة
+                </button>
+            </div>
+        `;
+    }
 };
 
-App._exitDirectMatch = function() {
+// ===== خروج نظيف مع حذف المباراة =====
+App._exitDirectMatchClean = async function() {
     const container = document.getElementById('directMatchContainer');
     if (container) {
         container.style.display = 'none';
         container.innerHTML = '';
     }
-    if (MatchmakingSystem._matchUnsubscribe) {
-        MatchmakingSystem._matchUnsubscribe();
-        MatchmakingSystem._matchUnsubscribe = null;
+    
+    // ✅ حذف المباراة إذا كانت موجودة ومنتهية
+    const matchId = MatchmakingSystem._matchId;
+    if (matchId) {
+        // التحقق من حالة المباراة قبل الحذف
+        try {
+            const gameData = await RealtimeService.getOnce(`directMatches/${matchId}`);
+            if (gameData && gameData.status === 'finished') {
+                await MatchmakingSystem.deleteMatch(matchId);
+            }
+        } catch (e) {
+            console.warn('⚠️ Could not check match status:', e);
+        }
     }
-    MatchmakingSystem._searching = false;
-    MatchmakingSystem._isMatchCreated = false;
-    if (MatchmakingSystem._searchInterval) {
-        clearInterval(MatchmakingSystem._searchInterval);
-        MatchmakingSystem._searchInterval = null;
-    }
-    if (MatchmakingSystem._searchTimerInterval) {
-        clearInterval(MatchmakingSystem._searchTimerInterval);
-        MatchmakingSystem._searchTimerInterval = null;
-    }
+    
     App._activateSection('dashboard');
 };
 
+// ===== الخروج (يستدعي safeExit) =====
+App._exitDirectMatch = function() {
+    // إذا كانت المباراة منتهية، نحذفها فوراً
+    if (MatchmakingSystem._matchStatus === 'finished') {
+        App._exitDirectMatchClean();
+        return;
+    }
+    // وإلا نستدعي safeExit
+    MatchmakingSystem.safeExit();
+};
+
+App._renderMatchError = function(message) {
+    return `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:2rem;">
+            <div style="font-size:3rem;margin-bottom:1rem;">⚠️</div>
+            <h3 style="color:var(--light);margin-bottom:0.5rem;">حدث خطأ</h3>
+            <p style="color:var(--gray);margin-bottom:1.5rem;">${message}</p>
+            <button class="btn btn-primary" onclick="App._exitDirectMatch()">
+                <i class="fas fa-home"></i> العودة للرئيسية
+            </button>
+        </div>
+    `;
+};
+
+App._bindMatchEvents = function() {
+    // يمكن إضافة تأثيرات صوتية أو تحديثات إضافية هنا
+};
+
+// ============================================================
+// دوال مساعدة وإدارة الأحداث
+// ============================================================
+
+App._renderMatchError = function(message) {
+    return `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:2rem;">
+            <div style="font-size:3rem;margin-bottom:1rem;">⚠️</div>
+            <h3 style="color:var(--light);margin-bottom:0.5rem;">حدث خطأ</h3>
+            <p style="color:var(--gray);margin-bottom:1.5rem;">${message}</p>
+            <button class="btn btn-primary" onclick="App._exitDirectMatch()">
+                <i class="fas fa-home"></i> العودة للرئيسية
+            </button>
+        </div>
+    `;
+};
+
+App._bindMatchEvents = function() {
+    // يمكن إضافة أحداث إضافية هنا
+    // مثل: تأثيرات صوتية عند الإجابة، تحديثات آنية
+};
+
+// تحديث دالة المؤقت
+App._startMatchTimer = function(matchId, timeLimit) {
+    if (MatchmakingSystem._timerInterval) {
+        clearInterval(MatchmakingSystem._timerInterval);
+        MatchmakingSystem._timerInterval = null;
+    }
+
+    let elapsed = 0;
+    const startTime = Date.now();
+
+    MatchmakingSystem._timerInterval = setInterval(async () => {
+        elapsed = (Date.now() - startTime) / 1000;
+        const timeLeft = Math.max(0, timeLimit - Math.floor(elapsed));
+        
+        // تحديث واجهة المؤقت
+        const timerEl = document.getElementById('matchTimerDisplay');
+        if (timerEl) {
+            timerEl.textContent = `⏱ ${timeLeft}s`;
+            timerEl.className = `badge ${timeLeft <= 5 ? 'badge-danger' : 'badge-warning'}`;
+            if (timeLeft <= 5) {
+                timerEl.style.animation = 'pulse 0.5s ease infinite';
+            } else {
+                timerEl.style.animation = 'none';
+            }
+        }
+        
+        // تحديث شريط التقدم
+        const progressEl = document.getElementById('matchProgressFill');
+        if (progressEl) {
+            const gameData = await RealtimeService.getOnce(`directMatches/${matchId}`);
+            if (gameData) {
+                const total = gameData.questions?.length || 1;
+                const current = gameData.currentQuestion || 0;
+                const progress = Math.min(((current + (elapsed / timeLimit)) / total) * 100, 100);
+                progressEl.style.width = `${Math.min(progress, 100)}%`;
+            }
+        }
+
+        // إذا انتهى الوقت
+        if (timeLeft <= 0 || elapsed >= timeLimit) {
+            clearInterval(MatchmakingSystem._timerInterval);
+            MatchmakingSystem._timerInterval = null;
+            
+            // التحقق من إجابة المستخدم
+            const user = AuthService.currentUser;
+            if (user) {
+                const gameData = await RealtimeService.getOnce(`directMatches/${matchId}`);
+                if (gameData) {
+                    const answers = gameData.answers || {};
+                    const currentQ = gameData.currentQuestion || 0;
+                    if (!answers[user.uid] || answers[user.uid][currentQ] === undefined) {
+                        showToast('⏰ انتهى الوقت!', 'error');
+                        MatchmakingSystem.submitAnswer(-1);
+                    }
+                }
+            }
+        }
+    }, 500);
+};
+
+App._calculateAccuracy = function(players, scores) {
+    let totalCorrect = 0;
+    let totalAnswers = 0;
+    players.forEach(p => {
+        const s = scores[p.uid] || {};
+        totalCorrect += s.correct || 0;
+        totalAnswers += s.answersCount || 0;
+    });
+    return totalAnswers > 0 ? Math.round((totalCorrect / totalAnswers) * 100) : 0;
+};
+
+App._calculateBestStreak = function(players, scores) {
+    let max = 0;
+    players.forEach(p => {
+        const s = scores[p.uid] || {};
+        if ((s.bestStreak || 0) > max) max = s.bestStreak;
+    });
+    return max;
+};
+
+App._calculateAvgTime = function(players, scores) {
+    let total = 0;
+    let count = 0;
+    players.forEach(p => {
+        const s = scores[p.uid] || {};
+        if (s.avgTime) {
+            total += s.avgTime;
+            count++;
+        }
+    });
+    return count > 0 ? (total / count).toFixed(1) : '0';
+};
+
+// ===== خروج نظيف بدون عقوبة (للمباريات المنتهية) =====
+App._exitDirectMatchClean = function() {
+    const container = document.getElementById('directMatchContainer');
+    if (container) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+    }
+    // إيقاف المؤقتات
+    if (MatchmakingSystem._timerInterval) {
+        clearInterval(MatchmakingSystem._timerInterval);
+        MatchmakingSystem._timerInterval = null;
+    }
+    // العودة للداشبورد
+    App._activateSection('dashboard');
+};
+
+// ===== الخروج من المباراة المباشرة (يستدعي الدالة الآمنة) =====
+App._exitDirectMatch = function() {
+    // استدعاء دالة الخروج الآمنة في MatchmakingSystem
+    MatchmakingSystem.safeExit();
+};
 // ============================================================
 // إضافة أزرار اللعب المباشر في الصفحة الرئيسية
 // ============================================================
@@ -22547,11 +23864,13 @@ App._renderDashboard = function() {
                 <span>🎟️ الباتل باس قريباً...</span>
             </div>
 
-<!-- ✅ أزرار الإجراءات (مع زر اللعب المباشر) -->
 <div class="action-buttons">
     <button class="btn-action primary" id="dashboardPlayBtn"><i class="fas fa-play"></i> العب الآن</button>
     <button class="btn-action direct-match" id="dashboardDirectMatchBtn">
         <i class="fas fa-bolt"></i> لعب مباشر 🎯
+    </button>
+    <button class="btn-action secondary" id="dashboardMatchSettingsBtn" style="background: var(--glass); border-color: var(--glass-border);">
+        <i class="fas fa-cog"></i> إعدادات المباراة
     </button>
     <button class="btn-action secondary" id="dashboardMultiplayerBtn"><i class="fas fa-users"></i> لعب جماعي</button>
     <button class="btn-action" id="dashboardAchievementsBtn"><i class="fas fa-star"></i> الإنجازات</button>
@@ -22566,12 +23885,11 @@ App._renderDashboard = function() {
 // ربط زر اللعب المباشر
 // ============================================================
 
-// ✅ ربط زر اللعب المباشر
+// ربط حدث الزر (يجب أن يكون موجوداً في _setupUI أو مكان مناسب)
 document.addEventListener('click', function(e) {
     const target = e.target.closest('#dashboardDirectMatchBtn');
     if (target) {
         e.preventDefault();
-        // بدء البحث مباشرة بدون إعدادات
         MatchmakingSystem.startMatchmaking();
     }
 });
@@ -22624,147 +23942,6 @@ App._showDirectMatchGame = function(matchId) {
         const match = doc.data();
         App._renderDirectMatch(matchId, match);
     });
-};
-
-App._renderDirectMatch = function(matchId, match) {
-    const container = document.getElementById('directMatchContainer');
-    if (!container) return;
-
-    const user = AuthService.currentUser;
-    const currentQ = match.currentQuestion || 0;
-    const questions = match.questions || [];
-    if (currentQ >= questions.length) {
-        // انتهت المباراة
-        return;
-    }
-
-    const question = questions[currentQ];
-    const players = match.players || [];
-    const answers = match.answers || {};
-    const scores = match.scores || {};
-
-    const timeLimit = match.settings?.timeLimit || 15;
-    const elapsed = (Date.now() - match.questionStartTime) / 1000;
-    const timeLeft = Math.max(0, timeLimit - Math.floor(elapsed));
-
-    // عرض اللاعبين
-    const sortedPlayers = [...players].sort((a, b) => {
-        const scoreA = scores[a.uid]?.score || 0;
-        const scoreB = scores[b.uid]?.score || 0;
-        return scoreB - scoreA;
-    });
-
-    const userAnswered = user && answers[user.uid] && answers[user.uid][currentQ] !== undefined;
-
-    // بناء HTML
-    let html = `
-        <div style="max-width:800px;margin:0 auto;">
-            <div class="game-header" style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 1rem;background:var(--card-bg);border-radius:var(--radius-sm);margin-bottom:1rem;">
-                <div style="display:flex;gap:0.8rem;align-items:center;">
-                    <span class="badge badge-primary">⚡ ${currentQ+1}/${questions.length}</span>
-                    <span class="badge ${timeLeft <= 5 ? 'badge-danger' : 'badge-warning'}">⏱ ${timeLeft}s</span>
-                </div>
-                <button class="btn btn-sm btn-danger" onclick="App._exitDirectMatch()">
-                    <i class="fas fa-times"></i> خروج
-                </button>
-            </div>
-
-            <div class="question-box" style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius);padding:2rem;text-align:center;margin-bottom:1rem;">
-                <div class="q-category" style="display:inline-block;background:var(--primary);color:#fff;padding:4px 20px;border-radius:30px;font-size:0.8rem;font-weight:700;margin-bottom:0.5rem;">
-                    📚 ${question.category || 'عام'}
-                </div>
-                <div class="q-type-badge" style="display:inline-block;background:var(--glass);color:var(--gray);padding:2px 14px;border-radius:30px;font-size:0.7rem;margin-right:0.5rem;">
-                    ${GameEngine._getTypeLabel(question.type)}
-                </div>
-                <div class="q-text" style="font-size:1.3rem;font-weight:700;margin:0.5rem 0 1.5rem;line-height:1.8;">${question.question}</div>
-                <div class="options-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;max-width:600px;margin:0 auto;">
-    `;
-
-    // عرض الخيارات حسب نوع السؤال
-    if (question.type === 'multiple_choice' || question.type === 'true_false') {
-        const opts = question.options || [];
-        opts.forEach((opt, idx) => {
-            const isSelected = userAnswered && answers[user.uid][currentQ].answer === idx;
-            const isCorrect = isSelected && answers[user.uid][currentQ].isCorrect;
-            const isWrong = isSelected && !isCorrect;
-            let btnClass = 'option-btn';
-            if (userAnswered) {
-                btnClass += ' disabled';
-                if (idx === question.correct) btnClass += ' show-correct';
-                if (isWrong) btnClass += ' selected-wrong';
-            }
-            html += `
-                <button class="${btnClass}" onclick="MatchmakingSystem.submitAnswer(${idx})" ${userAnswered ? 'disabled' : ''}>
-                    ${String.fromCharCode(65 + idx)}. ${opt}
-                </button>
-            `;
-        });
-    } else if (question.type === 'fill_blank') {
-        html += `
-            <div style="grid-column:1/-1;display:flex;gap:0.5rem;justify-content:center;max-width:400px;margin:0 auto;">
-                <input type="text" id="directFillBlankInput" placeholder="اكتب الإجابة..." 
-                       style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);color:var(--light);" 
-                       ${userAnswered ? 'disabled' : ''}>
-                <button class="btn btn-primary" onclick="App._submitDirectFillBlank()" ${userAnswered ? 'disabled' : ''}>
-                    تأكيد
-                </button>
-            </div>
-        `;
-    }
-
-    html += `
-                </div>
-            </div>
-
-            <div class="card" style="padding:0.8rem;">
-                <div class="card-title" style="font-size:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.3rem;">
-                    <span><i class="fas fa-crown" style="color:var(--accent);"></i> الترتيب</span>
-                    <span style="font-size:0.7rem;color:var(--gray);">
-                        ⭐ النقاط • ✅ الصحيح
-                    </span>
-                </div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.3rem;">
-    `;
-
-    sortedPlayers.forEach((p, i) => {
-        const isMe = p.uid === user?.uid;
-        const pScore = scores[p.uid]?.score || 0;
-        const pCorrect = scores[p.uid]?.correct || 0;
-        const pWrong = scores[p.uid]?.wrong || 0;
-        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
-        const isTop = i < 3;
-
-        html += `
-            <div class="player-rank-item ${isTop ? 'top' : ''} ${isMe ? 'me' : ''}" 
-                 style="background:${isTop ? 'var(--accent)' : (isMe ? 'var(--primary)' : 'var(--glass)')};
-                        ${isTop ? 'color:var(--dark);' : ''}
-                        ${isMe && !isTop ? 'color:#fff;' : ''}
-                        padding:0.3rem 0.6rem;border-radius:6px;
-                        display:flex;justify-content:space-between;align-items:center;
-                        border:${isMe ? '2px solid var(--accent)' : '1px solid var(--glass-border)'};">
-                <div style="display:flex;align-items:center;gap:0.3rem;min-width:0;">
-                    <span style="font-weight:700;font-size:0.9rem;flex-shrink:0;">${medal}</span>
-                    <span style="font-weight:600;font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;">
-                        ${p.name} ${isMe ? '👈' : ''}
-                    </span>
-                </div>
-                <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
-                    <span style="font-weight:700;font-size:0.9rem;color:${isTop ? 'var(--dark)' : 'var(--accent)'};">⭐ ${pScore}</span>
-                    <span style="font-size:0.6rem;color:${isTop ? 'rgba(0,0,0,0.5)' : 'var(--gray)'};">
-                        ✅${pCorrect}
-                    </span>
-                </div>
-            </div>
-        `;
-    });
-
-    html += `
-                </div>
-            </div>
-        </div>
-    `;
-
-    container.innerHTML = html;
 };
 
 // ============================================================
