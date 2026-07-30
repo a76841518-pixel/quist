@@ -1531,13 +1531,22 @@ const MultiplayerManager = {
     _gameSettings: {},
     _isWaitingForNext: false, // منع الانتقال المتكرر
 
-    async createGame(settings) {
-        if (!AuthService.currentUser) {
-            showToast('يجب تسجيل الدخول أولاً', 'error');
-            return null;
-        }
+// داخل MultiplayerManager
+async createGame(settings) {
+    if (!AuthService.currentUser) {
+        showToast('يجب تسجيل الدخول أولاً', 'error');
+        return null;
+    }
 
-        const user = AuthService.currentUser;
+    const user = AuthService.currentUser;
+    
+    // التحقق من وجود بطاقة غرفة في المخزون
+    const inventory = user.inventory || [];
+    const ticket = inventory.find(i => i.itemId === 'room_ticket');
+    if (!ticket || ticket.quantity < 1) {
+        showToast('⚠️ تحتاج إلى بطاقة غرفة لإنشاء غرفة! يمكنك شراؤها من المتجر', 'error', 4000);
+        return null;
+    }
         const gameData = {
             hostId: user.uid,
             hostName: user.username || user.displayName || 'مجهول',
@@ -1593,6 +1602,15 @@ const MultiplayerManager = {
             showToast(`✅ تم إنشاء المباراة! الرمز: ${gameData.code}`, 'success', 5000);
             App._renderMultiplayerLobby(docRef.id);
             return docRef.id;
+                // بعد إنشاء الغرفة بنجاح، نخصم بطاقة واحدة
+    const updatedInventory = inventory.map(i => {
+        if (i.itemId === 'room_ticket') {
+            return { ...i, quantity: i.quantity - 1 };
+        }
+        return i;
+    }).filter(i => i.quantity > 0);
+    
+    await AuthService.updateUser({ inventory: updatedInventory });
         } catch (e) {
             console.error('Error creating game:', e);
             showToast('❌ فشل إنشاء المباراة', 'error');
@@ -3951,9 +3969,47 @@ getStats() {
 },
 };
 
-// ============================================================
-// محرك اللعبة المتطور - دعم جميع أنواع الأسئلة
-// ============================================================
+// المتغيرات العامة للتحكم في الطور المختار
+let selectedGameMode = 'normal_1v1';  // الوضع الافتراضي
+let selectedPlayerCount = 1;
+
+// تعريف أوصاف الأطوار (للشرح)
+const MODE_DESCRIPTIONS = {
+    'normal_1v1': {
+        title: '⚔️ عادي 1 ضد 1',
+        desc: 'مواجهة مباشرة بين لاعبين، كل لاعب يجيب على الأسئلة في وقت محدد. الفائز هو من يحصل على أكبر عدد من النقاط.',
+        icon: '⚔️',
+        active: true
+    },
+    'single_player': {
+        title: '🧠 فردي',
+        desc: 'تحدي ذاتي ضد الأسئلة. أجب على أكبر عدد من الأسئلة بشكل صحيح في وقت محدد. لا يوجد خصم، فقط أنت ومعرفتك!',
+        icon: '🧠',
+        active: true
+    },
+    'create_room': {
+        title: '🏠 غرفة لعب',
+        desc: 'أنشئ غرفة خاصة بك وادعُ أصدقائك للانضمام. يمكنك تحديد إعدادات الغرفة مثل عدد الأسئلة والوقت. تكلفة الإنشاء 600 عملة.',
+        icon: '🏠',
+        active: true,
+        cost: 600
+    },
+    'crossword': {
+        title: '🔤 كلمات متقاطعة',
+        desc: 'طور قادم قريباً! حل الكلمات المتقاطعة في تحدٍ مع الأصدقاء. استعد لتجربة جديدة وممتعة.',
+        icon: '🔤',
+        active: false
+    },
+    'tournament': {
+        title: '🏆 بطولة',
+        desc: 'طور قادم قريباً! شارك في البطولات المجدولة وتنافس مع أفضل اللاعبين للفوز بالجوائز الكبرى.',
+        icon: '🏆',
+        active: false
+    }
+};
+
+// الأطوار المفعلة
+const ACTIVE_MODES = ['normal_1v1', 'single_player', 'create_room'];
 
 // ============================================================
 // محرك اللعبة المتطور - النسخة المُصلحة بالكامل
@@ -4034,7 +4090,8 @@ start() {
     this.mode = mode;
     this.totalQuestions = count;
     this.isTimeAttack = (mode === 'time_attack');
-    
+    this._updatePlayButtonMode();
+
     let pool = [...DataManager.data.questions];
     if (category !== 'all') {
         pool = pool.filter(q => q.category === category);
@@ -7769,49 +7826,232 @@ _buildModals() {
             </div>
         </div>
 
-<!-- Match Settings Modal -->
-<div class="modal-overlay" id="matchSettingsModal">
-    <div class="modal-card" style="max-width:500px;">
-        <div class="modal-header">
-            <h3><i class="fas fa-sliders-h"></i> إعدادات المباراة المباشرة</h3>
-            <button class="modal-close-btn" onclick="App._closeModal('matchSettingsModal')"><i class="fas fa-times"></i></button>
-        </div>
-        <div style="padding:0.5rem 0;">
-            <p class="text-gray" style="margin-bottom:1rem;">اختر الطور الذي ترغب في اللعب به</p>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.8rem;">
-                <button class="btn btn-outline mode-option active" data-mode="normal_1v1" onclick="App._selectMatchMode('normal_1v1')" style="flex-direction:column; padding:1rem; border-color:var(--primary);">
-                    <span style="font-size:2rem;">⚔️</span>
-                    <span style="font-weight:700;">عادي 1 ضد 1</span>
-                    <span style="font-size:0.7rem;color:var(--gray);">متاح الآن</span>
-                </button>
-                <button class="btn btn-outline mode-option" data-mode="normal_2v2" onclick="App._selectMatchMode('normal_2v2')" style="flex-direction:column; padding:1rem; opacity:0.5; cursor:not-allowed;" disabled>
-                    <span style="font-size:2rem;">👥</span>
-                    <span style="font-weight:700;">عادي 2 ضد 2</span>
-                    <span style="font-size:0.7rem;color:var(--gray);">قريباً</span>
-                </button>
-                <button class="btn btn-outline mode-option" data-mode="crossword_1v1" onclick="App._selectMatchMode('crossword_1v1')" style="flex-direction:column; padding:1rem; opacity:0.5; cursor:not-allowed;" disabled>
-                    <span style="font-size:2rem;">🔤</span>
-                    <span style="font-weight:700;">كلمات متقاطعة 1 ضد 1</span>
-                    <span style="font-size:0.7rem;color:var(--gray);">قريباً</span>
-                </button>
-                <button class="btn btn-outline mode-option" data-mode="crossword_2v2" onclick="App._selectMatchMode('crossword_2v2')" style="flex-direction:column; padding:1rem; opacity:0.5; cursor:not-allowed;" disabled>
-                    <span style="font-size:2rem;">🔤👥</span>
-                    <span style="font-weight:700;">كلمات متقاطعة 2 ضد 2</span>
-                    <span style="font-size:0.7rem;color:var(--gray);">قريباً</span>
-                </button>
-            </div>
-            <div style="margin-top:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">
-                الطور المختار حالياً: <strong id="selectedModeDisplay">عادي 1 ضد 1</strong>
-            </div>
-            <div style="display:flex; gap:0.5rem; justify-content:center; margin-top:1rem;">
-                <button class="btn btn-primary" onclick="App._startMatchWithCurrentMode()">
-                    <i class="fas fa-bolt"></i> ابدأ البحث
-                </button>
-                <button class="btn btn-outline" onclick="App._closeModal('matchSettingsModal')">إلغاء</button>
-            </div>
-        </div>
+        <!-- ============================================================ -->
+        <!-- ✅ مودال إعدادات اللعبة المطور (Match Settings Modal)        -->
+        <!-- ============================================================ -->
+        <div class="modal-overlay" id="matchSettingsModal">
+            <div class="modal-card" style="max-width:700px; padding: 1.2rem 1.5rem;">
+                <div class="modal-header">
+                    <h3><i class="fas fa-sliders-h" style="color:var(--accent);"></i> إعدادات اللعب</h3>
+                    <button class="modal-close-btn" onclick="App._closeModal('matchSettingsModal')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div style="padding: 0.2rem 0 0.8rem;">
+                    <!-- ===== اختيار عدد اللاعبين ===== -->
+                    <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.2rem; flex-wrap:wrap;">
+                        <span style="font-weight:700; font-size:0.9rem; color:var(--gray);">👥 عدد اللاعبين:</span>
+                        <div style="display:flex; gap:0.3rem; background:var(--glass); border-radius:30px; padding:0.2rem; border:1px solid var(--glass-border);">
+                            <button class="player-count-btn active" data-count="1" style="
+                                padding:0.4rem 1.2rem;
+                                border-radius:30px;
+                                border:none;
+                                background:var(--primary);
+                                color:#fff;
+                                font-weight:700;
+                                font-size:0.8rem;
+                                cursor:pointer;
+                                transition:all 0.2s ease;
+                            ">
+                                <i class="fas fa-user"></i> 1 لاعب
+                            </button>
+                            <button class="player-count-btn" data-count="2" style="
+                                padding:0.4rem 1.2rem;
+                                border-radius:30px;
+                                border:none;
+                                background:transparent;
+                                color:var(--gray);
+                                font-weight:700;
+                                font-size:0.8rem;
+                                cursor:pointer;
+                                transition:all 0.2s ease;
+                            ">
+                                <i class="fas fa-users"></i> 2 لاعبين
+                            </button>
+                        </div>
+                        <span style="font-size:0.7rem; color:var(--gray-dark);" id="playerCountHint">(لعبة فردية)</span>
+                    </div>
+                    
+                    <!-- ===== أطوار اللعب (تمرير أفقي) ===== -->
+                    <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                        <span style="font-weight:700; font-size:0.85rem; color:var(--gray);">🎯 اختر الطور:</span>
+                        <span style="font-size:0.65rem; color:var(--gray-dark);">↔ اسحب للتمرير</span>
+                    </div>
+                    
+                    <div class="game-modes-scroll" style="
+                        display: flex;
+                        gap: 0.8rem;
+                        overflow-x: auto;
+                        padding: 0.5rem 0.2rem 1rem;
+                        scroll-snap-type: x mandatory;
+                        -webkit-overflow-scrolling: touch;
+                        scrollbar-width: thin;
+                    ">
+                        <!-- 1. اللعب العادي 1 ضد 1 -->
+                        <div class="mode-card active" data-mode="normal_1v1" style="
+                            min-width: 120px;
+                            max-width: 140px;
+                            flex: 0 0 auto;
+                            scroll-snap-align: start;
+                            background: var(--card-bg);
+                            border: 2px solid var(--primary);
+                            border-radius: var(--radius-sm);
+                            padding: 0.8rem 0.6rem;
+                            text-align: center;
+                            cursor: pointer;
+                            transition: all 0.3s ease;
+                            position: relative;
+                        ">
+                            <div style="font-size:2.8rem; margin-bottom:0.2rem;">⚔️</div>
+                            <div style="font-weight:800; font-size:0.9rem; color:var(--light);">عادي 1v1</div>
+                            <div style="font-size:0.55rem; color:var(--gray); margin:0.1rem 0;">مواجهة مباشرة</div>
+                            <div style="display:flex; gap:0.3rem; justify-content:center; margin-top:0.3rem; flex-wrap:wrap;">
+                                <span class="badge badge-success" style="font-size:0.5rem; padding:1px 6px;">✅ مفعل</span>
+                                <button class="btn btn-xs btn-outline mode-desc-btn" data-mode="normal_1v1" style="font-size:0.5rem; padding:1px 6px; min-height:20px;">
+                                    <i class="fas fa-info-circle"></i> شرح
+                                </button>
+                            </div>
+                            <div class="mode-status" style="position:absolute; top:4px; right:4px; font-size:0.5rem; color:var(--success);">●</div>
+                        </div>
+                        
+                        <!-- 2. اللعب الفردي (لعبة عادية بدون مواجهة) -->
+                        <div class="mode-card" data-mode="single_player" style="
+                            min-width: 120px;
+                            max-width: 140px;
+                            flex: 0 0 auto;
+                            scroll-snap-align: start;
+                            background: var(--card-bg);
+                            border: 2px solid var(--glass-border);
+                            border-radius: var(--radius-sm);
+                            padding: 0.8rem 0.6rem;
+                            text-align: center;
+                            cursor: pointer;
+                            transition: all 0.3s ease;
+                            position: relative;
+                        ">
+                            <div style="font-size:2.8rem; margin-bottom:0.2rem;">🧠</div>
+                            <div style="font-weight:800; font-size:0.9rem; color:var(--light);">فردي</div>
+                            <div style="font-size:0.55rem; color:var(--gray); margin:0.1rem 0;">تحدي ذاتي</div>
+                            <div style="display:flex; gap:0.3rem; justify-content:center; margin-top:0.3rem; flex-wrap:wrap;">
+                                <span class="badge badge-success" style="font-size:0.5rem; padding:1px 6px;">✅ مفعل</span>
+                                <button class="btn btn-xs btn-outline mode-desc-btn" data-mode="single_player" style="font-size:0.5rem; padding:1px 6px; min-height:20px;">
+                                    <i class="fas fa-info-circle"></i> شرح
+                                </button>
+                            </div>
+                            <div class="mode-status" style="position:absolute; top:4px; right:4px; font-size:0.5rem; color:var(--gray);">○</div>
+                        </div>
+                        
+                        <!-- 3. إنشاء غرفة لعب -->
+                        <div class="mode-card" data-mode="create_room" style="
+                            min-width: 120px;
+                            max-width: 140px;
+                            flex: 0 0 auto;
+                            scroll-snap-align: start;
+                            background: var(--card-bg);
+                            border: 2px solid var(--glass-border);
+                            border-radius: var(--radius-sm);
+                            padding: 0.8rem 0.6rem;
+                            text-align: center;
+                            cursor: pointer;
+                            transition: all 0.3s ease;
+                            position: relative;
+                        ">
+                            <div style="font-size:2.8rem; margin-bottom:0.2rem;">🏠</div>
+                            <div style="font-weight:800; font-size:0.9rem; color:var(--light);">غرفة لعب</div>
+                            <div style="font-size:0.55rem; color:var(--gray); margin:0.1rem 0;">إنشاء غرفة</div>
+                            <div style="display:flex; gap:0.3rem; justify-content:center; margin-top:0.3rem; flex-wrap:wrap;">
+                                <span class="badge badge-success" style="font-size:0.5rem; padding:1px 6px;">✅ مفعل</span>
+                                <span class="badge badge-warning" style="font-size:0.5rem; padding:1px 6px;">💰 600</span>
+                                <button class="btn btn-xs btn-outline mode-desc-btn" data-mode="create_room" style="font-size:0.5rem; padding:1px 6px; min-height:20px;">
+                                    <i class="fas fa-info-circle"></i> شرح
+                                </button>
+                            </div>
+                            <div class="mode-status" style="position:absolute; top:4px; right:4px; font-size:0.5rem; color:var(--gray);">○</div>
+                        </div>
+                        
+                        <!-- 4. الكلمات المتقاطعة (غير مفعل) -->
+                        <div class="mode-card" data-mode="crossword" style="
+                            min-width: 120px;
+                            max-width: 140px;
+                            flex: 0 0 auto;
+                            scroll-snap-align: start;
+                            background: var(--card-bg);
+                            border: 2px solid var(--glass-border);
+                            border-radius: var(--radius-sm);
+                            padding: 0.8rem 0.6rem;
+                            text-align: center;
+                            cursor: not-allowed;
+                            transition: all 0.3s ease;
+                            position: relative;
+                            opacity: 0.6;
+                        ">
+                            <div style="font-size:2.8rem; margin-bottom:0.2rem;">🔤</div>
+                            <div style="font-weight:800; font-size:0.9rem; color:var(--gray);">كلمات متقاطعة</div>
+                            <div style="font-size:0.55rem; color:var(--gray); margin:0.1rem 0;">قريباً</div>
+                            <div style="display:flex; gap:0.3rem; justify-content:center; margin-top:0.3rem; flex-wrap:wrap;">
+                                <span class="badge badge-danger" style="font-size:0.5rem; padding:1px 6px;">🔒 قريباً</span>
+                                <button class="btn btn-xs btn-outline mode-desc-btn" data-mode="crossword" style="font-size:0.5rem; padding:1px 6px; min-height:20px; opacity:0.5;">
+                                    <i class="fas fa-info-circle"></i> شرح
+                                </button>
+                            </div>
+                            <div class="mode-status" style="position:absolute; top:4px; right:4px; font-size:0.5rem; color:var(--secondary);">🔒</div>
+                        </div>
+                        
+                        <!-- 5. البطولة (غير مفعل) -->
+                        <div class="mode-card" data-mode="tournament" style="
+                            min-width: 120px;
+                            max-width: 140px;
+                            flex: 0 0 auto;
+                            scroll-snap-align: start;
+                            background: var(--card-bg);
+                            border: 2px solid var(--glass-border);
+                            border-radius: var(--radius-sm);
+                            padding: 0.8rem 0.6rem;
+                            text-align: center;
+                            cursor: not-allowed;
+                            transition: all 0.3s ease;
+                            position: relative;
+                            opacity: 0.6;
+                        ">
+                            <div style="font-size:2.8rem; margin-bottom:0.2rem;">🏆</div>
+                            <div style="font-weight:800; font-size:0.9rem; color:var(--gray);">بطولة</div>
+                            <div style="font-size:0.55rem; color:var(--gray); margin:0.1rem 0;">أوقات محددة</div>
+                            <div style="display:flex; gap:0.3rem; justify-content:center; margin-top:0.3rem; flex-wrap:wrap;">
+                                <span class="badge badge-danger" style="font-size:0.5rem; padding:1px 6px;">🔒 قريباً</span>
+                                <button class="btn btn-xs btn-outline mode-desc-btn" data-mode="tournament" style="font-size:0.5rem; padding:1px 6px; min-height:20px; opacity:0.5;">
+                                    <i class="fas fa-info-circle"></i> شرح
+                                </button>
+                            </div>
+                            <div class="mode-status" style="position:absolute; top:4px; right:4px; font-size:0.5rem; color:var(--secondary);">🔒</div>
+                        </div>
+                    </div>
+                    <!-- عرض بطاقات الغرف -->
+<div id="roomTicketsDisplay" style="display:none; background:var(--glass); border-radius:8px; padding:0.5rem 1rem; margin:0.5rem 0; border:1px solid var(--accent);">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-weight:700; font-size:0.9rem;">🎫 بطاقات الغرف المتوفرة:</span>
+        <span id="roomTicketsCount" style="font-weight:900; font-size:1.2rem; color:var(--accent);">0</span>
     </div>
+    <div style="font-size:0.7rem; color:var(--gray);">يمكنك شراء بطاقات إضافية من المتجر</div>
 </div>
+                    <!-- ===== الطور المختار ===== -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.3rem; padding:0.3rem 0.5rem; background:var(--glass); border-radius:8px; margin-bottom:0.8rem;">
+                        <span style="font-size:0.8rem; color:var(--gray);">الطور المختار:</span>
+                        <span style="font-weight:700; font-size:1rem; color:var(--accent);" id="selectedModeDisplay">⚔️ عادي 1v1</span>
+                    </div>
+
+<!-- داخل مودال الإعدادات، استبدال الزر -->
+<div style="display:flex; gap:0.5rem; justify-content:center; flex-wrap:wrap;">
+    <button class="btn btn-primary" id="selectGameModeBtn" style="justify-content:center; min-width:160px; padding:12px 28px; font-size:1rem;">
+        <i class="fas fa-check"></i> تحديد
+    </button>
+    <button class="btn btn-outline" onclick="App._closeModal('matchSettingsModal')" style="justify-content:center;">
+        <i class="fas fa-times"></i> إلغاء
+    </button>
+</div>
+                </div>
+            </div>
+        </div>
 
 <!-- Question Modal - نسخة متطورة -->
 <div class="modal-overlay" id="questionModal">
@@ -13378,6 +13618,56 @@ _openAdminPanel() {
     }, 100);
 },
 
+_setupGameSettingsEvents() {
+    // 1. اختيار الطور عند النقر على البطاقة
+    document.querySelectorAll('.mode-card').forEach(card => {
+        card.addEventListener('click', function() {
+            const mode = this.dataset.mode;
+            if (this.style.cursor === 'not-allowed') {
+                showToast('⚠️ هذا الطور غير مفعل حالياً', 'info', 2000);
+                return;
+            }
+            App._selectGameMode(mode);
+        });
+    });
+    
+    // 2. أزرار شرح الطور
+    document.querySelectorAll('.mode-desc-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const mode = this.dataset.mode;
+            App._showModeDescription(mode);
+        });
+    });
+    
+    // 3. اختيار عدد اللاعبين
+    document.querySelectorAll('.player-count-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const count = parseInt(this.dataset.count);
+            App._selectPlayerCount(count);
+        });
+    });
+    
+// في _setupGameSettingsEvents
+document.getElementById('selectGameModeBtn')?.addEventListener('click', function() {
+    App._selectGameModeFromSettings(); // هذه الدالة تغلق المودال
+});
+    
+    // 5. عند فتح المودال، تأكد من تحديد الطور الحالي
+    const modal = document.getElementById('matchSettingsModal');
+    if (modal) {
+        const observer = new MutationObserver(() => {
+            if (modal.classList.contains('open')) {
+                // تحديث المودال ليعكس الطور الحالي
+                App._updateModalWithCurrentMode();
+            }
+        });
+        observer.observe(modal, { attributes: true, attributeFilter: ['class'] });
+    }
+    
+    console.log('✅ Game settings events bound');
+},
+
     // ===== معالجات الأحداث =====
     _setupUI() {
         this._initSearch();
@@ -13550,11 +13840,6 @@ document.getElementById('dashboardProfileClick')?.addEventListener('click', () =
     App._activateSection('profile');
 });
 
-// زر اللعب
-document.getElementById('dashboardPlayBtn')?.addEventListener('click', () => {
-    App._activateSection('game');
-});
-
 // زر اللعب الجماعي
 document.getElementById('dashboardMultiplayerBtn')?.addEventListener('click', () => {
     App._activateSection('multiplayer');
@@ -13641,6 +13926,18 @@ document.getElementById('checkDuplicatesBtn')?.addEventListener('click', () => {
         App._showDuplicateReport(questions, duplicates, similar);
     }, 100);
 });
+
+   // ===== زر اللعب الرئيسي =====
+    document.getElementById('dashboardPlayBtn')?.addEventListener('click', function() {
+        // بدء اللعب بالطور المختار
+        App._executeGameMode(selectedGameMode);
+    });
+    
+    // ===== زر إعدادات اللعب =====
+    document.getElementById('dashboardMatchSettingsBtn')?.addEventListener('click', function() {
+        // فتح مودال الإعدادات
+        App._openModal('matchSettingsModal');
+    });
 
 // ============================================================
 // ربط الأزرار الجديدة في _setupUI
@@ -13977,6 +14274,7 @@ document.getElementById('loginToPostBtn')?.addEventListener('click', () => {
         }
     });
 
+        this._setupGameSettingsEvents();
         this._setupModalHandlers();
         this._setupFormHandlers();
         this._setupAuthHandlers();
@@ -14912,6 +15210,11 @@ _getDefaultStoreItems() {
         { id: 'room_extra_time', name: '⏳ وقت إضافي 5s', icon: '⏳', desc: 'أضف 5 ثوانٍ للجميع', price: 150, currency: 'coins', rarity: 'common', effect: 'extra_room_time', value: 5, uses: 1 },
     ];
     roomBoosts.forEach(b => items.push({ ...b, category: 'room_boosts', duration: 'limited', effectType: b.effect, effectValue: b.value, stackable: true, maxStack: 99 }));
+
+const roomTickets = [
+    { id: 'room_ticket', name: '🎫 بطاقة غرفة', icon: '🎫', desc: 'تسمح لك بإنشاء غرفة لعب خاصة (استخدام واحد)', price: 600, currency: 'coins', rarity: 'rare', category: 'tickets', effect: 'room_ticket', value: 1, stackable: true, maxStack: 99 }
+];
+roomTickets.forEach(b => items.push({ ...b, duration: 'permanent', effectType: 'room_ticket', effectValue: 1, stackable: true, maxStack: 99 }));
 
     // ============================================================
     // 3. إطارات الملف الشخصي (Frames)
@@ -19790,6 +20093,275 @@ async _duplicateQuestion (id) {
 };
 
 // ============================================================
+// تحديث دوال إعدادات اللعبة في script.js
+// ============================================================
+
+// ===== متغيرات الحالة =====
+App._selectedGameMode = 'normal_1v1';
+App._selectedPlayerCount = 1;
+App._modeDescriptions = {
+    'normal_1v1': {
+        title: '⚔️ عادي 1 ضد 1',
+        desc: 'مواجهة مباشرة بين لاعبين، كل لاعب يجيب على الأسئلة في وقت محدد. الفائز هو من يحصل على أكبر عدد من النقاط.'
+    },
+    'single_player': {
+        title: '🧠 فردي',
+        desc: 'تحدي ذاتي ضد الأسئلة. أجب على أكبر عدد من الأسئلة بشكل صحيح في وقت محدد. لا يوجد خصم، فقط أنت ومعرفتك!'
+    },
+    'create_room': {
+        title: '🏠 غرفة لعب',
+        desc: 'أنشئ غرفة خاصة بك وادعُ أصدقائك للانضمام. يمكنك تحديد إعدادات الغرفة مثل عدد الأسئلة والوقت. تكلفة الإنشاء 600 عملة.'
+    },
+    'crossword': {
+        title: '🔤 كلمات متقاطعة',
+        desc: 'طور قادم قريباً! حل الكلمات المتقاطعة في تحدٍ مع الأصدقاء. استعد لتجربة جديدة وممتعة.'
+    },
+    'tournament': {
+        title: '🏆 بطولة',
+        desc: 'طور قادم قريباً! شارك في البطولات المجدولة وتنافس مع أفضل اللاعبين للفوز بالجوائز الكبرى.'
+    }
+};
+
+// ============================================================
+// 9. دالة تحديث المودال بالطور الحالي
+// ============================================================
+
+// ============================================================
+// تحديث دالة _updateModalWithCurrentMode
+// ============================================================
+
+App._updateModalWithCurrentMode = function() {
+    const mode = selectedGameMode;
+    const selectBtn = document.getElementById('selectGameModeBtn');
+    
+    // تحديث البطاقات
+    document.querySelectorAll('.mode-card').forEach(card => {
+        card.classList.remove('active');
+        card.style.borderColor = 'var(--glass-border)';
+        const status = card.querySelector('.mode-status');
+        if (status) {
+            status.style.color = 'var(--gray)';
+            status.textContent = '○';
+        }
+        if (card.dataset.mode === mode) {
+            card.classList.add('active');
+            card.style.borderColor = 'var(--primary)';
+            if (status) {
+                status.style.color = 'var(--success)';
+                status.textContent = '●';
+            }
+        }
+    });
+    
+    // تحديث العرض
+    const modeNames = {
+        'normal_1v1': '⚔️ عادي 1v1',
+        'single_player': '🧠 فردي',
+        'create_room': '🏠 غرفة لعب',
+        'crossword': '🔤 كلمات متقاطعة',
+        'tournament': '🏆 بطولة'
+    };
+    const display = document.getElementById('selectedModeDisplay');
+    if (display) {
+        display.textContent = modeNames[mode] || mode;
+        display.style.color = 'var(--accent)';
+    }
+    
+    // تحديث تلميح عدد اللاعبين
+    const hint = document.getElementById('playerCountHint');
+    if (hint) {
+        if (mode === 'single_player') {
+            hint.textContent = '(لعب فردي تلقائياً)';
+        } else if (mode === 'create_room') {
+            hint.textContent = '(إنشاء غرفة مع الأصدقاء)';
+        } else {
+            hint.textContent = selectedPlayerCount === 1 ? '(لعبة فردية)' : '(مواجهة مع لاعب آخر)';
+        }
+    }
+    
+    // تحديث أزرار عدد اللاعبين
+    const isSingleOrRoom = mode === 'single_player' || mode === 'create_room';
+    document.querySelectorAll('.player-count-btn').forEach(btn => {
+        const count = parseInt(btn.dataset.count);
+        if (isSingleOrRoom) {
+            btn.disabled = true;
+            btn.style.opacity = '0.4';
+            btn.style.cursor = 'not-allowed';
+        } else {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+        }
+        btn.classList.remove('active');
+        btn.style.background = 'transparent';
+        btn.style.color = 'var(--gray)';
+        if (count === selectedPlayerCount && !isSingleOrRoom) {
+            btn.classList.add('active');
+            btn.style.background = 'var(--primary)';
+            btn.style.color = '#fff';
+        } else if (isSingleOrRoom && count === 1) {
+            btn.classList.add('active');
+            btn.style.background = 'var(--primary)';
+            btn.style.color = '#fff';
+        }
+    });
+    
+    // ===== عرض بطاقات الغرف والتحقق =====
+    const ticketDisplay = document.getElementById('roomTicketsDisplay');
+    const ticketCount = document.getElementById('roomTicketsCount');
+    const ticketWarning = document.getElementById('ticketWarning');
+    
+    if (mode === 'create_room') {
+        const user = AuthService.currentUser;
+        const inventory = user?.inventory || [];
+        const ticket = inventory.find(i => i.itemId === 'room_ticket');
+        const count = ticket ? ticket.quantity : 0;
+        
+        if (ticketDisplay) {
+            ticketDisplay.style.display = 'block';
+            ticketDisplay.style.background = count > 0 ? 'var(--glass)' : 'rgba(255,107,107,0.15)';
+            ticketDisplay.style.borderColor = count > 0 ? 'var(--accent)' : 'var(--secondary)';
+        }
+        if (ticketCount) {
+            ticketCount.textContent = count;
+            ticketCount.style.color = count > 0 ? 'var(--accent)' : 'var(--secondary)';
+        }
+        
+        // ✅ تعطيل زر التحديد إذا كانت البطاقات 0
+        if (selectBtn) {
+            if (count <= 0) {
+                selectBtn.disabled = true;
+                selectBtn.style.opacity = '0.5';
+                selectBtn.style.cursor = 'not-allowed';
+                selectBtn.innerHTML = '<i class="fas fa-times"></i> لا توجد بطاقات';
+                selectBtn.title = 'تحتاج إلى بطاقة غرفة لإنشاء غرفة. قم بشرائها من المتجر.';
+            } else {
+                selectBtn.disabled = false;
+                selectBtn.style.opacity = '1';
+                selectBtn.style.cursor = 'pointer';
+                selectBtn.innerHTML = '<i class="fas fa-check"></i> تحديد';
+                selectBtn.title = 'تأكيد اختيار الطور';
+            }
+        }
+        
+        // عرض رسالة تحذيرية إذا كانت البطاقات 0
+        if (ticketWarning) {
+            if (count <= 0) {
+                ticketWarning.style.display = 'block';
+                ticketWarning.textContent = '⚠️ ليس لديك بطاقات غرفة! اشترِ من المتجر.';
+                ticketWarning.style.color = 'var(--secondary)';
+            } else {
+                ticketWarning.style.display = 'none';
+            }
+        }
+    } else {
+        if (ticketDisplay) ticketDisplay.style.display = 'none';
+        if (ticketWarning) ticketWarning.style.display = 'none';
+        
+        // ✅ تفعيل زر التحديد للأطوار الأخرى
+        if (selectBtn) {
+            selectBtn.disabled = false;
+            selectBtn.style.opacity = '1';
+            selectBtn.style.cursor = 'pointer';
+            selectBtn.innerHTML = '<i class="fas fa-check"></i> تحديد';
+            selectBtn.title = 'تأكيد اختيار الطور';
+        }
+    }
+};
+
+// ============================================================
+// 10. دالة اختيار عدد اللاعبين (تحديث المتغير العام)
+// ============================================================
+
+App._selectPlayerCount = function(count) {
+    const mode = selectedGameMode;
+    if (mode === 'single_player' || mode === 'create_room') {
+        showToast('⚠️ هذا الطور لا يدعم اختيار عدد اللاعبين', 'info', 2000);
+        return;
+    }
+    
+    selectedPlayerCount = count;
+    
+    document.querySelectorAll('.player-count-btn').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = 'transparent';
+        btn.style.color = 'var(--gray)';
+        if (parseInt(btn.dataset.count) === count) {
+            btn.classList.add('active');
+            btn.style.background = 'var(--primary)';
+            btn.style.color = '#fff';
+        }
+    });
+    
+    const hint = document.getElementById('playerCountHint');
+    if (hint) {
+        hint.textContent = count === 1 ? '(لعبة فردية)' : '(مواجهة مع لاعب آخر)';
+    }
+    
+    console.log(`👥 Player count: ${count}`);
+};
+
+// ============================================================
+// 11. دالة عرض شرح الطور (نفسها لكن مع استخدام MODE_DESCRIPTIONS)
+// ============================================================
+
+App._showModeDescription = function(mode) {
+    const desc = MODE_DESCRIPTIONS[mode];
+    if (!desc) {
+        showToast('لا توجد معلومات عن هذا الطور', 'info');
+        return;
+    }
+    
+    const isActive = ACTIVE_MODES.includes(mode);
+    const statusText = isActive ? '✅ مفعل' : '🔒 قريباً';
+    const statusColor = isActive ? 'var(--success)' : 'var(--secondary)';
+    
+    // إنشاء مودال شرح
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay open';
+    modal.innerHTML = `
+        <div class="modal-card" style="max-width:450px;">
+            <div class="modal-header">
+                <h3 style="color:var(--accent);">${desc.title}</h3>
+                <button class="btn btn-sm" onclick="this.closest('.modal-overlay').remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div style="padding:0.5rem 0;">
+                <div style="font-size:0.95rem; color:var(--gray); line-height:1.8; margin-bottom:1rem;">
+                    ${desc.desc}
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; background:var(--glass); border-radius:8px;">
+                    <span style="font-size:0.8rem; color:var(--gray);">الحالة:</span>
+                    <span style="font-weight:700; color:${statusColor};">${statusText}</span>
+                </div>
+                ${mode === 'create_room' ? `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; background:var(--glass); border-radius:8px; margin-top:0.3rem;">
+                        <span style="font-size:0.8rem; color:var(--gray);">التكلفة:</span>
+                        <span style="font-weight:700; color:var(--accent);">💰 600 عملة</span>
+                    </div>
+                ` : ''}
+                ${mode === 'tournament' ? `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; background:var(--glass); border-radius:8px; margin-top:0.3rem;">
+                        <span style="font-size:0.8rem; color:var(--gray);">الأوقات:</span>
+                        <span style="font-weight:700; color:var(--info);">📅 سيتم الإعلان قريباً</span>
+                    </div>
+                ` : ''}
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="this.closest('.modal-overlay').remove()">
+                    <i class="fas fa-check"></i> فهمت
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+};
+
+// ============================================================
 // دوال واجهة المستخدم للعب الجماعي - المعدلة
 // ============================================================
 
@@ -24234,15 +24806,7 @@ App._exitDirectMatch = function() {
 const originalRenderDashboard = App._renderDashboard;
 
 // ============================================================
-// تعديل دالة _renderDashboard في script.js
-// ============================================================
-
-// ============================================================
-// دالة _renderDashboard المعدلة
-// ============================================================
-
-// ============================================================
-// دالة _renderDashboard المعدلة - صور تغطي كامل العناصر
+// دالة _renderDashboard المعدلة - ترتيب جديد
 // ============================================================
 
 App._renderDashboard = function() {
@@ -24253,7 +24817,11 @@ App._renderDashboard = function() {
     const avatarHtml = user?.avatar ? `<img src="${user.avatar}" alt="avatar">` : '👤';
     const clanName = user?.clan || 'غير منضم';
     
-    // مسارات الصور
+    // الحصول على الطور المختار
+    const modeInfo = MODE_DESCRIPTIONS[selectedGameMode] || MODE_DESCRIPTIONS['normal_1v1'];
+    const modeDisplayName = modeInfo.title || 'عادي 1v1';
+    const modeIcon = modeInfo.icon || '⚔️';
+    
     const imgPath = 'images/dashboard/';
     
     return `
@@ -24264,7 +24832,9 @@ App._renderDashboard = function() {
         background-repeat: no-repeat;
         min-height: 100vh;
         position: relative;
-        padding-bottom: 80px;
+        display: flex;
+        flex-direction: column;
+        padding-bottom: 0;
     ">
         <!-- طبقة التعتيم -->
         <div style="
@@ -24278,17 +24848,14 @@ App._renderDashboard = function() {
         "></div>
         
         <!-- المحتوى -->
-        <div style="position: relative; z-index: 1;">
+        <div style="position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh;">
 
             <!-- ===== الشريط العلوي ===== -->
             <div class="dashboard-top-bar-new">
                 <div class="left-section">
-                    <!-- زر الإعدادات -->
                     <button class="top-icon-btn" id="dashboardSettingsBtn" title="الإعدادات">
                         <div class="btn-bg" style="background-image: url('${imgPath}settings-icon.png');"></div>
                     </button>
-                    
-                    <!-- زر الإشعارات -->
                     <button class="top-icon-btn" id="dashboardNotificationsBtn" title="الإشعارات">
                         <div class="btn-bg" style="background-image: url('${imgPath}notifications-icon.png');"></div>
                         <span class="badge-dot" id="notificationBadge" style="display:none;"></span>
@@ -24296,19 +24863,14 @@ App._renderDashboard = function() {
                 </div>
                 
                 <div class="right-section">
-                    <!-- العملات الذهبية -->
                     <div class="currency-display-new">
                         <div class="currency-icon" style="background-image: url('${imgPath}coins-icon.png');"></div>
                         <span id="dashboardCoins">${user?.coins || 0}</span>
                     </div>
-                    
-                    <!-- الجواهر -->
                     <div class="currency-display-new">
                         <div class="currency-icon" style="background-image: url('${imgPath}gems-icon.png');"></div>
                         <span id="dashboardGems">${user?.gems || 0}</span>
                     </div>
-                    
-                    <!-- المستوى -->
                     <div class="level-display-new" id="dashboardLevelClick">
                         <div class="level-icon" style="background-image: url('${imgPath}level-icon.png');"></div>
                         <div class="level-info">
@@ -24335,29 +24897,19 @@ App._renderDashboard = function() {
                 </div>
             </div>
             
-            <!-- ===== القائمة الجانبية (اليسرى) ===== -->
-            <div class="side-menu">
-                <button class="side-btn" id="sidebarBattlePass" title="الباتل باس">
-                    <div class="btn-bg" style="background-image: url('${imgPath}battlepass-icon.png');"></div>
-                    <span class="tooltip">الباتل باس</span>
-                </button>
-                <button class="side-btn" id="sidebarRanks" title="الرتب">
-                    <div class="btn-bg" style="background-image: url('${imgPath}ranks-icon.png');"></div>
-                    <span class="tooltip">الرتب</span>
-                </button>
-                <button class="side-btn" id="sidebarTasks" title="المهام">
-                    <div class="btn-bg" style="background-image: url('${imgPath}tasks-icon.png');"></div>
-                    <span class="tooltip">المهام</span>
-                </button>
-            </div>
+            <!-- ===== مساحة فارغة تدفع الأزرار للأسفل ===== -->
+            <div style="flex: 1;"></div>
             
-            <!-- ===== زر اللعب الكبير + زر الإعدادات بجانبه ===== -->
-            <div class="play-section">
-                <button class="play-btn-large" id="dashboardPlayBtn">
+            <!-- ===== زر اللعب الكبير + زر الإعدادات (في الأسفل) ===== -->
+            <div class="play-section" style="margin-bottom: 0.5rem; padding: 0.5rem 1rem;">
+                <button class="play-btn-large" id="dashboardPlayBtn" title="ابدأ اللعب (الطور المختار: ${modeDisplayName})">
                     <div class="btn-bg" style="background-image: url('${imgPath}play-bg.png');"></div>
                     <div class="btn-content">
                         <div class="play-icon" style="background-image: url('${imgPath}play-icon.png');"></div>
-                        العب الآن
+                        <span>العب الآن</span>
+                        <span class="mode-badge" style="font-size:0.6rem; background:rgba(255,255,255,0.15); padding:0.1rem 0.6rem; border-radius:30px; margin-right:0.5rem; font-weight:400;">
+                            ${modeIcon} ${modeDisplayName}
+                        </span>
                     </div>
                 </button>
                 <button class="settings-btn-small" id="dashboardMatchSettingsBtn" title="إعدادات اللعب">
@@ -24390,9 +24942,250 @@ App._renderDashboard = function() {
                 </button>
             </div>
             
+            <!-- ===== القائمة الجانبية (اليسرى) - تظهر فقط على الشاشات الكبيرة ===== -->
+            <div class="side-menu">
+                <button class="side-btn" id="sidebarBattlePass" title="الباتل باس">
+                    <div class="btn-bg" style="background-image: url('${imgPath}battlepass-icon.png');"></div>
+                    <span class="tooltip">الباتل باس</span>
+                </button>
+                <button class="side-btn" id="sidebarRanks" title="الرتب">
+                    <div class="btn-bg" style="background-image: url('${imgPath}ranks-icon.png');"></div>
+                    <span class="tooltip">الرتب</span>
+                </button>
+                <button class="side-btn" id="sidebarTasks" title="المهام">
+                    <div class="btn-bg" style="background-image: url('${imgPath}tasks-icon.png');"></div>
+                    <span class="tooltip">المهام</span>
+                </button>
+            </div>
+            
         </div>
     </div>
     `;
+};
+
+// ============================================================
+// 3. تحديث دالة _selectGameMode لتخزين الطور المختار
+// ============================================================
+
+App._selectGameMode = function(mode) {
+    // التحقق من أن الطور مفعل
+    if (!ACTIVE_MODES.includes(mode)) {
+        showToast('⚠️ هذا الطور غير مفعل حالياً، سيتم إطلاقه قريباً!', 'info', 3000);
+        return;
+    }
+    
+    // إذا كان الطور هو إنشاء غرفة، تحقق من الرصيد
+    if (mode === 'create_room') {
+        const user = AuthService.currentUser;
+        if (!user) {
+            showToast('يجب تسجيل الدخول أولاً', 'error');
+            return;
+        }
+        if (user.coins < 600) {
+            showToast('⚠️ رصيدك غير كافٍ! تحتاج 600 عملة لإنشاء غرفة', 'error', 4000);
+            return;
+        }
+    }
+    
+    // تحديث المتغير العام
+    selectedGameMode = mode;
+    
+    // تحديث المظهر في المودال
+    document.querySelectorAll('.mode-card').forEach(card => {
+        card.classList.remove('active');
+        card.style.borderColor = 'var(--glass-border)';
+        const status = card.querySelector('.mode-status');
+        if (status) {
+            status.style.color = 'var(--gray)';
+            status.textContent = '○';
+        }
+    });
+    
+    const selectedCard = document.querySelector(`.mode-card[data-mode="${mode}"]`);
+    if (selectedCard) {
+        selectedCard.classList.add('active');
+        selectedCard.style.borderColor = 'var(--primary)';
+        const status = selectedCard.querySelector('.mode-status');
+        if (status) {
+            status.style.color = 'var(--success)';
+            status.textContent = '●';
+        }
+    }
+    
+    // تحديث العرض في المودال
+    const modeNames = {
+        'normal_1v1': '⚔️ عادي 1v1',
+        'single_player': '🧠 فردي',
+        'create_room': '🏠 غرفة لعب',
+        'crossword': '🔤 كلمات متقاطعة',
+        'tournament': '🏆 بطولة'
+    };
+    const display = document.getElementById('selectedModeDisplay');
+    if (display) {
+        display.textContent = modeNames[mode] || mode;
+        display.style.color = 'var(--accent)';
+    }
+    
+    // تحديث تلميح عدد اللاعبين
+    const hint = document.getElementById('playerCountHint');
+    if (hint) {
+        if (mode === 'single_player') {
+            hint.textContent = '(لعب فردي تلقائياً)';
+        } else if (mode === 'create_room') {
+            hint.textContent = '(إنشاء غرفة مع الأصدقاء)';
+        } else {
+            const count = selectedPlayerCount;
+            hint.textContent = count === 1 ? '(لعبة فردية)' : '(مواجهة مع لاعب آخر)';
+        }
+    }
+    
+    // تحديث حالة أزرار عدد اللاعبين
+    document.querySelectorAll('.player-count-btn').forEach(btn => {
+        const count = parseInt(btn.dataset.count);
+        if (mode === 'single_player' || mode === 'create_room') {
+            btn.disabled = true;
+            btn.style.opacity = '0.4';
+            btn.style.cursor = 'not-allowed';
+        } else {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+        }
+    });
+    
+    // إذا كان الطور فردي أو غرفة، حدد العدد المناسب تلقائياً
+    if (mode === 'single_player' || mode === 'create_room') {
+        selectedPlayerCount = 1;
+        document.querySelectorAll('.player-count-btn').forEach(btn => {
+            btn.classList.remove('active');
+            btn.style.background = 'transparent';
+            btn.style.color = 'var(--gray)';
+            if (parseInt(btn.dataset.count) === 1) {
+                btn.classList.add('active');
+                btn.style.background = 'var(--primary)';
+                btn.style.color = '#fff';
+            }
+        });
+    }
+    
+    // ✅ تحديث زر اللعب الرئيسي في الصفحة الرئيسية
+    this._updatePlayButtonMode();
+    this._updateModalWithCurrentMode();
+    console.log(`🎯 Mode selected: ${mode}`);
+};
+
+// ============================================================
+// تحديث دالة _updatePlayButtonMode
+// ============================================================
+
+App._updatePlayButtonMode = function() {
+    const playBtn = document.getElementById('dashboardPlayBtn');
+    if (!playBtn) return;
+    
+    // الحصول على معلومات الطور الحالي
+    const modeInfo = MODE_DESCRIPTIONS[selectedGameMode] || MODE_DESCRIPTIONS['normal_1v1'];
+    const modeDisplayName = modeInfo.title || 'عادي 1v1';
+    const modeIcon = modeInfo.icon || '⚔️';
+    
+    // تحديث النص مع عرض الطور المختار
+    const contentDiv = playBtn.querySelector('.btn-content');
+    if (contentDiv) {
+        // إزالة الشارة القديمة إذا وجدت
+        const oldBadge = contentDiv.querySelector('.mode-badge');
+        if (oldBadge) oldBadge.remove();
+        
+        // الاحتفاظ بالأيقونة والنص الأساسي
+        const iconSpan = contentDiv.querySelector('.play-icon');
+        const textSpan = contentDiv.querySelector('span:not(.play-icon)');
+        
+        if (textSpan) {
+            textSpan.textContent = 'العب الآن';
+        }
+        
+        // إضافة شارة الطور الجديدة
+        const badge = document.createElement('span');
+        badge.className = 'mode-badge';
+        badge.style.cssText = 'font-size:0.6rem; background:rgba(255,255,255,0.15); padding:0.1rem 0.6rem; border-radius:30px; margin-right:0.5rem; font-weight:400;';
+        badge.textContent = `${modeIcon} ${modeDisplayName}`;
+        contentDiv.appendChild(badge);
+    }
+    
+    // تحديث عنوان الزر (tooltip)
+    playBtn.title = `ابدأ اللعب (الطور المختار: ${modeDisplayName})`;
+};
+
+App._selectGameModeFromSettings = function() {
+    // استخدام المتغير العام selectedGameMode
+    const mode = selectedGameMode;
+    const count = selectedPlayerCount;
+    
+    console.log(`🎯 Mode selected from settings: ${mode}, players: ${count}`);
+    
+    // تحديث زر اللعب الرئيسي
+    this._updatePlayButtonMode();
+    
+    // عرض رسالة تأكيد
+    const modeInfo = MODE_DESCRIPTIONS[mode] || MODE_DESCRIPTIONS['normal_1v1'];
+    showToast(`✅ تم تحديد الطور: ${modeInfo.title}`, 'success', 3000);
+    
+    // إغلاق المودال
+    App._closeModal('matchSettingsModal');
+};
+
+// ============================================================
+// 6. دالة تنفيذ الطور (مستخدمة من زر اللعب الرئيسي والإعدادات)
+// ============================================================
+
+App._executeGameMode = function(mode) {
+    switch(mode) {
+        case 'normal_1v1':
+            // اللعب العادي 1 ضد 1 (البحث عن خصم)
+            showToast('🔍 جاري البحث عن خصم...', 'info', 3000);
+            MatchmakingSystem.startMatchmaking('normal_1v1');
+            break;
+            
+        case 'single_player':
+            // اللعب الفردي (اللعبة العادية)
+            showToast('🎮 بدء اللعب الفردي...', 'success', 2000);
+            App._activateSection('game');
+            // تشغيل اللعبة تلقائياً
+            setTimeout(() => {
+                const startBtn = document.getElementById('startGameBtn');
+                if (startBtn) {
+                    startBtn.click();
+                } else {
+                    // إذا لم يوجد الزر، نبدأ اللعبة مباشرة
+                    GameEngine.start();
+                }
+            }, 300);
+            break;
+            
+        case 'create_room':
+            // إنشاء غرفة لعب (صفحة الغرف)
+            const user = AuthService.currentUser;
+            if (!user) {
+                showToast('يجب تسجيل الدخول أولاً', 'error');
+                return;
+            }
+            if (user.coins < 600) {
+                showToast('⚠️ رصيدك غير كافٍ! تحتاج 600 عملة لإنشاء غرفة', 'error', 4000);
+                return;
+            }
+            showToast('🏠 جاري فتح صفحة الغرف...', 'info', 2000);
+            App._activateSection('multiplayer');
+            break;
+            
+        case 'crossword':
+            showToast('🔤 الكلمات المتقاطعة قادمة قريباً!', 'info', 3000);
+            break;
+            
+        case 'tournament':
+            showToast('🏆 البطولات قادمة قريباً!', 'info', 3000);
+            break;
+            
+        default:
+            showToast('⚠️ طور غير معروف', 'error');
+    }
 };
 
 // ============================================================
