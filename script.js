@@ -8477,16 +8477,28 @@ _updateDashboardUI() {
         clanName.textContent = user.clan || 'غير منضم';
     }
 
-    // تحديث العملات
+    // تحديث العملات الذهبية
     const coinsEl = document.getElementById('dashboardCoins');
     if (coinsEl) {
-        coinsEl.textContent = user.coins || 0;
+        const oldValue = parseInt(coinsEl.textContent) || 0;
+        const newValue = user.coins || 0;
+        coinsEl.textContent = newValue;
+        if (newValue > oldValue) {
+            coinsEl.classList.add('updating');
+            setTimeout(() => coinsEl.classList.remove('updating'), 300);
+        }
     }
 
     // تحديث الجواهر
     const gemsEl = document.getElementById('dashboardGems');
     if (gemsEl) {
-        gemsEl.textContent = user.gems || 0;
+        const oldValue = parseInt(gemsEl.textContent) || 0;
+        const newValue = user.gems || 0;
+        gemsEl.textContent = newValue;
+        if (newValue > oldValue) {
+            gemsEl.classList.add('updating');
+            setTimeout(() => gemsEl.classList.remove('updating'), 300);
+        }
     }
 
     // تحديث المستوى وشريط التقدم
@@ -24863,14 +24875,19 @@ App._renderDashboard = function() {
                 </div>
                 
                 <div class="right-section">
-                    <div class="currency-display-new">
-                        <div class="currency-icon" style="background-image: url('${imgPath}coins-icon.png');"></div>
-                        <span id="dashboardCoins">${user?.coins || 0}</span>
-                    </div>
-                    <div class="currency-display-new">
-                        <div class="currency-icon" style="background-image: url('${imgPath}gems-icon.png');"></div>
-                        <span id="dashboardGems">${user?.gems || 0}</span>
-                    </div>
+    <!-- العملات الذهبية -->
+    <div class="currency-item coins" id="coinsDisplay">
+        <div class="currency-icon" style="background-image: url('${imgPath}coins-icon.png');"></div>
+        <span class="currency-value" id="dashboardCoins">${user?.coins || 0}</span>
+        <span class="currency-plus">+</span>
+    </div>
+    
+    <!-- الجواهر -->
+    <div class="currency-item gems" id="gemsDisplay">
+        <div class="currency-icon" style="background-image: url('${imgPath}gems-icon.png');"></div>
+        <span class="currency-value" id="dashboardGems">${user?.gems || 0}</span>
+        <span class="currency-plus">+</span>
+    </div>
                     <div class="level-display-new" id="dashboardLevelClick">
                         <div class="level-icon" style="background-image: url('${imgPath}level-icon.png');"></div>
                         <div class="level-info">
@@ -24917,30 +24934,40 @@ App._renderDashboard = function() {
                 </button>
             </div>
             
-            <!-- ===== القائمة السفلية ===== -->
-            <div class="bottom-nav">
-                <button class="nav-btn" id="navStore" title="المتجر">
-                    <div class="nav-icon" style="background-image: url('${imgPath}store-icon.png');"></div>
-                    <span>المتجر</span>
-                </button>
-                <button class="nav-btn" id="navFriends" title="الأصدقاء">
-                    <div class="nav-icon" style="background-image: url('${imgPath}friends-icon.png');"></div>
-                    <span>الأصدقاء</span>
-                    <span class="badge-count" id="friendsNavBadge" style="display:none;">0</span>
-                </button>
-                <button class="nav-btn active" id="navPlay" title="اللعب">
-                    <div class="nav-icon" style="background-image: url('${imgPath}play-nav-icon.png');"></div>
-                    <span>اللعب</span>
-                </button>
-                <button class="nav-btn" id="navClan" title="القبيلة">
-                    <div class="nav-icon" style="background-image: url('${imgPath}clan-icon.png');"></div>
-                    <span>القبيلة</span>
-                </button>
-                <button class="nav-btn" id="navTournament" title="البطولة">
-                    <div class="nav-icon" style="background-image: url('${imgPath}tournament-icon.png');"></div>
-                    <span>البطولة</span>
-                </button>
-            </div>
+<!-- ===== القائمة السفلية ===== -->
+<div class="bottom-nav">
+    <button class="nav-btn" id="navStore" title="المتجر">
+        <div class="nav-bg" style="background-image: url('${imgPath}store-icon.png');"></div>
+        <div class="nav-content">
+            <span>المتجر</span>
+        </div>
+    </button>
+    <button class="nav-btn" id="navFriends" title="الأصدقاء">
+        <div class="nav-bg" style="background-image: url('${imgPath}friends-icon.png');"></div>
+        <div class="nav-content">
+            <span>الأصدقاء</span>
+        </div>
+        <span class="badge-count" id="friendsNavBadge" style="display:none;">0</span>
+    </button>
+    <button class="nav-btn active" id="navPlay" title="اللعب">
+        <div class="nav-bg" style="background-image: url('${imgPath}play-nav-icon.png');"></div>
+        <div class="nav-content">
+            <span>اللعب</span>
+        </div>
+    </button>
+    <button class="nav-btn" id="navClan" title="القبيلة">
+        <div class="nav-bg" style="background-image: url('${imgPath}clan-icon.png');"></div>
+        <div class="nav-content">
+            <span>القبيلة</span>
+        </div>
+    </button>
+    <button class="nav-btn" id="navTournament" title="البطولة">
+        <div class="nav-bg" style="background-image: url('${imgPath}tournament-icon.png');"></div>
+        <div class="nav-content">
+            <span>البطولة</span>
+        </div>
+    </button>
+</div>
             
             <!-- ===== القائمة الجانبية (اليسرى) - تظهر فقط على الشاشات الكبيرة ===== -->
             <div class="side-menu">
