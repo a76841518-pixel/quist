@@ -188,7 +188,7 @@ const GENERAL_CATEGORIES = [
     { id: 'أدب', icon: '📚', label: 'أدب' },
     { id: 'فن', icon: '🎨', label: 'فن' },
     { id: 'موسيقى', icon: '🎵', label: 'موسيقى' },
-    { id: 'أفلام', icon: '🎬', label: 'أفلام' },
+    { id: 'أفلام ومسلسلات', icon: '🎬', label: 'أفلام ومسلسلات' },
     { id: 'ألعاب', icon: '🎮', label: 'ألعاب فيديو' },
     { id: 'رياضة', icon: '⚽', label: 'رياضة' },
     { id: 'صحة', icon: '💊', label: 'صحة' },
