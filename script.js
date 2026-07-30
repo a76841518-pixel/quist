@@ -4077,45 +4077,66 @@ const GameEngine = {
         this._updateGameStats();
     },
 
+// داخل GameEngine، إصلاح دالة start
+
 start() {
-    if (this.isPlaying) return;
+    console.log('🎮 GameEngine.start() called');
     
-    const category = document.getElementById('gameCategory').value;
-    const questionType = document.getElementById('gameQuestionType').value; // ✅ جديد
-    const count = parseInt(document.getElementById('gameCount').value);
-    const diff = document.getElementById('gameDifficulty').value;
-    const mode = document.getElementById('gameMode').value;
+    // التحقق من وجود أسئلة
+    const questions = DataManager.data.questions || [];
+    if (questions.length === 0) {
+        showToast('⚠️ لا توجد أسئلة! يرجى إضافة أسئلة أولاً', 'error', 4000);
+        return;
+    }
+    
+    if (this.isPlaying) {
+        console.log('⚠️ اللعبة قيد التشغيل بالفعل');
+        return;
+    }
+    
+    // جلب الإعدادات
+    const category = document.getElementById('gameCategory')?.value || 'all';
+    const questionType = document.getElementById('gameQuestionType')?.value || 'all';
+    const count = parseInt(document.getElementById('gameCount')?.value || '10');
+    const diff = document.getElementById('gameDifficulty')?.value || 'medium';
+    const mode = document.getElementById('gameMode')?.value || 'normal';
+    
+    console.log('📊 إعدادات اللعبة:', { category, questionType, count, diff, mode });
     
     this.difficulty = diff;
     this.mode = mode;
     this.totalQuestions = count;
     this.isTimeAttack = (mode === 'time_attack');
-    this._updatePlayButtonMode();
+    
+    // ❌ إزالة هذا السطر - الدالة غير موجودة في GameEngine
+    // this._updatePlayButtonMode();
 
-    let pool = [...DataManager.data.questions];
+    // تصفية الأسئلة
+    let pool = [...questions];
     if (category !== 'all') {
         pool = pool.filter(q => q.category === category);
     }
-
-        // ✅ تصفية حسب نوع السؤال (جديد)
     if (questionType !== 'all') {
         pool = pool.filter(q => q.type === questionType);
     }
+    
     pool = shuffleArray(pool);
     this.questionPool = pool;
     
     if (pool.length === 0) {
-        showToast('لا توجد أسئلة في هذه الفئة!', 'error');
+        showToast(`⚠️ لا توجد أسئلة في هذه الفئة (${category})`, 'error', 4000);
         return;
     }
     
+    console.log(`📚 تم العثور على ${pool.length} سؤال`);
+    
+    // اختيار الأسئلة
     if (this.isTimeAttack) {
         const initialCount = Math.min(30, pool.length);
         this.gameQuestions = pool.slice(0, initialCount);
         this.totalQuestions = Infinity;
         this.totalTime = 60;
         this.timeLeft = 60;
-        // ✅ لا حاجة لـ pointsPerQuestion
     } else {
         const maxCount = Math.min(count, pool.length);
         this.gameQuestions = pool.slice(0, maxCount);
@@ -4130,13 +4151,14 @@ start() {
         const settings = diffMap[this.difficulty] || diffMap.medium;
         this.totalTime = settings.time;
         this.timeLeft = settings.time;
-        // ✅ لا حاجة لـ pointsPerQuestion
     }
     
     if (this.gameQuestions.length === 0) {
-        showToast('لا توجد أسئلة كافية!', 'error');
+        showToast('⚠️ لا توجد أسئلة كافية!', 'error');
         return;
     }
+    
+    console.log(`🎯 تم اختيار ${this.gameQuestions.length} سؤال`);
 
     // تهيئة المتغيرات
     this.currentIndex = 0;
@@ -4156,17 +4178,40 @@ start() {
     this._orderingAnswers = [];
     this._lastProgressSound = 0;
     this._progressCompleteSoundPlayed = false;
+    this._answerTimes = [];
+    this._fastAnswers = 0;
+    this._allAnswersIn1s = false;
+    this._streaksHistory = [];
+    this._isEnding = false;
     
-    // عرض الواجهة
-    document.getElementById('gameHintBtn').style.display = this.isTimeAttack ? 'none' : 'inline-flex';
-    document.getElementById('gameStartScreen').style.display = 'none';
-    document.getElementById('gamePlayScreen').style.display = 'block';
-    document.getElementById('gameResultScreen').style.display = 'none';
+    // عرض واجهة اللعب
+    const startScreen = document.getElementById('gameStartScreen');
+    const playScreen = document.getElementById('gamePlayScreen');
+    const resultScreen = document.getElementById('gameResultScreen');
     
-    SoundSystem.playGameStart();
+    if (startScreen) startScreen.style.display = 'none';
+    if (playScreen) playScreen.style.display = 'block';
+    if (resultScreen) resultScreen.style.display = 'none';
+    
+    // إظهار زر التلميح
+    const hintBtn = document.getElementById('gameHintBtn');
+    if (hintBtn) {
+        hintBtn.style.display = this.isTimeAttack ? 'none' : 'inline-flex';
+    }
+    
+    // تحديث الإحصائيات
     this._updateGameStats();
+    
+    // تشغيل الصوت
+    if (typeof SoundSystem !== 'undefined') {
+        SoundSystem.playGameStart();
+    }
+    
+    // عرض أول سؤال
     this.renderQuestion();
     this.startTimer();
+    
+    console.log('✅ بدأت اللعبة بنجاح!');
 },
 
 renderQuestion() {
@@ -13950,6 +13995,80 @@ document.getElementById('checkDuplicatesBtn')?.addEventListener('click', () => {
         // فتح مودال الإعدادات
         App._openModal('matchSettingsModal');
     });
+
+    // ===== زر بدء اللعبة الفردية =====
+    const startGameBtn = document.getElementById('startGameBtn');
+    if (startGameBtn) {
+        // إزالة أي مستمعات قديمة
+        const newBtn = startGameBtn.cloneNode(true);
+        startGameBtn.parentNode.replaceChild(newBtn, startGameBtn);
+        
+        newBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('🎮 زر بدء اللعبة clicked');
+            
+            // التحقق من تسجيل الدخول
+            if (!AuthService.currentUser) {
+                showToast('⚠️ يرجى تسجيل الدخول أولاً', 'error');
+                document.getElementById('loginModal').classList.add('open');
+                return;
+            }
+            
+            // بدء اللعبة
+            GameEngine.start();
+        });
+    }
+
+    // ===== زر إعادة اللعب =====
+    const replayBtn = document.getElementById('gameReplayBtn');
+    if (replayBtn) {
+        replayBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('🔄 زر إعادة اللعب clicked');
+            GameEngine.start();
+        });
+    }
+
+    // ===== زر العودة للرئيسية من اللعبة =====
+    const homeBtn = document.getElementById('gameHomeBtn');
+    if (homeBtn) {
+        homeBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('🏠 زر العودة للرئيسية clicked');
+            document.getElementById('gameResultScreen').style.display = 'none';
+            document.getElementById('gameStartScreen').style.display = 'block';
+            App._activateSection('dashboard');
+        });
+    }
+
+    // ===== زر الخروج من اللعبة =====
+    const quitBtn = document.getElementById('gameQuitBtn');
+    if (quitBtn) {
+        quitBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            GameEngine.quit();
+        });
+    }
+
+    // ===== زر التلميح =====
+    const hintBtn = document.getElementById('gameHintBtn');
+    if (hintBtn) {
+        hintBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            GameEngine.showHint();
+        });
+    }
+
+    // ===== زر مشاركة النتيجة =====
+    const shareBtn = document.getElementById('gameShareResultBtn');
+    if (shareBtn) {
+        shareBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            GameEngine.shareResult();
+        });
+    }
+
 
 // ============================================================
 // ربط الأزرار الجديدة في _setupUI
@@ -24888,15 +25007,21 @@ App._renderDashboard = function() {
         <span class="currency-value" id="dashboardGems">${user?.gems || 0}</span>
         <span class="currency-plus">+</span>
     </div>
-                    <div class="level-display-new" id="dashboardLevelClick">
-                        <div class="level-icon" style="background-image: url('${imgPath}level-icon.png');"></div>
-                        <div class="level-info">
-                            <span class="level-number">المستوى ${progress.currentLevel || 1}</span>
-                            <div class="level-progress">
-                                <div class="fill" id="dashboardLevelProgress" style="width:${progress.progress}%;"></div>
-                            </div>
-                        </div>
-                    </div>
+<div class="level-display-new" id="dashboardLevelClick">
+    <!-- ✅ صورة المستوى مع الرقم داخلها -->
+    <div class="level-icon-wrapper">
+        <div class="level-icon-bg" style="background-image: url('${imgPath}level-icon.png');"></div>
+        <span class="level-number-inside" id="dashboardLevelNumber">${progress.currentLevel || 1}</span>
+    </div>
+    
+    <!-- ✅ شريط التقدم بجانب الصورة -->
+    <div class="level-progress-wrapper">
+        <div class="level-progress">
+            <div class="fill" id="dashboardLevelProgress" style="width:${progress.progress}%;"></div>
+        </div>
+        <div class="level-progress-label" id="dashboardLevelLabel">${user?.totalScore || 0} pts</div>
+    </div>
+</div>
                 </div>
             </div>
             
