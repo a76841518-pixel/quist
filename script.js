@@ -2975,6 +2975,19 @@ listenWhere(collection, field, operator, value, callback) {
     }
 };
 
+// دالة مساعدة للتحقق من وجود العنصر والحصول على قيمته بأمان
+function getSafeElementValue(elementId, defaultValue = 0) {
+    const element = document.getElementById(elementId);
+    if (!element) {
+        console.warn(`⚠️ Element "${elementId}" not found, using default value: ${defaultValue}`);
+        return defaultValue;
+    }
+    return element.value;
+}
+
+// استخدامها في النموذج
+const rankRequired = parseInt(getSafeElementValue('qRankRequired', 0)) || 0;
+
 // ============================================================
 // نظام الإنجازات الجديد (67 إنجازاً مع صور)
 // ============================================================
@@ -8407,22 +8420,48 @@ _buildModals() {
                     </button>
                 </div>
             </div>
+            <!-- ✅ الرتبة المطلوبة - تأكد من وجودها داخل form -->
+            <div class="form-group">
+                <label>الرتبة المطلوبة *</label>
+                <select id="qRankRequired" required>
+                    ${RANKS.map(rank => `<option value="${rank.min}">${rank.name} (${rank.min}+)</option>`).join('')}
+                </select>
+                <div style="font-size:0.7rem;color:var(--gray);margin-top:0.2rem;">
+                    ⚡ الأسئلة ستظهر فقط للاعبين الذين وصلوا إلى هذه الرتبة أو أعلى
+                </div>
+            </div>
             
             <!-- إعدادات إضافية -->
             <div class="form-row">
-<div class="form-group">
-    <label>الرتبة المطلوبة *</label>
-    <select id="qRankRequired" required>
-        ${RANKS.map(rank => `<option value="${rank.min}">${rank.name} (${rank.min}+)</option>`).join('')}
+<!-- ✅ حقل الصعوبة مخفي (لأنه يُحدد تلقائياً) -->
+<div class="form-group" style="display:none;">
+    <label>الصعوبة</label>
+    <select id="qDifficulty">
+        <option value="سهل">🟢 سهل</option>
+        <option value="متوسط" selected>🟡 متوسط</option>
+        <option value="صعب">🔴 صعب</option>
     </select>
+</div>
+
+<!-- ✅ رسالة توضيحية عن الصعوبة والرتبة -->
+<div class="form-group" style="background:var(--glass);padding:0.5rem 1rem;border-radius:var(--radius-sm);margin-bottom:1rem;">
+    <div style="display:flex;align-items:center;gap:0.5rem;">
+        <span style="font-size:1.2rem;">🎯</span>
+        <div>
+            <div style="font-weight:700;font-size:0.9rem;">الصعوبة تُحدد تلقائياً حسب الرتبة</div>
+            <div style="font-size:0.75rem;color:var(--gray);">
+                🟢 سهل (برونزي) • 🟡 متوسط (فضي) • 🔴 صعب (ذهبي) • 💀 خبير (بلاتيني+)
+            </div>
+        </div>
+    </div>
 </div>
                 <div class="form-group">
                     <label>التصنيف</label>
-<select id="qCategory">
-    ${GENERAL_CATEGORIES.map(cat => 
-        `<option value="${cat.id}">${cat.icon} ${cat.label}</option>`
-    ).join('')}
-</select>
+                    <select id="qCategory">
+                        ${GENERAL_CATEGORIES.map(cat => 
+                            `<option value="${cat.id}">${cat.icon} ${cat.label}</option>`
+                        ).join('')}
+                    </select>
                 </div>
             </div>
             
@@ -14265,7 +14304,7 @@ document.getElementById('checkDuplicatesBtn')?.addEventListener('click', () => {
             App._activateSection('dashboard');
         });
     }
-    
+
     // ===== زر التلميح =====
     const hintBtn = document.getElementById('gameHintBtn');
     if (hintBtn) {
@@ -14713,38 +14752,48 @@ document.getElementById('editPostModal')?.addEventListener('click', (e) => {
 // في _setupFormHandlers
 document.getElementById('questionForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
+    
     if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'question') {
         showToast('ليس لديك صلاحية', 'error');
         return;
     }
     
     const form = e.target;
-    const id = form.dataset.id || document.getElementById('qFormId').value;
-    const type = document.getElementById('qType').value;
+    const id = form.dataset.id || document.getElementById('qFormId')?.value || '';
+    const type = document.getElementById('qType')?.value || 'multiple_choice';
     
-    // جمع البيانات حسب النوع
-    let data = {
-        type: type,
-        question: document.getElementById('qText').value.trim(),
-        difficulty: document.getElementById('qDifficulty').value,
-        category: document.getElementById('qCategory').value,
-        points: parseInt(document.getElementById('qPoints').value) || 10,
-        timeLimit: parseInt(document.getElementById('qTimeLimit').value) || 30,
-        isPublic: document.getElementById('qIsPublic').checked,
-        tags: []
-    };
-    
-    if (!data.question) {
+    // ✅ جمع البيانات بأمان مع التحقق من وجود العناصر
+    const questionText = document.getElementById('qText')?.value?.trim() || '';
+    if (!questionText) {
         showToast('يرجى إدخال نص السؤال', 'error');
         return;
+    }
+    
+    let data = {
+        type: type,
+        question: questionText,
+        difficulty: document.getElementById('qDifficulty')?.value || 'متوسط',
+        category: document.getElementById('qCategory')?.value || 'عام',
+        points: parseInt(document.getElementById('qPoints')?.value) || 10,
+        timeLimit: parseInt(document.getElementById('qTimeLimit')?.value) || 30,
+        isPublic: document.getElementById('qIsPublic')?.checked || false,
+        tags: [],
+        rankRequired: 0 // قيمة افتراضية
+    };
+    
+    // ✅ التحقق من وجود عنصر الرتبة
+    const rankRequiredEl = document.getElementById('qRankRequired');
+    if (rankRequiredEl) {
+        data.rankRequired = parseInt(rankRequiredEl.value) || 0;
+    } else {
+        console.warn('⚠️ qRankRequired element not found, using default value 0');
     }
     
     // معالجة حسب النوع
     switch(type) {
         case 'multiple_choice':
             const options = [];
-            const optionInputs = document.querySelectorAll('#qOptionsList .option-input');
-            optionInputs.forEach(input => {
+            document.querySelectorAll('#qOptionsList .option-input').forEach(input => {
                 if (input.value.trim()) {
                     options.push(input.value.trim());
                 }
@@ -14760,11 +14809,12 @@ document.getElementById('questionForm')?.addEventListener('submit', async (e) =>
             
         case 'true_false':
             data.options = ['صحيح', 'خطأ'];
-            data.correct = parseInt(document.querySelector('input[name="qCorrect"]:checked')?.value || 0);
+            const tfCorrect = document.querySelector('input[name="qCorrect"]:checked');
+            data.correct = parseInt(tfCorrect?.value || 0);
             break;
             
         case 'fill_blank':
-            const answer = document.getElementById('qFillBlankAnswer').value.trim();
+            const answer = document.getElementById('qFillBlankAnswer')?.value?.trim() || '';
             if (!answer) {
                 showToast('يرجى إدخال الإجابة الصحيحة', 'error');
                 return;
@@ -14821,6 +14871,7 @@ document.getElementById('questionForm')?.addEventListener('submit', async (e) =>
         App._renderQuestionsAdvanced();
         App._refreshAllData();
     } catch (err) {
+        console.error('Error saving question:', err);
         showToast('❌ خطأ: ' + err.message, 'error');
     }
 });
@@ -15320,7 +15371,6 @@ if (registerForm) {
 // ============================================================
 
 window.editQuestion = async (id) => {
-    document.getElementById('qRankRequired').value = q.rankRequired || 0;
     if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'question') {
         showToast('ليس لديك صلاحية', 'error');
         return;
@@ -15403,6 +15453,12 @@ window.editQuestion = async (id) => {
     // تحديث واجهة النوع
     App._updateQuestionTypeUI(q.type || 'multiple_choice');
     
+    // ✅ تعبئة حقل الرتبة مع التحقق من وجوده
+    const rankRequiredEl = document.getElementById('qRankRequired');
+    if (rankRequiredEl) {
+        rankRequiredEl.value = q.rankRequired || 0;
+    }
+
     // فتح المودال
     App._openModal('questionModal');
 };
@@ -18065,12 +18121,12 @@ async _exportQuestions() {
         return;
     }
     
-    // ✅ تنظيم البيانات للتصدير
     const exportData = {
         exportDate: new Date().toISOString(),
         totalQuestions: questions.length,
         version: '1.0',
         questions: questions.map(q => {
+            // ✅ تأكد من تعريف base بشكل صحيح
             const base = {
                 question: q.question,
                 options: q.options || [],
@@ -18129,16 +18185,15 @@ async _importQuestions(file) {
         this._importedCount = 0;
         
         const text = await file.text();
-        const data = JSON.parse(text);
+        const importedData = JSON.parse(text);  // ✅ استخدم اسم مختلف لتجنب التعارض
         
-        if (!data.questions || !Array.isArray(data.questions)) {
+        if (!importedData.questions || !Array.isArray(importedData.questions)) {
             showToast('❌ تنسيق الملف غير صحيح', 'error');
             this._isImporting = false;
             return;
         }
         
-        // ✅ تعريف المتغير هنا أولاً
-        const questionsToImport = data.questions;
+        const questionsToImport = importedData.questions;
         const totalQuestions = questionsToImport.length;
         
         if (totalQuestions === 0) {
@@ -18273,11 +18328,20 @@ async _importQuestions(file) {
  * بناء بيانات السؤال للاستيراد
  */
 _buildQuestionData(q) {
+    const rankRequired = parseInt(q.rankRequired) || 0;
+    
+    // ✅ تحديد الصعوبة تلقائياً حسب الرتبة
+    let autoDifficulty = 'متوسط';
+    if (rankRequired < 600) autoDifficulty = 'سهل';
+    else if (rankRequired < 1700) autoDifficulty = 'متوسط';
+    else if (rankRequired < 3200) autoDifficulty = 'صعب';
+    else autoDifficulty = 'خبير';
+    
     const base = {
         question: q.question.trim(),
         options: q.options || [],
         correct: q.correct !== undefined ? q.correct : 0,
-        difficulty: q.difficulty || 'متوسط',
+        difficulty: autoDifficulty,  // ✅ تجاهل ما اختاره المستخدم
         category: q.category || 'عام',
         type: q.type || 'multiple_choice',
         points: q.points || 10,
@@ -18286,18 +18350,25 @@ _buildQuestionData(q) {
         tags: q.tags || [],
         usedCount: q.usedCount || 0,
         createdAt: new Date().toISOString(),
-        rankRequired: parseInt(q.rankRequired) || 0  // ✅ أضف هذا السطر
-
+        rankRequired: rankRequired  // ✅ هذا هو المهم الآن
     };
-    
-    if (q.type === 'fill_blank' && q.correctAnswer) base.correctAnswer = q.correctAnswer;
-    if (q.type === 'matching' && q.matchingPairs) base.matchingPairs = q.matchingPairs;
-    if (q.type === 'ordering' && q.orderedItems) base.orderedItems = q.orderedItems;
+
+    // إضافة حقول خاصة حسب النوع
+    if (q.type === 'fill_blank' && q.correctAnswer) {
+        base.correctAnswer = q.correctAnswer;
+    }
+    if (q.type === 'matching' && q.matchingPairs) {
+        base.matchingPairs = q.matchingPairs;
+    }
+    if (q.type === 'ordering' && q.orderedItems) {
+        base.orderedItems = q.orderedItems;
+    }
     if (q.type === 'odd_one_out' && q.items) {
         base.items = q.items;
         base.oddIndex = q.oddIndex;
     }
-    return base;
+    
+    return base;  // ✅ إرجاع base وليس data
 },
 
 /**
@@ -18577,19 +18648,15 @@ _updateQuestionTypeUI(type) {
             if (containers.options) containers.options.style.display = 'block';
             break;
         case 'true_false':
-            // صح/خطأ يستخدم نفس حاوية الخيارات لكن مع خيارين فقط
             if (containers.options) {
                 containers.options.style.display = 'block';
                 // تحديث الخيارات لـ صح/خطأ
                 const optionInputs = document.querySelectorAll('#qOptionsList .option-input');
-                const optionLabels = document.querySelectorAll('#qOptionsList .option-label');
                 if (optionInputs.length >= 2) {
                     optionInputs[0].value = 'صحيح';
                     optionInputs[1].value = 'خطأ';
                     optionInputs[0].disabled = true;
                     optionInputs[1].disabled = true;
-                    if (optionInputs[2]) optionInputs[2].style.display = 'none';
-                    if (optionInputs[3]) optionInputs[3].style.display = 'none';
                 }
             }
             break;
@@ -18607,9 +18674,14 @@ _updateQuestionTypeUI(type) {
             break;
     }
     
+    // ✅ إخفاء حقل الصعوبة القديم
+    const difficultyGroup = document.querySelector('.form-group:has(#qDifficulty)');
+    if (difficultyGroup) {
+        difficultyGroup.style.display = 'none';
+    }
+    
     // إعادة تعيين الخيارات عند التغيير
     if (type !== 'true_false' && type !== 'multiple_choice') {
-        // إعادة تمكين الخيارات
         document.querySelectorAll('#qOptionsList .option-input').forEach(input => {
             input.disabled = false;
             input.style.display = '';

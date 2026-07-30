@@ -11663,3 +11663,109 @@ body.light-theme .level-display-new .level-progress-wrapper .level-progress-labe
         box-shadow: 0 0 25px rgba(46, 204, 113, 0.4);
     }
 }
+
+/* ============================================================
+   إعدادات اللعبة
+   ============================================================ */
+
+/* أزرار اختيار الصعوبة */
+.settings-option-btn {
+    transition: all 0.3s ease !important;
+    user-select: none !important;
+}
+
+.settings-option-btn:hover {
+    transform: translateY(-2px) !important;
+}
+
+.settings-option-btn.active {
+    border-color: var(--success) !important;
+    background: rgba(46, 204, 113, 0.15) !important;
+    color: var(--success) !important;
+    box-shadow: 0 0 20px rgba(46, 204, 113, 0.1) !important;
+}
+
+/* أزرار اختيار نمط اللعبة */
+.settings-mode-btn {
+    transition: all 0.3s ease !important;
+    user-select: none !important;
+}
+
+.settings-mode-btn:hover {
+    transform: translateY(-2px) !important;
+}
+
+.settings-mode-btn.active {
+    border-color: var(--primary) !important;
+    background: rgba(108, 99, 255, 0.15) !important;
+    color: var(--primary) !important;
+    box-shadow: 0 0 20px rgba(108, 99, 255, 0.1) !important;
+}
+
+/* شريط تمرير عدد الأسئلة */
+#settingsQuestionCount {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 10px;
+    background: var(--glass);
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+#settingsQuestionCount::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(108, 99, 255, 0.3);
+    transition: all 0.2s ease;
+}
+
+#settingsQuestionCount::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 30px rgba(108, 99, 255, 0.5);
+}
+
+#settingsQuestionCount::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+    border: none;
+}
+
+/* الوضع النهاري */
+body.light-theme .settings-option-btn {
+    color: #555577;
+}
+
+body.light-theme .settings-option-btn.active {
+    border-color: var(--success) !important;
+    background: rgba(46, 204, 113, 0.1) !important;
+    color: var(--success) !important;
+}
+
+body.light-theme .settings-mode-btn {
+    color: #555577;
+}
+
+body.light-theme .settings-mode-btn.active {
+    border-color: var(--primary) !important;
+    background: rgba(108, 99, 255, 0.1) !important;
+    color: var(--primary) !important;
+}
+
+body.light-theme #settingsCategory {
+    background: rgba(0, 0, 0, 0.04) !important;
+    color: var(--dark) !important;
+}
+
+body.light-theme #settingsQuestionType {
+    background: rgba(0, 0, 0, 0.04) !important;
+    color: var(--dark) !important;
+}
