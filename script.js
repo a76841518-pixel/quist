@@ -4081,7 +4081,23 @@ const GameEngine = {
 
 start() {
     console.log('🎮 GameEngine.start() called');
-    
+    // داخل GameEngine.start بعد جلب pool
+const user = AuthService.currentUser;
+const rankPoints = user?.rankPoints || 0;
+
+// تصفية حسب الفئة والنوع (إن وجدت)
+let filteredPool = pool;
+if (category !== 'all') filteredPool = filteredPool.filter(q => q.category === category);
+if (questionType !== 'all') filteredPool = filteredPool.filter(q => q.type === questionType);
+
+// تطبيق فلتر الرتبة
+const questionsForRank = getQuestionsForRank(rankPoints, filteredPool, this.totalQuestions);
+
+if (questionsForRank.length === 0) {
+    showToast('⚠️ لا توجد أسئلة تناسب رتبتك الحالية!', 'error');
+    return;
+}
+
     // التحقق من وجود أسئلة
     const questions = DataManager.data.questions || [];
     if (questions.length === 0) {
@@ -4103,6 +4119,8 @@ start() {
     
     console.log('📊 إعدادات اللعبة:', { category, questionType, count, diff, mode });
     
+    this.gameQuestions = questionsForRank;
+    this.totalQuestions = this.gameQuestions.length;
     this.difficulty = diff;
     this.mode = mode;
     this.totalQuestions = count;
@@ -5007,6 +5025,15 @@ startTimer() {
             }
         }
     }, 1000);
+},
+
+_getQuestionsForRank(rankPoints, pool, count = 10) {
+    // نقوم بتصفية الأسئلة التي rankRequired <= rankPoints
+    const filtered = pool.filter(q => (q.rankRequired || 0) <= rankPoints);
+    // ترتيب تنازلي حسب rankRequired (الأعلى أولاً)
+    filtered.sort((a, b) => (b.rankRequired || 0) - (a.rankRequired || 0));
+    // نأخذ أول count سؤال (أو أقل)
+    return filtered.slice(0, count);
 },
 
 // ============================================================
@@ -8222,14 +8249,12 @@ _buildModals() {
             
             <!-- إعدادات إضافية -->
             <div class="form-row">
-                <div class="form-group">
-                    <label>الصعوبة</label>
-                    <select id="qDifficulty">
-                        <option value="سهل">🟢 سهل</option>
-                        <option value="متوسط" selected>🟡 متوسط</option>
-                        <option value="صعب">🔴 صعب</option>
-                    </select>
-                </div>
+<div class="form-group">
+    <label>الرتبة المطلوبة *</label>
+    <select id="qRankRequired" required>
+        ${RANKS.map(rank => `<option value="${rank.min}">${rank.name} (${rank.min}+)</option>`).join('')}
+    </select>
+</div>
                 <div class="form-group">
                     <label>التصنيف</label>
 <select id="qCategory">
@@ -11168,6 +11193,7 @@ _renderAdminSection() {
             <div class="admin-tabs">
                 <button class="admin-tab active" data-tab="dashboard">📊 لوحة التحكم</button>
                 <button class="admin-tab" data-tab="users">👥 المستخدمين</button>
+                <button class="admin-tab" data-tab="questions">❓ الأسئلة</button>
                 <button class="admin-tab" data-tab="content">📝 المحتوى</button>
                 <button class="admin-tab" data-tab="data">🗃️ البيانات</button>
                 <button class="admin-tab" data-tab="logs">📋 السجلات</button>
@@ -11278,6 +11304,31 @@ _renderAdminDashboard() {
 // دوال عرض التبويبات
 // ============================================================
 
+_renderAdminQuestionsTab() {
+    // نعيد استخدام عرض الأسئلة المتقدم لكن مع إضافة صلاحيات إدارة
+    return `
+        <div class="card">
+            <div class="card-title"><i class="fas fa-question-circle"></i> إدارة الأسئلة (حسب الرتب)</div>
+            <p class="text-gray" style="margin-bottom:1rem;">
+                الصعوبة تُحدد تلقائياً حسب رتبة اللاعب: 
+                🟢 سهل (برونزي) – 🟡 متوسط (فضي) – 🔴 صعب (ذهبي) – 💀 خبير (بلاتيني+)
+            </p>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
+                <button class="btn btn-primary" onclick="App._activateSection('questions')">
+                    <i class="fas fa-arrow-left"></i> فتح إدارة الأسئلة
+                </button>
+                <button class="btn btn-outline" onclick="App._renderQuestionsAdvanced()">
+                    <i class="fas fa-sync"></i> تحديث
+                </button>
+            </div>
+            <div id="adminQuestionsContainer">
+                <!-- سيتم تعبئته بنفس طريقة questions -->
+                ${this._renderQuestionsAdvanced()}
+            </div>
+        </div>
+    `;
+},
+
 _showAdminTab(tab) {
     console.log(`🔄 Showing admin tab: ${tab}`);
     
@@ -11298,6 +11349,9 @@ case 'users':
     setTimeout(() => {
         this._renderAdminUsers(1);
     }, 300);
+    break;
+    case 'questions':
+    content = this._renderAdminQuestionsTab();
     break;
         case 'content': content = this._renderAdminContentContent(); break;
         case 'data': content = this._renderAdminDataContent(); break;
@@ -13090,6 +13144,15 @@ async _restoreBackup(file) {
                     <input type="file" id="importFileInput" accept=".json" style="display:none;">
                     <button class="btn btn-sm btn-danger mt-1" id="clearLocalStorageBtn"><i class="fas fa-trash"></i> مسح البيانات المحلية</button>
                 </div>
+                ${this._isAdminUser() ? `
+    <div class="card">
+        <h3 class="card-title"><i class="fas fa-shield-halved"></i> لوحة المشرف</h3>
+        <p class="text-gray">التحكم الكامل في النظام والبيانات</p>
+        <button class="btn btn-primary" id="goToAdminFromSettingsBtn">
+            <i class="fas fa-arrow-left"></i> فتح لوحة المشرف
+        </button>
+    </div>
+` : ''}
                 <div class="card">
                     <h3 class="card-title"><i class="fas fa-bell"></i> الإشعارات</h3>
                     <div class="form-group"><label><input type="checkbox" id="notifGame"> إشعارات اللعبة</label></div>
@@ -14069,6 +14132,9 @@ document.getElementById('checkDuplicatesBtn')?.addEventListener('click', () => {
         });
     }
 
+document.getElementById('goToAdminFromSettingsBtn')?.addEventListener('click', () => {
+    App._activateSection('admin');
+});
 
 // ============================================================
 // ربط الأزرار الجديدة في _setupUI
@@ -15102,6 +15168,7 @@ if (registerForm) {
 // ============================================================
 
 window.editQuestion = async (id) => {
+    document.getElementById('qRankRequired').value = q.rankRequired || 0;
     if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'question') {
         showToast('ليس لديك صلاحية', 'error');
         return;
@@ -17723,136 +17790,6 @@ _handleCancelBtnClick(e) {
 // دوال إدارة الأسئلة المتقدمة
 // ============================================================
 
-renderQuestionsAdvanced() {
-    const container = document.getElementById('questionsGrid');
-    const empty = document.getElementById('questionsEmpty');
-    
-    if (!container) return;
-    
-    const questions = DataManager.data.questions || [];
-    
-    // تحديث الإحصائيات
-    this._renderQuestionStats(questions);
-    
-    // تطبيق الفلترة
-    const search = document.getElementById('searchQuestion')?.value?.toLowerCase() || '';
-    const type = document.getElementById('filterQuestionType')?.value || '';
-    const category = document.getElementById('filterQuestionCategory')?.value || '';
-    const difficulty = document.getElementById('filterQuestionDifficulty')?.value || '';
-    const sort = document.getElementById('filterQuestionSort')?.value || 'newest';
-    
-    let filtered = [...questions];
-    
-    if (search) {
-        const searchLower = search.toLowerCase();
-        filtered = filtered.filter(q => 
-            (q.question || '').toLowerCase().includes(searchLower) ||
-            (q.category || '').toLowerCase().includes(searchLower) ||
-            (q.options || []).some(o => (o || '').toLowerCase().includes(searchLower))
-        );
-    }
-    
-    if (type) filtered = filtered.filter(q => q.type === type);
-    if (category) filtered = filtered.filter(q => q.category === category);
-    if (difficulty) filtered = filtered.filter(q => q.difficulty === difficulty);
-    
-    // ترتيب
-    switch(sort) {
-        case 'newest':
-            filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-            break;
-        case 'oldest':
-            filtered.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-            break;
-        case 'alphabetical':
-            filtered.sort((a, b) => (a.question || '').localeCompare(b.question || ''));
-            break;
-        case 'difficulty':
-            const diffOrder = { 'سهل': 1, 'متوسط': 2, 'صعب': 3 };
-            filtered.sort((a, b) => (diffOrder[a.difficulty] || 0) - (diffOrder[b.difficulty] || 0));
-            break;
-        case 'popular':
-            filtered.sort((a, b) => (b.usedCount || 0) - (a.usedCount || 0));
-            break;
-    }
-    
-    if (filtered.length === 0) {
-        container.innerHTML = '';
-        if (empty) empty.style.display = 'block';
-        document.getElementById('questionsContainer').style.display = 'none';
-        return;
-    }
-    
-    if (empty) empty.style.display = 'none';
-    document.getElementById('questionsContainer').style.display = 'block';
-    
-    const canEdit = AuthService.checkPermission('editor') || AuthService.currentUser?.adminRole === 'question';
-    const isAdmin = AuthService.checkPermission('admin');
-    
-    let html = '';
-    filtered.forEach((q, index) => {
-        const diffColor = q.difficulty === 'سهل' ? 'easy' : q.difficulty === 'صعب' ? 'hard' : 'medium';
-        const diffIcon = q.difficulty === 'سهل' ? '🟢' : q.difficulty === 'صعب' ? '🔴' : '🟡';
-        const typeInfo = this._getQuestionTypeInfo(q.type);
-        const isSelected = this._selectedQuestions && this._selectedQuestions.includes(q.id);
-        
-        html += `
-            <div class="question-card ${isSelected ? 'selected' : ''}" data-id="${q.id}">
-                <div class="question-card-header">
-                    <div style="display:flex;align-items:center;gap:0.5rem;">
-                        <!-- ✅ مربع اختيار لتحديد السؤال -->
-                        ${canEdit ? `
-                            <input type="checkbox" class="question-checkbox" data-id="${q.id}" 
-                                   ${isSelected ? 'checked' : ''} 
-                                   onchange="App._toggleQuestionSelection('${q.id}')">
-                        ` : ''}
-                        <span class="question-card-number">#${index + 1}</span>
-                    </div>
-                    <div class="question-card-badges">
-                        <span class="badge badge-type">${typeInfo?.icon || '📝'} ${typeInfo?.name || 'اختيار من متعدد'}</span>
-                        <span class="badge badge-category">${q.category || 'عام'}</span>
-                        <span class="badge badge-difficulty ${diffColor}">${diffIcon} ${q.difficulty || 'متوسط'}</span>
-                        <span class="badge badge-options">${q.options?.length || 0} خيارات</span>
-                        ${q.usedCount > 0 ? `<span class="badge badge-used">🎯 ${q.usedCount} استخدم</span>` : ''}
-                    </div>
-                </div>
-                <div class="question-card-body">
-                    <div class="question-text">${q.question || 'سؤال بدون نص'}</div>
-                    ${this._renderQuestionContent(q)}
-                </div>
-                <div class="question-card-footer">
-                    <div class="question-meta">
-                        <span><i class="far fa-calendar-alt"></i> ${formatDate(q.createdAt)}</span>
-                        <span><i class="fas fa-star"></i> ${q.points || 10} نقطة</span>
-                        <span><i class="fas fa-clock"></i> ${q.timeLimit || 30} ث</span>
-                    </div>
-                    <div class="question-actions">
-                        ${canEdit ? `
-                            <button class="btn btn-xs btn-primary" onclick="window.editQuestion('${q.id}')">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn btn-xs btn-success" onclick="window.duplicateQuestion('${q.id}')">
-                                <i class="fas fa-copy"></i>
-                            </button>
-                            <button class="btn btn-xs btn-danger" onclick="window.deleteQuestion('${q.id}')">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        ` : ''}
-                        <button class="btn btn-xs btn-outline" onclick="window.previewQuestion('${q.id}')">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    });
-    
-    container.innerHTML = html;
-    
-    // ✅ تحديث عدد المحددات
-    this._updateSelectedCount();
-},
-
 /**
  * عرض محتوى السؤال حسب النوع
  */
@@ -17990,7 +17927,8 @@ async _exportQuestions() {
                 category: q.category || 'عام',
                 type: q.type || 'multiple_choice',
                 points: q.points || 10,
-                timeLimit: q.timeLimit || 30
+                timeLimit: q.timeLimit || 30,
+                rankRequired: q.rankRequired || 0  // ✅ أضف هذا السطر
             };
             
             // إضافة حقول خاصة حسب النوع
@@ -18195,7 +18133,9 @@ _buildQuestionData(q) {
         isPublic: q.isPublic !== false,
         tags: q.tags || [],
         usedCount: q.usedCount || 0,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        rankRequired: parseInt(q.rankRequired) || 0  // ✅ أضف هذا السطر
+
     };
     
     if (q.type === 'fill_blank' && q.correctAnswer) base.correctAnswer = q.correctAnswer;
@@ -18213,6 +18153,7 @@ _buildQuestionData(q) {
  */
 _validateQuestionData(data) {
     if (!data.question) return false;
+    if (data.rankRequired === undefined || data.rankRequired < 0) return false;
     switch(data.type) {
         case 'multiple_choice': return data.options && data.options.length >= 2;
         case 'true_false': return data.options && data.options.length >= 2;
@@ -18552,6 +18493,8 @@ _initQuestionForm() {
     document.getElementById('addOrderingItemBtn')?.addEventListener('click', () => {
         this._addOrderingItem();
     });
+    
+    // لا تضع أي كود لتعيين القيم هنا
 },
 
 /**
@@ -19195,8 +19138,15 @@ _renderQuestionsAdvanced() {
                         <span class="badge badge-difficulty ${diffColor}">${diffIcon} ${q.difficulty || 'متوسط'}</span>
                         <span class="badge badge-options">${q.options?.length || 0} خيارات</span>
                         ${q.usedCount > 0 ? `<span class="badge badge-used">🎯 ${q.usedCount} استخدم</span>` : ''}
-                    </div>
-                </div>
+                <!-- ✅ أضف هنا بادجة الرتبة -->
+                ${(() => {
+                    const rankRequired = q.rankRequired || 0;
+                    const rankName = RANKS.find(r => r.min === rankRequired)?.name || 'بدون';
+                    return `<span class="badge badge-rank" style="background:var(--primary);color:#fff;">🏅 ${rankName}</span>`;
+                })()}
+            </div>
+        </div>
+    </div>
                 <div class="question-card-body">
                     <div class="question-text">${q.question || 'سؤال بدون نص'}</div>
                     ${this._renderQuestionContent(q)}
@@ -22898,6 +22848,7 @@ async _cleanup() {
             userName: this._currentUser.username || this._currentUser.displayName || 'مجهول',
             userLevel: getLevel(this._currentUser.totalScore || 0).level,
             userRank: getRank(this._currentUser.rankPoints || 0).name,
+            rankPoints: this._currentUser.rankPoints || 0, // أضف هذا السطر
             mode: mode,
             status: 'searching',
             matched: false,
@@ -22989,7 +22940,6 @@ _listenToMyMatchmaking(matchmakingId) {
     );
 },
 
-// ===== البحث عن خصم (مع عمليات ذرية) =====
 async _findMatch() {
     if (!this._searching || this._isMatchCreated) return;
 
@@ -22998,37 +22948,37 @@ async _findMatch() {
         if (!candidates || candidates.length === 0) return;
 
         const now = Date.now();
-        const filtered = candidates.filter(c =>
-            c.userId !== this._currentUser.uid &&
-            c.status === 'searching' &&
-            !c.matched &&
-            c.expiresAt > now
-        );
+        const myRank = this._currentUser.rankPoints || 0;
 
-        if (filtered.length === 0) return;
+        // نطاقات البحث: تبدأ من 0 (نفس الرتبة) ثم تتسع
+        const rankRanges = [0, 100, 200, 400, 700, 1000, 1500, 3000];
+        let foundOpponent = null;
 
-        // اختيار أول مرشح
-        const opponent = filtered[0];
+        for (const range of rankRanges) {
+            const filtered = candidates.filter(c =>
+                c.userId !== this._currentUser.uid &&
+                c.status === 'searching' &&
+                !c.matched &&
+                c.expiresAt > now &&
+                Math.abs((c.rankPoints || 0) - myRank) <= range
+            );
+            if (filtered.length > 0) {
+                foundOpponent = filtered[0];
+                break;
+            }
+        }
 
-        // ✅ التحقق الذري: محاولة حجز الخصم
-        const oppRef = RealtimeService.getRawRef(`matchmaking/${this._mode}/${opponent.id}`);
+        if (!foundOpponent) return;
+
+        // التحقق الذري وحجز الخصم (نفس الكود السابق)
+        const oppRef = RealtimeService.getRawRef(`matchmaking/${this._mode}/${foundOpponent.id}`);
         const oppData = await oppRef.once('value');
         const currentOppData = oppData.val();
-        
-        if (!currentOppData || currentOppData.matched === true) {
-            // الخصم تم حجبه بالفعل
-            console.log('⏳ Opponent already matched, skipping...');
+        if (!currentOppData || currentOppData.matched === true || currentOppData.status !== 'searching') {
             return;
         }
 
-        // ✅ التحقق من أن الخصم لا يزال في حالة بحث
-        if (currentOppData.status !== 'searching') {
-            console.log('⏳ Opponent no longer searching, skipping...');
-            return;
-        }
-
-        // ✅ إنشاء المباراة وإشعار الخصم
-        await this._createMatchAndNotify(opponent);
+        await this._createMatchAndNotify(foundOpponent);
 
     } catch (e) {
         console.warn('Match search error:', e);
