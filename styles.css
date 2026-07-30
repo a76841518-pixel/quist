@@ -9871,3 +9871,772 @@ html, body {
         gap: 0.2rem !important;
     }
 }
+
+/* ============================================================
+   أنماط الداشبورد الجديدة - الصور تغطي كامل العناصر
+   ============================================================ */
+
+/* الشريط العلوي */
+.dashboard-top-bar-new {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background: rgba(15, 14, 23, 0.7);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.dashboard-top-bar-new .left-section {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.dashboard-top-bar-new .right-section {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+/* أزرار الشريط العلوي - صورة تغطي كامل الزر */
+.top-icon-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    padding: 0;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: transparent;
+}
+
+.top-icon-btn .btn-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transition: all 0.2s ease;
+}
+
+.top-icon-btn:hover .btn-bg {
+    transform: scale(1.1);
+}
+
+.top-icon-btn .badge-dot {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 10px;
+    height: 10px;
+    background: #FF6B6B;
+    border-radius: 50%;
+    border: 2px solid #0f0e17;
+    z-index: 2;
+}
+
+/* العملات - صورة كاملة */
+.currency-display-new {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 30px;
+    padding: 0.2rem 0.8rem 0.2rem 0.4rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    height: 38px;
+}
+
+.currency-display-new .currency-icon {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.currency-display-new span {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #fffffe;
+    min-width: 30px;
+}
+
+/* المستوى وشريط التقدم */
+.level-display-new {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 30px;
+    padding: 0.2rem 0.8rem 0.2rem 0.4rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    height: 38px;
+}
+
+.level-display-new:hover {
+    background: rgba(255, 255, 255, 0.10);
+}
+
+.level-display-new .level-icon {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.level-display-new .level-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.level-display-new .level-info .level-number {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #a7a9be;
+    line-height: 1;
+}
+
+.level-display-new .level-info .level-progress {
+    width: 50px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.level-display-new .level-info .level-progress .fill {
+    height: 100%;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #6C63FF, #FFD93D);
+    transition: width 0.5s ease;
+}
+
+/* ===== بطاقة اللاعب ===== */
+.player-card-new {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.8rem 1.2rem;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    margin: 0.5rem 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.player-card-new:hover {
+    background: rgba(255, 255, 255, 0.07);
+    transform: translateY(-2px);
+}
+
+.player-card-new .player-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid #FFD93D;
+    flex-shrink: 0;
+    background: #6C63FF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: #fff;
+}
+
+.player-card-new .player-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.player-card-new .player-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.player-card-new .player-info .player-name {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #fffffe;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.player-card-new .player-info .player-clan {
+    font-size: 0.8rem;
+    color: #a7a9be;
+}
+
+.player-card-new .player-info .player-clan span {
+    color: #FFD93D;
+    font-weight: 600;
+}
+
+.player-card-new .player-rank {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.player-card-new .player-rank img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+/* ===== القائمة الجانبية (اليسرى) ===== */
+.side-menu {
+    position: fixed;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(15, 14, 23, 0.7);
+    backdrop-filter: blur(12px);
+    border-radius: 0 16px 16px 0;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-left: none;
+    z-index: 50;
+}
+
+.side-menu .side-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+    background: transparent;
+    flex-shrink: 0;
+}
+
+.side-menu .side-btn .btn-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    transition: all 0.2s ease;
+}
+
+.side-menu .side-btn:hover .btn-bg {
+    transform: scale(1.08);
+}
+
+.side-menu .side-btn.active {
+    background: rgba(108, 99, 255, 0.2);
+    border: 1px solid rgba(108, 99, 255, 0.3);
+}
+
+.side-menu .side-btn .tooltip {
+    position: absolute;
+    right: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(15, 14, 23, 0.9);
+    color: #fffffe;
+    padding: 0.2rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    z-index: 10;
+}
+
+.side-menu .side-btn:hover .tooltip {
+    opacity: 1;
+}
+
+/* ===== القائمة السفلية ===== */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0.4rem 0.5rem 0.5rem;
+    background: rgba(15, 14, 23, 0.85);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    z-index: 100;
+}
+
+.bottom-nav .nav-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0.2rem 0.6rem;
+    transition: all 0.2s ease;
+    color: #a7a9be;
+    font-size: 0.55rem;
+    font-weight: 600;
+    position: relative;
+}
+
+.bottom-nav .nav-btn .nav-icon {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    transition: all 0.2s ease;
+}
+
+.bottom-nav .nav-btn span {
+    transition: all 0.2s ease;
+}
+
+.bottom-nav .nav-btn:hover {
+    color: #fffffe;
+}
+
+.bottom-nav .nav-btn:hover .nav-icon {
+    transform: scale(1.1);
+}
+
+.bottom-nav .nav-btn.active {
+    color: #6C63FF;
+}
+
+.bottom-nav .nav-btn.active .nav-icon {
+    filter: drop-shadow(0 0 8px rgba(108, 99, 255, 0.3));
+}
+
+.bottom-nav .nav-btn .badge-count {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #FF6B6B;
+    color: #fff;
+    font-size: 0.5rem;
+    font-weight: 700;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+}
+
+/* ===== زر اللعب الكبير + زر الإعدادات بجانبه ===== */
+.play-section {
+    display: flex;
+    gap: 0.8rem;
+    padding: 0.5rem 1rem;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 4rem;
+    margin-top: 1rem;
+}
+
+.play-btn-large {
+    flex: 1;
+    max-width: 300px;
+    padding: 0.8rem 1.5rem;
+    border-radius: 16px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    box-shadow: 0 4px 30px rgba(108, 99, 255, 0.3);
+    height: 64px;
+    background: linear-gradient(135deg, #6C63FF, #5a52d5);
+    position: relative;
+    overflow: hidden;
+}
+
+.play-btn-large .btn-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0.15;
+}
+
+.play-btn-large .btn-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    position: relative;
+    z-index: 1;
+    color: #fff;
+    font-weight: 800;
+    font-size: 1.2rem;
+}
+
+.play-btn-large .btn-content .play-icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.play-btn-large:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 40px rgba(108, 99, 255, 0.5);
+}
+
+.play-btn-large:active {
+    transform: scale(0.97);
+}
+
+.settings-btn-small {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0;
+    overflow: hidden;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.settings-btn-small .btn-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    transition: all 0.2s ease;
+}
+
+.settings-btn-small:hover .btn-bg {
+    transform: scale(1.08);
+}
+
+/* ===== استجابة للشاشات الصغيرة ===== */
+
+/* إخفاء القائمة الجانبية في الهواتف */
+@media (max-width: 768px) {
+    .side-menu {
+        display: none !important;
+    }
+    
+    .dashboard-top-bar-new {
+        padding: 0.3rem 0.6rem;
+        flex-wrap: wrap;
+        gap: 0.3rem;
+    }
+    
+    .dashboard-top-bar-new .left-section {
+        gap: 0.4rem;
+        flex-wrap: wrap;
+    }
+    
+    .dashboard-top-bar-new .right-section {
+        gap: 0.4rem;
+        flex-wrap: wrap;
+    }
+    
+    .top-icon-btn {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .currency-display-new {
+        height: 32px;
+        padding: 0.1rem 0.5rem 0.1rem 0.2rem;
+    }
+    
+    .currency-display-new .currency-icon {
+        width: 22px;
+        height: 22px;
+    }
+    
+    .currency-display-new span {
+        font-size: 0.8rem;
+        min-width: 20px;
+    }
+    
+    .level-display-new {
+        height: 32px;
+        padding: 0.1rem 0.5rem 0.1rem 0.2rem;
+    }
+    
+    .level-display-new .level-icon {
+        width: 22px;
+        height: 22px;
+    }
+    
+    .level-display-new .level-info .level-progress {
+        width: 35px;
+    }
+    
+    .player-card-new {
+        padding: 0.5rem 0.8rem;
+        margin: 0.3rem 0.5rem;
+    }
+    
+    .player-card-new .player-avatar {
+        width: 48px;
+        height: 48px;
+        font-size: 1.5rem;
+    }
+    
+    .player-card-new .player-rank {
+        width: 44px;
+        height: 44px;
+    }
+    
+    .play-section {
+        padding: 0.3rem 0.5rem;
+        margin-bottom: 3.5rem;
+    }
+    
+    .play-btn-large {
+        height: 54px;
+        padding: 0.5rem 1rem;
+        flex: 1 1 70%;
+        max-width: 100%;
+    }
+    
+    .play-btn-large .btn-content {
+        font-size: 1rem;
+    }
+    
+    .play-btn-large .btn-content .play-icon {
+        width: 26px;
+        height: 26px;
+    }
+    
+    .settings-btn-small {
+        width: 54px;
+        height: 54px;
+        flex: 0 0 54px;
+    }
+    
+    .bottom-nav .nav-btn .nav-icon {
+        width: 24px;
+        height: 24px;
+    }
+    
+    .bottom-nav .nav-btn span {
+        font-size: 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .dashboard-top-bar-new .left-section {
+        gap: 0.2rem;
+    }
+    
+    .dashboard-top-bar-new .right-section {
+        gap: 0.2rem;
+    }
+    
+    .top-icon-btn {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .currency-display-new {
+        height: 28px;
+        padding: 0.05rem 0.3rem 0.05rem 0.1rem;
+    }
+    
+    .currency-display-new .currency-icon {
+        width: 18px;
+        height: 18px;
+    }
+    
+    .currency-display-new span {
+        font-size: 0.7rem;
+        min-width: 16px;
+    }
+    
+    .level-display-new {
+        height: 28px;
+        padding: 0.05rem 0.3rem 0.05rem 0.1rem;
+    }
+    
+    .level-display-new .level-icon {
+        width: 18px;
+        height: 18px;
+    }
+    
+    .level-display-new .level-info .level-number {
+        font-size: 0.55rem;
+    }
+    
+    .level-display-new .level-info .level-progress {
+        width: 30px;
+        height: 3px;
+    }
+    
+    .player-card-new .player-avatar {
+        width: 40px;
+        height: 40px;
+        font-size: 1.2rem;
+    }
+    
+    .player-card-new .player-info .player-name {
+        font-size: 0.9rem;
+    }
+    
+    .player-card-new .player-rank {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .play-btn-large {
+        height: 48px;
+        padding: 0.4rem 0.8rem;
+        flex: 1 1 60%;
+    }
+    
+    .play-btn-large .btn-content {
+        font-size: 0.85rem;
+    }
+    
+    .play-btn-large .btn-content .play-icon {
+        width: 22px;
+        height: 22px;
+    }
+    
+    .settings-btn-small {
+        width: 48px;
+        height: 48px;
+        flex: 0 0 48px;
+    }
+}
+
+/* ===== الوضع النهاري ===== */
+body.light-theme .dashboard-top-bar-new {
+    background: rgba(255, 255, 255, 0.85);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+body.light-theme .currency-display-new {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .currency-display-new span {
+    color: #1a1a2e;
+}
+
+body.light-theme .level-display-new {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .level-display-new .level-info .level-number {
+    color: #555577;
+}
+
+body.light-theme .player-card-new {
+    background: rgba(255, 255, 255, 0.6);
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+body.light-theme .player-card-new:hover {
+    background: rgba(255, 255, 255, 0.8);
+}
+
+body.light-theme .player-card-new .player-info .player-name {
+    color: #1a1a2e;
+}
+
+body.light-theme .player-card-new .player-info .player-clan {
+    color: #555577;
+}
+
+body.light-theme .bottom-nav {
+    background: rgba(255, 255, 255, 0.9);
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+body.light-theme .bottom-nav .nav-btn {
+    color: #555577;
+}
+
+body.light-theme .bottom-nav .nav-btn:hover {
+    color: #1a1a2e;
+}
+
+body.light-theme .bottom-nav .nav-btn.active {
+    color: #6C63FF;
+}
+
+body.light-theme .side-menu {
+    background: rgba(255, 255, 255, 0.85);
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+body.light-theme .side-menu .side-btn .tooltip {
+    background: rgba(255, 255, 255, 0.95);
+    color: #1a1a2e;
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+body.light-theme .settings-btn-small {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .settings-btn-small:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
