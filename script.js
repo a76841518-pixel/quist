@@ -208,6 +208,63 @@ function getCategoryOptions() {
 }
 
 // ============================================================
+// التحقق من حالة الاتصال بالإنترنت
+// ============================================================
+
+function checkInternetConnection() {
+    return new Promise((resolve) => {
+        if (!navigator.onLine) {
+            resolve(false);
+            return;
+        }
+        
+        // محاولة الاتصال بخادم Firebase
+        const timeout = 5000; // 5 ثواني مهلة
+        const startTime = Date.now();
+        
+        // استخدام fetch لمحاولة جلب أي مورد بسيط
+        fetch('https://www.google.com/favicon.ico', { 
+            mode: 'no-cors',
+            cache: 'no-cache',
+            signal: AbortSignal.timeout(timeout)
+        })
+        .then(() => {
+            resolve(true);
+        })
+        .catch(() => {
+            // إذا فشل fetch، نحاول الاتصال بقاعدة البيانات
+            if (db) {
+                db.collection('test').limit(1).get()
+                    .then(() => resolve(true))
+                    .catch(() => resolve(false));
+            } else {
+                resolve(false);
+            }
+        });
+    });
+}
+
+// دالة عرض حالة الاتصال للمستخدم
+function showConnectionStatus(online) {
+    const statusEl = document.getElementById('connectionStatus');
+    const textEl = document.getElementById('connectionText');
+    
+    if (statusEl) {
+        statusEl.className = `connection-status ${online ? 'online' : 'offline'}`;
+    }
+    if (textEl) {
+        textEl.textContent = online ? 'متصل' : 'غير متصل';
+    }
+    
+    // تحديث شارة Firebase
+    const firebaseStatus = document.getElementById('firebaseStatus');
+    if (firebaseStatus) {
+        firebaseStatus.textContent = online ? '🟢 متصل' : '🔴 غير متصل';
+        firebaseStatus.style.color = online ? 'var(--success)' : 'var(--secondary)';
+    }
+}
+
+// ============================================================
 // نظام الصوتيات المتقدم
 // ============================================================
 
@@ -666,6 +723,37 @@ const RANKS = [
     // ===== البطل (10000 نقطة) =====
     { name: 'البطل', min: 10000, icon: '👑', color: '#ff4500', image: 'champion.png', lockedImage: 'champion_locked.png' },
 ];
+
+// ============================================================
+// دالة تحويل الرتبة إلى صعوبة
+// ============================================================
+function mapRankToDifficulty(rankPoints) {
+    // برونزي 1-5: 0-599
+    if (rankPoints < 600) return 'easy';
+    // فضي 1-5: 600-1699
+    else if (rankPoints < 1700) return 'medium';
+    // ذهبي 1-5: 1700-3199
+    else if (rankPoints < 3200) return 'hard';
+    // بلاتيني+ : 3200 فما فوق
+    else return 'expert';
+}
+
+// دالة للحصول على اسم الرتبة من النقاط
+function getRankNameByPoints(rankPoints) {
+    const rank = RANKS.find(r => rankPoints >= r.min);
+    return rank ? rank.name : 'برونزي 1';
+}
+
+// دالة للحصول على تفاصيل الرتبة الكاملة
+function getRankDetails(rankPoints) {
+    let currentRank = RANKS[0];
+    for (const rank of RANKS) {
+        if (rankPoints >= rank.min) {
+            currentRank = rank;
+        }
+    }
+    return currentRank;
+}
 
 // ============================================================
 // نظام الإحصائيات المتطور
@@ -3886,29 +3974,50 @@ data: {
     _isLoading: false,
     _lastUpdate: null,
 
-    async loadAll() {
-        if (this._isLoading) return this.data;
-        this._isLoading = true;
-        try {
-            const collections = ['questions', 'leaderboard', 'rooms', 'storeItems', 'transactions'];
-
-            const results = await Promise.all(
-                collections.map(col => FirestoreService.getAll(col))
-            );
-            collections.forEach((col, idx) => {
-                this.data[col] = results[idx];
-            });
+async loadAll() {
+    if (this._isLoading) return this.data;
+    this._isLoading = true;
+    try {
+        // التحقق من الاتصال أولاً
+        const isOnline = await checkInternetConnection();
+        if (!isOnline) {
+            console.warn('⚠️ غير متصل بالإنترنت، استخدام البيانات المخزنة');
             this._lastUpdate = new Date();
             this._notifyListeners();
-            return this.data;
-        } catch (e) {
-            console.error('❌ Error loading data:', e);
-            showToast('خطأ في تحميل البيانات، جاري استخدام البيانات المخزنة', 'error');
-            throw e;
-        } finally {
+            showToast('⚠️ غير متصل، يتم عرض البيانات المخزنة مؤقتاً', 'info', 3000);
             this._isLoading = false;
+            return this.data;
         }
-    },
+        
+        const collections = ['questions', 'leaderboard', 'rooms', 'storeItems', 'transactions'];
+        
+        // محاولة جلب البيانات مع مهلة
+        const results = await Promise.race([
+            Promise.all(collections.map(col => FirestoreService.getAll(col))),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
+        ]);
+        
+        collections.forEach((col, idx) => {
+            this.data[col] = results[idx];
+        });
+        this._lastUpdate = new Date();
+        this._notifyListeners();
+        return this.data;
+    } catch (e) {
+        console.error('❌ Error loading data:', e);
+        // إذا كان الخطأ بسبب الاتصال، استخدم البيانات المخزنة
+        if (e.message === 'timeout' || e.message.includes('unavailable')) {
+            showToast('⚠️ بطء في الاتصال، استخدام البيانات المخزنة مؤقتاً', 'info', 4000);
+        } else {
+            showToast('⚠️ خطأ في تحميل البيانات، جاري استخدام البيانات المخزنة', 'error');
+        }
+        this._lastUpdate = new Date();
+        this._notifyListeners();
+        return this.data;
+    } finally {
+        this._isLoading = false;
+    }
+},
 
 startListening() {
     if (!isFirebaseReady) return;
@@ -4079,25 +4188,43 @@ const GameEngine = {
 
 // داخل GameEngine، إصلاح دالة start
 
+// استبدل دالة GameEngine.start بالكود التالي
 start() {
+    // مراقبة حالة الاتصال
+window.addEventListener('online', () => {
+    console.log('🟢 استعادة الاتصال بالإنترنت');
+    showConnectionStatus(true);
+    showToast('🟢 تم استعادة الاتصال بالإنترنت', 'success', 3000);
+    
+    // محاولة إعادة الاتصال بقاعدة البيانات
+    if (isFirebaseReady) {
+        db.collection('test').limit(1).get().catch(() => {});
+    }
+});
+
+window.addEventListener('offline', () => {
+    console.log('🔴 فقدان الاتصال بالإنترنت');
+    showConnectionStatus(false);
+    showToast('🔴 تم فقدان الاتصال بالإنترنت، سيتم العمل في وضع غير متصل', 'error', 5000);
+});
+
+// التحقق الأولي من الاتصال
+setTimeout(async () => {
+    const online = await checkInternetConnection();
+    showConnectionStatus(online);
+    if (!online) {
+        showToast('⚠️ أنت غير متصل بالإنترنت، بعض الميزات قد لا تعمل', 'error', 5000);
+    }
+}, 2000);
     console.log('🎮 GameEngine.start() called');
-    // داخل GameEngine.start بعد جلب pool
-const user = AuthService.currentUser;
-const rankPoints = user?.rankPoints || 0;
-
-// تصفية حسب الفئة والنوع (إن وجدت)
-let filteredPool = pool;
-if (category !== 'all') filteredPool = filteredPool.filter(q => q.category === category);
-if (questionType !== 'all') filteredPool = filteredPool.filter(q => q.type === questionType);
-
-// تطبيق فلتر الرتبة
-const questionsForRank = getQuestionsForRank(rankPoints, filteredPool, this.totalQuestions);
-
-if (questionsForRank.length === 0) {
-    showToast('⚠️ لا توجد أسئلة تناسب رتبتك الحالية!', 'error');
-    return;
-}
-
+    
+    // التحقق من وجود مستخدم
+    const user = AuthService.currentUser;
+    if (!user) {
+        showToast('⚠️ يرجى تسجيل الدخول أولاً', 'error');
+        return;
+    }
+    
     // التحقق من وجود أسئلة
     const questions = DataManager.data.questions || [];
     if (questions.length === 0) {
@@ -4114,30 +4241,24 @@ if (questionsForRank.length === 0) {
     const category = document.getElementById('gameCategory')?.value || 'all';
     const questionType = document.getElementById('gameQuestionType')?.value || 'all';
     const count = parseInt(document.getElementById('gameCount')?.value || '10');
-    const diff = document.getElementById('gameDifficulty')?.value || 'medium';
     const mode = document.getElementById('gameMode')?.value || 'normal';
     
-    console.log('📊 إعدادات اللعبة:', { category, questionType, count, diff, mode });
+    console.log('📊 إعدادات اللعبة:', { category, questionType, count, mode });
     
-    this.gameQuestions = questionsForRank;
-    this.totalQuestions = this.gameQuestions.length;
-    this.difficulty = diff;
-    this.mode = mode;
-    this.totalQuestions = count;
-    this.isTimeAttack = (mode === 'time_attack');
-    
-    // ❌ إزالة هذا السطر - الدالة غير موجودة في GameEngine
-    // this._updatePlayButtonMode();
-
-    // تصفية الأسئلة
+    // ✅ تعريف pool هنا أولاً
     let pool = [...questions];
+    
+    // تصفية حسب الفئة
     if (category !== 'all') {
         pool = pool.filter(q => q.category === category);
     }
+    
+    // تصفية حسب نوع السؤال
     if (questionType !== 'all') {
         pool = pool.filter(q => q.type === questionType);
     }
     
+    // خلط الأسئلة
     pool = shuffleArray(pool);
     this.questionPool = pool;
     
@@ -4148,36 +4269,52 @@ if (questionsForRank.length === 0) {
     
     console.log(`📚 تم العثور على ${pool.length} سؤال`);
     
-    // اختيار الأسئلة
-    if (this.isTimeAttack) {
-        const initialCount = Math.min(30, pool.length);
-        this.gameQuestions = pool.slice(0, initialCount);
-        this.totalQuestions = Infinity;
-        this.totalTime = 60;
-        this.timeLeft = 60;
-    } else {
-        const maxCount = Math.min(count, pool.length);
-        this.gameQuestions = pool.slice(0, maxCount);
-        this.totalQuestions = this.gameQuestions.length;
-        
-        const diffMap = {
-            easy: { time: 20 },
-            medium: { time: 15 },
-            hard: { time: 10 },
-            expert: { time: 5 }
-        };
-        const settings = diffMap[this.difficulty] || diffMap.medium;
-        this.totalTime = settings.time;
-        this.timeLeft = settings.time;
+    // ✅ الحصول على نقاط الرتبة من المستخدم
+    const rankPoints = user.rankPoints || 0;
+    
+    // ✅ تصفية الأسئلة حسب الرتبة (rankRequired)
+    let filteredByRank = pool.filter(q => {
+        const rankRequired = q.rankRequired || 0;
+        return rankRequired <= rankPoints;
+    });
+    
+    // إذا لم توجد أسئلة تناسب الرتبة، استخدم جميع الأسئلة
+    if (filteredByRank.length === 0) {
+        console.warn('⚠️ لا توجد أسئلة تناسب الرتبة، سيتم استخدام جميع الأسئلة');
+        filteredByRank = pool;
+        showToast(`⚠️ لا توجد أسئلة تناسب رتبتك، سيتم استخدام أسئلة عامة`, 'info', 3000);
     }
+    
+    // ترتيب الأسئلة حسب الصعوبة (الأعلى أولاً)
+    filteredByRank.sort((a, b) => (b.rankRequired || 0) - (a.rankRequired || 0));
+    
+    // اختيار عدد الأسئلة المطلوب
+    const maxCount = Math.min(count, filteredByRank.length);
+    this.gameQuestions = filteredByRank.slice(0, maxCount);
+    this.totalQuestions = this.gameQuestions.length;
     
     if (this.gameQuestions.length === 0) {
         showToast('⚠️ لا توجد أسئلة كافية!', 'error');
         return;
     }
     
-    console.log(`🎯 تم اختيار ${this.gameQuestions.length} سؤال`);
-
+    // ✅ إعدادات الوقت حسب الرتبة (يمكن تعديلها)
+    const timeSettings = {
+        easy: { time: 20 },
+        medium: { time: 15 },
+        hard: { time: 10 },
+        expert: { time: 5 }
+    };
+    
+    // تحديد الصعوبة بناءً على الرتبة
+    let difficulty = mapRankToDifficulty(rankPoints);
+    const settings = timeSettings[difficulty] || timeSettings.medium;
+    this.totalTime = settings.time;
+    this.timeLeft = settings.time;
+    this.difficulty = difficulty;
+    
+    console.log(`🎯 تم اختيار ${this.gameQuestions.length} سؤال (الصعوبة: ${difficulty})`);
+    
     // تهيئة المتغيرات
     this.currentIndex = 0;
     this.score = 0;
@@ -4201,6 +4338,8 @@ if (questionsForRank.length === 0) {
     this._allAnswersIn1s = false;
     this._streaksHistory = [];
     this._isEnding = false;
+    this.mode = mode;
+    this.isTimeAttack = (mode === 'time_attack');
     
     // عرض واجهة اللعب
     const startScreen = document.getElementById('gameStartScreen');
@@ -4211,10 +4350,18 @@ if (questionsForRank.length === 0) {
     if (playScreen) playScreen.style.display = 'block';
     if (resultScreen) resultScreen.style.display = 'none';
     
-    // إظهار زر التلميح
+    // إظهار/إخفاء زر التلميح
     const hintBtn = document.getElementById('gameHintBtn');
     if (hintBtn) {
         hintBtn.style.display = this.isTimeAttack ? 'none' : 'inline-flex';
+    }
+    
+    // عرض الصعوبة والرتبة
+    const diffDisplay = document.getElementById('gameDifficultyDisplay');
+    if (diffDisplay) {
+        const diffLabels = { easy: '🟢 سهل', medium: '🟡 متوسط', hard: '🔴 صعب', expert: '💀 خبير' };
+        const rank = getRank(rankPoints);
+        diffDisplay.innerHTML = `🎯 الصعوبة: <strong style="color:var(--accent);">${diffLabels[difficulty] || 'متوسط'}</strong> | 🏅 الرتبة: <strong style="color:var(--accent);">${rank.name}</strong>`;
     }
     
     // تحديث الإحصائيات
@@ -7027,18 +7174,32 @@ _checkAchievements(data) {
     return [];
 },
 
-    quit() {
-        clearInterval(this.timer);
-        this.isPlaying = false;
-        if (confirm('هل تريد إنهاء اللعبة؟')) {
-            document.getElementById('gamePlayScreen').style.display = 'none';
-            document.getElementById('gameResultScreen').style.display = 'none';
-            document.getElementById('gameStartScreen').style.display = 'block';
-        } else {
-            this.isPlaying = true;
-            this.startTimer();
+// استبدل دالة quit بالكود التالي
+quit() {
+    // منع تكرار الاستدعاء
+    if (this._isQuitting) return;
+    this._isQuitting = true;
+    
+    clearInterval(this.timer);
+    this.isPlaying = false;
+    
+    if (confirm('هل تريد إنهاء اللعبة؟')) {
+        document.getElementById('gamePlayScreen').style.display = 'none';
+        document.getElementById('gameResultScreen').style.display = 'none';
+        document.getElementById('gameStartScreen').style.display = 'block';
+        this._isQuitting = false;
+        
+        // تنظيف أي مؤقتات أخرى
+        if (this._timerInterval) {
+            clearInterval(this._timerInterval);
+            this._timerInterval = null;
         }
+    } else {
+        this.isPlaying = true;
+        this.startTimer();
+        this._isQuitting = false;
     }
+},
 };
 
 // ============================================================
@@ -14104,16 +14265,7 @@ document.getElementById('checkDuplicatesBtn')?.addEventListener('click', () => {
             App._activateSection('dashboard');
         });
     }
-
-    // ===== زر الخروج من اللعبة =====
-    const quitBtn = document.getElementById('gameQuitBtn');
-    if (quitBtn) {
-        quitBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            GameEngine.quit();
-        });
-    }
-
+    
     // ===== زر التلميح =====
     const hintBtn = document.getElementById('gameHintBtn');
     if (hintBtn) {
