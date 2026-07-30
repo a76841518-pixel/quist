@@ -10186,86 +10186,6 @@ html, body {
     opacity: 1;
 }
 
-/* ===== القائمة السفلية ===== */
-.bottom-nav {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    padding: 0.3rem 0.5rem 0.5rem;
-    background: rgba(15, 14, 23, 0.9);
-    backdrop-filter: blur(12px);
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
-    z-index: 100;
-    height: 60px;
-}
-
-.bottom-nav .nav-btn {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.1rem;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    padding: 0.2rem 0.6rem;
-    transition: all 0.2s ease;
-    color: #a7a9be;
-    font-size: 0.55rem;
-    font-weight: 600;
-    position: relative;
-}
-
-.bottom-nav .nav-btn .nav-icon {
-    width: 28px;
-    height: 28px;
-    flex-shrink: 0;
-    background-size: contain;
-    background-position: center;
-    background-repeat: no-repeat;
-    transition: all 0.2s ease;
-}
-
-.bottom-nav .nav-btn span {
-    transition: all 0.2s ease;
-}
-
-.bottom-nav .nav-btn:hover {
-    color: #fffffe;
-}
-
-.bottom-nav .nav-btn:hover .nav-icon {
-    transform: scale(1.1);
-}
-
-.bottom-nav .nav-btn.active {
-    color: #6C63FF;
-}
-
-.bottom-nav .nav-btn.active .nav-icon {
-    filter: drop-shadow(0 0 8px rgba(108, 99, 255, 0.3));
-}
-
-.bottom-nav .nav-btn .badge-count {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    background: #FF6B6B;
-    color: #fff;
-    font-size: 0.5rem;
-    font-weight: 700;
-    min-width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 4px;
-}
-
 /* ============================================================
    تعديل موضع أزرار اللعب - تظهر في الأسفل
    ============================================================ */
@@ -10687,7 +10607,10 @@ body.light-theme .mode-card:hover:not([style*="cursor: not-allowed"]) {
     transform: scale(1.08);
 }
 
-/* ===== القائمة السفلية ===== */
+/* ============================================================
+   القائمة السفلية - الصورة بحجم الزر
+   ============================================================ */
+
 .bottom-nav {
     position: sticky;
     bottom: 0;
@@ -10695,96 +10618,676 @@ body.light-theme .mode-card:hover:not([style*="cursor: not-allowed"]) {
     right: 0;
     display: flex;
     justify-content: space-around;
-    align-items: center;
-    padding: 0.4rem 0.5rem 0.5rem;
-    background: rgba(15, 14, 23, 0.85);
-    backdrop-filter: blur(12px);
+    align-items: stretch;
+    padding: 0;
+    background: rgba(15, 14, 23, 0.92);
+    backdrop-filter: blur(16px);
     border-top: 1px solid rgba(255, 255, 255, 0.06);
     z-index: 100;
     width: 100%;
+    box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.3);
+    border-radius: 20px 20px 0 0;
+    overflow: hidden;
+    height: 72px;
 }
 
-/* ===== القائمة الجانبية (تظهر فقط على الشاشات الكبيرة) ===== */
-.side-menu {
-    position: fixed;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
+.bottom-nav .nav-btn {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    padding: 0.5rem;
-    background: rgba(15, 14, 23, 0.7);
-    backdrop-filter: blur(12px);
-    border-radius: 0 16px 16px 0;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-left: none;
-    z-index: 50;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.3s ease;
+    color: #fffffe;
+    font-size: 0.5rem;
+    font-weight: 600;
+    position: relative;
+    flex: 1;
+    height: 100%;
+    border-right: 1px solid rgba(255, 255, 255, 0.04);
+    overflow: hidden;
 }
 
-/* ===== إخفاء القائمة الجانبية في الهواتف ===== */
+.bottom-nav .nav-btn:last-child {
+    border-right: none;
+}
+
+/* الصورة كخلفية للزر */
+.bottom-nav .nav-btn .nav-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transition: all 0.4s ease;
+    opacity: 0.7;
+    filter: grayscale(0.6) brightness(0.7);
+}
+
+/* النص فوق الصورة */
+.bottom-nav .nav-btn .nav-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.05rem;
+    width: 100%;
+    height: 100%;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
+    padding: 0.2rem 0;
+}
+
+.bottom-nav .nav-btn .nav-content span {
+    transition: all 0.3s ease;
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: #fffffe;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 0.05rem 0.5rem;
+    border-radius: 10px;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bottom-nav .nav-btn:hover .nav-bg {
+    transform: scale(1.05);
+    opacity: 0.9;
+    filter: grayscale(0.3) brightness(0.9);
+}
+
+.bottom-nav .nav-btn:hover .nav-content span {
+    background: rgba(0, 0, 0, 0.6);
+    transform: scale(1.05);
+}
+
+/* ===== الحالة النشطة ===== */
+.bottom-nav .nav-btn.active .nav-bg {
+    opacity: 1;
+    filter: grayscale(0) brightness(1.1);
+    transform: scale(1.02);
+}
+
+.bottom-nav .nav-btn.active .nav-content span {
+    color: #fff;
+    background: rgba(108, 99, 255, 0.7);
+    border-color: rgba(108, 99, 255, 0.3);
+    box-shadow: 0 0 30px rgba(108, 99, 255, 0.2);
+}
+
+.bottom-nav .nav-btn.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: #6C63FF;
+    box-shadow: 0 0 20px rgba(108, 99, 255, 0.5);
+    z-index: 3;
+}
+
+/* ===== شارة الإشعارات ===== */
+.bottom-nav .nav-btn .badge-count {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: #FF6B6B;
+    color: #fff;
+    font-size: 0.45rem;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    box-shadow: 0 2px 10px rgba(255, 107, 107, 0.4);
+    border: 2px solid rgba(15, 14, 23, 0.8);
+    z-index: 4;
+}
+
+/* ===== تأثير الضغط ===== */
+.bottom-nav .nav-btn:active:not(.active) {
+    transform: scale(0.94);
+}
+
+.bottom-nav .nav-btn:active .nav-bg {
+    transform: scale(0.94);
+}
+
+/* ===== استجابة للشاشات الصغيرة ===== */
 @media (max-width: 768px) {
-    .side-menu {
-        display: none !important;
+    .bottom-nav {
+        height: 62px;
+        border-radius: 14px 14px 0 0;
     }
     
-    .play-btn-large {
-        height: 54px;
-        padding: 0.5rem 1rem;
-        flex: 1 1 70%;
-        max-width: 100%;
+    .bottom-nav .nav-btn .nav-content span {
+        font-size: 0.45rem;
+        padding: 0.05rem 0.4rem;
     }
     
-    .play-btn-large .btn-content {
-        font-size: 1rem;
-    }
-    
-    .play-btn-large .btn-content .play-icon {
-        width: 26px;
-        height: 26px;
-    }
-    
-    .play-btn-large .btn-content .mode-badge {
-        font-size: 0.5rem !important;
-        padding: 0.05rem 0.4rem !important;
-    }
-    
-    .settings-btn-small {
-        width: 54px;
-        height: 54px;
-        flex: 0 0 54px;
-    }
-    
-    .play-section {
-        padding: 0.3rem 0.5rem;
-        margin-bottom: 0.2rem;
+    .bottom-nav .nav-btn .badge-count {
+        font-size: 0.4rem;
+        min-width: 16px;
+        height: 16px;
+        top: 4px;
+        right: 4px;
     }
 }
 
 @media (max-width: 480px) {
-    .play-btn-large {
-        height: 48px;
-        padding: 0.4rem 0.8rem;
-        flex: 1 1 60%;
+    .bottom-nav {
+        height: 56px;
+        border-radius: 12px 12px 0 0;
     }
     
-    .play-btn-large .btn-content {
-        font-size: 0.85rem;
+    .bottom-nav .nav-btn .nav-content span {
+        font-size: 0.4rem;
+        padding: 0.05rem 0.3rem;
     }
     
-    .play-btn-large .btn-content .play-icon {
+    .bottom-nav .nav-btn .badge-count {
+        font-size: 0.35rem;
+        min-width: 14px;
+        height: 14px;
+        top: 3px;
+        right: 3px;
+    }
+}
+
+/* ===== الوضع النهاري ===== */
+body.light-theme .bottom-nav {
+    background: rgba(255, 255, 255, 0.92);
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.05);
+}
+
+body.light-theme .bottom-nav .nav-btn {
+    border-right: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+body.light-theme .bottom-nav .nav-btn:last-child {
+    border-right: none;
+}
+
+body.light-theme .bottom-nav .nav-btn .nav-bg {
+    filter: grayscale(0.8) brightness(0.8);
+    opacity: 0.6;
+}
+
+body.light-theme .bottom-nav .nav-btn:hover .nav-bg {
+    filter: grayscale(0.3) brightness(0.9);
+    opacity: 0.8;
+}
+
+body.light-theme .bottom-nav .nav-btn .nav-content span {
+    color: #1a1a2e;
+    background: rgba(255, 255, 255, 0.7);
+    border-color: rgba(0, 0, 0, 0.06);
+    text-shadow: none;
+}
+
+body.light-theme .bottom-nav .nav-btn:hover .nav-content span {
+    background: rgba(255, 255, 255, 0.9);
+}
+
+body.light-theme .bottom-nav .nav-btn.active .nav-bg {
+    filter: grayscale(0) brightness(1.05);
+    opacity: 1;
+}
+
+body.light-theme .bottom-nav .nav-btn.active .nav-content span {
+    color: #fff;
+    background: rgba(108, 99, 255, 0.7);
+    border-color: rgba(108, 99, 255, 0.3);
+}
+
+body.light-theme .bottom-nav .nav-btn .badge-count {
+    border-color: rgba(255, 255, 255, 0.9);
+}
+
+/* ============================================================
+   العملات والجواهر - تصميم جديد
+   ============================================================ */
+
+/* حاوية العملات والجواهر */
+.currencies-container {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 20px;
+    padding: 0.2rem 0.6rem 0.2rem 0.3rem;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(8px);
+}
+
+/* عنصر العملة الفردي */
+.currency-item {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.15rem 0.4rem 0.15rem 0.6rem;
+    border-radius: 14px;
+    transition: all 0.3s ease;
+    cursor: default;
+    position: relative;
+}
+
+/* أيقونة العملة */
+.currency-item .currency-icon {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
+    transition: all 0.3s ease;
+}
+
+/* القيمة الرقمية */
+.currency-item .currency-value {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #fffffe;
+    letter-spacing: 0.5px;
+    font-variant-numeric: tabular-nums;
+    min-width: 45px;
+    text-align: center;
+    transition: all 0.3s ease;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* علامة الزيادة (+)
+.currency-item .currency-plus {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.3);
+    margin-right: 0.1rem;
+    transition: all 0.3s ease;
+} */
+
+/* ===== العملات الذهبية ===== */
+.currency-item.coins {
+    background: rgba(255, 217, 61, 0.08);
+    border: 1px solid rgba(255, 217, 61, 0.12);
+}
+
+.currency-item.coins .currency-icon {
+    filter: drop-shadow(0 2px 12px rgba(255, 217, 61, 0.3));
+}
+
+.currency-item.coins .currency-value {
+    color: #FFD93D;
+}
+
+/* ===== الجواهر ===== */
+.currency-item.gems {
+    background: rgba(155, 89, 182, 0.08);
+    border: 1px solid rgba(155, 89, 182, 0.12);
+}
+
+.currency-item.gems .currency-icon {
+    filter: drop-shadow(0 2px 12px rgba(155, 89, 182, 0.3));
+}
+
+.currency-item.gems .currency-value {
+    color: #c77dff;
+}
+
+/* ===== زر المتجر ===== */
+.currency-store-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: #a7a9be;
+    font-size: 0.8rem;
+    padding: 0;
+    margin-right: 0.2rem;
+}
+
+.currency-store-btn:hover {
+    background: rgba(108, 99, 255, 0.2);
+    border-color: rgba(108, 99, 255, 0.3);
+    color: #fff;
+    transform: scale(1.08);
+}
+
+.currency-store-btn:active {
+    transform: scale(0.92);
+}
+
+/* ===== تأثير التحديث ===== */
+.currency-item .currency-value.updating {
+    animation: valueUpdate 0.3s ease;
+}
+
+@keyframes valueUpdate {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.15); color: #FFD93D; }
+    70% { transform: scale(0.95); }
+    100% { transform: scale(1); }
+}
+
+/* ===== استجابة للشاشات الصغيرة ===== */
+@media (max-width: 768px) {
+    .currencies-container {
+        gap: 0.4rem;
+        padding: 0.1rem 0.4rem 0.1rem 0.2rem;
+        border-radius: 14px;
+    }
+    
+    .currency-item {
+        padding: 0.1rem 0.3rem 0.1rem 0.4rem;
+        border-radius: 10px;
+    }
+    
+    .currency-item .currency-icon {
         width: 22px;
         height: 22px;
     }
     
-    .play-btn-large .btn-content .mode-badge {
-        font-size: 0.45rem !important;
-        padding: 0.05rem 0.3rem !important;
+    .currency-item .currency-value {
+        font-size: 0.85rem;
+        min-width: 35px;
     }
     
-    .settings-btn-small {
-        width: 48px;
-        height: 48px;
-        flex: 0 0 48px;
+    .currency-store-btn {
+        width: 24px;
+        height: 24px;
+        font-size: 0.65rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .currencies-container {
+        gap: 0.3rem;
+        padding: 0.05rem 0.3rem 0.05rem 0.15rem;
+        border-radius: 12px;
+    }
+    
+    .currency-item {
+        padding: 0.05rem 0.2rem 0.05rem 0.3rem;
+        border-radius: 8px;
+    }
+    
+    .currency-item .currency-icon {
+        width: 18px;
+        height: 18px;
+    }
+    
+    .currency-item .currency-value {
+        font-size: 0.7rem;
+        min-width: 28px;
+    }
+    
+    .currency-store-btn {
+        width: 20px;
+        height: 20px;
+        font-size: 0.55rem;
+    }
+}
+
+/* ===== الوضع النهاري ===== */
+body.light-theme .currencies-container {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+body.light-theme .currency-item.coins {
+    background: rgba(255, 217, 61, 0.12);
+    border-color: rgba(255, 217, 61, 0.15);
+}
+
+body.light-theme .currency-item.coins .currency-value {
+    color: #d4a800;
+}
+
+body.light-theme .currency-item.gems {
+    background: rgba(155, 89, 182, 0.10);
+    border-color: rgba(155, 89, 182, 0.12);
+}
+
+body.light-theme .currency-item.gems .currency-value {
+    color: #7b2fbe;
+}
+
+body.light-theme .currency-store-btn {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.06);
+    color: #555577;
+}
+
+body.light-theme .currency-store-btn:hover {
+    background: rgba(108, 99, 255, 0.1);
+    border-color: rgba(108, 99, 255, 0.2);
+    color: #6C63FF;
+}
+
+/* ============================================================
+   الشريط العلوي - تجاوب مع الهواتف
+   ============================================================ */
+
+/* ✅ تحسين الشريط العلوي للهواتف */
+@media (max-width: 768px) {
+    .dashboard-top-bar-new {
+        padding: 0.3rem 0.5rem !important;
+        gap: 0.3rem !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+    }
+    
+    .dashboard-top-bar-new::-webkit-scrollbar {
+        display: none !important;
+    }
+    
+    .dashboard-top-bar-new .left-section {
+        gap: 0.3rem !important;
+        flex-shrink: 0 !important;
+    }
+    
+    .dashboard-top-bar-new .right-section {
+        gap: 0.2rem !important;
+        flex-shrink: 0 !important;
+        flex-wrap: nowrap !important;
+    }
+    
+    /* تصغير الأزرار */
+    .top-icon-btn {
+        width: 32px !important;
+        height: 32px !important;
+        flex-shrink: 0 !important;
+    }
+    
+    .top-icon-btn .badge-dot {
+        width: 8px !important;
+        height: 8px !important;
+        top: 1px !important;
+        right: 1px !important;
+    }
+    
+    /* تصغير العملات */
+    .currency-item {
+        padding: 0.05rem 0.2rem 0.05rem 0.3rem !important;
+        border-radius: 8px !important;
+    }
+    
+    .currency-item .currency-icon {
+        width: 18px !important;
+        height: 18px !important;
+    }
+    
+    .currency-item .currency-value {
+        font-size: 0.7rem !important;
+        min-width: 20px !important;
+    }
+    
+    .currency-store-btn {
+        width: 20px !important;
+        height: 20px !important;
+        font-size: 0.5rem !important;
+        margin-right: 0 !important;
+    }
+    
+    /* تصغير المستوى */
+    .level-display-new {
+        padding: 0.1rem 0.3rem 0.1rem 0.2rem !important;
+        height: 30px !important;
+        gap: 0.3rem !important;
+        border-radius: 20px !important;
+    }
+    
+    .level-display-new .level-icon {
+        width: 20px !important;
+        height: 20px !important;
+    }
+    
+    .level-display-new .level-info .level-number {
+        font-size: 0.5rem !important;
+    }
+    
+    .level-display-new .level-info .level-progress {
+        width: 30px !important;
+        height: 3px !important;
+    }
+    
+    /* إخفاء علامة + */
+    .currency-item .currency-plus {
+        display: none !important;
+    }
+    
+    /* حاوية العملات */
+    .currencies-container {
+        gap: 0.2rem !important;
+        padding: 0.05rem 0.2rem 0.05rem 0.1rem !important;
+        border-radius: 10px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .dashboard-top-bar-new {
+        padding: 0.2rem 0.3rem !important;
+        gap: 0.2rem !important;
+    }
+    
+    .dashboard-top-bar-new .left-section {
+        gap: 0.2rem !important;
+    }
+    
+    .dashboard-top-bar-new .right-section {
+        gap: 0.15rem !important;
+    }
+    
+    .top-icon-btn {
+        width: 28px !important;
+        height: 28px !important;
+    }
+    
+    .currency-item .currency-icon {
+        width: 16px !important;
+        height: 16px !important;
+    }
+    
+    .currency-item .currency-value {
+        font-size: 0.6rem !important;
+        min-width: 16px !important;
+    }
+    
+    .currency-store-btn {
+        width: 18px !important;
+        height: 18px !important;
+        font-size: 0.45rem !important;
+    }
+    
+    .level-display-new {
+        height: 26px !important;
+        padding: 0.05rem 0.2rem 0.05rem 0.15rem !important;
+        gap: 0.2rem !important;
+    }
+    
+    .level-display-new .level-icon {
+        width: 18px !important;
+        height: 18px !important;
+    }
+    
+    .level-display-new .level-info .level-number {
+        font-size: 0.45rem !important;
+    }
+    
+    .level-display-new .level-info .level-progress {
+        width: 24px !important;
+        height: 2px !important;
+    }
+}
+
+/* ============================================================
+   إخفاء بعض العناصر في الهواتف الصغيرة جداً
+   ============================================================ */
+
+@media (max-width: 380px) {
+    .level-display-new .level-info .level-progress {
+        display: none !important;
+    }
+    
+    .currency-item .currency-plus {
+        display: none !important;
+    }
+    
+    .currency-store-btn {
+        display: none !important;
+    }
+}
+
+/* ============================================================
+   إضافة زر القائمة (☰) للهواتف فقط
+   ============================================================ */
+
+@media (max-width: 768px) {
+    .dashboard-top-bar-new .menu-icon-mobile {
+        display: flex !important;
+        width: 32px !important;
+        height: 32px !important;
+        border-radius: 50% !important;
+        background: rgba(255, 255, 255, 0.06) !important;
+        border: 1px solid rgba(255, 255, 255, 0.06) !important;
+        align-items: center !important;
+        justify-content: center !important;
+        color: #fffffe !important;
+        font-size: 1rem !important;
+        cursor: pointer !important;
+        flex-shrink: 0 !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    .dashboard-top-bar-new .menu-icon-mobile:hover {
+        background: rgba(255, 255, 255, 0.10) !important;
+    }
+}
+
+@media (min-width: 769px) {
+    .dashboard-top-bar-new .menu-icon-mobile {
+        display: none !important;
     }
 }
