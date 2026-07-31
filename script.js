@@ -4095,43 +4095,65 @@ getStats() {
 let selectedGameMode = 'normal_1v1';  // الوضع الافتراضي
 let selectedPlayerCount = 1;
 
-// تعريف أوصاف الأطوار (للشرح)
+// في أعلى الملف، بعد تعريف GENERAL_CATEGORIES
+
 const MODE_DESCRIPTIONS = {
+    // ===== تصنيفي =====
     'normal_1v1': {
-        title: '⚔️ عادي 1 ضد 1',
-        desc: 'مواجهة مباشرة بين لاعبين، كل لاعب يجيب على الأسئلة في وقت محدد. الفائز هو من يحصل على أكبر عدد من النقاط.',
+        title: '⚔️ عادي 1v1',
+        desc: 'مواجهة مباشرة بين لاعبين، تزيد الرتبة. إعدادات ثابتة.',
         icon: '⚔️',
-        active: true
-    },
-    'single_player': {
-        title: '🧠 فردي',
-        desc: 'تحدي ذاتي ضد الأسئلة. أجب على أكبر عدد من الأسئلة بشكل صحيح في وقت محدد. لا يوجد خصم، فقط أنت ومعرفتك!',
-        icon: '🧠',
-        active: true
-    },
-    'create_room': {
-        title: '🏠 غرفة لعب',
-        desc: 'أنشئ غرفة خاصة بك وادعُ أصدقائك للانضمام. يمكنك تحديد إعدادات الغرفة مثل عدد الأسئلة والوقت. تكلفة الإنشاء 600 عملة.',
-        icon: '🏠',
+        competitive: true,
         active: true,
-        cost: 600
+        supportsPlayerCount: true
     },
     'crossword': {
         title: '🔤 كلمات متقاطعة',
-        desc: 'طور قادم قريباً! حل الكلمات المتقاطعة في تحدٍ مع الأصدقاء. استعد لتجربة جديدة وممتعة.',
+        desc: 'حل الكلمات المتقاطعة في تحدٍ مع الأصدقاء، يزيد الرتبة. إعدادات ثابتة.',
         icon: '🔤',
-        active: false
+        competitive: true,
+        active: false, // غير مفعل حالياً
+        supportsPlayerCount: false
     },
     'tournament': {
         title: '🏆 بطولة',
-        desc: 'طور قادم قريباً! شارك في البطولات المجدولة وتنافس مع أفضل اللاعبين للفوز بالجوائز الكبرى.',
+        desc: 'شارك في البطولات المجدولة وتنافس مع أفضل اللاعبين، يزيد الرتبة. إعدادات ثابتة.',
         icon: '🏆',
-        active: false
+        competitive: true,
+        active: false,
+        supportsPlayerCount: false
+    },
+
+    // ===== ودي =====
+    'normal_1v1_unranked': {
+        title: '⚔️ عادي غير مصنف',
+        desc: 'مواجهة مباشرة بين لاعبين، لا تزيد الرتبة. إعدادات ثابتة.',
+        icon: '⚔️',
+        competitive: false,
+        active: true,
+        supportsPlayerCount: true
+    },
+    'single_player': {
+        title: '🧠 فردي',
+        desc: 'تحدي ذاتي ضد الأسئلة، لا يزيد الرتبة. يمكنك تخصيص الإعدادات.',
+        icon: '🧠',
+        competitive: false,
+        active: true,
+        supportsPlayerCount: false
+    },
+    'create_room': {
+        title: '🏠 غرفة مدفوعة',
+        desc: 'أنشئ غرفة خاصة بك وادعُ أصدقائك للانضمام. تكلفة 600 عملة. لا تزيد الرتبة.',
+        icon: '🏠',
+        competitive: false,
+        active: true,
+        supportsPlayerCount: false,
+        cost: 600
     }
 };
 
-// الأطوار المفعلة
-const ACTIVE_MODES = ['normal_1v1', 'single_player', 'create_room'];
+// الأطوار المفعلة حالياً
+const ACTIVE_MODES = ['normal_1v1', 'normal_1v1_unranked', 'single_player', 'create_room'];
 
 // ============================================================
 // محرك اللعبة المتطور - النسخة المُصلحة بالكامل
@@ -8072,232 +8094,221 @@ _buildModals() {
             </div>
         </div>
 
-        <!-- ============================================================ -->
-        <!-- ✅ مودال إعدادات اللعبة المطور (Match Settings Modal)        -->
-        <!-- ============================================================ -->
-        <div class="modal-overlay" id="matchSettingsModal">
-            <div class="modal-card" style="max-width:700px; padding: 1.2rem 1.5rem;">
-                <div class="modal-header">
-                    <h3><i class="fas fa-sliders-h" style="color:var(--accent);"></i> إعدادات اللعب</h3>
-                    <button class="modal-close-btn" onclick="App._closeModal('matchSettingsModal')">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                
-                <div style="padding: 0.2rem 0 0.8rem;">
-                    <!-- ===== اختيار عدد اللاعبين ===== -->
-                    <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.2rem; flex-wrap:wrap;">
-                        <span style="font-weight:700; font-size:0.9rem; color:var(--gray);">👥 عدد اللاعبين:</span>
-                        <div style="display:flex; gap:0.3rem; background:var(--glass); border-radius:30px; padding:0.2rem; border:1px solid var(--glass-border);">
-                            <button class="player-count-btn active" data-count="1" style="
-                                padding:0.4rem 1.2rem;
-                                border-radius:30px;
-                                border:none;
-                                background:var(--primary);
-                                color:#fff;
-                                font-weight:700;
-                                font-size:0.8rem;
-                                cursor:pointer;
-                                transition:all 0.2s ease;
-                            ">
-                                <i class="fas fa-user"></i> 1 لاعب
-                            </button>
-                            <button class="player-count-btn" data-count="2" style="
-                                padding:0.4rem 1.2rem;
-                                border-radius:30px;
-                                border:none;
-                                background:transparent;
-                                color:var(--gray);
-                                font-weight:700;
-                                font-size:0.8rem;
-                                cursor:pointer;
-                                transition:all 0.2s ease;
-                            ">
-                                <i class="fas fa-users"></i> 2 لاعبين
-                            </button>
-                        </div>
-                        <span style="font-size:0.7rem; color:var(--gray-dark);" id="playerCountHint">(لعبة فردية)</span>
-                    </div>
-                    
-                    <!-- ===== أطوار اللعب (تمرير أفقي) ===== -->
-                    <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
-                        <span style="font-weight:700; font-size:0.85rem; color:var(--gray);">🎯 اختر الطور:</span>
-                        <span style="font-size:0.65rem; color:var(--gray-dark);">↔ اسحب للتمرير</span>
-                    </div>
-                    
-                    <div class="game-modes-scroll" style="
-                        display: flex;
-                        gap: 0.8rem;
-                        overflow-x: auto;
-                        padding: 0.5rem 0.2rem 1rem;
-                        scroll-snap-type: x mandatory;
-                        -webkit-overflow-scrolling: touch;
-                        scrollbar-width: thin;
-                    ">
-                        <!-- 1. اللعب العادي 1 ضد 1 -->
-                        <div class="mode-card active" data-mode="normal_1v1" style="
-                            min-width: 120px;
-                            max-width: 140px;
-                            flex: 0 0 auto;
-                            scroll-snap-align: start;
-                            background: var(--card-bg);
-                            border: 2px solid var(--primary);
-                            border-radius: var(--radius-sm);
-                            padding: 0.8rem 0.6rem;
-                            text-align: center;
-                            cursor: pointer;
-                            transition: all 0.3s ease;
-                            position: relative;
-                        ">
-                            <div style="font-size:2.8rem; margin-bottom:0.2rem;">⚔️</div>
-                            <div style="font-weight:800; font-size:0.9rem; color:var(--light);">عادي 1v1</div>
-                            <div style="font-size:0.55rem; color:var(--gray); margin:0.1rem 0;">مواجهة مباشرة</div>
-                            <div style="display:flex; gap:0.3rem; justify-content:center; margin-top:0.3rem; flex-wrap:wrap;">
-                                <span class="badge badge-success" style="font-size:0.5rem; padding:1px 6px;">✅ مفعل</span>
-                                <button class="btn btn-xs btn-outline mode-desc-btn" data-mode="normal_1v1" style="font-size:0.5rem; padding:1px 6px; min-height:20px;">
-                                    <i class="fas fa-info-circle"></i> شرح
-                                </button>
-                            </div>
-                            <div class="mode-status" style="position:absolute; top:4px; right:4px; font-size:0.5rem; color:var(--success);">●</div>
-                        </div>
-                        
-                        <!-- 2. اللعب الفردي (لعبة عادية بدون مواجهة) -->
-                        <div class="mode-card" data-mode="single_player" style="
-                            min-width: 120px;
-                            max-width: 140px;
-                            flex: 0 0 auto;
-                            scroll-snap-align: start;
-                            background: var(--card-bg);
-                            border: 2px solid var(--glass-border);
-                            border-radius: var(--radius-sm);
-                            padding: 0.8rem 0.6rem;
-                            text-align: center;
-                            cursor: pointer;
-                            transition: all 0.3s ease;
-                            position: relative;
-                        ">
-                            <div style="font-size:2.8rem; margin-bottom:0.2rem;">🧠</div>
-                            <div style="font-weight:800; font-size:0.9rem; color:var(--light);">فردي</div>
-                            <div style="font-size:0.55rem; color:var(--gray); margin:0.1rem 0;">تحدي ذاتي</div>
-                            <div style="display:flex; gap:0.3rem; justify-content:center; margin-top:0.3rem; flex-wrap:wrap;">
-                                <span class="badge badge-success" style="font-size:0.5rem; padding:1px 6px;">✅ مفعل</span>
-                                <button class="btn btn-xs btn-outline mode-desc-btn" data-mode="single_player" style="font-size:0.5rem; padding:1px 6px; min-height:20px;">
-                                    <i class="fas fa-info-circle"></i> شرح
-                                </button>
-                            </div>
-                            <div class="mode-status" style="position:absolute; top:4px; right:4px; font-size:0.5rem; color:var(--gray);">○</div>
-                        </div>
-                        
-                        <!-- 3. إنشاء غرفة لعب -->
-                        <div class="mode-card" data-mode="create_room" style="
-                            min-width: 120px;
-                            max-width: 140px;
-                            flex: 0 0 auto;
-                            scroll-snap-align: start;
-                            background: var(--card-bg);
-                            border: 2px solid var(--glass-border);
-                            border-radius: var(--radius-sm);
-                            padding: 0.8rem 0.6rem;
-                            text-align: center;
-                            cursor: pointer;
-                            transition: all 0.3s ease;
-                            position: relative;
-                        ">
-                            <div style="font-size:2.8rem; margin-bottom:0.2rem;">🏠</div>
-                            <div style="font-weight:800; font-size:0.9rem; color:var(--light);">غرفة لعب</div>
-                            <div style="font-size:0.55rem; color:var(--gray); margin:0.1rem 0;">إنشاء غرفة</div>
-                            <div style="display:flex; gap:0.3rem; justify-content:center; margin-top:0.3rem; flex-wrap:wrap;">
-                                <span class="badge badge-success" style="font-size:0.5rem; padding:1px 6px;">✅ مفعل</span>
-                                <span class="badge badge-warning" style="font-size:0.5rem; padding:1px 6px;">💰 600</span>
-                                <button class="btn btn-xs btn-outline mode-desc-btn" data-mode="create_room" style="font-size:0.5rem; padding:1px 6px; min-height:20px;">
-                                    <i class="fas fa-info-circle"></i> شرح
-                                </button>
-                            </div>
-                            <div class="mode-status" style="position:absolute; top:4px; right:4px; font-size:0.5rem; color:var(--gray);">○</div>
-                        </div>
-                        
-                        <!-- 4. الكلمات المتقاطعة (غير مفعل) -->
-                        <div class="mode-card" data-mode="crossword" style="
-                            min-width: 120px;
-                            max-width: 140px;
-                            flex: 0 0 auto;
-                            scroll-snap-align: start;
-                            background: var(--card-bg);
-                            border: 2px solid var(--glass-border);
-                            border-radius: var(--radius-sm);
-                            padding: 0.8rem 0.6rem;
-                            text-align: center;
-                            cursor: not-allowed;
-                            transition: all 0.3s ease;
-                            position: relative;
-                            opacity: 0.6;
-                        ">
-                            <div style="font-size:2.8rem; margin-bottom:0.2rem;">🔤</div>
-                            <div style="font-weight:800; font-size:0.9rem; color:var(--gray);">كلمات متقاطعة</div>
-                            <div style="font-size:0.55rem; color:var(--gray); margin:0.1rem 0;">قريباً</div>
-                            <div style="display:flex; gap:0.3rem; justify-content:center; margin-top:0.3rem; flex-wrap:wrap;">
-                                <span class="badge badge-danger" style="font-size:0.5rem; padding:1px 6px;">🔒 قريباً</span>
-                                <button class="btn btn-xs btn-outline mode-desc-btn" data-mode="crossword" style="font-size:0.5rem; padding:1px 6px; min-height:20px; opacity:0.5;">
-                                    <i class="fas fa-info-circle"></i> شرح
-                                </button>
-                            </div>
-                            <div class="mode-status" style="position:absolute; top:4px; right:4px; font-size:0.5rem; color:var(--secondary);">🔒</div>
-                        </div>
-                        
-                        <!-- 5. البطولة (غير مفعل) -->
-                        <div class="mode-card" data-mode="tournament" style="
-                            min-width: 120px;
-                            max-width: 140px;
-                            flex: 0 0 auto;
-                            scroll-snap-align: start;
-                            background: var(--card-bg);
-                            border: 2px solid var(--glass-border);
-                            border-radius: var(--radius-sm);
-                            padding: 0.8rem 0.6rem;
-                            text-align: center;
-                            cursor: not-allowed;
-                            transition: all 0.3s ease;
-                            position: relative;
-                            opacity: 0.6;
-                        ">
-                            <div style="font-size:2.8rem; margin-bottom:0.2rem;">🏆</div>
-                            <div style="font-weight:800; font-size:0.9rem; color:var(--gray);">بطولة</div>
-                            <div style="font-size:0.55rem; color:var(--gray); margin:0.1rem 0;">أوقات محددة</div>
-                            <div style="display:flex; gap:0.3rem; justify-content:center; margin-top:0.3rem; flex-wrap:wrap;">
-                                <span class="badge badge-danger" style="font-size:0.5rem; padding:1px 6px;">🔒 قريباً</span>
-                                <button class="btn btn-xs btn-outline mode-desc-btn" data-mode="tournament" style="font-size:0.5rem; padding:1px 6px; min-height:20px; opacity:0.5;">
-                                    <i class="fas fa-info-circle"></i> شرح
-                                </button>
-                            </div>
-                            <div class="mode-status" style="position:absolute; top:4px; right:4px; font-size:0.5rem; color:var(--secondary);">🔒</div>
-                        </div>
-                    </div>
-                    <!-- عرض بطاقات الغرف -->
-<div id="roomTicketsDisplay" style="display:none; background:var(--glass); border-radius:8px; padding:0.5rem 1rem; margin:0.5rem 0; border:1px solid var(--accent);">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-weight:700; font-size:0.9rem;">🎫 بطاقات الغرف المتوفرة:</span>
-        <span id="roomTicketsCount" style="font-weight:900; font-size:1.2rem; color:var(--accent);">0</span>
-    </div>
-    <div style="font-size:0.7rem; color:var(--gray);">يمكنك شراء بطاقات إضافية من المتجر</div>
-</div>
-                    <!-- ===== الطور المختار ===== -->
-                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.3rem; padding:0.3rem 0.5rem; background:var(--glass); border-radius:8px; margin-bottom:0.8rem;">
-                        <span style="font-size:0.8rem; color:var(--gray);">الطور المختار:</span>
-                        <span style="font-weight:700; font-size:1rem; color:var(--accent);" id="selectedModeDisplay">⚔️ عادي 1v1</span>
-                    </div>
+<div class="modal-overlay" id="matchSettingsModal">
+    <div class="modal-card" style="max-width:800px; padding: 1.2rem 1.5rem;">
+        <div class="modal-header">
+            <h3><i class="fas fa-sliders-h" style="color:var(--accent);"></i> إعدادات اللعب</h3>
+            <button class="modal-close-btn" onclick="App._closeModal('matchSettingsModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
 
-<!-- داخل مودال الإعدادات، استبدال الزر -->
-<div style="display:flex; gap:0.5rem; justify-content:center; flex-wrap:wrap;">
-    <button class="btn btn-primary" id="selectGameModeBtn" style="justify-content:center; min-width:160px; padding:12px 28px; font-size:1rem;">
-        <i class="fas fa-check"></i> تحديد
-    </button>
-    <button class="btn btn-outline" onclick="App._closeModal('matchSettingsModal')" style="justify-content:center;">
-        <i class="fas fa-times"></i> إلغاء
-    </button>
-</div>
+        <div style="padding: 0.2rem 0 0.8rem;">
+
+            <!-- ===== تبويبات ===== -->
+            <div style="display:flex; gap:0.5rem; margin-bottom:1rem; border-bottom:2px solid var(--glass-border); padding-bottom:0.3rem;">
+                <button class="settings-tab active" data-tab="competitive" style="
+                    padding:0.4rem 1.2rem; border-radius:30px; border:none; background:var(--primary); color:#fff; font-weight:700; font-size:0.85rem; cursor:pointer; transition:all 0.3s ease;
+                ">
+                    <i class="fas fa-trophy"></i> تصنيفي
+                </button>
+                <button class="settings-tab" data-tab="friendly" style="
+                    padding:0.4rem 1.2rem; border-radius:30px; border:none; background:transparent; color:var(--gray); font-weight:700; font-size:0.85rem; cursor:pointer; transition:all 0.3s ease;
+                ">
+                    <i class="fas fa-handshake"></i> ودي
+                </button>
+            </div>
+
+            <!-- ===== محتوى التبويب التصنيفي ===== -->
+            <div id="tab-competitive" class="settings-tab-content">
+                <div class="modes-scroll-wrapper">
+                    <div class="modes-horizontal-scroll">
+                        <!-- 1. عادي 1v1 -->
+                        <div class="mode-card-horizontal" data-mode="normal_1v1" data-competitive="true">
+                            <div class="mode-icon">⚔️</div>
+                            <div class="mode-info">
+                                <div class="mode-title">عادي 1v1</div>
+                                <div class="mode-desc">مواجهة مباشرة، تزيد الرتبة</div>
+                            </div>
+                            <div class="mode-badges">
+                                <span class="badge badge-primary">🏅 تصنيفي</span>
+                                <span class="mode-status-dot"></span>
+                            </div>
+                        </div>
+
+                        <!-- 2. كلمات متقاطعة -->
+                        <div class="mode-card-horizontal" data-mode="crossword" data-competitive="true" style="opacity:0.6; cursor:not-allowed;">
+                            <div class="mode-icon">🔤</div>
+                            <div class="mode-info">
+                                <div class="mode-title">كلمات متقاطعة</div>
+                                <div class="mode-desc">حل الكلمات، يزيد الرتبة</div>
+                            </div>
+                            <div class="mode-badges">
+                                <span class="badge badge-primary">🏅 تصنيفي</span>
+                                <span class="badge badge-danger">🔒 قريباً</span>
+                            </div>
+                        </div>
+
+                        <!-- 3. بطولة -->
+                        <div class="mode-card-horizontal" data-mode="tournament" data-competitive="true" style="opacity:0.6; cursor:not-allowed;">
+                            <div class="mode-icon">🏆</div>
+                            <div class="mode-info">
+                                <div class="mode-title">بطولة</div>
+                                <div class="mode-desc">منافسة مجدولة، تزيد الرتبة</div>
+                            </div>
+                            <div class="mode-badges">
+                                <span class="badge badge-primary">🏅 تصنيفي</span>
+                                <span class="badge badge-danger">🔒 قريباً</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            <!-- ===== محتوى التبويب الودي ===== -->
+            <div id="tab-friendly" class="settings-tab-content" style="display:none;">
+                <div class="modes-scroll-wrapper">
+                    <div class="modes-horizontal-scroll">
+                        <!-- 4. عادي غير مصنف -->
+                        <div class="mode-card-horizontal" data-mode="normal_1v1_unranked" data-competitive="false">
+                            <div class="mode-icon">⚔️</div>
+                            <div class="mode-info">
+                                <div class="mode-title">عادي غير مصنف</div>
+                                <div class="mode-desc">مواجهة ودية، لا تزيد الرتبة</div>
+                            </div>
+                            <div class="mode-badges">
+                                <span class="badge badge-success">🎮 ودي</span>
+                                <span class="mode-status-dot"></span>
+                            </div>
+                        </div>
+
+                        <!-- 5. فردي -->
+                        <div class="mode-card-horizontal" data-mode="single_player" data-competitive="false">
+                            <div class="mode-icon">🧠</div>
+                            <div class="mode-info">
+                                <div class="mode-title">فردي</div>
+                                <div class="mode-desc">تحدي ذاتي، إعدادات قابلة للتعديل</div>
+                            </div>
+                            <div class="mode-badges">
+                                <span class="badge badge-success">🎮 ودي</span>
+                                <span class="mode-status-dot"></span>
+                            </div>
+                        </div>
+
+                        <!-- 6. غرفة مدفوعة -->
+                        <div class="mode-card-horizontal" data-mode="create_room" data-competitive="false">
+                            <div class="mode-icon">🏠</div>
+                            <div class="mode-info">
+                                <div class="mode-title">غرفة مدفوعة</div>
+                                <div class="mode-desc">أنشئ غرفة خاصة مع الأصدقاء</div>
+                            </div>
+                            <div class="mode-badges">
+                                <span class="badge badge-success">🎮 ودي</span>
+                                <span class="badge badge-warning">💰 600</span>
+                                <span class="ticket-count-badge">🎫 0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== خيار عدد اللاعبين (يظهر فقط للأطوار التي تدعم المواجهة) ===== -->
+            <div id="playerCountSelector" style="display:none; margin:0.5rem 0; padding:0.5rem; background:var(--glass); border-radius:var(--radius-sm); border:1px solid var(--glass-border);">
+                <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+                    <span style="font-weight:700; font-size:0.85rem; color:var(--gray);">👥 عدد اللاعبين:</span>
+                    <div style="display:flex; gap:0.3rem; background:var(--dark); border-radius:30px; padding:0.2rem; border:1px solid var(--glass-border);">
+                        <button class="player-count-btn active" data-count="1" style="
+                            padding:0.3rem 1rem; border-radius:30px; border:none; background:var(--primary); color:#fff; font-weight:700; font-size:0.8rem; cursor:pointer; transition:all 0.2s ease;
+                        ">
+                            <i class="fas fa-user"></i> 1v1
+                        </button>
+                        <button class="player-count-btn" data-count="2" style="
+                            padding:0.3rem 1rem; border-radius:30px; border:none; background:transparent; color:var(--gray); font-weight:700; font-size:0.8rem; cursor:pointer; transition:all 0.2s ease;
+                        ">
+                            <i class="fas fa-users"></i> 2v2
+                        </button>
+                    </div>
+                    <span style="font-size:0.7rem; color:var(--gray-dark);" id="playerCountHint">(مواجهة فردية)</span>
+                </div>
+            </div>
+
+            <!-- ===== منطقة الإعدادات الخاصة (تظهر فقط للفردي) ===== -->
+            <div id="modeSettingsArea" style="display: none; background: var(--glass); border-radius: var(--radius-sm); padding: 0.8rem; margin: 0.5rem 0; border: 1px solid var(--glass-border);">
+                <div style="font-weight:600; font-size:0.85rem; margin-bottom:0.5rem; color:var(--gray);">
+                    <i class="fas fa-sliders-h"></i> إعدادات اللعب الفردي
+                </div>
+                <!-- نفس الحقول السابقة (الصعوبة، الفئة، نوع السؤال، عدد الأسئلة، نمط اللعبة) -->
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">المستوى</label>
+                    <select id="settingsGameDifficulty" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
+                        <option value="easy">🟢 سهل (20 ثانية)</option>
+                        <option value="medium" selected>🟡 متوسط (15 ثانية)</option>
+                        <option value="hard">🔴 صعب (10 ثوانٍ)</option>
+                        <option value="expert">💀 خبير (5 ثوانٍ)</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">الفئة</label>
+                    <select id="settingsGameCategory" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
+                        <option value="all">📚 كل الفئات</option>
+                        ${GENERAL_CATEGORIES.map(cat => 
+                            `<option value="${cat.id}">${cat.icon} ${cat.label}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">نوع السؤال</label>
+                    <select id="settingsGameQuestionType" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
+                        <option value="all">📚 الكل</option>
+                        <option value="multiple_choice">📝 اختيار من متعدد</option>
+                        <option value="true_false">✅ صح / خطأ</option>
+                        <option value="fill_blank">✏️ ملء الفراغ</option>
+                        <option value="matching">🔗 مطابقة</option>
+                        <option value="ordering">🔢 ترتيب</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">عدد الأسئلة</label>
+                    <select id="settingsGameCount" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
+                        <option value="5">5 أسئلة</option>
+                        <option value="10" selected>10 أسئلة</option>
+                        <option value="15">15 سؤال</option>
+                        <option value="20">20 سؤال</option>
+                        <option value="30">30 سؤال</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">نمط اللعبة</label>
+                    <select id="settingsGameMode" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
+                        <option value="normal">🎯 عادي</option>
+                        <option value="timed">⏱ زمني (تحدي الوقت)</option>
+                        <option value="survival">💪 صمود (تنتهي بخطأ)</option>
+                        <option value="time_attack">⚡ تحدي الزمن المفتوح (60s)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- ===== عرض الطور المختار والإعدادات ===== -->
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.3rem; padding:0.3rem 0.5rem; background:var(--glass); border-radius:8px; margin:0.5rem 0;">
+                <span style="font-size:0.8rem; color:var(--gray);">الطور المختار:</span>
+                <span style="font-weight:700; font-size:1rem; color:var(--accent);" id="selectedModeDisplay">⚔️ عادي 1v1</span>
+                <span id="competitiveBadge" style="font-size:0.7rem; padding:0.1rem 0.6rem; border-radius:30px; background:var(--primary); color:#fff; display:none;">🏅 تصنيفي</span>
+                <span id="friendlyBadge" style="font-size:0.7rem; padding:0.1rem 0.6rem; border-radius:30px; background:var(--success); color:#fff; display:none;">🎮 ودي</span>
+            </div>
+
+            <!-- زر التحديد -->
+            <div style="display:flex; gap:0.5rem; justify-content:center; flex-wrap:wrap; margin-top:0.5rem;">
+                <button class="btn btn-primary" id="selectGameModeBtn" style="justify-content:center; min-width:160px; padding:12px 28px; font-size:1rem;">
+                    <i class="fas fa-check"></i> تحديد
+                </button>
+                <button class="btn btn-outline" onclick="App._closeModal('matchSettingsModal')" style="justify-content:center;">
+                    <i class="fas fa-times"></i> إلغاء
+                </button>
+            </div>
+
         </div>
+    </div>
+</div>
 
 <!-- Question Modal - نسخة متطورة -->
 <div class="modal-overlay" id="questionModal">
@@ -9614,8 +9625,807 @@ async _sendFriendRequest(userId) {
 },
 
 // ============================================================
+// نظام الاستيراد المتعدد (Batch Import)
+// ============================================================
+
+_fileQueue: [],
+_isBatchImporting: false,
+_isQueueStarted: false,
+
+// ===== إضافة ملفات إلى قائمة الانتظار =====
+_addFilesToQueue(files) {
+    if (!files || files.length === 0) return;
+    
+    // إزالة الملفات المكررة بناءً على الاسم والحجم
+    const existingNames = this._fileQueue.map(f => f.name + f.size);
+    
+    for (const file of files) {
+        if (!file.name.endsWith('.json')) {
+            showToast(`⚠️ الملف "${file.name}" ليس بصيغة JSON، تم تخطيه`, 'info', 2000);
+            continue;
+        }
+        const key = file.name + file.size;
+        if (!existingNames.includes(key)) {
+            this._fileQueue.push({
+                id: Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                file: file,
+                name: file.name,
+                size: (file.size / 1024).toFixed(1) + ' KB',
+                status: 'pending' // pending, processing, completed, error
+            });
+            existingNames.push(key);
+        }
+    }
+    
+    this._updateQueueUI();
+    showToast(`✅ تم إضافة ${files.length} ملف إلى قائمة الانتظار`, 'success', 2000);
+},
+
+// ===== تحديث واجهة قائمة الانتظار =====
+_updateQueueUI() {
+    const queueList = document.getElementById('fileQueueList');
+    const queueBadge = document.getElementById('queueCountBadge');
+    const clearBtn = document.getElementById('clearQueueBtn');
+    const startBtn = document.getElementById('startQueueBtn');
+    
+    if (!queueList) return;
+    
+    const total = this._fileQueue.length;
+    const pending = this._fileQueue.filter(f => f.status === 'pending').length;
+    const completed = this._fileQueue.filter(f => f.status === 'completed').length;
+    const errors = this._fileQueue.filter(f => f.status === 'error').length;
+    
+    // تحديث الشارة
+    if (queueBadge) {
+        if (total > 0) {
+            queueBadge.style.display = 'inline-block';
+            queueBadge.textContent = total + (pending > 0 ? ` (${pending} معلق)` : '');
+        } else {
+            queueBadge.style.display = 'none';
+        }
+    }
+    
+    // تحديث الأزرار
+    if (clearBtn) {
+        clearBtn.style.display = total > 0 ? 'inline-flex' : 'none';
+    }
+    if (startBtn) {
+        startBtn.style.display = (pending > 0 && !this._isBatchImporting) ? 'inline-flex' : 'none';
+        startBtn.disabled = pending === 0 || this._isBatchImporting;
+    }
+    
+    // تحديث القائمة
+    if (total === 0) {
+        queueList.style.display = 'none';
+        queueList.innerHTML = '';
+        return;
+    }
+    
+    queueList.style.display = 'block';
+    
+    const statusColors = {
+        pending: 'var(--gray)',
+        processing: 'var(--accent)',
+        completed: 'var(--success)',
+        error: 'var(--secondary)'
+    };
+    
+    const statusIcons = {
+        pending: '⏳',
+        processing: '🔄',
+        completed: '✅',
+        error: '❌'
+    };
+    
+    // عرض آخر 10 ملفات فقط (مع إمكانية التمرير)
+    const displayFiles = this._fileQueue.slice(-10);
+    
+    let html = '';
+    displayFiles.forEach(item => {
+        html += `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:0.2rem 0.5rem; border-bottom:1px solid var(--glass-border); font-size:0.8rem;">
+                <div style="display:flex; align-items:center; gap:0.5rem; min-width:0;">
+                    <span style="color:${statusColors[item.status]}; font-size:1rem;">${statusIcons[item.status]}</span>
+                    <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;">${item.name}</span>
+                    <span style="font-size:0.6rem; color:var(--gray-dark);">${item.size}</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:0.3rem;">
+                    <span style="font-size:0.6rem; color:${statusColors[item.status]};">${item.status === 'pending' ? 'في الانتظار' : item.status === 'processing' ? 'جاري...' : item.status === 'completed' ? 'مكتمل' : 'خطأ'}</span>
+                    ${item.status === 'pending' ? `<button class="btn btn-xs btn-danger" onclick="App._removeFileFromQueue('${item.id}')" style="padding:0 6px; font-size:0.5rem;">✕</button>` : ''}
+                </div>
+            </div>
+        `;
+    });
+    
+    if (total > 10) {
+        html += `<div style="text-align:center; font-size:0.65rem; color:var(--gray); padding:0.2rem;">... و ${total - 10} ملفات أخرى</div>`;
+    }
+    
+    queueList.innerHTML = html;
+},
+
+// ===== إزالة ملف من قائمة الانتظار =====
+_removeFileFromQueue(id) {
+    this._fileQueue = this._fileQueue.filter(f => f.id !== id);
+    this._updateQueueUI();
+    this._updateBatchProgress();
+},
+
+// ===== مسح قائمة الانتظار بالكامل =====
+_clearQueue() {
+    if (this._fileQueue.length === 0) return;
+    if (!confirm('هل أنت متأكد من إلغاء جميع الملفات في قائمة الانتظار؟')) return;
+    this._fileQueue = [];
+    this._updateQueueUI();
+    this._updateBatchProgress();
+    document.getElementById('batchProgress').style.display = 'none';
+    showToast('🗑️ تم مسح قائمة الانتظار', 'info');
+},
+
+// ===== بدء استيراد قائمة الانتظار =====
+async _startQueueImport() {
+    if (this._isBatchImporting) return;
+    if (this._fileQueue.length === 0) {
+        showToast('⚠️ قائمة الانتظار فارغة', 'info');
+        return;
+    }
+    
+    const pending = this._fileQueue.filter(f => f.status === 'pending');
+    if (pending.length === 0) {
+        showToast('✅ جميع الملفات تم استيرادها مسبقاً', 'info');
+        return;
+    }
+    
+    this._isBatchImporting = true;
+    this._isQueueStarted = true;
+    
+    // تحديث الواجهة
+    document.getElementById('batchProgress').style.display = 'block';
+    document.getElementById('startQueueBtn').style.display = 'none';
+    
+    let completed = 0;
+    let errors = 0;
+    const total = pending.length;
+    
+    for (let i = 0; i < pending.length; i++) {
+        const item = pending[i];
+        const file = item.file;
+        
+        // تحديث حالة الملف إلى processing
+        item.status = 'processing';
+        this._updateQueueUI();
+        this._updateBatchProgress(completed, total, errors, `جاري استيراد ${item.name}...`);
+        
+        try {
+            // قراءة الملف
+            const text = await file.text();
+            const data = JSON.parse(text);
+            
+            if (!data.questions || !Array.isArray(data.questions)) {
+                throw new Error('تنسيق الملف غير صحيح (يفتقد إلى مصفوفة questions)');
+            }
+            
+            // استيراد الأسئلة
+            let importedCount = 0;
+            for (const q of data.questions) {
+                try {
+                    const questionData = this._buildQuestionData(q);
+                    if (this._validateQuestionData(questionData)) {
+                        await DataManager.add('questions', questionData);
+                        importedCount++;
+                    }
+                } catch (e) {
+                    console.warn('خطأ في استيراد سؤال:', e);
+                }
+            }
+            
+            item.status = 'completed';
+            completed++;
+            showToast(`✅ ${item.name}: تم استيراد ${importedCount} سؤال`, 'success', 2000);
+            
+        } catch (error) {
+            console.error('خطأ في استيراد الملف:', error);
+            item.status = 'error';
+            errors++;
+            showToast(`❌ ${item.name}: ${error.message}`, 'error', 3000);
+        }
+        
+        // تحديث التقدم
+        this._updateQueueUI();
+        this._updateBatchProgress(completed, total, errors);
+    }
+    
+    // انتهى الاستيراد
+    this._isBatchImporting = false;
+    this._isQueueStarted = false;
+    
+    // عرض النتيجة النهائية
+    const finalMessage = `✅ اكتمل الاستيراد! ${completed} ملف ناجح، ${errors} ملف به أخطاء`;
+    showToast(finalMessage, errors > 0 ? 'warning' : 'success', 5000);
+    
+    // إخفاء شريط التقدم بعد 3 ثوانٍ
+    setTimeout(() => {
+        document.getElementById('batchProgress').style.display = 'none';
+    }, 3000);
+    
+    // إعادة تحميل قائمة الأسئلة
+    this._renderQuestionsAdvanced();
+    this._refreshAllData();
+    
+    // إزالة الملفات المكتملة من القائمة (احتفظ بالملفات التي بها أخطاء)
+    this._fileQueue = this._fileQueue.filter(f => f.status === 'error');
+    this._updateQueueUI();
+    
+    if (this._fileQueue.length === 0) {
+        document.getElementById('startQueueBtn').style.display = 'none';
+    } else {
+        document.getElementById('startQueueBtn').style.display = 'inline-flex';
+    }
+    
+    this._isBatchImporting = false;
+},
+
+// ===== تحديث شريط تقدم الاستيراد المتعدد =====
+_updateBatchProgress(completed, total, errors, statusText) {
+    const fill = document.getElementById('batchProgressFill');
+    const statusEl = document.getElementById('batchProgressStatus');
+    const textEl = document.getElementById('batchProgressText');
+    const completedEl = document.getElementById('batchCompletedCount');
+    const remainingEl = document.getElementById('batchRemainingCount');
+    const errorEl = document.getElementById('batchErrorCount');
+    
+    const totalItems = this._fileQueue.length;
+    const done = this._fileQueue.filter(f => f.status === 'completed' || f.status === 'error').length;
+    const pending = this._fileQueue.filter(f => f.status === 'pending').length;
+    const errs = this._fileQueue.filter(f => f.status === 'error').length;
+    
+    if (fill) {
+        const progress = totalItems > 0 ? (done / totalItems) * 100 : 0;
+        fill.style.width = Math.min(progress, 100) + '%';
+    }
+    
+    if (statusEl && statusText) {
+        statusEl.textContent = statusText;
+    } else if (statusEl) {
+        statusEl.textContent = pending > 0 ? `⏳ ${pending} ملف في الانتظار...` : '✅ اكتمل!';
+    }
+    
+    if (textEl) {
+        const progress = totalItems > 0 ? Math.round((done / totalItems) * 100) : 0;
+        textEl.textContent = Math.min(progress, 100) + '%';
+    }
+    
+    if (completedEl) completedEl.textContent = done;
+    if (remainingEl) remainingEl.textContent = pending;
+    if (errorEl) errorEl.textContent = errs;
+},
+
+// ============================================================
+// إعدادات الأطوار
+// ============================================================
+
+_modeSettings: {
+    currentMode: null,
+    questionCount: 10,
+    timeLimit: 15,
+    // إعدادات خاصة بكل طور
+    specific: {}
+},
+
+// ===== فتح مودال إعدادات الطور =====
+_openModeSettings(mode) {
+    const modeNames = {
+        'normal_1v1': '⚔️ عادي 1v1',
+        'single_player': '🧠 فردي',
+        'create_room': '🏠 غرفة لعب',
+        'crossword': '🔤 كلمات متقاطعة',
+        'tournament': '🏆 بطولة'
+    };
+    
+    const modeDescriptions = {
+        'normal_1v1': 'إعدادات المواجهة المباشرة بين لاعبين',
+        'single_player': 'إعدادات التحدي الذاتي',
+        'create_room': 'إعدادات إنشاء الغرفة',
+        'crossword': 'إعدادات الكلمات المتقاطعة',
+        'tournament': 'إعدادات البطولة'
+    };
+    
+    // تحديث عنوان المودال
+    const titleEl = document.getElementById('modeSettingsTitle');
+    if (titleEl) titleEl.textContent = `إعدادات ${modeNames[mode] || mode}`;
+    
+    const nameEl = document.getElementById('modeSettingsModeName');
+    if (nameEl) nameEl.textContent = modeNames[mode] || mode;
+    
+    // تخزين الطور الحالي
+    this._modeSettings.currentMode = mode;
+    
+    // تحميل الإعدادات المحفوظة
+    this._loadModeSettings(mode);
+    
+    // تحديث المحتوى الخاص حسب الطور
+    this._updateModeSpecificSettings(mode);
+    
+    // فتح المودال
+    this._openModal('modeSettingsModal');
+},
+
+// ===== تحميل إعدادات الطور =====
+_loadModeSettings(mode) {
+        // ✅ إذا كان الطور normal_1v1، استخدم القيم التلقائية مباشرة
+    if (mode === 'normal_1v1') {
+        this._modeSettings = {
+            currentMode: mode,
+            questionCount: 30,
+            timeLimit: 15,
+            specific: {}
+        };
+        
+        // تطبيق الإعدادات على الواجهة
+        const countEl = document.getElementById('modeSettingsQuestionCount');
+        const timeEl = document.getElementById('modeSettingsTimeLimit');
+        
+        if (countEl) countEl.value = 30;
+        if (timeEl) timeEl.value = 15;
+        
+        // تعطيل حقول الإعدادات العامة
+        if (countEl) countEl.disabled = true;
+        if (timeEl) timeEl.disabled = true;
+        
+        return;
+    }
+    try {
+        const saved = localStorage.getItem(`modeSettings_${mode}`);
+        if (saved) {
+            const settings = JSON.parse(saved);
+            this._modeSettings = { ...this._modeSettings, ...settings };
+        }
+    } catch (e) {
+        console.warn('⚠️ Error loading mode settings:', e);
+    }
+    
+    // تطبيق الإعدادات على الواجهة
+    const countEl = document.getElementById('modeSettingsQuestionCount');
+    const timeEl = document.getElementById('modeSettingsTimeLimit');
+    
+    if (countEl) countEl.value = this._modeSettings.questionCount || 10;
+    if (timeEl) timeEl.value = this._modeSettings.timeLimit || 15;
+},
+
+// ===== تحديث الإعدادات الخاصة حسب الطور =====
+_updateModeSpecificSettings(mode) {
+    const container = document.getElementById('modeSpecificContent');
+    const titleEl = document.getElementById('modeSpecificTitle');
+    
+    if (!container) return;
+    
+    let html = '';
+    let title = 'إعدادات خاصة';
+    
+    switch(mode) {            
+        case 'single_player':
+            title = '🧠 إعدادات التحدي الذاتي';
+            html = `
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">وضع الصعوبة</label>
+                    <select id="modeSpecificDifficulty" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
+                        <option value="auto">تلقائي</option>
+                        <option value="easy">🟢 سهل</option>
+                        <option value="medium">🟡 متوسط</option>
+                        <option value="hard">🔴 صعب</option>
+                        <option value="expert">💀 خبير</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">إظهار التلميحات</label>
+                    <select id="modeSpecificHints" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
+                        <option value="on">مفعل</option>
+                        <option value="off">معطل</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">تصحيح الأخطاء</label>
+                    <select id="modeSpecificCorrection" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
+                        <option value="on">إظهار الإجابة الصحيحة</option>
+                        <option value="off">عدم الإظهار</option>
+                    </select>
+                </div>
+            `;
+            break;
+            
+        case 'create_room':
+            title = '🏠 إعدادات الغرفة';
+            html = `
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">الحد الأقصى للاعبين</label>
+                    <select id="modeSpecificMaxPlayers" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
+                        <option value="2">2 لاعبين</option>
+                        <option value="4" selected>4 لاعبين</option>
+                        <option value="6">6 لاعبين</option>
+                        <option value="8">8 لاعبين</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">الغرفة عامة أو خاصة</label>
+                    <select id="modeSpecificRoomPrivacy" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
+                        <option value="public">عامة (الكل يمكنه الانضمام)</option>
+                        <option value="private">خاصة (برمز)</option>
+                        <option value="friends">الأصدقاء فقط</option>
+                    </select>
+                </div>
+            `;
+            break;            
+        default:
+            html = `<div class="text-gray" style="font-size:0.8rem; text-align:center;">لا توجد إعدادات خاصة لهذا الطور</div>`;
+    }
+    
+    if (titleEl) titleEl.textContent = title;
+    container.innerHTML = html;
+    
+    // تحميل الإعدادات المحفوظة للخاصة
+    this._loadModeSpecificSettings(mode);
+},
+
+// ===== تحميل الإعدادات الخاصة =====
+_loadModeSpecificSettings(mode) {
+    const specific = this._modeSettings.specific || {};
+    const modeSpecific = specific[mode] || {};
+    
+    // تطبيق الإعدادات على العناصر
+    document.querySelectorAll('#modeSpecificContent select').forEach(el => {
+        const key = el.id;
+        if (modeSpecific[key] !== undefined) {
+            el.value = modeSpecific[key];
+        }
+    });
+},
+
+// في _saveModeSettings
+
+_saveModeSettings() {
+    const mode = this._modeSettings.currentMode;
+    if (!mode) {
+        showToast('⚠️ لم يتم تحديد طور', 'error');
+        return;
+    }
+    
+    // ✅ منع حفظ إعدادات normal_1v1 (تلقائية)
+    if (mode === 'normal_1v1') {
+        showToast('⚡ طور عادي 1v1 إعداداته تلقائية ولا تحتاج للحفظ', 'info', 3000);
+        this._closeModal('modeSettingsModal');
+        return;
+    }
+    
+    // جمع الإعدادات العامة
+    const settings = {
+        questionCount: parseInt(document.getElementById('modeSettingsQuestionCount')?.value) || 10,
+        timeLimit: parseInt(document.getElementById('modeSettingsTimeLimit')?.value) || 15,
+    };
+    
+    // جمع الإعدادات الخاصة
+    const specific = {};
+    document.querySelectorAll('#modeSpecificContent select').forEach(el => {
+        specific[el.id] = el.value;
+    });
+    
+    settings.specific = {
+        [mode]: specific
+    };
+    
+    // حفظ في localStorage
+    try {
+        localStorage.setItem(`modeSettings_${mode}`, JSON.stringify(settings));
+        showToast(`✅ تم حفظ إعدادات ${mode}`, 'success', 2000);
+    } catch (e) {
+        console.error('Error saving mode settings:', e);
+        showToast('❌ خطأ في حفظ الإعدادات', 'error');
+    }
+    
+    // إغلاق المودال
+    this._closeModal('modeSettingsModal');
+},
+
+// ============================================================
 // صفحة الأسئلة - تصميم متطور
 // ============================================================
+// ============================================================
+// عكس إجابات أسئلة صح/خطأ مع شريط تقدم
+// ============================================================
+
+_fixProgressData: {
+    total: 0,
+    completed: 0,
+    errors: 0,
+    isRunning: false,
+    isCancelled: false,
+    fixTimer: null,
+    questions: []
+},
+
+// ===== عكس جميع أسئلة صح/خطأ =====
+async _fixAllTrueFalseQuestions() {
+    if (!AuthService.checkPermission('admin')) {
+        showToast('⚠️ تحتاج صلاحيات مشرف', 'error');
+        return;
+    }
+    
+    if (this._fixProgressData.isRunning) {
+        showToast('⏳ عملية عكس جارية بالفعل', 'info');
+        return;
+    }
+    
+    const questions = DataManager.data.questions || [];
+    const trueFalseQuestions = questions.filter(q => q.type === 'true_false');
+    
+    if (trueFalseQuestions.length === 0) {
+        showToast('⚠️ لا توجد أسئلة من نوع صح/خطأ', 'info');
+        return;
+    }
+    
+    if (!confirm(`⚠️ هل أنت متأكد من عكس إجابات ${trueFalseQuestions.length} سؤال من نوع صح/خطأ؟\n\nهذه العملية لا يمكن التراجع عنها بسهولة.`)) {
+        return;
+    }
+    
+    // إظهار شريط التقدم
+    this._showFixProgress(true);
+    this._updateFixProgress(0, trueFalseQuestions.length, 0, 'جاري التحضير...');
+    
+    // تهيئة البيانات
+    this._fixProgressData = {
+        total: trueFalseQuestions.length,
+        completed: 0,
+        errors: 0,
+        isRunning: true,
+        isCancelled: false,
+        fixTimer: null,
+        questions: [...trueFalseQuestions]
+    };
+    
+    // إظهار زر الإلغاء
+    const cancelBtn = document.getElementById('cancelFixBtn');
+    if (cancelBtn) cancelBtn.style.display = 'inline-flex';
+    
+    // بدء المعالجة
+    this._processFixQueue();
+},
+
+// ===== عكس الأسئلة المحددة فقط =====
+async _fixSelectedTrueFalseQuestions() {
+    if (!AuthService.checkPermission('admin')) {
+        showToast('⚠️ تحتاج صلاحيات مشرف', 'error');
+        return;
+    }
+    
+    if (this._fixProgressData.isRunning) {
+        showToast('⏳ عملية عكس جارية بالفعل', 'info');
+        return;
+    }
+    
+    const selectedIds = this._selectedQuestions || [];
+    if (selectedIds.length === 0) {
+        showToast('⚠️ لم يتم تحديد أي سؤال', 'info');
+        return;
+    }
+    
+    const questions = DataManager.data.questions || [];
+    const selectedQuestions = questions.filter(q => 
+        selectedIds.includes(q.id) && q.type === 'true_false'
+    );
+    
+    if (selectedQuestions.length === 0) {
+        showToast('⚠️ الأسئلة المحددة ليست من نوع صح/خطأ', 'info');
+        return;
+    }
+    
+    if (!confirm(`⚠️ هل أنت متأكد من عكس إجابات ${selectedQuestions.length} سؤال من نوع صح/خطأ؟`)) {
+        return;
+    }
+    
+    // إظهار شريط التقدم
+    this._showFixProgress(true);
+    this._updateFixProgress(0, selectedQuestions.length, 0, 'جاري التحضير...');
+    
+    // تهيئة البيانات
+    this._fixProgressData = {
+        total: selectedQuestions.length,
+        completed: 0,
+        errors: 0,
+        isRunning: true,
+        isCancelled: false,
+        fixTimer: null,
+        questions: [...selectedQuestions]
+    };
+    
+    // إظهار زر الإلغاء
+    const cancelBtn = document.getElementById('cancelFixBtn');
+    if (cancelBtn) cancelBtn.style.display = 'inline-flex';
+    
+    // مسح التحديدات
+    this._selectedQuestions = [];
+    this._updateSelectedCount();
+    
+    // بدء المعالجة
+    this._processFixQueue();
+},
+
+// ===== معالجة قائمة الأسئلة (بشكل تدريجي) =====
+_processFixQueue() {
+    if (!this._fixProgressData.isRunning || this._fixProgressData.isCancelled) {
+        this._finishFix();
+        return;
+    }
+    
+    const data = this._fixProgressData;
+    const questions = data.questions;
+    const total = data.total;
+    let completed = data.completed;
+    let errors = data.errors;
+    
+    // معالجة دفعة من الأسئلة (5 أسئلة في كل دفعة)
+    const batchSize = 5;
+    let processed = 0;
+    
+    for (let i = 0; i < batchSize && completed < total; i++) {
+        const q = questions[completed];
+        if (!q) break;
+        
+        try {
+            // عكس الإجابة الصحيحة (0 يصبح 1، و 1 يصبح 0)
+            const newCorrect = q.correct === 0 ? 1 : 0;
+            
+            // تحديث السؤال في قاعدة البيانات
+            // نستخدم update مباشرة مع عدم انتظار النتيجة (غير متزامن)
+            DataManager.update('questions', q.id, { correct: newCorrect })
+                .then(() => {
+                    // نجاح - سيتم تحديث العدد في الدورة التالية
+                })
+                .catch((e) => {
+                    console.error('Error fixing question:', q.id, e);
+                    data.errors++;
+                });
+            
+            completed++;
+            processed++;
+        } catch (e) {
+            console.error('Error processing question:', q.id, e);
+            errors++;
+            completed++;
+        }
+    }
+    
+    // تحديث التقدم
+    data.completed = completed;
+    data.errors = errors;
+    
+    const progress = total > 0 ? Math.round((completed / total) * 100) : 100;
+    const statusText = `معالجة ${completed}/${total}...`;
+    
+    this._updateFixProgress(progress, total, errors, statusText);
+    
+    // التحقق من الانتهاء
+    if (completed >= total) {
+        // الانتظار قليلاً للتأكد من اكتمال جميع عمليات التحديث
+        setTimeout(() => {
+            this._finishFix();
+        }, 500);
+        return;
+    }
+    
+    // معالجة الدفعة التالية بعد تأخير بسيط (50ms)
+    if (this._fixProgressData.isRunning && !this._fixProgressData.isCancelled) {
+        this._fixProgressData.fixTimer = setTimeout(() => {
+            this._processFixQueue();
+        }, 50);
+    } else {
+        this._finishFix();
+    }
+},
+
+// ===== إلغاء عملية العكس =====
+_cancelFix() {
+    if (!this._fixProgressData.isRunning) return;
+    
+    if (confirm('هل تريد إلغاء عملية العكس؟ الأسئلة التي تم عكسها بالفعل لن يتم التراجع عنها.')) {
+        this._fixProgressData.isCancelled = true;
+        if (this._fixProgressData.fixTimer) {
+            clearTimeout(this._fixProgressData.fixTimer);
+            this._fixProgressData.fixTimer = null;
+        }
+        showToast('⏹️ تم إلغاء عملية العكس', 'info');
+        this._finishFix();
+    }
+},
+
+// ===== إنهاء عملية العكس =====
+_finishFix() {
+    const data = this._fixProgressData;
+    const completed = data.completed;
+    const total = data.total;
+    const errors = data.errors;
+    
+    // إخفاء زر الإلغاء
+    const cancelBtn = document.getElementById('cancelFixBtn');
+    if (cancelBtn) cancelBtn.style.display = 'none';
+    
+    // تحديث الحالة
+    data.isRunning = false;
+    if (data.fixTimer) {
+        clearTimeout(data.fixTimer);
+        data.fixTimer = null;
+    }
+    
+    // عرض النتيجة النهائية
+    const successCount = completed - errors;
+    let message = `✅ تم عكس ${successCount} سؤال`;
+    if (errors > 0) message += `، ${errors} خطأ`;
+    showToast(message, errors > 0 ? 'warning' : 'success', 5000);
+    
+    // تحديث شريط التقدم إلى 100%
+    this._updateFixProgress(100, total, errors, '✅ اكتمل!');
+    
+    // إخفاء شريط التقدم بعد 2 ثانية
+    setTimeout(() => {
+        this._showFixProgress(false);
+    }, 2000);
+    
+    // إعادة تحميل الأسئلة
+    DataManager.loadAll().then(() => {
+        this._renderQuestionsAdvanced();
+        this._refreshAllData();
+    }).catch(() => {
+        this._renderQuestionsAdvanced();
+    });
+},
+
+// ===== إظهار/إخفاء شريط التقدم =====
+_showFixProgress(show) {
+    const container = document.getElementById('fixProgress');
+    if (!container) return;
+    container.style.display = show ? 'block' : 'none';
+},
+
+// ===== تحديث شريط التقدم =====
+_updateFixProgress(progress, total, errors, statusText) {
+    const fill = document.getElementById('fixProgressFill');
+    const textEl = document.getElementById('fixProgressText');
+    const statusEl = document.getElementById('fixProgressStatus');
+    const completedEl = document.getElementById('fixCompletedCount');
+    const remainingEl = document.getElementById('fixRemainingCount');
+    const errorEl = document.getElementById('fixErrorCount');
+    const totalEl = document.getElementById('fixTotalCount');
+    
+    const progressPercent = Math.min(Math.round(progress), 100);
+    const remaining = Math.max(0, total - (this._fixProgressData.completed || 0));
+    
+    if (fill) fill.style.width = progressPercent + '%';
+    if (textEl) textEl.textContent = progressPercent + '%';
+    if (completedEl) completedEl.textContent = this._fixProgressData.completed || 0;
+    if (remainingEl) remainingEl.textContent = remaining;
+    if (errorEl) errorEl.textContent = errors || 0;
+    if (totalEl) totalEl.textContent = total || 0;
+    
+    // تحديث الحالة في شريط التقدم
+    const statusContainer = document.querySelector('#fixProgress .fix-status-text');
+    if (statusContainer) {
+        statusContainer.textContent = statusText || '';
+    } else {
+        // إذا لم يكن موجوداً، نضيفه
+        const parent = document.getElementById('fixProgress');
+        if (parent) {
+            let statusEl = parent.querySelector('.fix-status-text');
+            if (!statusEl) {
+                statusEl = document.createElement('span');
+                statusEl.className = 'fix-status-text';
+                statusEl.style.cssText = 'font-size:0.8rem; color:var(--gray); margin-left:0.5rem;';
+                const textContainer = parent.querySelector('#fixProgressText');
+                if (textContainer && textContainer.parentElement) {
+                    textContainer.parentElement.insertBefore(statusEl, textContainer.nextSibling);
+                }
+            }
+            statusEl.textContent = statusText || '';
+        }
+    }
+},
 
 _renderQuestionsSection() {
     return `
@@ -9649,6 +10459,52 @@ _renderQuestionsSection() {
                             style="display:${AuthService.checkPermission('admin') ? 'inline-flex' : 'none'};">
                         <i class="fas fa-trash-alt"></i> حذف الكل
                     </button>
+${AuthService.checkPermission('admin') ? `
+    <button class="btn btn-sm btn-warning" id="fixAllTrueFalseBtn" style="background:#f39c12; color:#fff;">
+        <i class="fas fa-exchange-alt"></i> عكس صح/خطأ
+    </button>
+` : ''}
+<div class="import-queue-section" style="margin-top:0.5rem; padding:0.5rem 1rem; background:var(--glass); border-radius:var(--radius-sm); border:1px solid var(--glass-border);">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+        <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+            <button class="btn btn-primary" id="batchImportBtn">
+                <i class="fas fa-file-import"></i> استيراد متعدد
+            </button>
+            <input type="file" id="batchImportFileInput" accept=".json" multiple style="display:none;">
+            <span class="text-gray" style="font-size:0.75rem;">(اختر عدة ملفات JSON)</span>
+            <span id="queueCountBadge" class="badge badge-primary" style="display:none;">0 في الانتظار</span>
+        </div>
+        <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
+            <button class="btn btn-sm btn-danger" id="clearQueueBtn" style="display:none;">
+                <i class="fas fa-times"></i> إلغاء الكل
+            </button>
+            <button class="btn btn-sm btn-success" id="startQueueBtn" style="display:none;">
+                <i class="fas fa-play"></i> بدء الاستيراد
+            </button>
+        </div>
+    </div>
+    
+    <!-- قائمة انتظار الملفات -->
+    <div id="fileQueueList" style="margin-top:0.5rem; max-height:150px; overflow-y:auto; display:none;">
+        <!-- سيتم تعبئتها بواسطة JavaScript -->
+    </div>
+    
+    <!-- شريط تقدم الاستيراد المتعدد -->
+    <div id="batchProgress" style="display:none; margin-top:0.5rem;">
+        <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--gray);">
+            <span id="batchProgressStatus">جاري الاستيراد...</span>
+            <span id="batchProgressText">0%</span>
+        </div>
+        <div style="height:6px; background:var(--glass); border-radius:10px; overflow:hidden;">
+            <div id="batchProgressFill" style="height:100%; width:0%; background:linear-gradient(90deg, var(--primary), var(--accent)); border-radius:10px; transition:width 0.3s ease;"></div>
+        </div>
+        <div style="display:flex; gap:0.5rem; font-size:0.7rem; color:var(--gray); margin-top:0.2rem;">
+            <span>✅ المنجز: <span id="batchCompletedCount">0</span></span>
+            <span>⏳ المتبقي: <span id="batchRemainingCount">0</span></span>
+            <span>❌ الأخطاء: <span id="batchErrorCount">0</span></span>
+        </div>
+    </div>
+</div>
                 </div>
             </div>
 
@@ -9693,6 +10549,33 @@ _renderQuestionsSection() {
                     </button>
                 </div>
             </div>
+
+<!-- ============================================================ -->
+<!-- ✅ شريط تقدم عكس الأسئلة -->
+<!-- ============================================================ -->
+<div id="fixProgress" style="display:none; margin-top:1rem; background:var(--card-bg); padding:0.8rem 1rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+    <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+            <i class="fas fa-exchange-alt" style="color:var(--accent); font-size:1.2rem;"></i>
+            <span style="font-weight:600; font-size:0.85rem; color:var(--gray);">عكس الإجابات:</span>
+        </div>
+        <div style="flex:1; min-width:150px;">
+            <div class="progress-bar" style="height:8px; background:var(--glass);">
+                <div class="fill" id="fixProgressFill" style="width:0%; height:100%; background:linear-gradient(90deg, var(--primary), var(--accent)); border-radius:10px; transition:width 0.3s ease;"></div>
+            </div>
+        </div>
+        <span id="fixProgressText" style="font-size:0.85rem; color:var(--gray); min-width:120px; text-align:center;">0%</span>
+        <button class="btn btn-sm btn-danger" id="cancelFixBtn" style="display:none;">
+            <i class="fas fa-times"></i> إلغاء
+        </button>
+    </div>
+    <div style="display:flex; gap:0.8rem; font-size:0.7rem; color:var(--gray); margin-top:0.3rem; flex-wrap:wrap;">
+        <span>✅ تم العكس: <span id="fixCompletedCount">0</span></span>
+        <span>⏳ المتبقي: <span id="fixRemainingCount">0</span></span>
+        <span>❌ الأخطاء: <span id="fixErrorCount">0</span></span>
+        <span>📊 الإجمالي: <span id="fixTotalCount">0</span></span>
+    </div>
+</div>
 
             <!-- الإحصائيات -->
             <div class="questions-stats-grid mb-2" id="questionsStats">
@@ -10392,6 +11275,7 @@ _updateProfileInventory(user) {
         'emotes': '💬 رموز',
         'themes': '🎨 سمات',
         'loot_boxes': '📦 صناديق',
+        tickets: '🎫 تذاكر',
         'أخرى': '📌 أخرى'
     };
     
@@ -10511,24 +11395,51 @@ _updateProfileInventory(user) {
 
 _renderStoreSection() {
     return `
-        <h2 style="font-size:1.8rem;font-weight:800;margin-bottom:1.5rem;">
-            <i class="fas fa-store" style="color:var(--accent);"></i> المتجر المتطور 🛒
-        </h2>
-        <div class="flex-between mb-2" style="flex-wrap:wrap;gap:0.5rem;">
-            <div style="display:flex;gap:0.8rem;flex-wrap:wrap;align-items:center;">
-                <span class="currency-display" style="background:var(--glass);padding:4px 16px;border-radius:40px;border:1px solid var(--accent);">
-                    🪙 <span id="storeCoins">0</span>
-                </span>
-                <span class="currency-display" style="background:var(--glass);padding:4px 16px;border-radius:40px;border:1px solid #9b59b6;">
-                    💎 <span id="storeGems">0</span>
-                </span>
-                <button class="btn btn-sm btn-outline" onclick="App._renderInventory()"><i class="fas fa-box"></i> مخزوني</button>
+        <div class="store-page">
+            <div class="store-header">
+                <div class="store-title-section">
+                    <h2 class="store-title">
+                        <i class="fas fa-store" style="color:var(--accent);"></i> 
+                        المتجر
+                    </h2>
+                    <p class="store-subtitle">اكتشف العروض والعناصر المميزة</p>
+                </div>
+                <div class="store-balance">
+                    <div class="balance-item coins">
+                        <i class="fas fa-coins"></i>
+                        <span id="storeCoins">0</span>
+                    </div>
+                    <div class="balance-item gems">
+                        <i class="fas fa-gem"></i>
+                        <span id="storeGems">0</span>
+                    </div>
+                    <button class="btn-inventory" onclick="App._renderInventory()" title="مخزوني">
+                        <i class="fas fa-box"></i>
+                    </button>
+                    <button class="btn-inventory" onclick="App._checkStoreImages()" title="فحص الصور" style="font-size:0.7rem;">
+                        <i class="fas fa-image"></i>
+                    </button>
+<button class="btn-inventory" onclick="App._resetStoreItems()" title="إعادة تعيين المتجر" style="font-size:0.7rem;color:var(--secondary);">
+    <i class="fas fa-undo"></i>
+</button>
+                </div>
             </div>
-            <button class="btn btn-sm btn-outline" id="refreshStoreBtn" onclick="App._renderStore(DataManager.data.storeItems || [])">
-                <i class="fas fa-refresh"></i> تحديث
-            </button>
+
+            <!-- فلاتر المتجر -->
+            <div class="store-filters-wrapper">
+                <div class="store-filters-scroll" id="storeFilters">
+                    <!-- سيتم تعبئتها بواسطة JavaScript -->
+                </div>
+            </div>
+
+            <!-- شبكة المنتجات -->
+            <div class="store-grid" id="storeGrid">
+                <div class="store-loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>جاري تحميل المتجر...</span>
+                </div>
+            </div>
         </div>
-        <div id="storeGrid"><div class="text-gray">جاري التحميل...</div></div>
     `;
 },
 
@@ -13314,15 +14225,18 @@ async _restoreBackup(file) {
                     <p class="text-gray" style="font-size:0.8rem;">آخر تحديث: <span id="lastUpdateTime">—</span></p>
                     <button class="btn btn-sm btn-primary" id="testConnectionBtn"><i class="fas fa-wifi"></i> اختبار الاتصال</button>
                 </div>
-                <div class="card">
-                    <h3 class="card-title"><i class="fas fa-users-cog"></i> إدارة المستخدمين</h3>
-                    <p class="text-gray">المستخدم الحالي: <strong id="settingsCurrentUser">زائر</strong></p>
-                    <p class="text-gray">الدور: <span id="settingsCurrentRole">user</span></p>
-                    <div class="flex-center gap-1" style="flex-wrap:wrap;">
-                        <button class="btn btn-outline" id="logoutBtn2"><i class="fas fa-sign-out-alt"></i> تسجيل الخروج</button>
-                        <button class="btn btn-outline" id="profileSettingsBtn"><i class="fas fa-user-edit"></i> تعديل الملف</button>
-                    </div>
-                </div>
+<div class="card">
+    <h3 class="card-title"><i class="fas fa-users-cog"></i> إدارة المستخدمين</h3>
+    <p class="text-gray">المستخدم الحالي: <strong id="settingsCurrentUser">زائر</strong></p>
+    <p class="text-gray">الدور: <span id="settingsCurrentRole">user</span></p>
+    <div class="flex-center gap-1" style="flex-wrap:wrap;">
+        <button class="btn btn-outline" id="profileSettingsBtn"><i class="fas fa-user-edit"></i> تعديل الملف</button>
+        <!-- ✅ زر تسجيل الخروج -->
+        <button class="btn btn-danger" id="settingsLogoutBtn" style="background:var(--secondary); color:#fff; border:none;">
+            <i class="fas fa-sign-out-alt"></i> تسجيل الخروج
+        </button>
+    </div>
+</div>
                 <div class="card">
                     <h3 class="card-title"><i class="fas fa-palette"></i> المظهر</h3>
                     <button class="btn btn-outline" id="themeToggleBtn"><i class="fas fa-moon"></i> الوضع الليلي</button>
@@ -14327,6 +15241,65 @@ document.getElementById('goToAdminFromSettingsBtn')?.addEventListener('click', (
     App._activateSection('admin');
 });
 
+// ===== استيراد متعدد =====
+document.getElementById('batchImportBtn')?.addEventListener('click', function() {
+    document.getElementById('batchImportFileInput').click();
+});
+
+document.getElementById('batchImportFileInput')?.addEventListener('change', function(e) {
+    if (this.files && this.files.length > 0) {
+        App._addFilesToQueue(this.files);
+        // إعادة تعيين الإدخال للسماح بإضافة المزيد
+        this.value = '';
+    }
+});
+
+document.getElementById('clearQueueBtn')?.addEventListener('click', function() {
+    App._clearQueue();
+});
+
+document.getElementById('startQueueBtn')?.addEventListener('click', function() {
+    App._startQueueImport();
+});
+
+// ===== أزرار إعدادات الأطوار =====
+document.querySelectorAll('.mode-settings-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation(); // منع انتشار الحدث لتجنب اختيار الطور
+        const mode = this.dataset.mode;
+        App._openModeSettings(mode);
+    });
+});
+
+// ===== زر حفظ إعدادات الطور =====
+document.getElementById('saveModeSettingsBtn')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    App._saveModeSettings();
+});
+
+// ===== زر تسجيل الخروج من الإعدادات =====
+document.getElementById('settingsLogoutBtn')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    
+    if (confirm('⚠️ هل أنت متأكد من تسجيل الخروج؟')) {
+        // تشغيل صوت الخروج
+        if (typeof SoundSystem !== 'undefined') {
+            SoundSystem.playClick();
+        }
+        
+        // تسجيل الخروج
+        AuthService.logout();
+        
+        // إغلاق مودال الإعدادات إذا كان مفتوحاً
+        App._closeModal('settingsModal');
+        
+        // إعادة تحميل الصفحة
+        setTimeout(() => {
+            window.location.reload(true);
+        }, 500);
+    }
+});
+
 // ============================================================
 // ربط الأزرار الجديدة في _setupUI
 // ============================================================
@@ -14387,6 +15360,21 @@ document.getElementById('dashboardMatchSettingsBtn')?.addEventListener('click', 
 // داخل _setupUI
 document.getElementById('dashboardDirectMatchBtn')?.addEventListener('click', () => {
     MatchmakingSystem.startMatchmaking(App._selectedMatchMode || 'normal_1v1');
+});
+
+// ===== زر عكس جميع صح/خطأ =====
+document.getElementById('fixAllTrueFalseBtn')?.addEventListener('click', function() {
+    App._fixAllTrueFalseQuestions();
+});
+
+// ===== زر عكس المحدد =====
+document.getElementById('fixSelectedTrueFalseBtn')?.addEventListener('click', function() {
+    App._fixSelectedTrueFalseQuestions();
+});
+
+// ===== زر إلغاء العكس =====
+document.getElementById('cancelFixBtn')?.addEventListener('click', function() {
+    App._cancelFix();
 });
 
 // في _setupUI - أضف هذه الأحداث
@@ -15536,13 +16524,9 @@ window.deleteQuestion = async (id) => {
         this._initStoreItems();
     },
 
-// ============================================================
-// 1. تهيئة المتجر بالعناصر الافتراضية (60+ عنصر)
-// ============================================================
-
 async _initStoreItems() {
     if (this._storeInitialized) return;
-    this._storeInitialized = true; // تعيين العلم فوراً
+    this._storeInitialized = true;
     if (!isFirebaseReady) return;
 
     try {
@@ -15557,200 +16541,403 @@ async _initStoreItems() {
             return;
         }
 
-        // إضافة العناصر على دفعات (batch) لتجنب إرهاق المتصفح
+        // إضافة العناصر على دفعات
         const batchSize = 10;
         let addedCount = 0;
         for (let i = 0; i < itemsToAdd.length; i += batchSize) {
             const batch = itemsToAdd.slice(i, i + batchSize);
-            // استخدام Promise.all لإضافة الدفعة بالتوازي
             await Promise.all(batch.map(item => FirestoreService.add('storeItems', item)));
             addedCount += batch.length;
-            // يمكنك إضافة تأخير صغير بين الدفعات لتخفيف الضغط (اختياري)
-            // if (i + batchSize < itemsToAdd.length) await new Promise(res => setTimeout(res, 100));
         }
 
         showToast(`🛒 تم إضافة ${addedCount} عنصر جديد إلى المتجر`, 'success', 4000);
         console.log(`✅ تمت إضافة ${addedCount} عنصر جديد، إجمالي العناصر الآن: ${existingItems.length + addedCount}`);
     } catch (e) {
         console.error('❌ خطأ في تهيئة المتجر:', e);
-        // إعادة تعيين العلم للسماح بمحاولة لاحقة (اختياري)
         this._storeInitialized = false;
         showToast('⚠️ فشل تهيئة المتجر', 'error');
     }
 },
 
-// ============================================================
-// 2. قائمة العناصر الافتراضية (يمكن توسيعها)
-// ============================================================
-
 _getDefaultStoreItems() {
     const items = [];
 
     // ============================================================
-    // 1. تعزيزات اللعبة (Boosts) - السابقة
+    // 1. تعزيزات اللعبة (Boosts)
     // ============================================================
     const boosts = [
-        { id: 'boost_x2_points', name: '⚡ مضاعف النقاط ×2', icon: '⚡', desc: 'ضعف النقاط في جولة واحدة (3 استخدامات)', price: 150, currency: 'coins', rarity: 'uncommon', effect: 'point_multiplier', value: 2, uses: 3 },
-        { id: 'boost_x3_points', name: '🔥 مضاعف النقاط ×3', icon: '🔥', desc: 'ثلاثة أضعاف النقاط (2 استخدامات)', price: 300, currency: 'coins', rarity: 'rare', effect: 'point_multiplier', value: 3, uses: 2 },
-        { id: 'boost_x5_points', name: '💎 مضاعف النقاط ×5', icon: '💎', desc: 'خمسة أضعاف النقاط (استخدام واحد)', price: 50, currency: 'gems', rarity: 'epic', effect: 'point_multiplier', value: 5, uses: 1 },
-        { id: 'boost_x2_coins', name: '🪙 مضاعف العملات ×2', icon: '🪙', desc: 'ضعف العملات في جولة (3 استخدامات)', price: 120, currency: 'coins', rarity: 'uncommon', effect: 'coin_multiplier', value: 2, uses: 3 },
-        { id: 'boost_x3_coins', name: '💰 مضاعف العملات ×3', icon: '💰', desc: 'ثلاثة أضعاف العملات (2 استخدامات)', price: 250, currency: 'coins', rarity: 'rare', effect: 'coin_multiplier', value: 3, uses: 2 },
-        { id: 'boost_freeze_5s', name: '❄️ تجميد 5s', icon: '❄️', desc: 'جمد المؤقت 5 ثوانٍ (مرة)', price: 80, currency: 'coins', rarity: 'common', effect: 'freeze_time', value: 5, uses: 1 },
-        { id: 'boost_freeze_10s', name: '🧊 تجميد 10s', icon: '🧊', desc: 'جمد المؤقت 10 ثوانٍ (مرة)', price: 150, currency: 'coins', rarity: 'uncommon', effect: 'freeze_time', value: 10, uses: 1 },
-        { id: 'boost_remove_wrong', name: '❌ حذف خاطئ', icon: '❌', desc: 'احذف خياراً خاطئاً (مرة)', price: 60, currency: 'coins', rarity: 'common', effect: 'remove_wrong_option', value: 1, uses: 1 },
-        { id: 'boost_remove_3wrong', name: '🚫 حذف 3 خيارات', icon: '🚫', desc: 'احذف 3 خيارات خاطئة (مرة)', price: 200, currency: 'coins', rarity: 'rare', effect: 'remove_wrong_option', value: 3, uses: 1 },
-        { id: 'boost_streak_shield', name: '🛡️ درع السلسلة', icon: '🛡️', desc: 'لا تنقطع السلسلة عند الخطأ (مرة)', price: 100, currency: 'coins', rarity: 'uncommon', effect: 'streak_shield', value: 1, uses: 1 },
-        { id: 'boost_extra_life', name: '❤️ حياة إضافية', icon: '❤️', desc: 'استمر بعد خطأ (مرة)', price: 180, currency: 'coins', rarity: 'rare', effect: 'extra_life', value: 1, uses: 1 },
+        { 
+            id: 'boost_x2_points', 
+            name: 'مضاعف النقاط ×2', 
+            imagePath: 'images/store/boosts/boost_x2_points.png',
+            desc: 'ضعف النقاط في جولة واحدة (3 استخدامات)', 
+            price: 150, 
+            currency: 'coins', 
+            rarity: 'uncommon', 
+            effect: 'point_multiplier', 
+            value: 2, 
+            uses: 3 
+        },
+        { 
+            id: 'boost_x3_points', 
+            name: 'مضاعف النقاط ×3', 
+            imagePath: 'images/store/boosts/boost_x3_points.png',
+            desc: 'ثلاثة أضعاف النقاط (2 استخدامات)', 
+            price: 300, 
+            currency: 'coins', 
+            rarity: 'rare', 
+            effect: 'point_multiplier', 
+            value: 3, 
+            uses: 2 
+        },
+        { 
+            id: 'boost_x5_points', 
+            name: 'مضاعف النقاط ×5', 
+            imagePath: 'images/store/boosts/boost_x5_points.png',
+            desc: 'خمسة أضعاف النقاط (استخدام واحد)', 
+            price: 50, 
+            currency: 'gems', 
+            rarity: 'epic', 
+            effect: 'point_multiplier', 
+            value: 5, 
+            uses: 1 
+        },
+        { 
+            id: 'boost_x2_coins', 
+            name: 'مضاعف العملات ×2', 
+            imagePath: 'images/store/boosts/boost_x2_coins.png',
+            desc: 'ضعف العملات في جولة (3 استخدامات)', 
+            price: 120, 
+            currency: 'coins', 
+            rarity: 'uncommon', 
+            effect: 'coin_multiplier', 
+            value: 2, 
+            uses: 3 
+        },
+        { 
+            id: 'boost_x3_coins', 
+            name: 'مضاعف العملات ×3', 
+            imagePath: 'images/store/boosts/boost_x3_coins.png',
+            desc: 'ثلاثة أضعاف العملات (2 استخدامات)', 
+            price: 250, 
+            currency: 'coins', 
+            rarity: 'rare', 
+            effect: 'coin_multiplier', 
+            value: 3, 
+            uses: 2 
+        },
+        { 
+            id: 'boost_freeze_5s', 
+            name: 'تجميد 5 ثوانٍ', 
+            imagePath: 'images/store/boosts/boost_freeze_5s.png',
+            desc: 'جمد المؤقت 5 ثوانٍ (مرة)', 
+            price: 80, 
+            currency: 'coins', 
+            rarity: 'common', 
+            effect: 'freeze_time', 
+            value: 5, 
+            uses: 1 
+        },
+        { 
+            id: 'boost_freeze_10s', 
+            name: 'تجميد 10 ثوانٍ', 
+            imagePath: 'images/store/boosts/boost_freeze_10s.png',
+            desc: 'جمد المؤقت 10 ثوانٍ (مرة)', 
+            price: 150, 
+            currency: 'coins', 
+            rarity: 'uncommon', 
+            effect: 'freeze_time', 
+            value: 10, 
+            uses: 1 
+        },
+        { 
+            id: 'boost_remove_wrong', 
+            name: 'حذف خيار خاطئ', 
+            imagePath: 'images/store/boosts/boost_remove_wrong.png',
+            desc: 'احذف خياراً خاطئاً (مرة)', 
+            price: 60, 
+            currency: 'coins', 
+            rarity: 'common', 
+            effect: 'remove_wrong_option', 
+            value: 1, 
+            uses: 1 
+        },
+        { 
+            id: 'boost_remove_3wrong', 
+            name: 'حذف 3 خيارات خاطئة', 
+            imagePath: 'images/store/boosts/boost_remove_3wrong.png',
+            desc: 'احذف 3 خيارات خاطئة (مرة)', 
+            price: 200, 
+            currency: 'coins', 
+            rarity: 'rare', 
+            effect: 'remove_wrong_option', 
+            value: 3, 
+            uses: 1 
+        },
+        { 
+            id: 'boost_streak_shield', 
+            name: 'درع السلسلة', 
+            imagePath: 'images/store/boosts/boost_streak_shield.png',
+            desc: 'لا تنقطع السلسلة عند الخطأ (مرة)', 
+            price: 100, 
+            currency: 'coins', 
+            rarity: 'uncommon', 
+            effect: 'streak_shield', 
+            value: 1, 
+            uses: 1 
+        },
+        { 
+            id: 'boost_extra_life', 
+            name: 'حياة إضافية', 
+            imagePath: 'images/store/boosts/boost_extra_life.png',
+            desc: 'استمر بعد خطأ (مرة)', 
+            price: 180, 
+            currency: 'coins', 
+            rarity: 'rare', 
+            effect: 'extra_life', 
+            value: 1, 
+            uses: 1 
+        }
     ];
-    boosts.forEach(b => items.push({ ...b, category: 'boosts', duration: 'limited', effectType: b.effect, effectValue: b.value, stackable: true, maxStack: 99 }));
+
+    boosts.forEach(b => items.push({ 
+        ...b, 
+        category: 'boosts', 
+        duration: 'limited', 
+        effectType: b.effect, 
+        effectValue: b.value, 
+        stackable: true, 
+        maxStack: 99 
+    }));
 
     // ============================================================
-    // 2. تعزيزات الغرف (Room Boosts) - السابقة
-    // ============================================================
-    const roomBoosts = [
-        { id: 'room_head_start_20', name: '🏃 بداية +20', icon: '🏃', desc: 'في الغرف، ابدأ بـ 20 نقطة', price: 200, currency: 'coins', rarity: 'uncommon', effect: 'head_start', value: 20, uses: 1 },
-        { id: 'room_head_start_50', name: '🚀 بداية +50', icon: '🚀', desc: 'في الغرف، ابدأ بـ 50 نقطة', price: 400, currency: 'coins', rarity: 'rare', effect: 'head_start', value: 50, uses: 1 },
-        { id: 'room_attack', name: '⚔️ هجوم خصم', icon: '⚔️', desc: 'خصم 10 نقاط من جميع الخصوم', price: 300, currency: 'coins', rarity: 'rare', effect: 'attack_opponent', value: 10, uses: 1 },
-        { id: 'room_shield', name: '🛡️ درع جماعي', icon: '🛡️', desc: 'احمِ فريقك من الهجمات', price: 250, currency: 'coins', rarity: 'uncommon', effect: 'team_shield', value: 1, uses: 1 },
-        { id: 'room_double_guess', name: '🎯 تخمين مزدوج', icon: '🎯', desc: 'اختر خيارين بدلاً من واحد', price: 180, currency: 'coins', rarity: 'uncommon', effect: 'double_guess', value: 1, uses: 1 },
-        { id: 'room_extra_time', name: '⏳ وقت إضافي 5s', icon: '⏳', desc: 'أضف 5 ثوانٍ للجميع', price: 150, currency: 'coins', rarity: 'common', effect: 'extra_room_time', value: 5, uses: 1 },
-    ];
-    roomBoosts.forEach(b => items.push({ ...b, category: 'room_boosts', duration: 'limited', effectType: b.effect, effectValue: b.value, stackable: true, maxStack: 99 }));
-
-const roomTickets = [
-    { id: 'room_ticket', name: '🎫 بطاقة غرفة', icon: '🎫', desc: 'تسمح لك بإنشاء غرفة لعب خاصة (استخدام واحد)', price: 600, currency: 'coins', rarity: 'rare', category: 'tickets', effect: 'room_ticket', value: 1, stackable: true, maxStack: 99 }
-];
-roomTickets.forEach(b => items.push({ ...b, duration: 'permanent', effectType: 'room_ticket', effectValue: 1, stackable: true, maxStack: 99 }));
-
-    // ============================================================
-    // 3. إطارات الملف الشخصي (Frames)
-    // ============================================================
-    const frames = [
-        { id: 'frame_bronze', name: '🟫 برونزي', icon: '🖼️', desc: 'إطار برونزي أنيق', price: 50, currency: 'coins', rarity: 'common', effect: 'profile_frame', value: 'bronze' },
-        { id: 'frame_silver', name: '⬜ فضي', icon: '🖼️', desc: 'إطار فضي لامع', price: 100, currency: 'coins', rarity: 'uncommon', effect: 'profile_frame', value: 'silver' },
-        { id: 'frame_gold', name: '🟨 ذهبي', icon: '🖼️', desc: 'إطار ذهبي فاخر', price: 200, currency: 'coins', rarity: 'rare', effect: 'profile_frame', value: 'gold' },
-        { id: 'frame_platinum', name: '⬜ بلاتيني', icon: '🖼️', desc: 'إطار بلاتيني نادر', price: 350, currency: 'coins', rarity: 'epic', effect: 'profile_frame', value: 'platinum' },
-        { id: 'frame_diamond', name: '💎 ألماس', icon: '🖼️', desc: 'إطار ألماسي متلألئ', price: 30, currency: 'gems', rarity: 'epic', effect: 'profile_frame', value: 'diamond' },
-        { id: 'frame_fire', name: '🔥 ناري', icon: '🖼️', desc: 'إطار ناري متوهج', price: 50, currency: 'gems', rarity: 'legendary', effect: 'profile_frame', value: 'fire' },
-        { id: 'frame_legend', name: '👑 أسطوري', icon: '🖼️', desc: 'إطار أسطوري نادر', price: 100, currency: 'gems', rarity: 'legendary', effect: 'profile_frame', value: 'legend' },
-        { id: 'frame_glow', name: '✨ متوهج', icon: '🖼️', desc: 'إطار متوهج بأنيميشن', price: 80, currency: 'gems', rarity: 'epic', effect: 'profile_frame', value: 'glow' },
-    ];
-    frames.forEach(b => items.push({ ...b, category: 'frames', duration: 'permanent', effectType: b.effect, effectValue: b.value, stackable: false }));
-
-    // ============================================================
-    // 4. خلفيات الملف الشخصي (Backgrounds)
-    // ============================================================
-    const backgrounds = [
-        { id: 'bg_stadium', name: '🏟️ ملعب', icon: '🏟️', desc: 'خلفية ملعب', price: 120, currency: 'coins', rarity: 'common', effect: 'profile_bg', value: 'stadium' },
-        { id: 'bg_crowd', name: '👥 جماهير', icon: '👥', desc: 'خلفية مع جماهير', price: 150, currency: 'coins', rarity: 'uncommon', effect: 'profile_bg', value: 'crowd' },
-        { id: 'bg_trophy', name: '🏆 كأس', icon: '🏆', desc: 'خلفية مع الكؤوس', price: 200, currency: 'coins', rarity: 'rare', effect: 'profile_bg', value: 'trophy' },
-        { id: 'bg_night', name: '🌙 ليلة', icon: '🌙', desc: 'خلفية ليلية', price: 180, currency: 'coins', rarity: 'uncommon', effect: 'profile_bg', value: 'night' },
-        { id: 'bg_sunset', name: '🌅 غروب', icon: '🌅', desc: 'خلفية غروب', price: 220, currency: 'coins', rarity: 'rare', effect: 'profile_bg', value: 'sunset' },
-        { id: 'bg_sky', name: '☁️ سماء', icon: '☁️', desc: 'خلفية سماء', price: 130, currency: 'coins', rarity: 'common', effect: 'profile_bg', value: 'sky' },
-        { id: 'bg_lights', name: '🎆 أضواء', icon: '🎆', desc: 'خلفية أضواء', price: 300, currency: 'coins', rarity: 'epic', effect: 'profile_bg', value: 'lights' },
-        { id: 'bg_legend', name: '🌟 أسطوري', icon: '🌟', desc: 'خلفية أسطورية', price: 40, currency: 'gems', rarity: 'legendary', effect: 'profile_bg', value: 'legend_bg' },
-    ];
-    backgrounds.forEach(b => items.push({ ...b, category: 'backgrounds', duration: 'permanent', effectType: b.effect, effectValue: b.value, stackable: false }));
-
-    // ============================================================
-    // 5. شارات (Badges)
-    // ============================================================
-    const badges = [
-        { id: 'badge_star', name: '⭐ نجم', icon: '⭐', desc: 'شارة نجم لامع', price: 80, currency: 'coins', rarity: 'common', effect: 'display_badge', value: '⭐' },
-        { id: 'badge_king', name: '👑 ملك', icon: '👑', desc: 'شارة الملك المتوج', price: 300, currency: 'coins', rarity: 'rare', effect: 'display_badge', value: '👑' },
-        { id: 'badge_warrior', name: '⚔️ محارب', icon: '⚔️', desc: 'شارة المحارب الشجاع', price: 150, currency: 'coins', rarity: 'uncommon', effect: 'display_badge', value: '⚔️' },
-        { id: 'badge_god', name: '⚡ إله', icon: '⚡', desc: 'شارة إلهية أسطورية', price: 50, currency: 'gems', rarity: 'epic', effect: 'display_badge', value: '⚡' },
-        { id: 'badge_speed', name: '💨 سريع', icon: '💨', desc: 'شارة السرعة الفائقة', price: 180, currency: 'coins', rarity: 'uncommon', effect: 'display_badge', value: '💨' },
-        { id: 'badge_smart', name: '🧠 ذكي', icon: '🧠', desc: 'شارة الذكاء الحاد', price: 200, currency: 'coins', rarity: 'rare', effect: 'display_badge', value: '🧠' },
-        { id: 'badge_invincible', name: '🛡️ لا يُقهر', icon: '🛡️', desc: 'شارة الذي لا يُقهر', price: 400, currency: 'coins', rarity: 'epic', effect: 'display_badge', value: '🛡️' },
-        { id: 'badge_legendary', name: '🌟 خرافي', icon: '🌟', desc: 'شارة أسطورية نادرة', price: 80, currency: 'gems', rarity: 'legendary', effect: 'display_badge', value: '🌟' },
-    ];
-    badges.forEach(b => items.push({ ...b, category: 'badges', duration: 'permanent', effectType: b.effect, effectValue: b.value, stackable: false }));
-
-    // ============================================================
-    // 6. رموز الدردشة (Emotes)
-    // ============================================================
-    const emotes = [
-        { id: 'emote_fire', name: '🔥 نار', icon: '🔥', desc: 'رمز ناري', price: 30, currency: 'coins', rarity: 'common', effect: 'chat_emote', value: '🔥' },
-        { id: 'emote_diamond', name: '💎 ماسة', icon: '💎', desc: 'رمز ماسي', price: 60, currency: 'coins', rarity: 'uncommon', effect: 'chat_emote', value: '💎' },
-        { id: 'emote_crown', name: '👑 تاج', icon: '👑', desc: 'رمز تاج', price: 80, currency: 'coins', rarity: 'rare', effect: 'chat_emote', value: '👑' },
-        { id: 'emote_thunder', name: '⚡ صاعقة', icon: '⚡', desc: 'رمز صاعقة', price: 100, currency: 'coins', rarity: 'uncommon', effect: 'chat_emote', value: '⚡' },
-        { id: 'emote_fireball', name: '🔥 كرة نارية', icon: '🔥', desc: 'رمز كرة نارية', price: 150, currency: 'coins', rarity: 'rare', effect: 'chat_emote', value: '🔥' },
-        { id: 'emote_beast', name: '👹 وحش', icon: '👹', desc: 'رمز وحش', price: 200, currency: 'coins', rarity: 'epic', effect: 'chat_emote', value: '👹' },
-        { id: 'emote_shining', name: '✨ نجم ساطع', icon: '✨', desc: 'رمز نجم ساطع', price: 120, currency: 'coins', rarity: 'uncommon', effect: 'chat_emote', value: '✨' },
-        { id: 'emote_heartbeat', name: '💓 قلب نابض', icon: '💓', desc: 'رمز قلب', price: 50, currency: 'coins', rarity: 'common', effect: 'chat_emote', value: '💓' },
-    ];
-    emotes.forEach(b => items.push({ ...b, category: 'emotes', duration: 'permanent', effectType: b.effect, effectValue: b.value, stackable: false }));
-
-    // ============================================================
-    // 7. سمات الواجهة (Themes)
-    // ============================================================
-    const themes = [
-        { id: 'theme_gold', name: '🟨 ذهبي', icon: '🎨', desc: 'سمة ذهبية فاخرة', price: 250, currency: 'coins', rarity: 'rare', effect: 'ui_theme', value: 'gold' },
-        { id: 'theme_electric', name: '🔵 أزرق كهربائي', icon: '🎨', desc: 'سمة زرقاء نيون', price: 200, currency: 'coins', rarity: 'uncommon', effect: 'ui_theme', value: 'electric' },
-        { id: 'theme_fire', name: '🔴 أحمر ناري', icon: '🎨', desc: 'سمة حمراء مشتعلة', price: 220, currency: 'coins', rarity: 'rare', effect: 'ui_theme', value: 'fire' },
-        { id: 'theme_emerald', name: '🟢 أخضر زمردي', icon: '🎨', desc: 'سمة خضراء أنيقة', price: 200, currency: 'coins', rarity: 'uncommon', effect: 'ui_theme', value: 'emerald' },
-        { id: 'theme_purple', name: '🟣 بنفسجي', icon: '🎨', desc: 'سمة بنفسجية ساحرة', price: 300, currency: 'coins', rarity: 'epic', effect: 'ui_theme', value: 'purple' },
-        { id: 'theme_neon_pink', name: '🩷 وردي نيون', icon: '🎨', desc: 'سمة وردية جريئة', price: 350, currency: 'coins', rarity: 'epic', effect: 'ui_theme', value: 'neon_pink' },
-    ];
-    themes.forEach(b => items.push({ ...b, category: 'themes', duration: 'permanent', effectType: b.effect, effectValue: b.value, stackable: false }));
-
-    // ============================================================
-    // 8. صناديق الحظ (Loot Boxes)
-    // ============================================================
-    const lootBoxes = [
-        { id: 'loot_common', name: '📦 صندوق عادي', icon: '📦', desc: 'عنصر عادي أو غير عادي', price: 50, currency: 'coins', rarity: 'common', effect: 'loot_box', value: 'common' },
-        { id: 'loot_rare', name: '🎁 صندوق مميز', icon: '🎁', desc: 'عنصر نادر أو أسطوري', price: 150, currency: 'coins', rarity: 'rare', effect: 'loot_box', value: 'rare' },
-        { id: 'loot_epic', name: '💎 صندوق أسطوري', icon: '💎', desc: 'عنصر أسطوري أو خرافي', price: 50, currency: 'gems', rarity: 'epic', effect: 'loot_box', value: 'epic' },
-        { id: 'loot_legendary', name: '🌟 صندوق خرافي', icon: '🌟', desc: 'عنصر خرافي مضمون', price: 150, currency: 'gems', rarity: 'legendary', effect: 'loot_box', value: 'legendary' },
-    ];
-    lootBoxes.forEach(b => items.push({ ...b, category: 'loot_boxes', duration: 'limited', effectType: b.effect, effectValue: b.value, stackable: true, maxStack: 99 }));
-
-    // ============================================================
-    // 9. عناصر مضاعفة النقود (Coin Multipliers) - NEW
+    // 2. مضاعفات النقود (Coin Multipliers)
     // ============================================================
     const coinMultipliers = [
-        // مدد زمنية (بالساعات)
-        { id: 'coin_x2_1h', name: '🪙 ×2 نقود (ساعة)', icon: '🪙', desc: 'مضاعفة النقود ×2 لمدة ساعة', price: 50, currency: 'coins', rarity: 'uncommon', effect: 'coin_multiplier', value: 2, durationType: 'time', durationValue: 1 },
-        { id: 'coin_x2_5h', name: '🪙 ×2 نقود (5 ساعات)', icon: '🪙', desc: 'مضاعفة النقود ×2 لمدة 5 ساعات', price: 200, currency: 'coins', rarity: 'rare', effect: 'coin_multiplier', value: 2, durationType: 'time', durationValue: 5 },
-        { id: 'coin_x2_24h', name: '🪙 ×2 نقود (24 ساعة)', icon: '🪙', desc: 'مضاعفة النقود ×2 لمدة 24 ساعة', price: 700, currency: 'coins', rarity: 'epic', effect: 'coin_multiplier', value: 2, durationType: 'time', durationValue: 24 },
-        { id: 'coin_x3_1h', name: '🪙 ×3 نقود (ساعة)', icon: '🪙', desc: 'مضاعفة النقود ×3 لمدة ساعة', price: 120, currency: 'coins', rarity: 'rare', effect: 'coin_multiplier', value: 3, durationType: 'time', durationValue: 1 },
-        { id: 'coin_x3_5h', name: '🪙 ×3 نقود (5 ساعات)', icon: '🪙', desc: 'مضاعفة النقود ×3 لمدة 5 ساعات', price: 450, currency: 'coins', rarity: 'epic', effect: 'coin_multiplier', value: 3, durationType: 'time', durationValue: 5 },
-        { id: 'coin_x3_24h', name: '🪙 ×3 نقود (24 ساعة)', icon: '🪙', desc: 'مضاعفة النقود ×3 لمدة 24 ساعة', price: 1500, currency: 'coins', rarity: 'legendary', effect: 'coin_multiplier', value: 3, durationType: 'time', durationValue: 24 },
-        // مدد جولات (Rounds)
-        { id: 'coin_x2_1r', name: '🪙 ×2 نقود (جولة)', icon: '🪙', desc: 'مضاعفة النقود ×2 لجولة واحدة', price: 30, currency: 'coins', rarity: 'common', effect: 'coin_multiplier', value: 2, durationType: 'rounds', durationValue: 1 },
-        { id: 'coin_x2_5r', name: '🪙 ×2 نقود (5 جولات)', icon: '🪙', desc: 'مضاعفة النقود ×2 لخمس جولات', price: 120, currency: 'coins', rarity: 'uncommon', effect: 'coin_multiplier', value: 2, durationType: 'rounds', durationValue: 5 },
-        { id: 'coin_x2_10r', name: '🪙 ×2 نقود (10 جولات)', icon: '🪙', desc: 'مضاعفة النقود ×2 لعشرة جولات', price: 220, currency: 'coins', rarity: 'rare', effect: 'coin_multiplier', value: 2, durationType: 'rounds', durationValue: 10 },
-        { id: 'coin_x3_1r', name: '🪙 ×3 نقود (جولة)', icon: '🪙', desc: 'مضاعفة النقود ×3 لجولة واحدة', price: 70, currency: 'coins', rarity: 'rare', effect: 'coin_multiplier', value: 3, durationType: 'rounds', durationValue: 1 },
-        { id: 'coin_x3_5r', name: '🪙 ×3 نقود (5 جولات)', icon: '🪙', desc: 'مضاعفة النقود ×3 لخمس جولات', price: 280, currency: 'coins', rarity: 'epic', effect: 'coin_multiplier', value: 3, durationType: 'rounds', durationValue: 5 },
-        { id: 'coin_x3_10r', name: '🪙 ×3 نقود (10 جولات)', icon: '🪙', desc: 'مضاعفة النقود ×3 لعشرة جولات', price: 520, currency: 'coins', rarity: 'epic', effect: 'coin_multiplier', value: 3, durationType: 'rounds', durationValue: 10 },
+        { id: 'coin_x2_1h', name: '×2 نقود (ساعة)', imagePath: 'images/store/boosts/coin_x2_1h.png', desc: 'مضاعفة النقود ×2 لمدة ساعة', price: 50, currency: 'coins', rarity: 'uncommon', effect: 'coin_multiplier', value: 2, durationType: 'time', durationValue: 1 },
+        { id: 'coin_x2_5h', name: '×2 نقود (5 ساعات)', imagePath: 'images/store/boosts/coin_x2_5h.png', desc: 'مضاعفة النقود ×2 لمدة 5 ساعات', price: 200, currency: 'coins', rarity: 'rare', effect: 'coin_multiplier', value: 2, durationType: 'time', durationValue: 5 },
+        { id: 'coin_x2_24h', name: '×2 نقود (24 ساعة)', imagePath: 'images/store/boosts/coin_x2_24h.png', desc: 'مضاعفة النقود ×2 لمدة 24 ساعة', price: 700, currency: 'coins', rarity: 'epic', effect: 'coin_multiplier', value: 2, durationType: 'time', durationValue: 24 },
+        { id: 'coin_x3_1h', name: '×3 نقود (ساعة)', imagePath: 'images/store/boosts/coin_x3_1h.png', desc: 'مضاعفة النقود ×3 لمدة ساعة', price: 120, currency: 'coins', rarity: 'rare', effect: 'coin_multiplier', value: 3, durationType: 'time', durationValue: 1 },
+        { id: 'coin_x3_5h', name: '×3 نقود (5 ساعات)', imagePath: 'images/store/boosts/coin_x3_5h.png', desc: 'مضاعفة النقود ×3 لمدة 5 ساعات', price: 450, currency: 'coins', rarity: 'epic', effect: 'coin_multiplier', value: 3, durationType: 'time', durationValue: 5 },
+        { id: 'coin_x3_24h', name: '×3 نقود (24 ساعة)', imagePath: 'images/store/boosts/coin_x3_24h.png', desc: 'مضاعفة النقود ×3 لمدة 24 ساعة', price: 1500, currency: 'coins', rarity: 'legendary', effect: 'coin_multiplier', value: 3, durationType: 'time', durationValue: 24 },
+        { id: 'coin_x2_1r', name: '×2 نقود (جولة)', imagePath: 'images/store/boosts/coin_x2_1r.png', desc: 'مضاعفة النقود ×2 لجولة واحدة', price: 30, currency: 'coins', rarity: 'common', effect: 'coin_multiplier', value: 2, durationType: 'rounds', durationValue: 1 },
+        { id: 'coin_x2_5r', name: '×2 نقود (5 جولات)', imagePath: 'images/store/boosts/coin_x2_5r.png', desc: 'مضاعفة النقود ×2 لخمس جولات', price: 120, currency: 'coins', rarity: 'uncommon', effect: 'coin_multiplier', value: 2, durationType: 'rounds', durationValue: 5 },
+        { id: 'coin_x2_10r', name: '×2 نقود (10 جولات)', imagePath: 'images/store/boosts/coin_x2_10r.png', desc: 'مضاعفة النقود ×2 لعشرة جولات', price: 220, currency: 'coins', rarity: 'rare', effect: 'coin_multiplier', value: 2, durationType: 'rounds', durationValue: 10 },
+        { id: 'coin_x3_1r', name: '×3 نقود (جولة)', imagePath: 'images/store/boosts/coin_x3_1r.png', desc: 'مضاعفة النقود ×3 لجولة واحدة', price: 70, currency: 'coins', rarity: 'rare', effect: 'coin_multiplier', value: 3, durationType: 'rounds', durationValue: 1 },
+        { id: 'coin_x3_5r', name: '×3 نقود (5 جولات)', imagePath: 'images/store/boosts/coin_x3_5r.png', desc: 'مضاعفة النقود ×3 لخمس جولات', price: 280, currency: 'coins', rarity: 'epic', effect: 'coin_multiplier', value: 3, durationType: 'rounds', durationValue: 5 },
+        { id: 'coin_x3_10r', name: '×3 نقود (10 جولات)', imagePath: 'images/store/boosts/coin_x3_10r.png', desc: 'مضاعفة النقود ×3 لعشرة جولات', price: 520, currency: 'coins', rarity: 'epic', effect: 'coin_multiplier', value: 3, durationType: 'rounds', durationValue: 10 }
     ];
-    coinMultipliers.forEach(b => items.push({ ...b, category: 'boosts', duration: 'limited', effectType: b.effect, effectValue: b.value, stackable: true, maxStack: 99, uses: 1 }));
+
+    coinMultipliers.forEach(b => items.push({ 
+        ...b, 
+        category: 'boosts', 
+        duration: 'limited', 
+        effectType: b.effect, 
+        effectValue: b.value, 
+        stackable: true, 
+        maxStack: 99, 
+        uses: 1 
+    }));
 
     // ============================================================
-    // 10. عناصر مضاعفة النقاط (Point Multipliers) - NEW
+    // 3. مضاعفات النقاط (Point Multipliers)
     // ============================================================
     const pointMultipliers = [
-        // مدد زمنية (بالساعات)
-        { id: 'point_x2_1h', name: '⭐ ×2 نقاط (ساعة)', icon: '⭐', desc: 'مضاعفة النقاط ×2 لمدة ساعة', price: 60, currency: 'coins', rarity: 'uncommon', effect: 'point_multiplier', value: 2, durationType: 'time', durationValue: 1 },
-        { id: 'point_x2_5h', name: '⭐ ×2 نقاط (5 ساعات)', icon: '⭐', desc: 'مضاعفة النقاط ×2 لمدة 5 ساعات', price: 250, currency: 'coins', rarity: 'rare', effect: 'point_multiplier', value: 2, durationType: 'time', durationValue: 5 },
-        { id: 'point_x2_24h', name: '⭐ ×2 نقاط (24 ساعة)', icon: '⭐', desc: 'مضاعفة النقاط ×2 لمدة 24 ساعة', price: 800, currency: 'coins', rarity: 'epic', effect: 'point_multiplier', value: 2, durationType: 'time', durationValue: 24 },
-        { id: 'point_x3_1h', name: '⭐ ×3 نقاط (ساعة)', icon: '⭐', desc: 'مضاعفة النقاط ×3 لمدة ساعة', price: 150, currency: 'coins', rarity: 'rare', effect: 'point_multiplier', value: 3, durationType: 'time', durationValue: 1 },
-        { id: 'point_x3_5h', name: '⭐ ×3 نقاط (5 ساعات)', icon: '⭐', desc: 'مضاعفة النقاط ×3 لمدة 5 ساعات', price: 550, currency: 'coins', rarity: 'epic', effect: 'point_multiplier', value: 3, durationType: 'time', durationValue: 5 },
-        { id: 'point_x3_24h', name: '⭐ ×3 نقاط (24 ساعة)', icon: '⭐', desc: 'مضاعفة النقاط ×3 لمدة 24 ساعة', price: 1800, currency: 'coins', rarity: 'legendary', effect: 'point_multiplier', value: 3, durationType: 'time', durationValue: 24 },
-        // مدد جولات (Rounds)
-        { id: 'point_x2_1r', name: '⭐ ×2 نقاط (جولة)', icon: '⭐', desc: 'مضاعفة النقاط ×2 لجولة واحدة', price: 40, currency: 'coins', rarity: 'common', effect: 'point_multiplier', value: 2, durationType: 'rounds', durationValue: 1 },
-        { id: 'point_x2_5r', name: '⭐ ×2 نقاط (5 جولات)', icon: '⭐', desc: 'مضاعفة النقاط ×2 لخمس جولات', price: 150, currency: 'coins', rarity: 'uncommon', effect: 'point_multiplier', value: 2, durationType: 'rounds', durationValue: 5 },
-        { id: 'point_x2_10r', name: '⭐ ×2 نقاط (10 جولات)', icon: '⭐', desc: 'مضاعفة النقاط ×2 لعشرة جولات', price: 270, currency: 'coins', rarity: 'rare', effect: 'point_multiplier', value: 2, durationType: 'rounds', durationValue: 10 },
-        { id: 'point_x3_1r', name: '⭐ ×3 نقاط (جولة)', icon: '⭐', desc: 'مضاعفة النقاط ×3 لجولة واحدة', price: 90, currency: 'coins', rarity: 'rare', effect: 'point_multiplier', value: 3, durationType: 'rounds', durationValue: 1 },
-        { id: 'point_x3_5r', name: '⭐ ×3 نقاط (5 جولات)', icon: '⭐', desc: 'مضاعفة النقاط ×3 لخمس جولات', price: 350, currency: 'coins', rarity: 'epic', effect: 'point_multiplier', value: 3, durationType: 'rounds', durationValue: 5 },
-        { id: 'point_x3_10r', name: '⭐ ×3 نقاط (10 جولات)', icon: '⭐', desc: 'مضاعفة النقاط ×3 لعشرة جولات', price: 650, currency: 'coins', rarity: 'epic', effect: 'point_multiplier', value: 3, durationType: 'rounds', durationValue: 10 },
+        { id: 'point_x2_1h', name: '×2 نقاط (ساعة)', imagePath: 'images/store/boosts/point_x2_1h.png', desc: 'مضاعفة النقاط ×2 لمدة ساعة', price: 60, currency: 'coins', rarity: 'uncommon', effect: 'point_multiplier', value: 2, durationType: 'time', durationValue: 1 },
+        { id: 'point_x2_5h', name: '×2 نقاط (5 ساعات)', imagePath: 'images/store/boosts/point_x2_5h.png', desc: 'مضاعفة النقاط ×2 لمدة 5 ساعات', price: 250, currency: 'coins', rarity: 'rare', effect: 'point_multiplier', value: 2, durationType: 'time', durationValue: 5 },
+        { id: 'point_x2_24h', name: '×2 نقاط (24 ساعة)', imagePath: 'images/store/boosts/point_x2_24h.png', desc: 'مضاعفة النقاط ×2 لمدة 24 ساعة', price: 800, currency: 'coins', rarity: 'epic', effect: 'point_multiplier', value: 2, durationType: 'time', durationValue: 24 },
+        { id: 'point_x3_1h', name: '×3 نقاط (ساعة)', imagePath: 'images/store/boosts/point_x3_1h.png', desc: 'مضاعفة النقاط ×3 لمدة ساعة', price: 150, currency: 'coins', rarity: 'rare', effect: 'point_multiplier', value: 3, durationType: 'time', durationValue: 1 },
+        { id: 'point_x3_5h', name: '×3 نقاط (5 ساعات)', imagePath: 'images/store/boosts/point_x3_5h.png', desc: 'مضاعفة النقاط ×3 لمدة 5 ساعات', price: 550, currency: 'coins', rarity: 'epic', effect: 'point_multiplier', value: 3, durationType: 'time', durationValue: 5 },
+        { id: 'point_x3_24h', name: '×3 نقاط (24 ساعة)', imagePath: 'images/store/boosts/point_x3_24h.png', desc: 'مضاعفة النقاط ×3 لمدة 24 ساعة', price: 1800, currency: 'coins', rarity: 'legendary', effect: 'point_multiplier', value: 3, durationType: 'time', durationValue: 24 },
+        { id: 'point_x2_1r', name: '×2 نقاط (جولة)', imagePath: 'images/store/boosts/point_x2_1r.png', desc: 'مضاعفة النقاط ×2 لجولة واحدة', price: 40, currency: 'coins', rarity: 'common', effect: 'point_multiplier', value: 2, durationType: 'rounds', durationValue: 1 },
+        { id: 'point_x2_5r', name: '×2 نقاط (5 جولات)', imagePath: 'images/store/boosts/point_x2_5r.png', desc: 'مضاعفة النقاط ×2 لخمس جولات', price: 150, currency: 'coins', rarity: 'uncommon', effect: 'point_multiplier', value: 2, durationType: 'rounds', durationValue: 5 },
+        { id: 'point_x2_10r', name: '×2 نقاط (10 جولات)', imagePath: 'images/store/boosts/point_x2_10r.png', desc: 'مضاعفة النقاط ×2 لعشرة جولات', price: 270, currency: 'coins', rarity: 'rare', effect: 'point_multiplier', value: 2, durationType: 'rounds', durationValue: 10 },
+        { id: 'point_x3_1r', name: '×3 نقاط (جولة)', imagePath: 'images/store/boosts/point_x3_1r.png', desc: 'مضاعفة النقاط ×3 لجولة واحدة', price: 90, currency: 'coins', rarity: 'rare', effect: 'point_multiplier', value: 3, durationType: 'rounds', durationValue: 1 },
+        { id: 'point_x3_5r', name: '×3 نقاط (5 جولات)', imagePath: 'images/store/boosts/point_x3_5r.png', desc: 'مضاعفة النقاط ×3 لخمس جولات', price: 350, currency: 'coins', rarity: 'epic', effect: 'point_multiplier', value: 3, durationType: 'rounds', durationValue: 5 },
+        { id: 'point_x3_10r', name: '×3 نقاط (10 جولات)', imagePath: 'images/store/boosts/point_x3_10r.png', desc: 'مضاعفة النقاط ×3 لعشرة جولات', price: 650, currency: 'coins', rarity: 'epic', effect: 'point_multiplier', value: 3, durationType: 'rounds', durationValue: 10 }
     ];
-    pointMultipliers.forEach(b => items.push({ ...b, category: 'boosts', duration: 'limited', effectType: b.effect, effectValue: b.value, stackable: true, maxStack: 99, uses: 1 }));
+
+    pointMultipliers.forEach(b => items.push({ 
+        ...b, 
+        category: 'boosts', 
+        duration: 'limited', 
+        effectType: b.effect, 
+        effectValue: b.value, 
+        stackable: true, 
+        maxStack: 99, 
+        uses: 1 
+    }));
 
     // ============================================================
-    // 11. عناصر إضافية (يمكنك إضافة المزيد هنا)
+    // 4. تعزيزات الغرف (Room Boosts)
     // ============================================================
+    const roomBoosts = [
+        { id: 'room_head_start_20', name: 'بداية +20', imagePath: 'images/store/room_boosts/room_head_start_20.png', desc: 'في الغرف، ابدأ بـ 20 نقطة', price: 200, currency: 'coins', rarity: 'uncommon', effect: 'head_start', value: 20, uses: 1 },
+        { id: 'room_head_start_50', name: 'بداية +50', imagePath: 'images/store/room_boosts/room_head_start_50.png', desc: 'في الغرف، ابدأ بـ 50 نقطة', price: 400, currency: 'coins', rarity: 'rare', effect: 'head_start', value: 50, uses: 1 },
+        { id: 'room_attack', name: 'هجوم خصم', imagePath: 'images/store/room_boosts/room_attack.png', desc: 'خصم 10 نقاط من جميع الخصوم', price: 300, currency: 'coins', rarity: 'rare', effect: 'attack_opponent', value: 10, uses: 1 },
+        { id: 'room_shield', name: 'درع جماعي', imagePath: 'images/store/room_boosts/room_shield.png', desc: 'احمِ فريقك من الهجمات', price: 250, currency: 'coins', rarity: 'uncommon', effect: 'team_shield', value: 1, uses: 1 },
+        { id: 'room_double_guess', name: 'تخمين مزدوج', imagePath: 'images/store/room_boosts/room_double_guess.png', desc: 'اختر خيارين بدلاً من واحد', price: 180, currency: 'coins', rarity: 'uncommon', effect: 'double_guess', value: 1, uses: 1 },
+        { id: 'room_extra_time', name: 'وقت إضافي 5s', imagePath: 'images/store/room_boosts/room_extra_time.png', desc: 'أضف 5 ثوانٍ للجميع', price: 150, currency: 'coins', rarity: 'common', effect: 'extra_room_time', value: 5, uses: 1 }
+    ];
+
+    roomBoosts.forEach(b => items.push({ 
+        ...b, 
+        category: 'room_boosts', 
+        duration: 'limited', 
+        effectType: b.effect, 
+        effectValue: b.value, 
+        stackable: true, 
+        maxStack: 99 
+    }));
+
+    // ============================================================
+    // 5. تذاكر الغرف (Room Tickets)
+    // ============================================================
+    const roomTickets = [
+        { id: 'room_ticket', name: 'بطاقة غرفة', imagePath: 'images/store/tickets/room_ticket.png', desc: 'تسمح لك بإنشاء غرفة لعب خاصة (استخدام واحد)', price: 600, currency: 'coins', rarity: 'rare', category: 'tickets', effect: 'room_ticket', value: 1 }
+    ];
+
+    roomTickets.forEach(b => items.push({ 
+        ...b, 
+        duration: 'permanent', 
+        effectType: 'room_ticket', 
+        effectValue: 1, 
+        stackable: true, 
+        maxStack: 99 
+    }));
+
+    // ============================================================
+    // 6. إطارات الملف الشخصي (Frames)
+    // ============================================================
+    const frames = [
+        { id: 'frame_bronze', name: 'إطار برونزي', imagePath: 'images/store/frames/frame_bronze.png', desc: 'إطار برونزي أنيق', price: 50, currency: 'coins', rarity: 'common', effect: 'profile_frame', value: 'bronze' },
+        { id: 'frame_silver', name: 'إطار فضي', imagePath: 'images/store/frames/frame_silver.png', desc: 'إطار فضي لامع', price: 100, currency: 'coins', rarity: 'uncommon', effect: 'profile_frame', value: 'silver' },
+        { id: 'frame_gold', name: 'إطار ذهبي', imagePath: 'images/store/frames/frame_gold.png', desc: 'إطار ذهبي فاخر', price: 200, currency: 'coins', rarity: 'rare', effect: 'profile_frame', value: 'gold' },
+        { id: 'frame_platinum', name: 'إطار بلاتيني', imagePath: 'images/store/frames/frame_platinum.png', desc: 'إطار بلاتيني نادر', price: 350, currency: 'coins', rarity: 'epic', effect: 'profile_frame', value: 'platinum' },
+        { id: 'frame_diamond', name: 'إطار ألماس', imagePath: 'images/store/frames/frame_diamond.png', desc: 'إطار ألماسي متلألئ', price: 30, currency: 'gems', rarity: 'epic', effect: 'profile_frame', value: 'diamond' },
+        { id: 'frame_fire', name: 'إطار ناري', imagePath: 'images/store/frames/frame_fire.png', desc: 'إطار ناري متوهج', price: 50, currency: 'gems', rarity: 'legendary', effect: 'profile_frame', value: 'fire' },
+        { id: 'frame_legend', name: 'إطار أسطوري', imagePath: 'images/store/frames/frame_legend.png', desc: 'إطار أسطوري نادر', price: 100, currency: 'gems', rarity: 'legendary', effect: 'profile_frame', value: 'legend' },
+        { id: 'frame_glow', name: 'إطار متوهج', imagePath: 'images/store/frames/frame_glow.png', desc: 'إطار متوهج بأنيميشن', price: 80, currency: 'gems', rarity: 'epic', effect: 'profile_frame', value: 'glow' }
+    ];
+
+    frames.forEach(b => items.push({ 
+        ...b, 
+        category: 'frames', 
+        duration: 'permanent', 
+        effectType: b.effect, 
+        effectValue: b.value, 
+        stackable: false 
+    }));
+
+    // ============================================================
+    // 7. خلفيات الملف الشخصي (Backgrounds)
+    // ============================================================
+    const backgrounds = [
+        { id: 'bg_stadium', name: 'خلفية ملعب', imagePath: 'images/store/backgrounds/bg_stadium.png', desc: 'خلفية ملعب كرة قدم', price: 120, currency: 'coins', rarity: 'common', effect: 'profile_bg', value: 'stadium' },
+        { id: 'bg_crowd', name: 'خلفية جماهير', imagePath: 'images/store/backgrounds/bg_crowd.png', desc: 'خلفية مع جماهير', price: 150, currency: 'coins', rarity: 'uncommon', effect: 'profile_bg', value: 'crowd' },
+        { id: 'bg_trophy', name: 'خلفية كأس', imagePath: 'images/store/backgrounds/bg_trophy.png', desc: 'خلفية مع الكؤوس', price: 200, currency: 'coins', rarity: 'rare', effect: 'profile_bg', value: 'trophy' },
+        { id: 'bg_night', name: 'خلفية ليلية', imagePath: 'images/store/backgrounds/bg_night.png', desc: 'خلفية ليلية هادئة', price: 180, currency: 'coins', rarity: 'uncommon', effect: 'profile_bg', value: 'night' },
+        { id: 'bg_sunset', name: 'خلفية غروب', imagePath: 'images/store/backgrounds/bg_sunset.png', desc: 'خلفية غروب شمس', price: 220, currency: 'coins', rarity: 'rare', effect: 'profile_bg', value: 'sunset' },
+        { id: 'bg_sky', name: 'خلفية سماء', imagePath: 'images/store/backgrounds/bg_sky.png', desc: 'خلفية سماء صافية', price: 130, currency: 'coins', rarity: 'common', effect: 'profile_bg', value: 'sky' },
+        { id: 'bg_lights', name: 'خلفية أضواء', imagePath: 'images/store/backgrounds/bg_lights.png', desc: 'خلفية أضواء ملونة', price: 300, currency: 'coins', rarity: 'epic', effect: 'profile_bg', value: 'lights' },
+        { id: 'bg_legend', name: 'خلفية أسطورية', imagePath: 'images/store/backgrounds/bg_legend.png', desc: 'خلفية أسطورية نادرة', price: 40, currency: 'gems', rarity: 'legendary', effect: 'profile_bg', value: 'legend_bg' }
+    ];
+
+    backgrounds.forEach(b => items.push({ 
+        ...b, 
+        category: 'backgrounds', 
+        duration: 'permanent', 
+        effectType: b.effect, 
+        effectValue: b.value, 
+        stackable: false 
+    }));
+
+    // ============================================================
+    // 8. شارات (Badges)
+    // ============================================================
+    const badges = [
+        { id: 'badge_star', name: 'شارة نجم', imagePath: 'images/store/badges/badge_star.png', desc: 'شارة نجم لامع', price: 80, currency: 'coins', rarity: 'common', effect: 'display_badge', value: '⭐' },
+        { id: 'badge_king', name: 'شارة ملك', imagePath: 'images/store/badges/badge_king.png', desc: 'شارة الملك المتوج', price: 300, currency: 'coins', rarity: 'rare', effect: 'display_badge', value: '👑' },
+        { id: 'badge_warrior', name: 'شارة محارب', imagePath: 'images/store/badges/badge_warrior.png', desc: 'شارة المحارب الشجاع', price: 150, currency: 'coins', rarity: 'uncommon', effect: 'display_badge', value: '⚔️' },
+        { id: 'badge_god', name: 'شارة إله', imagePath: 'images/store/badges/badge_god.png', desc: 'شارة إلهية أسطورية', price: 50, currency: 'gems', rarity: 'epic', effect: 'display_badge', value: '⚡' },
+        { id: 'badge_speed', name: 'شارة سرعة', imagePath: 'images/store/badges/badge_speed.png', desc: 'شارة السرعة الفائقة', price: 180, currency: 'coins', rarity: 'uncommon', effect: 'display_badge', value: '💨' },
+        { id: 'badge_smart', name: 'شارة ذكاء', imagePath: 'images/store/badges/badge_smart.png', desc: 'شارة الذكاء الحاد', price: 200, currency: 'coins', rarity: 'rare', effect: 'display_badge', value: '🧠' },
+        { id: 'badge_invincible', name: 'شارة لا يُقهر', imagePath: 'images/store/badges/badge_invincible.png', desc: 'شارة الذي لا يُقهر', price: 400, currency: 'coins', rarity: 'epic', effect: 'display_badge', value: '🛡️' },
+        { id: 'badge_legendary', name: 'شارة خرافية', imagePath: 'images/store/badges/badge_legendary.png', desc: 'شارة أسطورية نادرة', price: 80, currency: 'gems', rarity: 'legendary', effect: 'display_badge', value: '🌟' }
+    ];
+
+    badges.forEach(b => items.push({ 
+        ...b, 
+        category: 'badges', 
+        duration: 'permanent', 
+        effectType: b.effect, 
+        effectValue: b.value, 
+        stackable: false 
+    }));
+
+    // ============================================================
+    // 9. رموز الدردشة (Emotes)
+    // ============================================================
+    const emotes = [
+        { id: 'emote_fire', name: 'رمز نار', imagePath: 'images/store/emotes/emote_fire.png', desc: 'رمز ناري مشتعل', price: 30, currency: 'coins', rarity: 'common', effect: 'chat_emote', value: '🔥' },
+        { id: 'emote_diamond', name: 'رمز ماسة', imagePath: 'images/store/emotes/emote_diamond.png', desc: 'رمز ماسي براق', price: 60, currency: 'coins', rarity: 'uncommon', effect: 'chat_emote', value: '💎' },
+        { id: 'emote_crown', name: 'رمز تاج', imagePath: 'images/store/emotes/emote_crown.png', desc: 'رمز تاج ملكي', price: 80, currency: 'coins', rarity: 'rare', effect: 'chat_emote', value: '👑' },
+        { id: 'emote_thunder', name: 'رمز صاعقة', imagePath: 'images/store/emotes/emote_thunder.png', desc: 'رمز صاعقة كهربائية', price: 100, currency: 'coins', rarity: 'uncommon', effect: 'chat_emote', value: '⚡' },
+        { id: 'emote_fireball', name: 'رمز كرة نارية', imagePath: 'images/store/emotes/emote_fireball.png', desc: 'رمز كرة نارية قوية', price: 150, currency: 'coins', rarity: 'rare', effect: 'chat_emote', value: '🔥' },
+        { id: 'emote_beast', name: 'رمز وحش', imagePath: 'images/store/emotes/emote_beast.png', desc: 'رمز وحش مخيف', price: 200, currency: 'coins', rarity: 'epic', effect: 'chat_emote', value: '👹' },
+        { id: 'emote_shining', name: 'رمز نجم ساطع', imagePath: 'images/store/emotes/emote_shining.png', desc: 'رمز نجم ساطع متألق', price: 120, currency: 'coins', rarity: 'uncommon', effect: 'chat_emote', value: '✨' },
+        { id: 'emote_heartbeat', name: 'رمز قلب نابض', imagePath: 'images/store/emotes/emote_heartbeat.png', desc: 'رمز قلب نابض بالحياة', price: 50, currency: 'coins', rarity: 'common', effect: 'chat_emote', value: '💓' }
+    ];
+
+    emotes.forEach(b => items.push({ 
+        ...b, 
+        category: 'emotes', 
+        duration: 'permanent', 
+        effectType: b.effect, 
+        effectValue: b.value, 
+        stackable: false 
+    }));
+
+    // ============================================================
+    // 10. سمات الواجهة (Themes)
+    // ============================================================
+    const themes = [
+        { id: 'theme_gold', name: 'سمة ذهبية', imagePath: 'images/store/themes/theme_gold.png', desc: 'سمة ذهبية فاخرة', price: 250, currency: 'coins', rarity: 'rare', effect: 'ui_theme', value: 'gold' },
+        { id: 'theme_electric', name: 'سمة زرقاء كهربائية', imagePath: 'images/store/themes/theme_electric.png', desc: 'سمة زرقاء نيون', price: 200, currency: 'coins', rarity: 'uncommon', effect: 'ui_theme', value: 'electric' },
+        { id: 'theme_fire', name: 'سمة حمراء نارية', imagePath: 'images/store/themes/theme_fire.png', desc: 'سمة حمراء مشتعلة', price: 220, currency: 'coins', rarity: 'rare', effect: 'ui_theme', value: 'fire' },
+        { id: 'theme_emerald', name: 'سمة خضراء زمردية', imagePath: 'images/store/themes/theme_emerald.png', desc: 'سمة خضراء أنيقة', price: 200, currency: 'coins', rarity: 'uncommon', effect: 'ui_theme', value: 'emerald' },
+        { id: 'theme_purple', name: 'سمة بنفسجية', imagePath: 'images/store/themes/theme_purple.png', desc: 'سمة بنفسجية ساحرة', price: 300, currency: 'coins', rarity: 'epic', effect: 'ui_theme', value: 'purple' },
+        { id: 'theme_neon_pink', name: 'سمة وردية نيون', imagePath: 'images/store/themes/theme_neon_pink.png', desc: 'سمة وردية جريئة', price: 350, currency: 'coins', rarity: 'epic', effect: 'ui_theme', value: 'neon_pink' }
+    ];
+
+    themes.forEach(b => items.push({ 
+        ...b, 
+        category: 'themes', 
+        duration: 'permanent', 
+        effectType: b.effect, 
+        effectValue: b.value, 
+        stackable: false 
+    }));
+
+    // ============================================================
+    // 11. صناديق الحظ (Loot Boxes)
+    // ============================================================
+    const lootBoxes = [
+        { id: 'loot_common', name: 'صندوق عادي', imagePath: 'images/store/loot_boxes/loot_common.png', desc: 'عنصر عادي أو غير عادي', price: 50, currency: 'coins', rarity: 'common', effect: 'loot_box', value: 'common' },
+        { id: 'loot_rare', name: 'صندوق مميز', imagePath: 'images/store/loot_boxes/loot_rare.png', desc: 'عنصر نادر أو أسطوري', price: 150, currency: 'coins', rarity: 'rare', effect: 'loot_box', value: 'rare' },
+        { id: 'loot_epic', name: 'صندوق أسطوري', imagePath: 'images/store/loot_boxes/loot_epic.png', desc: 'عنصر أسطوري أو خرافي', price: 50, currency: 'gems', rarity: 'epic', effect: 'loot_box', value: 'epic' },
+        { id: 'loot_legendary', name: 'صندوق خرافي', imagePath: 'images/store/loot_boxes/loot_legendary.png', desc: 'عنصر خرافي مضمون', price: 150, currency: 'gems', rarity: 'legendary', effect: 'loot_box', value: 'legendary' }
+    ];
+
+    lootBoxes.forEach(b => items.push({ 
+        ...b, 
+        category: 'loot_boxes', 
+        duration: 'limited', 
+        effectType: b.effect, 
+        effectValue: b.value, 
+        stackable: true, 
+        maxStack: 99 
+    }));
 
     return items;
 },
@@ -16139,87 +17326,85 @@ _renderStore(items, filter = 'all') {
     const gems = user?.gems || 0;
 
     // تحديث العملات
-    document.getElementById('storeCoins').textContent = coins;
+    const coinsEl = document.getElementById('storeCoins');
     const gemsEl = document.getElementById('storeGems');
+    if (coinsEl) coinsEl.textContent = coins;
     if (gemsEl) gemsEl.textContent = gems;
 
-    // تعريفات
-    const rarityMap = {
-        common: { label: 'عادي', color: '#8e8e8e' },
-        uncommon: { label: 'غير عادي', color: '#2ecc71' },
-        rare: { label: 'نادر', color: '#3498db' },
-        epic: { label: 'أسطوري', color: '#9b59b6' },
-        legendary: { label: 'خرافي', color: '#f1c40f' }
-    };
+    // إعادة بناء الفلاتر
+    this._renderStoreFilters(filter);
 
+    // فلترة العناصر
+    let filteredItems = [...items];
+    if (filter !== 'all') {
+        filteredItems = filteredItems.filter(item => item.category === filter);
+    }
+
+    if (filteredItems.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state" style="grid-column:1/-1;padding:2rem;text-align:center;">
+                <i class="fas fa-box-open" style="font-size:2.5rem;color:var(--gray-dark);"></i>
+                <h3 style="font-size:1.1rem;">لا توجد عناصر</h3>
+                <p class="text-gray" style="font-size:0.85rem;">لا توجد عناصر في هذه الفئة</p>
+            </div>
+        `;
+        return;
+    }
+
+    // بناء HTML
+    let html = '';
+    filteredItems.forEach(item => {
+        html += this._renderStoreItem(item, inventory, activeItems, coins, gems);
+    });
+
+    container.innerHTML = html;
+},
+
+_renderStoreFilters(activeFilter = 'all') {
+    const filtersContainer = document.getElementById('storeFilters');
+    if (!filtersContainer) {
+        // إذا لم يكن موجوداً، نبحث عنه أو ننشئه
+        const wrapper = document.querySelector('.store-filters-wrapper');
+        if (wrapper) {
+            const container = document.createElement('div');
+            container.className = 'store-filters-scroll';
+            container.id = 'storeFilters';
+            wrapper.innerHTML = '';
+            wrapper.appendChild(container);
+        }
+        // نعيد المحاولة بعد قليل
+        setTimeout(() => this._renderStoreFilters(activeFilter), 100);
+        return;
+    }
+
+    // تعريف الفلاتر
     const categories = {
         all: '📦 الكل',
-        boosts: '⚡ تعزيزات اللعبة',
-        room_boosts: '🏠 تعزيزات الغرف',
+        boosts: '⚡ تعزيزات',
+        room_boosts: '🏠 غرف',
+        tickets: '🎫 تذاكر',
         frames: '🖼️ إطارات',
         backgrounds: '🌄 خلفيات',
         badges: '🏅 شارات',
         emotes: '💬 رموز',
         themes: '🎨 سمات',
-        loot_boxes: '🎁 صناديق الحظ'
+        loot_boxes: '🎁 صناديق'
     };
 
-    const activeCategory = document.querySelector('.store-filter.active')?.dataset?.category || 'all';
-
-    // فلترة
-    let filteredItems = items.filter(item => {
-        if (!item.category) item.category = 'boosts';
-        return true;
+    // بناء أزرار الفلاتر
+    let html = '';
+    Object.entries(categories).forEach(([key, label]) => {
+        const isActive = key === activeFilter;
+        html += `
+            <button class="store-filter ${isActive ? 'active' : ''}" 
+                    data-category="${key}"
+                    onclick="App._filterStore('${key}')">
+                ${label}
+            </button>
+        `;
     });
-    if (activeCategory !== 'all') {
-        filteredItems = filteredItems.filter(item => item.category === activeCategory);
-    }
 
-    // بناء HTML
-    let html = `
-        <div class="store-filters" style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:1.5rem;padding:0.5rem;background:var(--glass);border-radius:var(--radius-sm);">
-            ${Object.entries(categories).map(([key, label]) => `
-                <button class="store-filter ${key === activeCategory ? 'active' : ''}" 
-                        data-category="${key}" 
-                        style="padding:6px 16px;border-radius:30px;background:${key === activeCategory ? 'var(--primary)' : 'transparent'};color:${key === activeCategory ? '#fff' : 'var(--gray)'};border:1px solid ${key === activeCategory ? 'var(--primary)' : 'var(--glass-border)'};font-size:0.75rem;cursor:pointer;transition:var(--transition);font-weight:${key === activeCategory ? '700' : '400'};"
-                        onclick="App._filterStore('${key}')">
-                    ${label}
-                </button>
-            `).join('')}
-        </div>
-    `;
-
-    if (filteredItems.length === 0) {
-        html += `<div class="empty-state" style="text-align:center;padding:3rem;">
-            <i class="fas fa-box-open" style="font-size:4rem;color:var(--gray-dark);"></i>
-            <h3>لا توجد عناصر في هذه الفئة</h3>
-        </div>`;
-        container.innerHTML = html;
-        return;
-    }
-
-    // فصل العروض المميزة
-    const featured = filteredItems.filter(i => i.rarity === 'legendary' || i.rarity === 'epic');
-    const regular = filteredItems.filter(i => i.rarity !== 'legendary' && i.rarity !== 'epic');
-
-    if (featured.length > 0 && activeCategory === 'all') {
-        html += `<h3 style="margin-bottom:1rem;color:var(--accent);">🔥 العروض المميزة</h3>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1.2rem;margin-bottom:2rem;">
-                ${featured.map(item => this._renderStoreItem(item, inventory, activeItems, coins, gems, rarityMap)).join('')}
-            </div>
-            <hr style="border-color:var(--glass-border);margin:1.5rem 0;">`;
-    }
-
-    if (regular.length > 0) {
-        if (featured.length > 0 && activeCategory === 'all') {
-            html += `<h3 style="margin-bottom:1rem;color:var(--gray);">📦 جميع العناصر</h3>`;
-        }
-        html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;">
-            ${regular.map(item => this._renderStoreItem(item, inventory, activeItems, coins, gems, rarityMap)).join('')}
-        </div>`;
-    }
-
-    container.innerHTML = html;
+    filtersContainer.innerHTML = html;
 },
 
 // ============================================================
@@ -16276,10 +17461,14 @@ _renderStoreItem(item, inventory, activeItems, coins, gems, rarityMap) {
 // ============================================================
 
 _filterStore(category) {
+    // تحديث الفلاتر
     document.querySelectorAll('.store-filter').forEach(el => {
         el.classList.toggle('active', el.dataset.category === category);
     });
-    this._renderStore(DataManager.data.storeItems || []);
+
+    // إعادة عرض العناصر مع الفلتر المحدد
+    const items = DataManager.data.storeItems || [];
+    this._renderStore(items, category);
 },
 
 // ===== دالة مساعدة لعرض عنصر واحد =====
@@ -16288,6 +17477,7 @@ _filterStore(category) {
 // ============================================================
 
 _renderStoreItem(item, inventory, activeItems, coins, gems) {
+    // تعريف ألوان الندرة
     const RARITY_COLORS = {
         common: '#8e8e8e',
         uncommon: '#2ecc71',
@@ -16303,66 +17493,138 @@ _renderStoreItem(item, inventory, activeItems, coins, gems) {
         legendary: 'خرافي'
     };
 
-    const owned = inventory.some(i => i.itemId === item.id);
-    const quantity = inventory.find(i => i.itemId === item.id)?.quantity || 0;
-    const isActive = activeItems.includes(item.id);
+    // التحقق من وجود العنصر
+    if (!item) {
+        console.warn('⚠️ عنصر غير معرف في المتجر');
+        return '<div class="store-item error">عنصر غير صالح</div>';
+    }
+
+    // تعيين قيم افتراضية آمنة
+    const rarity = item.rarity || 'common';
+    const rarityColor = RARITY_COLORS[rarity] || '#8e8e8e';
+    const rarityLabel = RARITY_LABELS[rarity] || 'عادي';
+    const itemName = item.name || 'عنصر بدون اسم';
+    const imagePath = item.imagePath || item.image || '';
+
+    // التحقق من ملكية العنصر
+    const owned = inventory && Array.isArray(inventory) ? inventory.some(i => i.itemId === item.id) : false;
+    const quantity = inventory && Array.isArray(inventory) ? (inventory.find(i => i.itemId === item.id)?.quantity || 0) : 0;
+    const isActive = activeItems && Array.isArray(activeItems) ? activeItems.includes(item.id) : false;
+    
     const isAffordable = item.currency === 'gems' ? gems >= item.price : coins >= item.price;
     const isEquippable = item.duration === 'permanent';
-    const rarityColor = RARITY_COLORS[item.rarity] || '#8e8e8e';
-    const rarityLabel = RARITY_LABELS[item.rarity] || 'عادي';
     const currencyIcon = item.currency === 'gems' ? '💎' : '🪙';
     const stackable = item.stackable === true;
-    const ownedCount = inventory.find(i => i.itemId === item.id)?.quantity || 0;
-    return `
-        <div style="background:var(--card-bg);border:2px solid ${isActive ? 'var(--accent)' : rarityColor};border-radius:var(--radius);padding:1.2rem;text-align:center;transition:all 0.3s ease;position:relative;overflow:hidden;transform:${isActive ? 'scale(1.02)' : 'scale(1)'};box-shadow:${isActive ? '0 0 30px rgba(255,217,61,0.15)' : 'none'};">
-            ${isActive ? '<span style="position:absolute;top:8px;right:8px;font-size:0.55rem;background:var(--accent);color:#000;padding:2px 10px;border-radius:30px;font-weight:700;z-index:2;">مفعل</span>' : ''}
-            ${item.rarity === 'legendary' ? '<span style="position:absolute;top:8px;left:8px;font-size:1.5rem;animation:spin 3s linear infinite;">🌟</span>' : ''}
-            <div style="font-size:3.2rem;margin-bottom:0.3rem;filter:${item.rarity === 'legendary' ? 'drop-shadow(0 0 20px rgba(241,196,15,0.5))' : 'none'};">
-                ${item.icon || '🛒'}
-            </div>
-            <div style="font-weight:800;font-size:1.05rem;color:${rarityColor};">${item.name}</div>
-            <div style="font-size:0.7rem;color:var(--gray);margin:0.2rem 0;">
-                <span style="background:${rarityColor}22;color:${rarityColor};padding:1px 10px;border-radius:30px;border:1px solid ${rarityColor}44;">
-                    ${rarityLabel}
-                </span>
-                ${item.uses && item.uses !== Infinity ? ` • ${item.uses} استخدام` : ''}
-                ${item.duration === 'permanent' ? ' • دائم' : ''}
-            </div>
-            <div style="font-size:0.8rem;color:var(--gray);margin:0.3rem 0;min-height:40px;">${item.description || ''}</div>
-            <div style="font-size:1.2rem;font-weight:900;color:var(--accent);margin-bottom:0.5rem;">
-                ${currencyIcon} ${item.price}
-            </div>
-${owned ? `
-    <div style="display:flex;gap:0.3rem;justify-content:center;flex-wrap:wrap;">
-        <span style="font-size:0.65rem;background:var(--success);color:#fff;padding:2px 12px;border-radius:30px;">✅ مملوك (${ownedCount})</span>
-        ${stackable ? `
-            <button class="btn btn-xs btn-primary" onclick="App._purchaseItem('${item.id}', 1)" style="font-size:0.6rem;padding:2px 8px;">شراء 1</button>
-            <button class="btn btn-xs btn-success" onclick="App._purchaseItem('${item.id}', 10)" style="font-size:0.6rem;padding:2px 8px;">شراء 10</button>
-        ` : ''}
-        ${isEquippable ? `
-            <button class="btn btn-xs ${isActive ? 'btn-danger' : 'btn-primary'}" onclick="App._toggleActiveItem('${item.id}')" style="font-size:0.6rem;padding:2px 12px;">${isActive ? 'إلغاء' : 'تفعيل'}</button>
-        ` : ''}
-        ${!isEquippable && stackable ? `
-            <button class="btn btn-xs btn-warning" onclick="App._useBoostItem('${item.id}')" style="font-size:0.6rem;padding:2px 12px;">⚡ استخدام</button>
-        ` : ''}
-    </div>
-` : `
-    <button class="btn btn-sm ${isAffordable ? 'btn-success' : 'btn-outline'}" 
-            onclick="App._purchaseItem('${item.id}', 1)" 
-            style="width:100%;justify-content:center;${!isAffordable ? 'opacity:0.5;cursor:not-allowed;' : ''}"
-            ${!isAffordable ? 'disabled' : ''}>
-        ${isAffordable ? '<i class="fas fa-shopping-cart"></i> شراء' : '⚠️ رصيد غير كافٍ'}
-    </button>
-    ${stackable && isAffordable ? `
-        <button class="btn btn-xs btn-primary" onclick="App._purchaseItem('${item.id}', 10)" style="font-size:0.6rem;padding:2px 8px;margin-top:0.2rem;">شراء 10</button>
-    ` : ''}
-`}
+    const isLootBox = item.category === 'loot_boxes';
 
-            ${item.category === 'loot_boxes' && !owned ? `
-                <div style="font-size:0.55rem;color:var(--gray-dark);margin-top:4px;">🎲 احصل على عنصر عشوائي!</div>
-            ` : ''}
+    // معرف فريد للصورة
+    const imgId = 'img_' + (item.id || 'unknown') + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+
+    // ✅ بناء HTML - الصورة كخلفية لكامل البطاقة
+    const imageHtml = `
+        <div class="store-item-image" 
+             id="${imgId}_container"
+             style="background-image: url('${imagePath}'); 
+                    background-size: cover; 
+                    background-position: center;
+                    background-color: var(--glass);">
+            
+            <!-- placeholder يظهر عند فشل تحميل الصورة -->
+            <div class="store-item-placeholder" id="${imgId}_placeholder" style="display: ${imagePath ? 'none' : 'flex'};">
+                📦
+            </div>
+            
+            <!-- طبقة تعتيم فوق الصورة لتوضيح النص -->
+            <div class="store-item-overlay"></div>
+            
+            <!-- محتوى البطاقة (فوق الصورة) -->
+            <div class="store-item-content">
+                <!-- شارة مفعل -->
+                ${isActive ? '<span class="store-item-active-badge">مفعل</span>' : ''}
+                
+                <!-- اسم العنصر -->
+                <div class="store-item-name">${itemName}</div>
+                
+                <!-- الندرة -->
+                <div class="store-item-rarity" style="color:${rarityColor};background:${rarityColor}33;border:1px solid ${rarityColor}66;">
+                    ${rarityLabel}
+                </div>
+                
+                <!-- السعر -->
+                <div class="store-item-price">
+                    <span class="currency-icon">${currencyIcon}</span>
+                    ${item.price || 0}
+                </div>
+                
+                <!-- الأزرار -->
+                <div class="store-item-actions">
+                    ${owned ? this._renderOwnedActions(item, quantity, isActive, isEquippable, stackable, isLootBox) : this._renderBuyActions(item, isAffordable, stackable)}
+                </div>
+            </div>
         </div>
     `;
+
+    return imageHtml;
+},
+
+// ===== دوال مساعدة للأزرار =====
+_renderOwnedActions(item, quantity, isActive, isEquippable, stackable, isLootBox) {
+    let html = '';
+    if (quantity > 0) {
+        html += `<span class="owned-badge">✅ ${quantity > 1 ? quantity : ''}</span>`;
+    }
+    if (isEquippable) {
+        html += `
+            <button class="btn ${isActive ? 'btn-danger' : 'btn-primary'}" 
+                    onclick="App._toggleActiveItem('${item.id}')">
+                ${isActive ? 'إلغاء' : 'تفعيل'}
+            </button>
+        `;
+    }
+    if (stackable && quantity > 0) {
+        html += `
+            <button class="btn btn-success btn-xs" onclick="App._useBoostItem('${item.id}')">
+                استخدام
+            </button>
+        `;
+    }
+    if (isLootBox && quantity > 0) {
+        html += `
+            <button class="btn btn-warning btn-xs" onclick="App._openLootBox('${item.id}')">
+                فتح
+            </button>
+        `;
+    }
+    if (stackable) {
+        html += `
+            <button class="btn btn-primary btn-xs" onclick="App._purchaseItem('${item.id}', 1)">
+                +1
+            </button>
+        `;
+    }
+    return html;
+},
+
+_renderBuyActions(item, isAffordable, stackable) {
+    if (stackable) {
+        return `
+            <button class="btn btn-success btn-xs" onclick="App._purchaseItem('${item.id}', 1)" ${!isAffordable ? 'disabled' : ''}>
+                شراء
+            </button>
+            <button class="btn btn-primary btn-xs" onclick="App._purchaseItem('${item.id}', 10)" ${!isAffordable ? 'disabled' : ''}>
+                ×10
+            </button>
+        `;
+    } else {
+        return `
+            <button class="btn ${isAffordable ? 'btn-success' : 'btn-outline'}" 
+                    onclick="App._purchaseItem('${item.id}', 1)" 
+                    ${!isAffordable ? 'disabled' : ''}
+                    style="width:100%;justify-content:center;">
+                ${isAffordable ? 'شراء' : '⚠️'}
+            </button>
+        `;
+    }
 },
 
 /**
@@ -18934,14 +20196,13 @@ _toggleQuestionSelection(questionId) {
     this._updateCheckboxes();
 },
 
-/**
- * تحديث عدد المحددات
- */
 _updateSelectedCount() {
     const count = this._selectedQuestions ? this._selectedQuestions.length : 0;
     
     const countEl = document.getElementById('selectedCount');
     const deleteBtn = document.getElementById('deleteSelectedQuestionsBtn');
+    const fixBtn = document.getElementById('fixSelectedTrueFalseBtn');
+    const fixCountEl = document.getElementById('fixSelectedCount');
     
     if (countEl) countEl.textContent = count;
     
@@ -18954,8 +20215,20 @@ _updateSelectedCount() {
         }
     }
     
-    // ✅ تحديث زر "تحديد الكل"
-    this._updateSelectAllButton();
+    // ✅ تحديث زر عكس المحدد
+    if (fixBtn) {
+        const questions = DataManager.data.questions || [];
+        const trueFalseSelected = questions.filter(q => 
+            this._selectedQuestions.includes(q.id) && q.type === 'true_false'
+        );
+        
+        if (trueFalseSelected.length > 0) {
+            fixBtn.style.display = 'inline-flex';
+            if (fixCountEl) fixCountEl.textContent = trueFalseSelected.length;
+        } else {
+            fixBtn.style.display = 'none';
+        }
+    }
 },
 
 /**
@@ -20427,149 +21700,132 @@ App._modeDescriptions = {
     }
 };
 
-// ============================================================
-// 9. دالة تحديث المودال بالطور الحالي
-// ============================================================
-
-// ============================================================
-// تحديث دالة _updateModalWithCurrentMode
-// ============================================================
-
 App._updateModalWithCurrentMode = function() {
     const mode = selectedGameMode;
-    const selectBtn = document.getElementById('selectGameModeBtn');
-    
+    const modeInfo = MODE_DESCRIPTIONS[mode];
+    if (!modeInfo) return;
+
+    const isCompetitive = modeInfo.competitive || false;
+    const supportsPlayerCount = modeInfo.supportsPlayerCount || false;
+
+    // تحديث التبويب النشط
+    document.querySelectorAll('.settings-tab').forEach(tab => {
+        tab.classList.remove('active');
+        tab.style.background = 'transparent';
+        tab.style.color = 'var(--gray)';
+    });
+    document.querySelectorAll('.settings-tab-content').forEach(content => {
+        content.style.display = 'none';
+    });
+
+    const tabId = isCompetitive ? 'competitive' : 'friendly';
+    const activeTab = document.querySelector(`.settings-tab[data-tab="${tabId}"]`);
+    if (activeTab) {
+        activeTab.classList.add('active');
+        activeTab.style.background = 'var(--primary)';
+        activeTab.style.color = '#fff';
+    }
+    const activeContent = document.getElementById(`tab-${tabId}`);
+    if (activeContent) {
+        activeContent.style.display = 'block';
+    }
+
     // تحديث البطاقات
-    document.querySelectorAll('.mode-card').forEach(card => {
+    document.querySelectorAll('.mode-card-horizontal').forEach(card => {
+        const cardMode = card.dataset.mode;
         card.classList.remove('active');
-        card.style.borderColor = 'var(--glass-border)';
-        const status = card.querySelector('.mode-status');
-        if (status) {
-            status.style.color = 'var(--gray)';
-            status.textContent = '○';
-        }
-        if (card.dataset.mode === mode) {
+        if (cardMode === mode) {
             card.classList.add('active');
-            card.style.borderColor = 'var(--primary)';
-            if (status) {
-                status.style.color = 'var(--success)';
-                status.textContent = '●';
-            }
         }
     });
-    
-    // تحديث العرض
+
+    // تحديث العرض العلوي
     const modeNames = {
-        'normal_1v1': '⚔️ عادي 1v1',
-        'single_player': '🧠 فردي',
-        'create_room': '🏠 غرفة لعب',
+        'normal_1v1': '⚔️ عادي 1v1 (تصنيفي)',
         'crossword': '🔤 كلمات متقاطعة',
-        'tournament': '🏆 بطولة'
+        'tournament': '🏆 بطولة',
+        'normal_1v1_unranked': '⚔️ عادي غير مصنف',
+        'single_player': '🧠 فردي',
+        'create_room': '🏠 غرفة مدفوعة'
     };
     const display = document.getElementById('selectedModeDisplay');
     if (display) {
         display.textContent = modeNames[mode] || mode;
-        display.style.color = 'var(--accent)';
     }
-    
-    // تحديث تلميح عدد اللاعبين
-    const hint = document.getElementById('playerCountHint');
-    if (hint) {
-        if (mode === 'single_player') {
-            hint.textContent = '(لعب فردي تلقائياً)';
-        } else if (mode === 'create_room') {
-            hint.textContent = '(إنشاء غرفة مع الأصدقاء)';
+
+    // تحديث شارات التصنيف/ودي
+    const compBadge = document.getElementById('competitiveBadge');
+    const friendBadge = document.getElementById('friendlyBadge');
+    if (isCompetitive) {
+        compBadge.style.display = 'inline-block';
+        friendBadge.style.display = 'none';
+    } else {
+        compBadge.style.display = 'none';
+        friendBadge.style.display = 'inline-block';
+    }
+
+    // إظهار/إخفاء خيار عدد اللاعبين
+    const playerCountSelector = document.getElementById('playerCountSelector');
+    if (playerCountSelector) {
+        if (supportsPlayerCount) {
+            playerCountSelector.style.display = 'block';
+            const hint = document.getElementById('playerCountHint');
+            if (hint) {
+                hint.textContent = selectedPlayerCount === 1 ? '(مواجهة فردية)' : '(مواجهة ثنائية)';
+            }
         } else {
-            hint.textContent = selectedPlayerCount === 1 ? '(لعبة فردية)' : '(مواجهة مع لاعب آخر)';
+            playerCountSelector.style.display = 'none';
         }
     }
-    
+
+    // إظهار/إخفاء منطقة الإعدادات الخاصة (للفردي فقط)
+    const settingsArea = document.getElementById('modeSettingsArea');
+    if (settingsArea) {
+        if (mode === 'single_player') {
+            settingsArea.style.display = 'block';
+        } else {
+            settingsArea.style.display = 'none';
+        }
+    }
+
     // تحديث أزرار عدد اللاعبين
-    const isSingleOrRoom = mode === 'single_player' || mode === 'create_room';
     document.querySelectorAll('.player-count-btn').forEach(btn => {
         const count = parseInt(btn.dataset.count);
-        if (isSingleOrRoom) {
-            btn.disabled = true;
-            btn.style.opacity = '0.4';
-            btn.style.cursor = 'not-allowed';
-        } else {
-            btn.disabled = false;
-            btn.style.opacity = '1';
-            btn.style.cursor = 'pointer';
-        }
         btn.classList.remove('active');
         btn.style.background = 'transparent';
         btn.style.color = 'var(--gray)';
-        if (count === selectedPlayerCount && !isSingleOrRoom) {
-            btn.classList.add('active');
-            btn.style.background = 'var(--primary)';
-            btn.style.color = '#fff';
-        } else if (isSingleOrRoom && count === 1) {
+        if (count === selectedPlayerCount) {
             btn.classList.add('active');
             btn.style.background = 'var(--primary)';
             btn.style.color = '#fff';
         }
     });
-    
-    // ===== عرض بطاقات الغرف والتحقق =====
-    const ticketDisplay = document.getElementById('roomTicketsDisplay');
-    const ticketCount = document.getElementById('roomTicketsCount');
-    const ticketWarning = document.getElementById('ticketWarning');
-    
+
+    // عرض عدد بطاقات الغرف - قراءة من AuthService.currentUser مباشرة
     if (mode === 'create_room') {
-        const user = AuthService.currentUser;
-        const inventory = user?.inventory || [];
-        const ticket = inventory.find(i => i.itemId === 'room_ticket');
-        const count = ticket ? ticket.quantity : 0;
-        
-        if (ticketDisplay) {
-            ticketDisplay.style.display = 'block';
-            ticketDisplay.style.background = count > 0 ? 'var(--glass)' : 'rgba(255,107,107,0.15)';
-            ticketDisplay.style.borderColor = count > 0 ? 'var(--accent)' : 'var(--secondary)';
+        const user = AuthService.currentUser; // ✅ قراءة محدثة
+        let ticketCount = 0;
+        if (user) {
+            const inventory = user.inventory || [];
+            const ticket = inventory.find(i => i.itemId === 'room_ticket');
+            ticketCount = ticket ? ticket.quantity : 0;
         }
-        if (ticketCount) {
-            ticketCount.textContent = count;
-            ticketCount.style.color = count > 0 ? 'var(--accent)' : 'var(--secondary)';
-        }
-        
-        // ✅ تعطيل زر التحديد إذا كانت البطاقات 0
-        if (selectBtn) {
-            if (count <= 0) {
-                selectBtn.disabled = true;
-                selectBtn.style.opacity = '0.5';
-                selectBtn.style.cursor = 'not-allowed';
-                selectBtn.innerHTML = '<i class="fas fa-times"></i> لا توجد بطاقات';
-                selectBtn.title = 'تحتاج إلى بطاقة غرفة لإنشاء غرفة. قم بشرائها من المتجر.';
-            } else {
-                selectBtn.disabled = false;
-                selectBtn.style.opacity = '1';
-                selectBtn.style.cursor = 'pointer';
-                selectBtn.innerHTML = '<i class="fas fa-check"></i> تحديد';
-                selectBtn.title = 'تأكيد اختيار الطور';
+
+        const roomCard = document.querySelector('.mode-card-horizontal[data-mode="create_room"]');
+        if (roomCard) {
+            // تحديث شارة العدد
+            const countBadge = roomCard.querySelector('.ticket-count-badge');
+            if (countBadge) {
+                countBadge.textContent = `🎫 ${ticketCount}`;
             }
-        }
-        
-        // عرض رسالة تحذيرية إذا كانت البطاقات 0
-        if (ticketWarning) {
-            if (count <= 0) {
-                ticketWarning.style.display = 'block';
-                ticketWarning.textContent = '⚠️ ليس لديك بطاقات غرفة! اشترِ من المتجر.';
-                ticketWarning.style.color = 'var(--secondary)';
+            // تحديث لون البطاقة
+            if (ticketCount === 0) {
+                roomCard.style.borderColor = 'var(--secondary)';
+                roomCard.style.opacity = '0.6';
             } else {
-                ticketWarning.style.display = 'none';
+                roomCard.style.borderColor = 'var(--success)';
+                roomCard.style.opacity = '1';
             }
-        }
-    } else {
-        if (ticketDisplay) ticketDisplay.style.display = 'none';
-        if (ticketWarning) ticketWarning.style.display = 'none';
-        
-        // ✅ تفعيل زر التحديد للأطوار الأخرى
-        if (selectBtn) {
-            selectBtn.disabled = false;
-            selectBtn.style.opacity = '1';
-            selectBtn.style.cursor = 'pointer';
-            selectBtn.innerHTML = '<i class="fas fa-check"></i> تحديد';
-            selectBtn.title = 'تأكيد اختيار الطور';
         }
     }
 };
@@ -20579,30 +21835,22 @@ App._updateModalWithCurrentMode = function() {
 // ============================================================
 
 App._selectPlayerCount = function(count) {
-    const mode = selectedGameMode;
-    if (mode === 'single_player' || mode === 'create_room') {
-        showToast('⚠️ هذا الطور لا يدعم اختيار عدد اللاعبين', 'info', 2000);
-        return;
-    }
-    
     selectedPlayerCount = count;
-    
     document.querySelectorAll('.player-count-btn').forEach(btn => {
+        const c = parseInt(btn.dataset.count);
         btn.classList.remove('active');
         btn.style.background = 'transparent';
         btn.style.color = 'var(--gray)';
-        if (parseInt(btn.dataset.count) === count) {
+        if (c === count) {
             btn.classList.add('active');
             btn.style.background = 'var(--primary)';
             btn.style.color = '#fff';
         }
     });
-    
     const hint = document.getElementById('playerCountHint');
     if (hint) {
-        hint.textContent = count === 1 ? '(لعبة فردية)' : '(مواجهة مع لاعب آخر)';
+        hint.textContent = count === 1 ? '(مواجهة فردية)' : '(مواجهة ثنائية)';
     }
-    
     console.log(`👥 Player count: ${count}`);
 };
 
@@ -22214,6 +23462,40 @@ window._renderStatCard = function(statKey, value, sub = '', details = null) {
     `;
 };
 
+App._resetStoreItems = async function() {
+    if (!confirm('⚠️ هل أنت متأكد من إعادة تعيين عناصر المتجر؟ سيتم حذف جميع العناصر الحالية وإعادة إنشائها.')) {
+        return;
+    }
+    
+    try {
+        showToast('⏳ جاري إعادة تعيين المتجر...', 'info');
+        
+        // حذف جميع العناصر الحالية
+        const existingItems = await FirestoreService.getAll('storeItems');
+        for (const item of existingItems) {
+            if (item.id) {
+                await FirestoreService.delete('storeItems', item.id);
+            }
+        }
+        
+        // إضافة العناصر الجديدة
+        const newItems = this._getDefaultStoreItems();
+        for (const item of newItems) {
+            await FirestoreService.add('storeItems', item);
+        }
+        
+        // إعادة تحميل البيانات
+        await DataManager.loadAll();
+        this._renderStore(DataManager.data.storeItems || []);
+        
+        showToast(`✅ تم إعادة تعيين المتجر بنجاح (${newItems.length} عنصر)`, 'success');
+        
+    } catch (e) {
+        console.error('❌ خطأ في إعادة تعيين المتجر:', e);
+        showToast('❌ فشل في إعادة تعيين المتجر', 'error');
+    }
+};
+
 // ============================================================
 // دالة تبديل إظهار/إخفاء التفاصيل
 // ============================================================
@@ -22412,6 +23694,21 @@ App._onDataUpdate = function(data) {
             section.innerHTML = App._renderAnalyticsSection();
         }
     }
+};
+
+App._initStoreImages = function() {
+    // معالجة جميع صور المتجر بعد تحميلها
+    document.querySelectorAll('.store-item .item-image').forEach(img => {
+        // إذا كانت الصورة محملة بالفعل
+        if (img.complete && img.naturalWidth > 0) {
+            // إخفاء أي placeholder
+            const wrapper = img.closest('.item-image-wrapper');
+            if (wrapper) {
+                const placeholder = wrapper.querySelector('.item-image-placeholder');
+                if (placeholder) placeholder.remove();
+            }
+        }
+    });
 };
 
 // ✅ استبدال دالة _renderAnalyticsSection بالنسخة المحدثة
@@ -25289,229 +26586,222 @@ App._renderDashboard = function() {
     `;
 };
 
-// ============================================================
-// 3. تحديث دالة _selectGameMode لتخزين الطور المختار
-// ============================================================
-
 App._selectGameMode = function(mode) {
-    // التحقق من أن الطور مفعل
-    if (!ACTIVE_MODES.includes(mode)) {
-        showToast('⚠️ هذا الطور غير مفعل حالياً، سيتم إطلاقه قريباً!', 'info', 3000);
+    if (!MODE_DESCRIPTIONS[mode]) {
+        showToast('⚠️ هذا الطور غير موجود', 'error');
         return;
     }
-    
-    // إذا كان الطور هو إنشاء غرفة، تحقق من الرصيد
-    if (mode === 'create_room') {
-        const user = AuthService.currentUser;
-        if (!user) {
-            showToast('يجب تسجيل الدخول أولاً', 'error');
-            return;
-        }
-        if (user.coins < 600) {
-            showToast('⚠️ رصيدك غير كافٍ! تحتاج 600 عملة لإنشاء غرفة', 'error', 4000);
-            return;
-        }
-    }
-    
-    // تحديث المتغير العام
     selectedGameMode = mode;
-    
-    // تحديث المظهر في المودال
-    document.querySelectorAll('.mode-card').forEach(card => {
-        card.classList.remove('active');
-        card.style.borderColor = 'var(--glass-border)';
-        const status = card.querySelector('.mode-status');
-        if (status) {
-            status.style.color = 'var(--gray)';
-            status.textContent = '○';
-        }
-    });
-    
-    const selectedCard = document.querySelector(`.mode-card[data-mode="${mode}"]`);
-    if (selectedCard) {
-        selectedCard.classList.add('active');
-        selectedCard.style.borderColor = 'var(--primary)';
-        const status = selectedCard.querySelector('.mode-status');
-        if (status) {
-            status.style.color = 'var(--success)';
-            status.textContent = '●';
-        }
-    }
-    
-    // تحديث العرض في المودال
-    const modeNames = {
-        'normal_1v1': '⚔️ عادي 1v1',
-        'single_player': '🧠 فردي',
-        'create_room': '🏠 غرفة لعب',
-        'crossword': '🔤 كلمات متقاطعة',
-        'tournament': '🏆 بطولة'
-    };
-    const display = document.getElementById('selectedModeDisplay');
-    if (display) {
-        display.textContent = modeNames[mode] || mode;
-        display.style.color = 'var(--accent)';
-    }
-    
-    // تحديث تلميح عدد اللاعبين
-    const hint = document.getElementById('playerCountHint');
-    if (hint) {
-        if (mode === 'single_player') {
-            hint.textContent = '(لعب فردي تلقائياً)';
-        } else if (mode === 'create_room') {
-            hint.textContent = '(إنشاء غرفة مع الأصدقاء)';
-        } else {
-            const count = selectedPlayerCount;
-            hint.textContent = count === 1 ? '(لعبة فردية)' : '(مواجهة مع لاعب آخر)';
-        }
-    }
-    
-    // تحديث حالة أزرار عدد اللاعبين
-    document.querySelectorAll('.player-count-btn').forEach(btn => {
-        const count = parseInt(btn.dataset.count);
-        if (mode === 'single_player' || mode === 'create_room') {
-            btn.disabled = true;
-            btn.style.opacity = '0.4';
-            btn.style.cursor = 'not-allowed';
-        } else {
-            btn.disabled = false;
-            btn.style.opacity = '1';
-            btn.style.cursor = 'pointer';
-        }
-    });
-    
-    // إذا كان الطور فردي أو غرفة، حدد العدد المناسب تلقائياً
-    if (mode === 'single_player' || mode === 'create_room') {
-        selectedPlayerCount = 1;
-        document.querySelectorAll('.player-count-btn').forEach(btn => {
-            btn.classList.remove('active');
-            btn.style.background = 'transparent';
-            btn.style.color = 'var(--gray)';
-            if (parseInt(btn.dataset.count) === 1) {
-                btn.classList.add('active');
-                btn.style.background = 'var(--primary)';
-                btn.style.color = '#fff';
-            }
-        });
-    }
-    
-    // ✅ تحديث زر اللعب الرئيسي في الصفحة الرئيسية
-    this._updatePlayButtonMode();
     this._updateModalWithCurrentMode();
+    this._updatePlayButtonMode();
     console.log(`🎯 Mode selected: ${mode}`);
 };
-
-// ============================================================
-// تحديث دالة _updatePlayButtonMode
-// ============================================================
 
 App._updatePlayButtonMode = function() {
     const playBtn = document.getElementById('dashboardPlayBtn');
     if (!playBtn) return;
-    
-    // الحصول على معلومات الطور الحالي
+
     const modeInfo = MODE_DESCRIPTIONS[selectedGameMode] || MODE_DESCRIPTIONS['normal_1v1'];
     const modeDisplayName = modeInfo.title || 'عادي 1v1';
     const modeIcon = modeInfo.icon || '⚔️';
-    
-    // تحديث النص مع عرض الطور المختار
+    const isCompetitive = modeInfo.competitive || false;
+
     const contentDiv = playBtn.querySelector('.btn-content');
     if (contentDiv) {
-        // إزالة الشارة القديمة إذا وجدت
         const oldBadge = contentDiv.querySelector('.mode-badge');
         if (oldBadge) oldBadge.remove();
-        
-        // الاحتفاظ بالأيقونة والنص الأساسي
-        const iconSpan = contentDiv.querySelector('.play-icon');
+
         const textSpan = contentDiv.querySelector('span:not(.play-icon)');
-        
-        if (textSpan) {
-            textSpan.textContent = 'العب الآن';
-        }
-        
-        // إضافة شارة الطور الجديدة
+        if (textSpan) textSpan.textContent = 'العب الآن';
+
         const badge = document.createElement('span');
         badge.className = 'mode-badge';
         badge.style.cssText = 'font-size:0.6rem; background:rgba(255,255,255,0.15); padding:0.1rem 0.6rem; border-radius:30px; margin-right:0.5rem; font-weight:400;';
-        badge.textContent = `${modeIcon} ${modeDisplayName}`;
+        badge.textContent = `${modeIcon} ${modeDisplayName} ${isCompetitive ? '🏅' : '🎮'}`;
         contentDiv.appendChild(badge);
     }
-    
-    // تحديث عنوان الزر (tooltip)
+
     playBtn.title = `ابدأ اللعب (الطور المختار: ${modeDisplayName})`;
 };
 
 App._selectGameModeFromSettings = function() {
-    // استخدام المتغير العام selectedGameMode
     const mode = selectedGameMode;
-    const count = selectedPlayerCount;
-    
-    console.log(`🎯 Mode selected from settings: ${mode}, players: ${count}`);
-    
-    // تحديث زر اللعب الرئيسي
-    this._updatePlayButtonMode();
-    
+    const modeInfo = MODE_DESCRIPTIONS[mode];
+    if (!modeInfo) return;
+
+    // إذا كان الطور فردي، نحفظ الإعدادات
+    if (mode === 'single_player') {
+        const difficulty = document.getElementById('settingsGameDifficulty')?.value || 'medium';
+        const category = document.getElementById('settingsGameCategory')?.value || 'all';
+        const questionType = document.getElementById('settingsGameQuestionType')?.value || 'all';
+        const count = parseInt(document.getElementById('settingsGameCount')?.value) || 10;
+        const gameMode = document.getElementById('settingsGameMode')?.value || 'normal';
+
+        localStorage.setItem('singlePlayerSettings', JSON.stringify({
+            difficulty, category, questionType, count, gameMode
+        }));
+
+        // تحديث عناصر صفحة اللعبة
+        const gameDifficulty = document.getElementById('gameDifficulty');
+        const gameCategory = document.getElementById('gameCategory');
+        const gameQuestionType = document.getElementById('gameQuestionType');
+        const gameCount = document.getElementById('gameCount');
+        const gameModeEl = document.getElementById('gameMode');
+        if (gameDifficulty) gameDifficulty.value = difficulty;
+        if (gameCategory) gameCategory.value = category;
+        if (gameQuestionType) gameQuestionType.value = questionType;
+        if (gameCount) gameCount.value = count;
+        if (gameModeEl) gameModeEl.value = gameMode;
+    }
+
     // عرض رسالة تأكيد
-    const modeInfo = MODE_DESCRIPTIONS[mode] || MODE_DESCRIPTIONS['normal_1v1'];
-    showToast(`✅ تم تحديد الطور: ${modeInfo.title}`, 'success', 3000);
-    
-    // إغلاق المودال
+    const modeNames = {
+        'normal_1v1': '⚔️ عادي 1v1 (تصنيفي)',
+        'crossword': '🔤 كلمات متقاطعة',
+        'tournament': '🏆 بطولة',
+        'normal_1v1_unranked': '⚔️ عادي غير مصنف',
+        'single_player': '🧠 فردي',
+        'create_room': '🏠 غرفة مدفوعة'
+    };
+    showToast(`✅ تم تحديد الطور: ${modeNames[mode] || mode}`, 'success', 3000);
+
     App._closeModal('matchSettingsModal');
 };
 
-// ============================================================
-// 6. دالة تنفيذ الطور (مستخدمة من زر اللعب الرئيسي والإعدادات)
-// ============================================================
-
 App._executeGameMode = function(mode) {
+    const playerCount = selectedPlayerCount; // 1 أو 2
     switch(mode) {
         case 'normal_1v1':
-            // اللعب العادي 1 ضد 1 (البحث عن خصم)
-            showToast('🔍 جاري البحث عن خصم...', 'info', 3000);
-            MatchmakingSystem.startMatchmaking('normal_1v1');
+            // تصنيفي 1v1 أو 2v2
+            showToast(`🔍 جاري البحث عن خصم (تصنيفي ${playerCount}v${playerCount})...`, 'info', 3000);
+            MatchmakingSystem.startMatchmaking('normal_1v1', { competitive: true, playerCount: playerCount });
             break;
-            
+
+        case 'normal_1v1_unranked':
+            // ودي غير مصنف
+            showToast(`🔍 جاري البحث عن خصم (ودي ${playerCount}v${playerCount})...`, 'info', 3000);
+            MatchmakingSystem.startMatchmaking('normal_1v1_unranked', { competitive: false, playerCount: playerCount });
+            break;
+
+        case 'crossword':
+            showToast('🔤 الكلمات المتقاطعة التصنيفية قادمة قريباً!', 'info', 3000);
+            break;
+
+        case 'tournament':
+            showToast('🏆 البطولات التصنيفية قادمة قريباً!', 'info', 3000);
+            break;
+
         case 'single_player':
-            // اللعب الفردي (اللعبة العادية)
+            // فردي
             showToast('🎮 بدء اللعب الفردي...', 'success', 2000);
             App._activateSection('game');
-            // تشغيل اللعبة تلقائياً
+            const savedSettings = JSON.parse(localStorage.getItem('singlePlayerSettings') || '{}');
+            if (savedSettings) {
+                const gameDifficulty = document.getElementById('gameDifficulty');
+                const gameCategory = document.getElementById('gameCategory');
+                const gameQuestionType = document.getElementById('gameQuestionType');
+                const gameCount = document.getElementById('gameCount');
+                const gameModeEl = document.getElementById('gameMode');
+                if (gameDifficulty) gameDifficulty.value = savedSettings.difficulty || 'medium';
+                if (gameCategory) gameCategory.value = savedSettings.category || 'all';
+                if (gameQuestionType) gameQuestionType.value = savedSettings.questionType || 'all';
+                if (gameCount) gameCount.value = savedSettings.count || 10;
+                if (gameModeEl) gameModeEl.value = savedSettings.gameMode || 'normal';
+            }
             setTimeout(() => {
                 const startBtn = document.getElementById('startGameBtn');
-                if (startBtn) {
-                    startBtn.click();
-                } else {
-                    // إذا لم يوجد الزر، نبدأ اللعبة مباشرة
-                    GameEngine.start();
-                }
+                if (startBtn) startBtn.click();
+                else GameEngine.start();
             }, 300);
             break;
-            
-        case 'create_room':
-            // إنشاء غرفة لعب (صفحة الغرف)
-            const user = AuthService.currentUser;
-            if (!user) {
-                showToast('يجب تسجيل الدخول أولاً', 'error');
-                return;
-            }
-            if (user.coins < 600) {
-                showToast('⚠️ رصيدك غير كافٍ! تحتاج 600 عملة لإنشاء غرفة', 'error', 4000);
-                return;
-            }
-            showToast('🏠 جاري فتح صفحة الغرف...', 'info', 2000);
-            App._activateSection('multiplayer');
-            break;
-            
-        case 'crossword':
-            showToast('🔤 الكلمات المتقاطعة قادمة قريباً!', 'info', 3000);
-            break;
-            
-        case 'tournament':
-            showToast('🏆 البطولات قادمة قريباً!', 'info', 3000);
-            break;
-            
+
+    case 'create_room':
+    const user = AuthService.currentUser;
+    if (!user) {
+        showToast('يجب تسجيل الدخول أولاً', 'error');
+        return;
+    }
+    const inventory = user.inventory || [];
+    const ticket = inventory.find(i => i.itemId === 'room_ticket');
+    const ticketCount = ticket ? ticket.quantity : 0;
+    if (ticketCount < 1) {
+        showToast('⚠️ ليس لديك بطاقات غرفة! اشترِ من المتجر.', 'error', 4000);
+        // توجيه المستخدم إلى المتجر
+        setTimeout(() => App._activateSection('store'), 500);
+        return;
+    }
+    showToast('🏠 جاري فتح صفحة الغرف...', 'info', 2000);
+    App._activateSection('multiplayer');
+    break;
+
         default:
             showToast('⚠️ طور غير معروف', 'error');
     }
+};
+
+App._setupGameSettingsEvents = function() {
+    // 1. التبويبات
+    document.querySelectorAll('.settings-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            const tabId = this.dataset.tab;
+            document.querySelectorAll('.settings-tab').forEach(t => {
+                t.classList.remove('active');
+                t.style.background = 'transparent';
+                t.style.color = 'var(--gray)';
+            });
+            this.classList.add('active');
+            this.style.background = 'var(--primary)';
+            this.style.color = '#fff';
+
+            document.querySelectorAll('.settings-tab-content').forEach(content => {
+                content.style.display = 'none';
+            });
+            document.getElementById(`tab-${tabId}`).style.display = 'block';
+
+            const firstCard = document.querySelector(`#tab-${tabId} .mode-card-horizontal:not([style*="cursor: not-allowed"])`);
+            if (firstCard) {
+                App._selectGameMode(firstCard.dataset.mode);
+            }
+        });
+    });
+
+    // 2. اختيار الطور عند النقر على البطاقة
+    document.querySelectorAll('.mode-card-horizontal').forEach(card => {
+        card.addEventListener('click', function() {
+            if (this.style.cursor === 'not-allowed' || this.style.opacity === '0.6') {
+                showToast('⚠️ هذا الطور غير مفعل حالياً', 'info', 2000);
+                return;
+            }
+            const mode = this.dataset.mode;
+            App._selectGameMode(mode);
+        });
+    });
+
+    // 3. أزرار عدد اللاعبين
+    document.querySelectorAll('.player-count-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const count = parseInt(this.dataset.count);
+            App._selectPlayerCount(count);
+        });
+    });
+
+    // 4. زر تحديد الطور
+    document.getElementById('selectGameModeBtn')?.addEventListener('click', function() {
+        App._selectGameModeFromSettings();
+    });
+
+    // 5. عند فتح المودال، نحدّث الواجهة
+    const modal = document.getElementById('matchSettingsModal');
+    if (modal) {
+        const observer = new MutationObserver(() => {
+            if (modal.classList.contains('open')) {
+                App._updateModalWithCurrentMode();
+            }
+        });
+        observer.observe(modal, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    console.log('✅ Game settings events bound');
 };
 
 // ============================================================
@@ -25534,6 +26824,101 @@ App._startDirectMatch = function() {
         return;
     }
     MatchmakingSystem.startMatchmaking();
+};
+
+App._checkStoreImages = function() {
+    const items = DataManager.data.storeItems || [];
+    if (items.length === 0) {
+        showToast('⚠️ لا توجد عناصر في المتجر لفحصها', 'info');
+        return;
+    }
+
+    showToast('🔍 جاري فحص الصور...', 'info', 2000);
+    
+    let found = 0;
+    let missing = 0;
+    const missingImages = [];
+    const foundImages = [];
+
+    items.forEach((item, index) => {
+        if (!item.imagePath) {
+            missing++;
+            missingImages.push({ id: item.id, path: 'لا يوجد مسار صورة' });
+            return;
+        }
+
+        const img = new Image();
+        img.onload = () => {
+            found++;
+            foundImages.push(item.id);
+            console.log(`✅ ${item.id}: الصورة موجودة - ${item.imagePath}`);
+            
+            // تحديث التقدم
+            const progress = Math.round(((found + missing) / items.length) * 100);
+            if (progress % 10 === 0) {
+                showToast(`🔍 فحص الصور... ${progress}%`, 'info', 1000);
+            }
+        };
+        
+        img.onerror = () => {
+            missing++;
+            missingImages.push({ id: item.id, path: item.imagePath });
+            console.warn(`❌ ${item.id}: الصورة غير موجودة - ${item.imagePath}`);
+            
+            // تحديث التقدم
+            const progress = Math.round(((found + missing) / items.length) * 100);
+            if (progress % 10 === 0) {
+                showToast(`🔍 فحص الصور... ${progress}%`, 'info', 1000);
+            }
+        };
+        
+        // ✅ مهلة للصورة (5 ثوانٍ)
+        const timeout = setTimeout(() => {
+            if (!img.complete) {
+                missing++;
+                missingImages.push({ id: item.id, path: item.imagePath + ' (مهلة)' });
+                console.warn(`⏰ ${item.id}: مهلة في تحميل الصورة - ${item.imagePath}`);
+            }
+        }, 5000);
+        
+        img.src = item.imagePath;
+        
+        // إذا كانت الصورة محملة بالفعل (من الكاش)
+        if (img.complete) {
+            clearTimeout(timeout);
+            if (img.naturalWidth === 0) {
+                missing++;
+                missingImages.push({ id: item.id, path: item.imagePath + ' (فارغة)' });
+                console.warn(`❌ ${item.id}: الصورة فارغة - ${item.imagePath}`);
+            }
+        }
+    });
+
+    // عرض النتيجة بعد 3 ثوانٍ
+    setTimeout(() => {
+        const total = items.length;
+        const foundCount = total - missing;
+        
+        let message = `📊 فحص الصور: ${foundCount}/${total} موجودة`;
+        if (missing > 0) {
+            message += `، ${missing} مفقودة`;
+            console.warn('⚠️ الصور المفقودة:', missingImages);
+            
+            // عرض تفاصيل الصور المفقودة في وحدة التحكم
+            console.group('📋 تفاصيل الصور المفقودة:');
+            missingImages.forEach(m => {
+                console.log(`  - ${m.id}: ${m.path}`);
+            });
+            console.groupEnd();
+        }
+        
+        showToast(message, missing > 0 ? 'warning' : 'success', 4000);
+        
+        // عرض تقرير مفصل في وحدة التحكم
+        console.log('✅ الصور الموجودة:', foundImages);
+        console.log('❌ الصور المفقودة:', missingImages);
+        
+    }, 3000);
 };
 
 // ============================================================
