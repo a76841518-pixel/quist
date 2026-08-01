@@ -126,14 +126,16 @@
     bottom: 0;
     background: #0f0e17;
     display: flex;
-    align-items: center;
+    align-items: flex-start;      /* تغيير من center إلى flex-start */
     justify-content: center;
     z-index: 9999999;
     padding: 1rem;
+    overflow-y: auto;             /* ✅ إضافة تمرير عمودي */
+    overflow-x: hidden;
 ">
     <!-- الصورة كخلفية -->
     <img src="images/loading-bg.jpg" alt="خلفية" style="
-        position: absolute;
+        position: fixed;           /* تغيير من absolute إلى fixed */
         top: 0;
         left: 0;
         right: 0;
@@ -146,32 +148,37 @@
 
     <!-- طبقة تعتيم -->
     <div style="
-        position: absolute;
+        position: fixed;           /* تغيير من absolute إلى fixed */
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(15, 14, 23, 0.88);
+        background: rgba(15, 14, 23, 0.92);
         backdrop-filter: blur(8px);
         z-index: 1;
     "></div>
 
     <!-- المحتوى -->
-    <div style="position: relative; z-index: 2; width: 100%; max-width: 400px;">
-
+    <div style="
+        position: relative; 
+        z-index: 2; 
+        width: 100%; 
+        max-width: 420px; 
+        padding: 1.5rem 1rem 2.5rem;  /* زيادة padding السفلي */
+        margin: auto;                  /* تمركز العمودي */
+    ">
         <!-- الشعار -->
-        <div style="text-align: center; margin-bottom: 2rem;">
-            <!-- ✅ صورة الشعار (أكبر قليلاً) -->
+        <div style="text-align: center; margin-bottom: 1.5rem;">
             <div style="font-size: 4rem; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: center;">
                 <img src="images/logo.png" alt="شعار اللعبة" style="
-                    width: 90px;
-                    height: 90px;
+                    width: 80px;
+                    height: 80px;
                     object-fit: contain;
                     display: block;
                 " onerror="this.style.display='none'; this.parentElement.textContent='⚽'">
             </div>
-            <h1 style="color: #fffffe; font-size: 2rem; font-weight: 900; margin-bottom: 0.3rem;">معركة العقول</h1>
-            <p style="color: #a7a9be; font-size: 0.95rem;">🏆 تحدي المعرفة وارتقِ إلى القمة</p>
+            <h1 style="color: #fffffe; font-size: 1.8rem; font-weight: 900; margin-bottom: 0.2rem;">معركة العقول</h1>
+            <p style="color: #a7a9be; font-size: 0.9rem;">🏆 تحدي المعرفة وارتقِ إلى القمة</p>
         </div>
 
         <!-- ===== الأزرار الرئيسية ===== -->
@@ -268,7 +275,7 @@
             </button>
         </div>
 
-        <!-- ===== نموذج التسجيل (مخفي) ===== -->
+        <!-- ===== نموذج التسجيل (مخفي) - مع تحسينات التمرير ===== -->
         <div id="authRegisterForm" style="display: none;">
             <button id="authBackToMainBtn2" style="
                 background: transparent;
@@ -284,8 +291,9 @@
                 <i class="fas fa-arrow-right"></i> العودة
             </button>
 
+            <!-- 1️⃣ الاسم الكامل -->
             <div style="margin-bottom: 1rem;">
-                <label style="display: block; color: #a7a9be; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">الاسم الكامل</label>
+                <label style="display: block; color: #a7a9be; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">الاسم الكامل *</label>
                 <input type="text" id="authRegFullName" placeholder="اسم اللاعب" style="
                     width: 100%;
                     padding: 12px 16px;
@@ -297,8 +305,9 @@
                 ">
             </div>
 
+            <!-- 2️⃣ اسم المستخدم -->
             <div style="margin-bottom: 1rem;">
-                <label style="display: block; color: #a7a9be; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">اسم المستخدم</label>
+                <label style="display: block; color: #a7a9be; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">اسم المستخدم *</label>
                 <input type="text" id="authRegUsername" placeholder="ahmad_2024" style="
                     width: 100%;
                     padding: 12px 16px;
@@ -311,8 +320,9 @@
                 <div id="authRegUsernameStatus" style="font-size: 0.75rem; margin-top: 0.3rem; color: #a7a9be;"></div>
             </div>
 
+            <!-- 3️⃣ البريد الإلكتروني -->
             <div style="margin-bottom: 1rem;">
-                <label style="display: block; color: #a7a9be; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">البريد الإلكتروني</label>
+                <label style="display: block; color: #a7a9be; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">البريد الإلكتروني *</label>
                 <input type="email" id="authRegEmail" placeholder="example@gmail.com" style="
                     width: 100%;
                     padding: 12px 16px;
@@ -324,8 +334,9 @@
                 ">
             </div>
 
+            <!-- 4️⃣ كلمة المرور -->
             <div style="margin-bottom: 1rem;">
-                <label style="display: block; color: #a7a9be; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">كلمة المرور</label>
+                <label style="display: block; color: #a7a9be; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">كلمة المرور *</label>
                 <input type="password" id="authRegPassword" placeholder="••••••••" style="
                     width: 100%;
                     padding: 12px 16px;
@@ -334,11 +345,23 @@
                     background: rgba(255,255,255,0.05);
                     color: #fffffe;
                     font-size: 1rem;
+                    min-height: 48px;
                 ">
+                <!-- مؤشر قوة كلمة المرور -->
+                <div id="passwordStrength" style="margin-top: 0.3rem;">
+                    <div style="display:flex; gap:4px; height:4px;">
+                        <div class="strength-bar" style="flex:1; background:var(--glass); border-radius:2px;"></div>
+                        <div class="strength-bar" style="flex:1; background:var(--glass); border-radius:2px;"></div>
+                        <div class="strength-bar" style="flex:1; background:var(--glass); border-radius:2px;"></div>
+                        <div class="strength-bar" style="flex:1; background:var(--glass); border-radius:2px;"></div>
+                    </div>
+                    <div id="strengthText" style="font-size:0.65rem; margin-top:4px; color:var(--gray);">ضعيفة</div>
+                </div>
             </div>
 
-            <div style="margin-bottom: 1.5rem;">
-                <label style="display: block; color: #a7a9be; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">تأكيد كلمة المرور</label>
+            <!-- 5️⃣ تأكيد كلمة المرور -->
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; color: #a7a9be; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.3rem;">تأكيد كلمة المرور *</label>
                 <input type="password" id="authRegPasswordConfirm" placeholder="••••••••" style="
                     width: 100%;
                     padding: 12px 16px;
@@ -347,7 +370,9 @@
                     background: rgba(255,255,255,0.05);
                     color: #fffffe;
                     font-size: 1rem;
+                    min-height: 48px;
                 ">
+                <div id="passwordMatchFeedback" style="font-size:0.75rem; margin-top:4px; color:var(--gray);"></div>
             </div>
 
             <div id="authRegError" style="display: none; color: #FF6B6B; font-size: 0.85rem; margin-bottom: 1rem; text-align: center;"></div>
@@ -364,13 +389,18 @@
                 cursor: pointer;
                 box-shadow: 0 4px 20px rgba(46, 204, 113, 0.3);
                 transition: all 0.3s ease;
-            ">
+            " disabled>
                 <i class="fas fa-user-plus"></i> إنشاء حساب
             </button>
+
+            <!-- إشعار إضافي صغير -->
+            <div style="text-align:center; margin-top: 0.8rem; color: #4a4a6a; font-size: 0.65rem;">
+                🔒 جميع بياناتك آمنة ومشفرة
+            </div>
         </div>
 
         <!-- ===== رسالة أسفل الشاشة ===== -->
-        <div style="text-align: center; margin-top: 1.5rem; color: #a7a9be; font-size: 0.8rem;">
+        <div style="text-align: center; margin-top: 1rem; color: #a7a9be; font-size: 0.75rem;">
             🔒 بياناتك آمنة ومشفرة
         </div>
     </div>
