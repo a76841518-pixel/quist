@@ -823,6 +823,43 @@ const DEFAULT_STATS = {
     highestCoinsMatch: 0,
     longestWinStreak: 0,
   },
+    // ===== إحصائيات الأطوار الجديدة =====
+    ranked: {
+        matches: 0,
+        wins: 0,
+        streak: 0,
+        bestStreak: 0,
+        perfect: 0,
+        totalScore: 0,
+        avgScore: 0
+    },
+    unranked: {
+        matches: 0,
+        wins: 0,
+        streak: 0,
+        perfect: 0,
+        totalScore: 0,
+        avgScore: 0
+    },
+    training: {
+        completed: 0,
+        bestScore: 0,
+        survivalWins: 0,
+        speedWins: 0,
+        survivalStreak: 0,
+        speedCorrect: 0,
+        totalScore: 0,
+        avgScore: 0
+    },
+    rooms: {
+        joined: 0,
+        hosted: 0,
+        wins: 0,
+        bestScore: 0,
+        megaJoined: 0,
+        totalScore: 0,
+        avgScore: 0
+    },
   currentSeason: {
     matches: 0,
     winRate: 0,
@@ -888,6 +925,33 @@ const STAT_IMAGES = {
     'avgCompletionRate': { image: 'images/stats/avg-completion-rate.png', label: 'متوسط نسبة الإكمال', color: '#2ecc71' },
     'avgWithdrawalRate': { image: 'images/stats/avg-withdrawal-rate.png', label: 'متوسط نسبة الانسحاب', color: '#FF6B6B' },
     
+    // ===== إحصائيات الأطوار التصنيفية =====
+    'rankedMatches': { image: 'images/stats/ranked-matches.png', label: 'مباريات مصنفة', color: '#6C63FF' },
+    'rankedWins': { image: 'images/stats/ranked-wins.png', label: 'انتصارات مصنفة', color: '#FFD93D' },
+    'rankedStreak': { image: 'images/stats/ranked-streak.png', label: 'سلسلة مصنفة', color: '#FF6B6B' },
+    'rankedBestStreak': { image: 'images/stats/ranked-best-streak.png', label: 'أفضل سلسلة مصنفة', color: '#2ecc71' },
+    'rankedPerfect': { image: 'images/stats/ranked-perfect.png', label: 'مباريات كاملة مصنفة', color: '#FFD93D' },
+    
+    // ===== إحصائيات الأطوار الودية =====
+    'unrankedMatches': { image: 'images/stats/unranked-matches.png', label: 'مباريات ودية', color: '#4fc3f7' },
+    'unrankedWins': { image: 'images/stats/unranked-wins.png', label: 'انتصارات ودية', color: '#2ecc71' },
+    'unrankedPerfect': { image: 'images/stats/unranked-perfect.png', label: 'مباريات كاملة ودية', color: '#FFD93D' },
+    
+    // ===== إحصائيات أطوار التدريب =====
+    'trainingCompleted': { image: 'images/stats/training-completed.png', label: 'جولات تدريبية', color: '#3498db' },
+    'trainingBestScore': { image: 'images/stats/training-best-score.png', label: 'أفضل نقاط تدريب', color: '#FFD93D' },
+    'trainingSurvivalWins': { image: 'images/stats/training-survival-wins.png', label: 'انتصارات الصمود', color: '#FF6B6B' },
+    'trainingSpeedWins': { image: 'images/stats/training-speed-wins.png', label: 'انتصارات السرعة', color: '#f39c12' },
+    'trainingSurvivalStreak': { image: 'images/stats/training-survival-streak.png', label: 'سلسلة الصمود', color: '#2ecc71' },
+    'trainingSpeedCorrect': { image: 'images/stats/training-speed-correct.png', label: 'إجابات صحيحة في السرعة', color: '#9b59b6' },
+    
+    // ===== إحصائيات الغرف =====
+    'roomsJoined': { image: 'images/stats/rooms-joined.png', label: 'غرف انضم إليها', color: '#2ecc71' },
+    'roomsHosted': { image: 'images/stats/rooms-hosted.png', label: 'غرف أنشأها', color: '#FFD93D' },
+    'roomWins': { image: 'images/stats/room-wins.png', label: 'انتصارات في الغرف', color: '#6C63FF' },
+    'roomBestScore': { image: 'images/stats/room-best-score.png', label: 'أفضل نقاط في غرفة', color: '#FFD93D' },
+    'megaRoomsJoined': { image: 'images/stats/mega-rooms-joined.png', label: 'غرف ميجا', color: '#9b59b6' },
+
     // الأرقام القياسية
     'highestStreak': { image: 'images/stats/highest-streak.png', label: 'أعلى سلسلة إجابات', color: '#FFD93D' },
     'fastestMatchRecord': { image: 'images/stats/fastest-match-record.png', label: 'أسرع مباراة', color: '#6C63FF' },
@@ -1119,6 +1183,88 @@ setStat(stats, 'general.lastPlace', lastPlace);
             setStat(stats, 'averages.performance.avgCompletionRate', completionRate);
             setStat(stats, 'averages.performance.avgWithdrawalRate', withdrawalRate);
         }
+
+    // ============================================================
+    // إحصائيات الأطوار الجديدة
+    // ============================================================
+    
+    const mode = matchData.mode || 'unknown';
+    const isRanked = matchData.isRanked || false;
+    const isUnranked = matchData.isUnranked || false;
+    const isTraining = matchData.isTraining || false;
+    const isRoom = matchData.isRoom || false;
+    const isWin = matchData.win || false;
+    const isPerfect = matchData.allCorrect || false;
+
+    // ===== الأطوار التصنيفية =====
+    if (isRanked) {
+        const rankedMatches = getStat(stats, 'ranked.matches', 0) + 1;
+        const rankedWins = getStat(stats, 'ranked.wins', 0) + (isWin ? 1 : 0);
+        const rankedStreak = isWin ? (getStat(stats, 'ranked.streak', 0) + 1) : 0;
+        const rankedBestStreak = Math.max(getStat(stats, 'ranked.bestStreak', 0), rankedStreak);
+        const rankedPerfect = getStat(stats, 'ranked.perfect', 0) + (isPerfect ? 1 : 0);
+        
+        setStat(stats, 'ranked.matches', rankedMatches);
+        setStat(stats, 'ranked.wins', rankedWins);
+        setStat(stats, 'ranked.streak', rankedStreak);
+        setStat(stats, 'ranked.bestStreak', rankedBestStreak);
+        setStat(stats, 'ranked.perfect', rankedPerfect);
+    }
+
+    // ===== الأطوار الودية =====
+    if (isUnranked) {
+        const unrankedMatches = getStat(stats, 'unranked.matches', 0) + 1;
+        const unrankedWins = getStat(stats, 'unranked.wins', 0) + (isWin ? 1 : 0);
+        const unrankedPerfect = getStat(stats, 'unranked.perfect', 0) + (isPerfect ? 1 : 0);
+        const unrankedStreak = isWin ? (getStat(stats, 'unranked.streak', 0) + 1) : 0;
+        
+        setStat(stats, 'unranked.matches', unrankedMatches);
+        setStat(stats, 'unranked.wins', unrankedWins);
+        setStat(stats, 'unranked.perfect', unrankedPerfect);
+        setStat(stats, 'unranked.streak', unrankedStreak);
+    }
+
+    // ===== أطوار التدريب =====
+    if (isTraining) {
+        const trainingCompleted = getStat(stats, 'training.completed', 0) + 1;
+        const trainingBestScore = Math.max(getStat(stats, 'training.bestScore', 0), matchData.score || 0);
+        const trainingSurvivalWins = getStat(stats, 'training.survivalWins', 0) + (matchData.survivalWin ? 1 : 0);
+        const trainingSpeedWins = getStat(stats, 'training.speedWins', 0) + (matchData.speedWin ? 1 : 0);
+        
+        setStat(stats, 'training.completed', trainingCompleted);
+        setStat(stats, 'training.bestScore', trainingBestScore);
+        setStat(stats, 'training.survivalWins', trainingSurvivalWins);
+        setStat(stats, 'training.speedWins', trainingSpeedWins);
+        
+        // سلسلة الصمود
+        if (matchData.survivalStreak) {
+            const survivalStreak = getStat(stats, 'training.survivalStreak', 0);
+            if (matchData.survivalStreak > survivalStreak) {
+                setStat(stats, 'training.survivalStreak', matchData.survivalStreak);
+            }
+        }
+        
+        // إجابات صحيحة في تحدي السرعة
+        if (matchData.speedCorrect) {
+            const speedCorrect = getStat(stats, 'training.speedCorrect', 0) + matchData.speedCorrect;
+            setStat(stats, 'training.speedCorrect', speedCorrect);
+        }
+    }
+
+    // ===== الغرف =====
+    if (isRoom) {
+        const roomsJoined = getStat(stats, 'rooms.joined', 0) + 1;
+        const roomsHosted = getStat(stats, 'rooms.hosted', 0) + (matchData.isHost ? 1 : 0);
+        const roomWins = getStat(stats, 'rooms.wins', 0) + (isWin ? 1 : 0);
+        const roomBestScore = Math.max(getStat(stats, 'rooms.bestScore', 0), matchData.score || 0);
+        const megaRoomsJoined = getStat(stats, 'rooms.megaJoined', 0) + (matchData.isMegaRoom ? 1 : 0);
+        
+        setStat(stats, 'rooms.joined', roomsJoined);
+        setStat(stats, 'rooms.hosted', roomsHosted);
+        setStat(stats, 'rooms.wins', roomWins);
+        setStat(stats, 'rooms.bestScore', roomBestScore);
+        setStat(stats, 'rooms.megaJoined', megaRoomsJoined);
+    }
 
         // --- الموسم الحالي ---
         const seasonStart = new Date(getStat(stats, 'currentSeason.seasonStartDate', new Date().toISOString()));
@@ -3567,6 +3713,259 @@ const ACHIEVEMENTS_DATA = [
         check: (data) => data.boxesOpened >= 250
     },
 
+    // ===== إنجازات الأطوار التصنيفية =====
+    {
+        id: 'ranked_first_win',
+        name: 'أول فوز مصنف',
+        description: 'حقق أول فوز لك في الأطوار التصنيفية',
+        category: 'أطوار مصنفة',
+        points: 30,
+        image: 'images/achievements/ranked_first_win.png',
+        check: (data) => data.rankedWins >= 1
+    },
+    {
+        id: 'ranked_wins_10',
+        name: '10 انتصارات مصنفة',
+        description: 'حقق 10 انتصارات في الأطوار التصنيفية',
+        category: 'أطوار مصنفة',
+        points: 60,
+        image: 'images/achievements/ranked_wins_10.png',
+        check: (data) => data.rankedWins >= 10
+    },
+    {
+        id: 'ranked_wins_50',
+        name: '50 انتصاراً مصنفاً',
+        description: 'حقق 50 انتصاراً في الأطوار التصنيفية',
+        category: 'أطوار مصنفة',
+        points: 150,
+        image: 'images/achievements/ranked_wins_50.png',
+        check: (data) => data.rankedWins >= 50
+    },
+    {
+        id: 'ranked_wins_100',
+        name: '100 انتصار مصنف',
+        description: 'حقق 100 انتصار في الأطوار التصنيفية',
+        category: 'أطوار مصنفة',
+        points: 300,
+        image: 'images/achievements/ranked_wins_100.png',
+        check: (data) => data.rankedWins >= 100
+    },
+    {
+        id: 'ranked_streak_5',
+        name: '5 انتصارات مصنفة متتالية',
+        description: 'حقق 5 انتصارات متتالية في الأطوار التصنيفية',
+        category: 'أطوار مصنفة',
+        points: 80,
+        image: 'images/achievements/ranked_streak_5.png',
+        check: (data) => data.rankedStreak >= 5
+    },
+    {
+        id: 'ranked_streak_10',
+        name: '10 انتصارات مصنفة متتالية',
+        description: 'حقق 10 انتصارات متتالية في الأطوار التصنيفية',
+        category: 'أطوار مصنفة',
+        points: 200,
+        image: 'images/achievements/ranked_streak_10.png',
+        check: (data) => data.rankedStreak >= 10
+    },
+
+    // ===== إنجازات الأطوار الودية =====
+    {
+        id: 'unranked_first_win',
+        name: 'أول فوز ودي',
+        description: 'حقق أول فوز لك في الأطوار الودية',
+        category: 'أطوار ودية',
+        points: 15,
+        image: 'images/achievements/unranked_first_win.png',
+        check: (data) => data.unrankedWins >= 1
+    },
+    {
+        id: 'unranked_wins_25',
+        name: '25 انتصاراً ودياً',
+        description: 'حقق 25 انتصاراً في الأطوار الودية',
+        category: 'أطوار ودية',
+        points: 50,
+        image: 'images/achievements/unranked_wins_25.png',
+        check: (data) => data.unrankedWins >= 25
+    },
+    {
+        id: 'unranked_wins_100',
+        name: '100 انتصار ودي',
+        description: 'حقق 100 انتصار في الأطوار الودية',
+        category: 'أطوار ودية',
+        points: 150,
+        image: 'images/achievements/unranked_wins_100.png',
+        check: (data) => data.unrankedWins >= 100
+    },
+    {
+        id: 'unranked_perfect',
+        name: 'كامل الودية',
+        description: 'أجب على جميع الأسئلة بشكل صحيح في مباراة ودية',
+        category: 'أطوار ودية',
+        points: 40,
+        image: 'images/achievements/unranked_perfect.png',
+        check: (data) => data.unrankedPerfect >= 1
+    },
+
+    // ===== إنجازات أطوار التدريب =====
+    {
+        id: 'training_first',
+        name: 'أول تدريب',
+        description: 'أكمل أول جولة تدريبية',
+        category: 'أطوار تدريب',
+        points: 10,
+        image: 'images/achievements/training_first.png',
+        check: (data) => data.trainingCompleted >= 1
+    },
+    {
+        id: 'training_10',
+        name: '10 جولات تدريبية',
+        description: 'أكمل 10 جولات تدريبية',
+        category: 'أطوار تدريب',
+        points: 30,
+        image: 'images/achievements/training_10.png',
+        check: (data) => data.trainingCompleted >= 10
+    },
+    {
+        id: 'training_50',
+        name: '50 جولة تدريبية',
+        description: 'أكمل 50 جولة تدريبية',
+        category: 'أطوار تدريب',
+        points: 80,
+        image: 'images/achievements/training_50.png',
+        check: (data) => data.trainingCompleted >= 50
+    },
+    {
+        id: 'training_survival_10',
+        name: 'صمود 10 أسئلة',
+        description: 'أجب على 10 أسئلة متتالية في وضع الصمود',
+        category: 'أطوار تدريب',
+        points: 50,
+        image: 'images/achievements/training_survival_10.png',
+        check: (data) => data.survivalStreak >= 10
+    },
+    {
+        id: 'training_survival_20',
+        name: 'صمود 20 سؤالاً',
+        description: 'أجب على 20 سؤالاً متتالياً في وضع الصمود',
+        category: 'أطوار تدريب',
+        points: 100,
+        image: 'images/achievements/training_survival_20.png',
+        check: (data) => data.survivalStreak >= 20
+    },
+    {
+        id: 'training_speed_20',
+        name: 'سرعة 20 إجابة',
+        description: 'أجب على 20 سؤالاً بشكل صحيح في تحدي السرعة',
+        category: 'أطوار تدريب',
+        points: 60,
+        image: 'images/achievements/training_speed_20.png',
+        check: (data) => data.speedCorrect >= 20
+    },
+    {
+        id: 'training_speed_50',
+        name: 'سرعة 50 إجابة',
+        description: 'أجب على 50 سؤالاً بشكل صحيح في تحدي السرعة',
+        category: 'أطوار تدريب',
+        points: 150,
+        image: 'images/achievements/training_speed_50.png',
+        check: (data) => data.speedCorrect >= 50
+    },
+
+    // ===== إنجازات الغرف =====
+    {
+        id: 'room_first',
+        name: 'أول غرفة',
+        description: 'أنشئ أو انضم إلى أول غرفة',
+        category: 'الغرف',
+        points: 20,
+        image: 'images/achievements/room_first.png',
+        check: (data) => data.roomsJoined >= 1
+    },
+    {
+        id: 'room_10',
+        name: '10 غرف',
+        description: 'انضم إلى 10 غرف مختلفة',
+        category: 'الغرف',
+        points: 50,
+        image: 'images/achievements/room_10.png',
+        check: (data) => data.roomsJoined >= 10
+    },
+    {
+        id: 'room_50',
+        name: '50 غرفة',
+        description: 'انضم إلى 50 غرفة مختلفة',
+        category: 'الغرف',
+        points: 120,
+        image: 'images/achievements/room_50.png',
+        check: (data) => data.roomsJoined >= 50
+    },
+    {
+        id: 'room_host_first',
+        name: 'أول مضيف',
+        description: 'أنشئ أول غرفة لك',
+        category: 'الغرف',
+        points: 30,
+        image: 'images/achievements/room_host_first.png',
+        check: (data) => data.roomsHosted >= 1
+    },
+    {
+        id: 'room_host_10',
+        name: 'مضيف 10 غرف',
+        description: 'أنشئ 10 غرف',
+        category: 'الغرف',
+        points: 80,
+        image: 'images/achievements/room_host_10.png',
+        check: (data) => data.roomsHosted >= 10
+    },
+    {
+        id: 'room_winner',
+        name: 'فائز في الغرفة',
+        description: 'افز بأول مباراة في غرفة',
+        category: 'الغرف',
+        points: 40,
+        image: 'images/achievements/room_winner.png',
+        check: (data) => data.roomWins >= 1
+    },
+    {
+        id: 'room_winner_10',
+        name: '10 انتصارات في الغرف',
+        description: 'افز بـ 10 مباريات في الغرف',
+        category: 'الغرف',
+        points: 100,
+        image: 'images/achievements/room_winner_10.png',
+        check: (data) => data.roomWins >= 10
+    },
+    {
+        id: 'room_mega_first',
+        name: 'غرفة ميجا',
+        description: 'انضم إلى أول غرفة ميجا (16-32 لاعباً)',
+        category: 'الغرف',
+        points: 60,
+        image: 'images/achievements/room_mega_first.png',
+        check: (data) => data.megaRoomsJoined >= 1
+    },
+
+    // ===== إنجازات متنوعة =====
+    {
+        id: 'all_modes_player',
+        name: 'لاعب متكامل',
+        description: 'العب جميع أنواع الأطوار (مصنف، ودي، تدريب، غرفة)',
+        category: 'متنوع',
+        points: 100,
+        image: 'images/achievements/all_modes_player.png',
+        check: (data) => data.rankedWins >= 1 && data.unrankedWins >= 1 && data.trainingCompleted >= 1 && data.roomsJoined >= 1
+    },
+    {
+        id: 'master_of_all',
+        name: 'سيد الأطوار',
+        description: 'افز بـ 50 مباراة في كل نوع من الأطوار',
+        category: 'متنوع',
+        points: 500,
+        image: 'images/achievements/master_of_all.png',
+        check: (data) => data.rankedWins >= 50 && data.unrankedWins >= 50 && data.trainingCompleted >= 50 && data.roomWins >= 50
+    },
+
     // ===== 58-67: إنجازات الرتب =====
     {
         id: 'rank_silver_1',
@@ -3827,8 +4226,40 @@ const AchievementManager = {
         if (!this._data.rankLegendaryCount) this._data.rankLegendaryCount = 0;
         if (!this._data.rankChampionCount) this._data.rankChampionCount = 0;
         
-        this._saveData();
-    },
+    // ============================================================
+    // ✅ إحصائيات الأطوار الجديدة
+    // ============================================================
+    
+    // الأطوار التصنيفية
+    if (!this._data.rankedWins) this._data.rankedWins = 0;
+    if (!this._data.rankedStreak) this._data.rankedStreak = 0;
+    if (!this._data.rankedBestStreak) this._data.rankedBestStreak = 0;
+    if (!this._data.rankedMatches) this._data.rankedMatches = 0;
+    if (!this._data.rankedPerfect) this._data.rankedPerfect = 0;
+    
+    // الأطوار الودية
+    if (!this._data.unrankedWins) this._data.unrankedWins = 0;
+    if (!this._data.unrankedMatches) this._data.unrankedMatches = 0;
+    if (!this._data.unrankedPerfect) this._data.unrankedPerfect = 0;
+    if (!this._data.unrankedStreak) this._data.unrankedStreak = 0;
+    
+    // أطوار التدريب
+    if (!this._data.trainingCompleted) this._data.trainingCompleted = 0;
+    if (!this._data.survivalStreak) this._data.survivalStreak = 0;
+    if (!this._data.speedCorrect) this._data.speedCorrect = 0;
+    if (!this._data.trainingBestScore) this._data.trainingBestScore = 0;
+    if (!this._data.trainingSurvivalWins) this._data.trainingSurvivalWins = 0;
+    if (!this._data.trainingSpeedWins) this._data.trainingSpeedWins = 0;
+    
+    // الغرف
+    if (!this._data.roomsJoined) this._data.roomsJoined = 0;
+    if (!this._data.roomsHosted) this._data.roomsHosted = 0;
+    if (!this._data.roomWins) this._data.roomWins = 0;
+    if (!this._data.megaRoomsJoined) this._data.megaRoomsJoined = 0;
+    if (!this._data.roomBestScore) this._data.roomBestScore = 0;
+
+    this._saveData();
+},
 
     /**
      * ✅ مزامنة الإنجازات عند تسجيل الدخول
@@ -4092,68 +4523,307 @@ getStats() {
 };
 
 // المتغيرات العامة للتحكم في الطور المختار
-let selectedGameMode = 'normal_1v1';  // الوضع الافتراضي
+let selectedGameMode = 'ranked_classic';  // تغيير القيمة الافتراضية
 let selectedPlayerCount = 1;
 
-// في أعلى الملف، بعد تعريف GENERAL_CATEGORIES
+// ============================================================
+// تعريف الأطوار الجديدة مع إعداداتها الخاصة
+// ============================================================
 
 const MODE_DESCRIPTIONS = {
-    // ===== تصنيفي =====
-    'normal_1v1': {
-        title: '⚔️ عادي 1v1',
-        desc: 'مواجهة مباشرة بين لاعبين، تزيد الرتبة. إعدادات ثابتة.',
+    // ===== الأطوار المصنفة (تزيد الرتبة) =====
+    'ranked_classic': {
+        id: 'ranked_classic',
+        title: 'كلاسيكي مصنف',
+        desc: 'مواجهة مباشرة بين لاعبين أو فريقين، إجابات على نفس الأسئلة. يزيد الرتبة.',
         icon: '⚔️',
         competitive: true,
         active: true,
-        supportsPlayerCount: true
+        supportsPlayerCount: true,
+        category: 'ranked',
+        settings: {
+            questionCount: 10,
+            timeLimit: 15,
+            difficulty: 'medium',
+            category: 'all',
+            questionType: 'all'
+        }
     },
-    'crossword': {
-        title: '🔤 كلمات متقاطعة',
-        desc: 'حل الكلمات المتقاطعة في تحدٍ مع الأصدقاء، يزيد الرتبة. إعدادات ثابتة.',
+    'ranked_individual': {
+        id: 'ranked_individual',
+        title: 'تحدي فردي مصنف',
+        desc: 'كل لاعب يواجه سؤال مختلف ومؤقت خاص به. من ينتهي أولاً هو المنتصر. يزيد الرتبة.',
+        icon: '🎯',
+        competitive: true,
+        active: true,
+        supportsPlayerCount: true,
+        category: 'ranked',
+        settings: {
+            questionCount: 10,
+            timeLimit: 15,
+            difficulty: 'medium',
+            category: 'all',
+            questionType: 'all'
+        }
+    },
+    'ranked_crossword': {
+        id: 'ranked_crossword',
+        title: 'كلمات متقاطعة مصنف',
+        desc: 'حل الكلمات المتقاطعة في مواجهة مباشرة، نفس الشبكة للجميع. يزيد الرتبة.',
         icon: '🔤',
         competitive: true,
-        active: false, // غير مفعل حالياً
-        supportsPlayerCount: false
+        active: false,
+        supportsPlayerCount: true,
+        category: 'ranked',
+        settings: {
+            questionCount: 10,
+            timeLimit: 20,
+            difficulty: 'medium',
+            category: 'all',
+            questionType: 'crossword'
+        }
     },
-    'tournament': {
-        title: '🏆 بطولة',
-        desc: 'شارك في البطولات المجدولة وتنافس مع أفضل اللاعبين، يزيد الرتبة. إعدادات ثابتة.',
+    'ranked_crossword_diff': {
+        id: 'ranked_crossword_diff',
+        title: 'كلمات متقاطعة مختلفة',
+        desc: 'كل لاعب أو فريق يحصل على شبكة كلمات متقاطعة مختلفة عن الآخر. يزيد الرتبة.',
+        icon: '🔀',
+        competitive: true,
+        active: false,
+        supportsPlayerCount: true,
+        category: 'ranked',
+        settings: {
+            questionCount: 10,
+            timeLimit: 20,
+            difficulty: 'medium',
+            category: 'all',
+            questionType: 'crossword'
+        }
+    },
+    'ranked_tournament': {
+        id: 'ranked_tournament',
+        title: 'بطولة مصنفة',
+        desc: 'شارك في البطولات المجدولة وتنافس مع أفضل اللاعبين للفوز بالجوائز الكبرى. يزيد الرتبة.',
         icon: '🏆',
         competitive: true,
         active: false,
-        supportsPlayerCount: false
+        supportsPlayerCount: false,
+        category: 'ranked',
+        settings: {
+            questionCount: 20,
+            timeLimit: 15,
+            difficulty: 'hard',
+            category: 'all',
+            questionType: 'all'
+        }
+    },
+    'ranked_clan_tournament': {
+        id: 'ranked_clan_tournament',
+        title: 'بطولة القبائل',
+        desc: 'تنافس بين القبائل في بطولة كبرى، كل قبيلة ترسل أفضل لاعبينها. يزيد الرتبة.',
+        icon: '🏰',
+        competitive: true,
+        active: false,
+        supportsPlayerCount: false,
+        category: 'ranked',
+        settings: {
+            questionCount: 20,
+            timeLimit: 15,
+            difficulty: 'hard',
+            category: 'all',
+            questionType: 'all'
+        }
     },
 
-    // ===== ودي =====
-    'normal_1v1_unranked': {
-        title: '⚔️ عادي غير مصنف',
-        desc: 'مواجهة مباشرة بين لاعبين، لا تزيد الرتبة. إعدادات ثابتة.',
+    // ===== الأطوار غير المصنفة (ودية) =====
+    'unranked_classic': {
+        id: 'unranked_classic',
+        title: 'كلاسيكي ودي',
+        desc: 'مواجهة مباشرة بين لاعبين أو فريقين، إجابات على نفس الأسئلة. لا يزيد الرتبة.',
         icon: '⚔️',
         competitive: false,
         active: true,
-        supportsPlayerCount: true
+        supportsPlayerCount: true,
+        category: 'unranked',
+        settings: {
+            questionCount: 10,
+            timeLimit: 15,
+            difficulty: 'medium',
+            category: 'all',
+            questionType: 'all'
+        }
     },
-    'single_player': {
-        title: '🧠 فردي',
-        desc: 'تحدي ذاتي ضد الأسئلة، لا يزيد الرتبة. يمكنك تخصيص الإعدادات.',
-        icon: '🧠',
+    'unranked_individual': {
+        id: 'unranked_individual',
+        title: 'تحدي فردي ودي',
+        desc: 'كل لاعب يواجه سؤال مختلف ومؤقت خاص به. من ينتهي أولاً هو المنتصر. لا يزيد الرتبة.',
+        icon: '🎯',
         competitive: false,
         active: true,
-        supportsPlayerCount: false
+        supportsPlayerCount: true,
+        category: 'unranked',
+        settings: {
+            questionCount: 10,
+            timeLimit: 15,
+            difficulty: 'medium',
+            category: 'all',
+            questionType: 'all'
+        }
     },
-    'create_room': {
-        title: '🏠 غرفة مدفوعة',
-        desc: 'أنشئ غرفة خاصة بك وادعُ أصدقائك للانضمام. تكلفة 600 عملة. لا تزيد الرتبة.',
+    'unranked_crossword': {
+        id: 'unranked_crossword',
+        title: 'كلمات متقاطعة ودي',
+        desc: 'حل الكلمات المتقاطعة في مواجهة مباشرة، نفس الشبكة للجميع. لا يزيد الرتبة.',
+        icon: '🔤',
+        competitive: false,
+        active: false,
+        supportsPlayerCount: true,
+        category: 'unranked',
+        settings: {
+            questionCount: 10,
+            timeLimit: 20,
+            difficulty: 'medium',
+            category: 'all',
+            questionType: 'crossword'
+        }
+    },
+    'unranked_crossword_diff': {
+        id: 'unranked_crossword_diff',
+        title: 'كلمات متقاطعة مختلفة ودي',
+        desc: 'كل لاعب أو فريق يحصل على شبكة كلمات متقاطعة مختلفة عن الآخر. لا يزيد الرتبة.',
+        icon: '🔀',
+        competitive: false,
+        active: false,
+        supportsPlayerCount: true,
+        category: 'unranked',
+        settings: {
+            questionCount: 10,
+            timeLimit: 20,
+            difficulty: 'medium',
+            category: 'all',
+            questionType: 'crossword'
+        }
+    },
+
+    // ===== أطوار التدريب (فردي) =====
+    'training_classic': {
+        id: 'training_classic',
+        title: 'تدريب كلاسيكي',
+        desc: 'تحدي ذاتي ضد الأسئلة في وضع عادي. لا يزيد الرتبة.',
+        icon: '📚',
+        competitive: false,
+        active: true,
+        supportsPlayerCount: false,
+        category: 'training',
+        isTraining: true,
+        settings: {
+            questionCount: 10,
+            timeLimit: 15,
+            difficulty: 'medium',
+            category: 'all',
+            questionType: 'all',
+            gameMode: 'normal'
+        }
+    },
+    'training_survival': {
+        id: 'training_survival',
+        title: 'تحدي الصمود',
+        desc: 'لديك 3 قلوب، كل إجابة خاطئة تذهب قلب. استمر لأطول فترة ممكنة! لا يزيد الرتبة.',
+        icon: '❤️',
+        competitive: false,
+        active: true,
+        supportsPlayerCount: false,
+        category: 'training',
+        isTraining: true,
+        settings: {
+            questionCount: 50,
+            timeLimit: 10,
+            difficulty: 'medium',
+            category: 'all',
+            questionType: 'all',
+            gameMode: 'survival',
+            hearts: 3
+        }
+    },
+    'training_speed': {
+        id: 'training_speed',
+        title: 'تحدي السرعة',
+        desc: 'أجب على أكبر عدد من الأسئلة في وقت محدد (60 ثانية). كلما أسرعت زادت نقاطك! لا يزيد الرتبة.',
+        icon: '⚡',
+        competitive: false,
+        active: true,
+        supportsPlayerCount: false,
+        category: 'training',
+        isTraining: true,
+        settings: {
+            questionCount: 30,
+            timeLimit: 60,
+            difficulty: 'medium',
+            category: 'all',
+            questionType: 'all',
+            gameMode: 'time_attack'
+        }
+    },
+
+    // ===== الغرف =====
+    'room_standard': {
+        id: 'room_standard',
+        title: 'غرفة عادية',
+        desc: 'غرفة خاصة تستقبل من 2 إلى 8 لاعبين. تكلفة 600 عملة.',
         icon: '🏠',
         competitive: false,
         active: true,
         supportsPlayerCount: false,
-        cost: 600
+        category: 'rooms',
+        cost: 600,
+        maxPlayers: 8,
+        ticket: 'room_ticket',
+        settings: {
+            questionCount: 10,
+            timeLimit: 15,
+            difficulty: 'medium',
+            category: 'all',
+            questionType: 'all'
+        }
+    },
+    'room_mega': {
+        id: 'room_mega',
+        title: 'غرفة ميجا',
+        desc: 'غرفة خاصة تستقبل من 16 إلى 32 لاعباً. تكلفة 1200 عملة.',
+        icon: '🏟️',
+        competitive: false,
+        active: true,
+        supportsPlayerCount: false,
+        category: 'rooms',
+        cost: 1200,
+        maxPlayers: 32,
+        ticket: 'room_mega_ticket',
+        settings: {
+            questionCount: 15,
+            timeLimit: 12,
+            difficulty: 'medium',
+            category: 'all',
+            questionType: 'all'
+        }
     }
 };
 
-// الأطوار المفعلة حالياً
-const ACTIVE_MODES = ['normal_1v1', 'normal_1v1_unranked', 'single_player', 'create_room'];
+// ===== الأطوار المفعلة حالياً =====
+const ACTIVE_MODES = [
+    // مصنفة
+    'ranked_classic', 
+    'ranked_individual',
+    // غير مصنفة
+    'unranked_classic', 
+    'unranked_individual',
+    // تدريب
+    'training_classic', 
+    'training_survival', 
+    'training_speed',
+    // غرف
+    'room_standard', 
+    'room_mega'
+];
 
 // ============================================================
 // محرك اللعبة المتطور - النسخة المُصلحة بالكامل
@@ -4202,6 +4872,9 @@ const GameEngine = {
     _fastAnswers: 0,
     _allAnswersIn1s: false,
     _answerTimes: [],
+    isSurvival: false,
+    isTimeAttack: false,
+    heartsLeft: 3,
     
 
     init() {
@@ -4221,46 +4894,15 @@ const GameEngine = {
         this._updateGameStats();
     },
 
-// داخل GameEngine، إصلاح دالة start
-
-// استبدل دالة GameEngine.start بالكود التالي
-start() {
-    // مراقبة حالة الاتصال
-window.addEventListener('online', () => {
-    console.log('🟢 استعادة الاتصال بالإنترنت');
-    showConnectionStatus(true);
-    showToast('🟢 تم استعادة الاتصال بالإنترنت', 'success', 3000);
+start(settings = null) {
+    console.log('🎮 GameEngine.start() called with settings:', settings);
     
-    // محاولة إعادة الاتصال بقاعدة البيانات
-    if (isFirebaseReady) {
-        db.collection('test').limit(1).get().catch(() => {});
-    }
-});
-
-window.addEventListener('offline', () => {
-    console.log('🔴 فقدان الاتصال بالإنترنت');
-    showConnectionStatus(false);
-    showToast('🔴 تم فقدان الاتصال بالإنترنت، سيتم العمل في وضع غير متصل', 'error', 5000);
-});
-
-// التحقق الأولي من الاتصال
-setTimeout(async () => {
-    const online = await checkInternetConnection();
-    showConnectionStatus(online);
-    if (!online) {
-        showToast('⚠️ أنت غير متصل بالإنترنت، بعض الميزات قد لا تعمل', 'error', 5000);
-    }
-}, 2000);
-    console.log('🎮 GameEngine.start() called');
-    
-    // التحقق من وجود مستخدم
     const user = AuthService.currentUser;
     if (!user) {
         showToast('⚠️ يرجى تسجيل الدخول أولاً', 'error');
         return;
     }
     
-    // التحقق من وجود أسئلة
     const questions = DataManager.data.questions || [];
     if (questions.length === 0) {
         showToast('⚠️ لا توجد أسئلة! يرجى إضافة أسئلة أولاً', 'error', 4000);
@@ -4272,28 +4914,40 @@ setTimeout(async () => {
         return;
     }
     
-    // جلب الإعدادات
-    const category = document.getElementById('gameCategory')?.value || 'all';
-    const questionType = document.getElementById('gameQuestionType')?.value || 'all';
-    const count = parseInt(document.getElementById('gameCount')?.value || '10');
-    const mode = document.getElementById('gameMode')?.value || 'normal';
+    // ===== تحميل الإعدادات =====
+    const mode = selectedGameMode || 'ranked_classic';
     
-    console.log('📊 إعدادات اللعبة:', { category, questionType, count, mode });
+    // ✅ إذا لم يتم تمرير إعدادات، نحاول تحميلها
+    if (!settings || Object.keys(settings).length === 0) {
+        settings = this._loadSettingsForMode(mode);
+        console.log('📊 Settings loaded from Firebase:', settings);
+    }
     
-    // ✅ تعريف pool هنا أولاً
+    // ✅ استخراج الإعدادات مع قيم افتراضية
+    const category = settings.category || 'all';
+    const questionType = settings.questionType || 'all';
+    const count = parseInt(settings.questionCount) || parseInt(settings.count) || 10;
+    const difficulty = settings.difficulty || 'medium';
+    const timeLimit = parseInt(settings.timeLimit) || parseInt(settings.time) || 15;
+    const gameMode = settings.gameMode || 'normal';
+    
+    console.log('📊 Applied settings:', { category, questionType, count, difficulty, timeLimit, gameMode });
+    
+    // ===== تجهيز الأسئلة =====
     let pool = [...questions];
     
-    // تصفية حسب الفئة
+    // ✅ تصفية حسب الفئة
     if (category !== 'all') {
         pool = pool.filter(q => q.category === category);
+        console.log(`📊 Filtered by category "${category}": ${pool.length} questions`);
     }
     
-    // تصفية حسب نوع السؤال
+    // ✅ تصفية حسب نوع السؤال
     if (questionType !== 'all') {
         pool = pool.filter(q => q.type === questionType);
+        console.log(`📊 Filtered by question type "${questionType}": ${pool.length} questions`);
     }
     
-    // خلط الأسئلة
     pool = shuffleArray(pool);
     this.questionPool = pool;
     
@@ -4302,55 +4956,71 @@ setTimeout(async () => {
         return;
     }
     
-    console.log(`📚 تم العثور على ${pool.length} سؤال`);
-    
-    // ✅ الحصول على نقاط الرتبة من المستخدم
+    // ===== تصفية حسب الرتبة =====
     const rankPoints = user.rankPoints || 0;
-    
-    // ✅ تصفية الأسئلة حسب الرتبة (rankRequired)
-    let filteredByRank = pool.filter(q => {
-        const rankRequired = q.rankRequired || 0;
-        return rankRequired <= rankPoints;
-    });
-    
-    // إذا لم توجد أسئلة تناسب الرتبة، استخدم جميع الأسئلة
+    let filteredByRank = pool.filter(q => (q.rankRequired || 0) <= rankPoints);
     if (filteredByRank.length === 0) {
-        console.warn('⚠️ لا توجد أسئلة تناسب الرتبة، سيتم استخدام جميع الأسئلة');
         filteredByRank = pool;
         showToast(`⚠️ لا توجد أسئلة تناسب رتبتك، سيتم استخدام أسئلة عامة`, 'info', 3000);
     }
-    
-    // ترتيب الأسئلة حسب الصعوبة (الأعلى أولاً)
     filteredByRank.sort((a, b) => (b.rankRequired || 0) - (a.rankRequired || 0));
     
-    // اختيار عدد الأسئلة المطلوب
-    const maxCount = Math.min(count, filteredByRank.length);
-    this.gameQuestions = filteredByRank.slice(0, maxCount);
-    this.totalQuestions = this.gameQuestions.length;
+    // ===== اختيار عدد الأسئلة =====
+    let selectedQuestions = [];
+    const isTraining = mode === 'training_classic' || mode === 'training_survival' || mode === 'training_speed';
     
-    if (this.gameQuestions.length === 0) {
+    if (mode === 'training_speed' || gameMode === 'time_attack') {
+        // تحدي السرعة: جميع الأسئلة المتاحة (مفتوح)
+        selectedQuestions = filteredByRank;
+        this.totalQuestions = selectedQuestions.length;
+    } else if (mode === 'training_survival' || gameMode === 'survival') {
+        // وضع الصمود: عدد محدد من الأسئلة
+        const maxCount = Math.min(count, filteredByRank.length);
+        selectedQuestions = filteredByRank.slice(0, maxCount);
+        this.totalQuestions = selectedQuestions.length;
+        console.log(`📊 Survival mode: ${this.totalQuestions} questions selected`);
+    } else {
+        // الوضع العادي
+        const maxCount = Math.min(count, filteredByRank.length);
+        selectedQuestions = filteredByRank.slice(0, maxCount);
+        this.totalQuestions = selectedQuestions.length;
+    }
+    
+    if (selectedQuestions.length === 0) {
         showToast('⚠️ لا توجد أسئلة كافية!', 'error');
         return;
     }
     
-    // ✅ إعدادات الوقت حسب الرتبة (يمكن تعديلها)
-    const timeSettings = {
-        easy: { time: 20 },
-        medium: { time: 15 },
-        hard: { time: 10 },
-        expert: { time: 5 }
-    };
+    this.gameQuestions = selectedQuestions;
     
-    // تحديد الصعوبة بناءً على الرتبة
-    let difficulty = mapRankToDifficulty(rankPoints);
-    const settings = timeSettings[difficulty] || timeSettings.medium;
-    this.totalTime = settings.time;
-    this.timeLeft = settings.time;
-    this.difficulty = difficulty;
+    // ===== إعدادات الوقت والقلوب =====
+    let finalTimeLimit = timeLimit;
+    let hearts = 0;
+    let isTimeAttack = false;
+    let isSurvival = false;
     
-    console.log(`🎯 تم اختيار ${this.gameQuestions.length} سؤال (الصعوبة: ${difficulty})`);
+    if (mode === 'training_survival' || gameMode === 'survival') {
+        isSurvival = true;
+        hearts = 3;
+        this.heartsLeft = 3;
+        this.mode = 'survival';
+        this.isSurvival = true;
+        console.log('❤️ Survival mode activated with 3 hearts');
+    } else if (mode === 'training_speed' || gameMode === 'time_attack') {
+        isTimeAttack = true;
+        this.mode = 'time_attack';
+        this.isTimeAttack = true;
+        finalTimeLimit = 60;
+        this.totalTime = 60;
+        this.timeLeft = 60;
+        console.log('⚡ Time attack mode activated with 60 seconds');
+    } else {
+        this.mode = gameMode || 'normal';
+        this.isSurvival = false;
+        this.isTimeAttack = false;
+    }
     
-    // تهيئة المتغيرات
+    // ===== تهيئة المتغيرات =====
     this.currentIndex = 0;
     this.score = 0;
     this.correctCount = 0;
@@ -4373,19 +5043,29 @@ setTimeout(async () => {
     this._allAnswersIn1s = false;
     this._streaksHistory = [];
     this._isEnding = false;
-    this.mode = mode;
-    this.isTimeAttack = (mode === 'time_attack');
+    this.difficulty = difficulty;
+    this.totalTime = finalTimeLimit;
+    this.timeLeft = finalTimeLimit;
     
-    // عرض واجهة اللعب
+    console.log('📊 Final game state:', {
+        mode: this.mode,
+        isSurvival: this.isSurvival,
+        isTimeAttack: this.isTimeAttack,
+        heartsLeft: this.heartsLeft,
+        totalQuestions: this.totalQuestions,
+        difficulty: this.difficulty,
+        totalTime: this.totalTime,
+        gameQuestions: this.gameQuestions.length
+    });
+    
+    // ===== عرض واجهة اللعب =====
     const startScreen = document.getElementById('gameStartScreen');
     const playScreen = document.getElementById('gamePlayScreen');
     const resultScreen = document.getElementById('gameResultScreen');
-    
     if (startScreen) startScreen.style.display = 'none';
     if (playScreen) playScreen.style.display = 'block';
     if (resultScreen) resultScreen.style.display = 'none';
     
-    // إظهار/إخفاء زر التلميح
     const hintBtn = document.getElementById('gameHintBtn');
     if (hintBtn) {
         hintBtn.style.display = this.isTimeAttack ? 'none' : 'inline-flex';
@@ -4399,18 +5079,29 @@ setTimeout(async () => {
         diffDisplay.innerHTML = `🎯 الصعوبة: <strong style="color:var(--accent);">${diffLabels[difficulty] || 'متوسط'}</strong> | 🏅 الرتبة: <strong style="color:var(--accent);">${rank.name}</strong>`;
     }
     
-    // تحديث الإحصائيات
-    this._updateGameStats();
-    
-    // تشغيل الصوت
-    if (typeof SoundSystem !== 'undefined') {
-        SoundSystem.playGameStart();
+    // عرض عدد القلوب في وضع الصمود
+    if (isSurvival) {
+        let heartsDisplay = document.getElementById('heartsDisplay');
+        if (!heartsDisplay) {
+            heartsDisplay = document.createElement('div');
+            heartsDisplay.id = 'heartsDisplay';
+            heartsDisplay.style.cssText = 'text-align:center;font-size:1.2rem;margin-bottom:0.5rem;';
+            const progressBar = document.querySelector('.game-progress');
+            if (progressBar) {
+                progressBar.parentNode.insertBefore(heartsDisplay, progressBar.nextSibling);
+            }
+        }
+        heartsDisplay.innerHTML = '❤️'.repeat(this.heartsLeft) + ` (${this.heartsLeft})`;
+    } else {
+        // إزالة عرض القلوب إذا لم يكن في وضع الصمود
+        const heartsDisplay = document.getElementById('heartsDisplay');
+        if (heartsDisplay) heartsDisplay.remove();
     }
     
-    // عرض أول سؤال
+    this._updateGameStats();
+    SoundSystem.playGameStart();
     this.renderQuestion();
     this.startTimer();
-    
     console.log('✅ بدأت اللعبة بنجاح!');
 },
 
@@ -5012,9 +5703,8 @@ _calculateCoins(baseCoins) {
 // معالجة الإجابة - نسخة مصححة
 // ============================================================
 
-// داخل GameEngine._handleAnswer
 _handleAnswer(isCorrect, q) {
-    // ✅ حساب وقت الإجابة
+    // حساب وقت الإجابة
     const elapsed = (Date.now() - this.questionStartTime) / 1000;
     if (!this._answerTimes) this._answerTimes = [];
     this._answerTimes.push(elapsed);
@@ -5024,46 +5714,151 @@ _handleAnswer(isCorrect, q) {
         this._fastAnswers++;
     }
     
-    // ✅ مكافأة السرعة (كلما أسرع = مكافأة أكبر)
+    // ===== معالجة وضع الصمود (survival) =====
+    if (this.mode === 'survival' || this.isSurvival) {
+        if (!isCorrect) {
+            this.heartsLeft = (this.heartsLeft || 3) - 1;
+            showToast(`💔 خاطئ! تبقى ${this.heartsLeft} قلوب`, 'error', 1500);
+            
+            if (this.heartsLeft <= 0) {
+                this.wrongCount++;
+                this.streak = 0;
+                document.getElementById('gameStreakDisplay').textContent = `🔥 0`;
+                this.endGame();
+                return;
+            }
+            
+            // تحديث عرض القلوب
+            const heartsDisplay = document.getElementById('heartsDisplay');
+            if (heartsDisplay) {
+                heartsDisplay.innerHTML = '❤️'.repeat(this.heartsLeft) + ` (${this.heartsLeft})`;
+            }
+            
+            this.wrongCount++;
+            this.streak = 0;
+            document.getElementById('gameStreakDisplay').textContent = `🔥 0`;
+            
+            // منح عملة تشجيعية
+            const earnedCoins = this._calculateCoins(1);
+            this.coinsEarned += earnedCoins;
+            SoundSystem.playCoins();
+            SoundSystem.playWrong();
+            
+            setTimeout(() => {
+                this.currentIndex++;
+                if (this.currentIndex < this.gameQuestions.length) {
+                    this.renderQuestion();
+                    this.startTimer();
+                } else {
+                    this.endGame();
+                }
+            }, 1500);
+            return;
+        } else {
+            // إجابة صحيحة
+            const pointsEarned = this._calculatePoints(true, this.streak + 1, elapsed);
+            this.score += pointsEarned;
+            SoundSystem.playPoints();
+            this.correctCount++;
+            this.streak++;
+            SoundSystem.playCorrect();
+            if (this.streak > this.bestStreak) this.bestStreak = this.streak;
+            
+            let baseCoins = 2 + Math.floor(this.streak / 5);
+            const earnedCoins = this._calculateCoins(baseCoins);
+            this.coinsEarned += earnedCoins;
+            SoundSystem.playCoins();
+            
+            document.getElementById('gameScoreDisplay').textContent = `⭐ ${this.score}`;
+            document.getElementById('gameStreakDisplay').textContent = `🔥 ${this.streak}`;
+            this.totalAnswered++;
+            
+            this._showAnswerFeedback(q, true);
+            setTimeout(() => {
+                this.currentIndex++;
+                if (this.currentIndex < this.gameQuestions.length) {
+                    this.renderQuestion();
+                    this.startTimer();
+                } else {
+                    this.endGame();
+                }
+            }, 1500);
+            return;
+        }
+    }
+
+    // ===== معالجة وضع السرعة (time_attack) =====
+    if (this.mode === 'time_attack') {
+        if (isCorrect) {
+            this.timeLeft = Math.min(this.timeLeft + 3, 60);
+            const pointsEarned = this._calculatePoints(true, this.streak + 1, elapsed);
+            this.score += pointsEarned;
+            SoundSystem.playPoints();
+            this.correctCount++;
+            this.streak++;
+            SoundSystem.playCorrect();
+            if (this.streak > this.bestStreak) this.bestStreak = this.streak;
+            let baseCoins = 2 + Math.floor(this.streak / 5);
+            const earnedCoins = this._calculateCoins(baseCoins);
+            this.coinsEarned += earnedCoins;
+            SoundSystem.playCoins();
+            showToast(`✅ صحيح! +3s ⏱️`, 'success', 800);
+        } else {
+            this.timeLeft = Math.max(this.timeLeft - 5, 0);
+            this.wrongCount++;
+            this.streak = 0;
+            SoundSystem.playWrong();
+            const earnedCoins = this._calculateCoins(1);
+            this.coinsEarned += earnedCoins;
+            SoundSystem.playCoins();
+            showToast(`❌ خاطئ! -5s ⏱️`, 'error', 800);
+        }
+        document.getElementById('gameScoreDisplay').textContent = `⭐ ${this.score}`;
+        document.getElementById('gameStreakDisplay').textContent = `🔥 ${this.streak}`;
+        document.getElementById('gameTimerDisplay').textContent = `⏱ ${Math.max(0, this.timeLeft)}s`;
+        this.totalAnswered++;
+        this._decreaseRemainingRounds();
+        
+        if (this.timeLeft <= 0) {
+            this.timeLeft = 0;
+            document.getElementById('gameTimerDisplay').textContent = `⏱ 0s`;
+            this.endGame();
+            return;
+        }
+        this._showAnswerFeedback(q, isCorrect);
+        setTimeout(() => {
+            this.currentIndex++;
+            // في وضع السرعة، نستمر حتى انتهاء الوقت أو نفاد الأسئلة
+            if (this.currentIndex < this.gameQuestions.length && this.timeLeft > 0) {
+                this.renderQuestion();
+                this.startTimer();
+            } else {
+                this.endGame();
+            }
+        }, 1500);
+        return;
+    }
+
+    // ===== الوضع العادي (normal) أو أي وضع آخر =====
+    // الكود الأصلي للوضع العادي
     let speedBonus = 0;
     if (isCorrect) {
         if (elapsed <= 1.5) speedBonus = 3;
         else if (elapsed <= 3) speedBonus = 2;
         else if (elapsed <= 5) speedBonus = 1;
-    }
-    
-    let bonusTime = 0;
-    if (isCorrect) {
-        // ✅ حساب النقاط مع مكافأة السرعة
         const pointsEarned = this._calculatePoints(true, this.streak + 1, elapsed) + speedBonus;
         this.score += pointsEarned;
         SoundSystem.playPoints();
         this.correctCount++;
         this.streak++;
-
         SoundSystem.playCorrect();
-
-        // ✅ تسجيل السلسلة عند الوصول إلى 5
-        if (this.streak >= 5 && !this.streaksHistory.includes(this.streak)) {
-            this.streaksHistory.push(this.streak);
-        }
-        
         if (this.streak > this.bestStreak) this.bestStreak = this.streak;
-        
-        // ✅ حساب النقود مع مكافأة السرعة
         let baseCoins = 2 + Math.floor(this.streak / 5) + speedBonus;
         if (this.streak >= 10) baseCoins += 3;
         else if (this.streak >= 5) baseCoins += 1;
         const earnedCoins = this._calculateCoins(baseCoins);
         this.coinsEarned += earnedCoins;
         SoundSystem.playCoins();
-        
-        if (this.isTimeAttack) {
-            this.timeLeft += this.timeBonusCorrect;
-            bonusTime = this.timeBonusCorrect;
-            showToast(`✅ صحيح! +${this.timeBonusCorrect} ثانية ⏱️`, 'success', 800);
-        }
-        
         if (this.streak >= 5) {
             const bonus = Math.floor(this.streak / 5);
             this.score += bonus;
@@ -5073,54 +5868,23 @@ _handleAnswer(isCorrect, q) {
         this.wrongCount++;
         this.streak = 0;
         document.getElementById('gameStreakDisplay').textContent = `🔥 0`;
-        
         const earnedCoins = this._calculateCoins(1);
         this.coinsEarned += earnedCoins;
         SoundSystem.playCoins();
-
         SoundSystem.playWrong();
-
-        if (this.isTimeAttack) {
-            this.timeLeft -= this.timePenaltyWrong;
-            bonusTime = -this.timePenaltyWrong;
-            showToast(`❌ خاطئ! -${this.timePenaltyWrong} ثانية ⏱️`, 'error', 800);
-        }
     }
-
-    // تحديث العرض
     document.getElementById('gameScoreDisplay').textContent = `⭐ ${this.score}`;
     document.getElementById('gameStreakDisplay').textContent = `🔥 ${this.streak}`;
-    document.getElementById('gameTimerDisplay').textContent = `⏱ ${Math.max(0, this.timeLeft)}s`;
     this.totalAnswered++;
-
-    // تقليل عدد الجولات المتبقية
     this._decreaseRemainingRounds();
-
-    if (this.isTimeAttack && this.timeLeft <= 0) {
-        this.timeLeft = 0;
-        document.getElementById('gameTimerDisplay').textContent = `⏱ 0s`;
-        this.endGame();
-        return;
-    }
-
     this._showAnswerFeedback(q, isCorrect);
-
     setTimeout(() => {
         this.currentIndex++;
-        if (this.isTimeAttack) {
-            if (this.timeLeft <= 0) {
-                this.endGame();
-                return;
-            }
+        if (this.currentIndex < this.gameQuestions.length) {
             this.renderQuestion();
             this.startTimer();
         } else {
-            if (this.currentIndex < this.gameQuestions.length) {
-                this.renderQuestion();
-                this.startTimer();
-            } else {
-                this.endGame();
-            }
+            this.endGame();
         }
     }, 1500);
 },
@@ -5153,6 +5917,67 @@ _handleAnswer(isCorrect, q) {
             }
         }
     },
+
+_loadSettingsForMode(mode) {
+    const defaultSettings = {
+        difficulty: 'medium',
+        category: 'all',
+        questionType: 'all',
+        questionCount: 10,
+        timeLimit: 15,
+        gameMode: 'normal'
+    };
+    
+    let settings = {};
+    
+    // ✅ محاولة جلب الإعدادات من App._modeSettingsCache
+    if (typeof App !== 'undefined' && App._modeSettingsCache && App._modeSettingsCache[mode]) {
+        const cached = App._modeSettingsCache[mode];
+        if (cached.specific) {
+            settings = cached.specific;
+            console.log('📊 Settings loaded from App._modeSettingsCache:', settings);
+        } else {
+            settings = cached;
+        }
+    } else {
+        // fallback إلى localStorage
+        try {
+            const saved = localStorage.getItem(`modeSettings_${mode}`);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed.specific && parsed.specific[mode]) {
+                    settings = parsed.specific[mode];
+                } else {
+                    settings = parsed;
+                }
+                console.log('📊 Settings loaded from localStorage:', settings);
+            }
+        } catch (e) {
+            console.warn('⚠️ Could not load settings for mode:', mode, e);
+        }
+    }
+    
+    // ✅ تحويل القيم إلى التنسيق الصحيح
+    const cleanSettings = {};
+    for (const [key, value] of Object.entries(settings)) {
+        // تنظيف المفاتيح
+        if (key === 'modeSpecificDifficulty') {
+            cleanSettings.difficulty = value;
+        } else if (key === 'modeSpecificCategory') {
+            cleanSettings.category = value;
+        } else if (key === 'modeSpecificQuestionType') {
+            cleanSettings.questionType = value;
+        } else if (key === 'modeSpecificCount') {
+            cleanSettings.questionCount = parseInt(value) || 10;
+        } else if (key === 'modeSpecificTimeLimit') {
+            cleanSettings.timeLimit = parseInt(value) || 15;
+        } else {
+            cleanSettings[key] = value;
+        }
+    }
+    
+    return { ...defaultSettings, ...cleanSettings };
+},
 
     // ===== المؤقت =====
 
@@ -5899,10 +6724,13 @@ async endGame() {
     document.getElementById('gamePlayScreen').style.display = 'none';
     document.getElementById('gameResultScreen').style.display = 'block';
 
-    // ============================================================
-    // 1. حساب الإحصائيات الأساسية
-    // ============================================================
-    const totalQuestions = this.isTimeAttack ? this.totalAnswered : this.gameQuestions.length;
+    // ===== حساب الإحصائيات الأساسية =====
+    let totalQuestions = this.isTimeAttack ? this.totalAnswered : this.gameQuestions.length;
+    // في وضع الصمود، totalQuestions هو عدد الأسئلة التي تم عرضها (قد يقل بسبب انتهاء القلوب)
+    if (this.mode === 'survival') {
+        totalQuestions = this.correctCount + this.wrongCount; // الأسئلة التي تمت الإجابة عليها
+        // ملاحظة: إذا انتهت القلوب قبل نهاية الأسئلة، نأخذ عدد الأسئلة التي تمت إجابتها
+    }
     const correctAnswers = this.correctCount;
     const accuracy = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
     const timeTaken = Math.round((Date.now() - this.startTime) / 1000);
@@ -7252,6 +8080,8 @@ const App = {
     _isCreatingRoom: false, // ✅ إضافة هذا السطر
     _isSendingMessage: false,
     _isOnline: navigator.onLine, // حالة الاتصال الحالية
+    _modeSettingsCache: {}, // تخزين مؤقت للإعدادات المحملة من Firebase
+    _modeSettingsLoaded: false,
 
 async start() {
     // تهيئة Firebase (للاستخدام الفوري)
@@ -7406,6 +8236,123 @@ async start() {
 
     // تحميل التطبيق
     this._loadApp();
+},
+
+async _loadModeSettingsFromFirebase() {
+    const user = AuthService.currentUser;
+    if (!user) {
+        // محاولة تحميل من localStorage للمستخدم غير المسجل
+        const savedMode = localStorage.getItem('selectedGameMode');
+        if (savedMode && ACTIVE_MODES.includes(savedMode)) {
+            selectedGameMode = savedMode;
+            this._updatePlayButtonMode();
+        }
+        return;
+    }
+    
+    try {
+        const doc = await db.collection('userSettings').doc(user.uid).get();
+        if (doc.exists) {
+            const data = doc.data();
+            if (data.modeSettings) {
+                this._modeSettingsCache = data.modeSettings;
+                localStorage.setItem('modeSettings_backup', JSON.stringify(data.modeSettings));
+                console.log('✅ Mode settings loaded from Firebase:', this._modeSettingsCache);
+            }
+            // ✅ تحميل الطور المختار
+            if (data.selectedGameMode && ACTIVE_MODES.includes(data.selectedGameMode)) {
+                selectedGameMode = data.selectedGameMode;
+                console.log('✅ Selected game mode loaded from Firebase:', selectedGameMode);
+                this._updatePlayButtonMode();
+            } else {
+                // إذا لم يكن هناك طور مختار في Firebase، استخدم localStorage
+                const savedMode = localStorage.getItem('selectedGameMode');
+                if (savedMode && ACTIVE_MODES.includes(savedMode)) {
+                    selectedGameMode = savedMode;
+                    this._updatePlayButtonMode();
+                }
+            }
+        } else {
+            // إنشاء مستند افتراضي
+            await db.collection('userSettings').doc(user.uid).set({
+                modeSettings: {},
+                selectedGameMode: 'ranked_classic',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            console.log('✅ Created empty mode settings document in Firebase');
+            // استخدام القيمة الافتراضية
+            selectedGameMode = 'ranked_classic';
+            this._updatePlayButtonMode();
+        }
+        this._modeSettingsLoaded = true;
+    } catch (e) {
+        console.warn('⚠️ Could not load mode settings from Firebase, using localStorage backup', e);
+        // محاولة تحميل من localStorage كنسخة احتياطية
+        const backup = localStorage.getItem('modeSettings_backup');
+        if (backup) {
+            try {
+                this._modeSettingsCache = JSON.parse(backup);
+                console.log('✅ Mode settings loaded from localStorage backup');
+            } catch (e2) {
+                this._modeSettingsCache = {};
+            }
+        } else {
+            this._modeSettingsCache = {};
+        }
+        // تحميل الطور المختار من localStorage
+        const savedMode = localStorage.getItem('selectedGameMode');
+        if (savedMode && ACTIVE_MODES.includes(savedMode)) {
+            selectedGameMode = savedMode;
+            this._updatePlayButtonMode();
+        }
+        this._modeSettingsLoaded = true;
+    }
+},
+
+async _saveModeSettingsToFirebase(mode, settings) {
+    const user = AuthService.currentUser;
+    if (!user) {
+        console.warn('⚠️ Cannot save settings: No user logged in');
+        // حفظ محلياً كنسخة احتياطية
+        try {
+            const saved = localStorage.getItem(`modeSettings_${mode}`);
+            let data = saved ? JSON.parse(saved) : {};
+            data.specific = data.specific || {};
+            data.specific[mode] = settings;
+            localStorage.setItem(`modeSettings_${mode}`, JSON.stringify(data));
+        } catch (e) {}
+        return;
+    }
+    
+    // ✅ تحديث الكاش المحلي
+    if (!this._modeSettingsCache) {
+        this._modeSettingsCache = {};
+    }
+    if (!this._modeSettingsCache[mode]) {
+        this._modeSettingsCache[mode] = {};
+    }
+    if (!this._modeSettingsCache[mode].specific) {
+        this._modeSettingsCache[mode].specific = {};
+    }
+    // دمج الإعدادات الجديدة مع القديمة
+    this._modeSettingsCache[mode].specific = { ...this._modeSettingsCache[mode].specific, ...settings };
+    
+    console.log('💾 Saving to Firebase:', this._modeSettingsCache);
+    
+    // ✅ حفظ في localStorage كنسخة احتياطية
+    localStorage.setItem('modeSettings_backup', JSON.stringify(this._modeSettingsCache));
+    
+    // ✅ حفظ في Firebase
+    try {
+        await db.collection('userSettings').doc(user.uid).set({
+            modeSettings: this._modeSettingsCache,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        console.log('✅ Mode settings saved to Firebase successfully');
+    } catch (e) {
+        console.error('⚠️ Could not save mode settings to Firebase:', e);
+        showToast('⚠️ تعذر حفظ الإعدادات في الخادم، تم الحفظ محلياً', 'warning', 3000);
+    }
 },
 
 // ============================================================
@@ -7678,15 +8625,16 @@ async _checkUsernameAvailability(username) {
     }
 },
 
-// في App.start()
+// في App
 async _loadApp() {
     // ============================================================
-// شاشة التحميل وتحديث التقدم - عبارات محفزة
-// ============================================================
-const loadingScreen = document.getElementById('loadingScreen');
-const progressBar = document.getElementById('loadingProgress');
-const statusText = document.getElementById('loadingStatus');
-const percentText = document.getElementById('loadingPercent');
+    // شاشة التحميل وتحديث التقدم - عبارات محفزة
+    // ============================================================
+    const loadingScreen = document.getElementById('loadingScreen');
+    const progressBar = document.getElementById('loadingProgress');
+    const statusText = document.getElementById('loadingStatus');
+    const percentText = document.getElementById('loadingPercent');
+    const subStatusText = document.getElementById('loadingSubStatus');
     const loadingWelcome = document.getElementById('loadingWelcome');
     const loadingUserName = document.getElementById('loadingUserName');
 
@@ -7697,7 +8645,7 @@ const percentText = document.getElementById('loadingPercent');
     }
 
     // ============================================================
-    // 2. عرض رسالة ترحيب باسم المستخدم
+    // 1. عرض رسالة ترحيب باسم المستخدم
     // ============================================================
     const user = AuthService.currentUser;
     if (user && loadingWelcome && loadingUserName) {
@@ -7707,132 +8655,180 @@ const percentText = document.getElementById('loadingPercent');
         console.log(`👋 Welcome back, ${name}!`);
     }
 
+    // ============================================================
+    // 2. دالة تحديث التقدم
+    // ============================================================
+    let lastProgressSound = 0;
+    let currentPercent = 0;
 
-let lastProgressSound = 0;
-
-const updateProgress = (percent, status) => {
-    if (progressBar) progressBar.style.width = percent + '%';
-    if (percentText) percentText.textContent = percent + '%';
-    if (statusText) statusText.textContent = status;
-    
-    // ✅ تشغيل صوت شريط التقدم (كل 5%)
-    const progressStep = Math.floor(percent / 5);
-    if (progressStep > lastProgressSound && percent < 100) {
-        lastProgressSound = progressStep;
-        if (typeof SoundSystem !== 'undefined') {
-            SoundSystem.playProgressTick();
+    const updateTaskStatus = (taskId, status, icon = '⏳') => {
+        const taskEl = document.querySelector(`.loading-task[data-task="${taskId}"]`);
+        if (taskEl) {
+            const iconEl = taskEl.querySelector('.task-icon');
+            const statusEl = taskEl.querySelector('.task-status');
+            if (iconEl) iconEl.textContent = icon;
+            if (statusEl) {
+                statusEl.textContent = status;
+                statusEl.style.color = status === '✅ تم' ? '#2ecc71' : 
+                                       status === '❌ فشل' ? '#FF6B6B' : 
+                                       status === '🔄 جاري...' ? '#FFD93D' : '#a7a9be';
+            }
+            taskEl.style.opacity = status === '✅ تم' ? '1' : status === '❌ فشل' ? '0.7' : '1';
         }
+    };
+
+    const updateProgress = (percent, status, subStatus = null) => {
+        currentPercent = Math.min(percent, 100);
+        if (progressBar) progressBar.style.width = currentPercent + '%';
+        if (percentText) percentText.textContent = Math.round(currentPercent) + '%';
+        if (statusText) statusText.textContent = status || '';
+        if (subStatus && subStatusText) subStatusText.textContent = subStatus;
+
+        // ✅ تشغيل صوت شريط التقدم (كل 5%)
+        const progressStep = Math.floor(currentPercent / 5);
+        if (progressStep > lastProgressSound && currentPercent < 100) {
+            lastProgressSound = progressStep;
+            if (typeof SoundSystem !== 'undefined') {
+                SoundSystem.playProgressTick();
+            }
+        }
+    };
+
+    // ============================================================
+    // 3. تهيئة Firebase (الخطوة الأولى)
+    // ============================================================
+    updateProgress(5, '⚡ شحن المحركات...', 'جاري الاتصال بسحابة المعرفة');
+    updateTaskStatus('firebase', '🔄 جاري...', '🔗');
+
+    try {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        auth = firebase.auth();
+        isFirebaseReady = true;
+        updateFirebaseStatus(true);
+        updateProgress(15, '🔗 الاتصال بسحابة المعرفة...', '✅ تم الاتصال بقاعدة البيانات');
+        updateTaskStatus('firebase', '✅ تم', '🟢');
+    } catch (e) {
+        console.error('❌ Firebase error:', e);
+        updateFirebaseStatus(false);
+        showToast('⚠️ فشل الاتصال بـ Firebase، يعمل في وضع غير متصل', 'error');
+        updateProgress(15, '⚠️ وضع الطيران بدون اتصال', '⚠️ يعمل دون اتصال');
+        updateTaskStatus('firebase', '⚠️ غير متصل', '🟡');
     }
-};
 
-updateProgress(5, '⚡ شحن المحركات...');
+    // تأخير بسيط لإظهار التقدم
+    await new Promise(resolve => setTimeout(resolve, 300));
 
-// ============================================================
-// 1. تهيئة Firebase
-// ============================================================
-try {
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
-    auth = firebase.auth();
-    isFirebaseReady = true;
-    updateFirebaseStatus(true);
-    updateProgress(15, '🔗 الاتصال بسحابة المعرفة...');
-} catch (e) {
-    console.error('❌ Firebase error:', e);
-    updateFirebaseStatus(false);
-    showToast('⚠️ فشل الاتصال بـ Firebase، يعمل في وضع غير متصل', 'error');
-    updateProgress(15, '⚠️ وضع الطيران بدون اتصال');
-}
+    // ============================================================
+    // 4. تهيئة AuthService
+    // ============================================================
+    updateProgress(20, '📚 جاري التحميل...', 'التحقق من بيانات المستخدم');
+    updateTaskStatus('auth', '🔄 جاري...', '🔍');
 
-// ============================================================
-// 2. تهيئة AuthService
-// ============================================================
-updateProgress(20, '📚 جاري التحميل ...');
-await AuthService.init();
-updateProgress(30, '📚 جاري التحميل ...');
-
-// ============================================================
-// 3. تحميل البيانات
-// ============================================================
-updateProgress(35, '📚 جاري التحميل ...');
-await DataManager.loadAll();
-DataManager.startListening();
-updateProgress(55, '📚 جاري التحميل ...');
-
-// ============================================================
-// 4. بناء واجهة المستخدم
-// ============================================================
-updateProgress(60, '📚 جاري التحميل ...');
-this._buildLayout();
-this._setupUI();
-updateProgress(75, '📚 جاري التحميل ...');
-
-// ============================================================
-// 5. تهيئة محرك اللعبة
-// ============================================================
-updateProgress(80, '📚 جاري التحميل ...');
-GameEngine.init();
-updateProgress(88, '✅ الذكاء الاصطناعي نشط');
-
-// ============================================================
-// 6. تهيئة الإنجازات
-// ============================================================
-updateProgress(90, '📚 جاري التحميل ...');
-if (typeof AchievementManager !== 'undefined' && AchievementManager.init) {
-    AchievementManager.init();
-}
-updateProgress(94, '🏅 نظام المكافآت جاهز');
-
-// ============================================================
-// 7. تسجيل المستمعين
-// ============================================================
-updateProgress(95, '📚 جاري التحميل ...');
-DataManager.addListener((data) => { this._onDataUpdate(data); });
-AuthService.addListener((user) => { this._onUserUpdate(user); });
-
-// ============================================================
-// 8. فتح نافذة الدخول إذا لم يكن مستخدم
-// ============================================================
-if (!AuthService.currentUser) {
-    setTimeout(() => {
-        document.getElementById('loginModal').classList.add('open');
-    }, 400);
-}
-
-// ============================================================
-// 9. إنهاء التحميل
-// ============================================================
-updateProgress(100, '📚 جاري التحميل ...');
-setTimeout(() => {
-    if (loadingScreen) {
-        loadingScreen.style.opacity = '0';
-        setTimeout(() => {
-            loadingScreen.style.display = 'none';
-        }, 500);
-    }
-}, 400);
-    this._buildLayout();
     await AuthService.init();
-    await DataManager.loadAll();
-    DataManager.startListening();
-    GameEngine.init();
-    this._setupUI();
+    
+    if (AuthService.currentUser) {
+        await this._loadModeSettingsFromFirebase();
+        updateTaskStatus('auth', '✅ تم', '✅');
+        updateProgress(30, '✅ تم التحقق من المستخدم', `مرحباً ${AuthService.currentUser.username || 'لاعب'}`);
+    } else {
+        updateTaskStatus('auth', '⏳ لا يوجد مستخدم', '👤');
+        updateProgress(30, '📝 لا يوجد حساب مسجل', 'يمكنك تسجيل الدخول أو إنشاء حساب');
+    }
 
-    // ✅ تهيئة نظام الإنجازات
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // ============================================================
+    // 5. تحميل البيانات (الخطوة الرئيسية)
+    // ============================================================
+    updateProgress(35, '📚 جاري التحميل...', 'جلب الأسئلة والبيانات من الخادم');
+    updateTaskStatus('data', '🔄 جاري...', '📡');
+
+    try {
+        // تحميل البيانات مع مهلة
+        await Promise.race([
+            DataManager.loadAll(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000))
+        ]);
+        DataManager.startListening();
+        updateProgress(55, '✅ تم تحميل البيانات', `تم جلب ${DataManager.data.questions.length || 0} سؤال`);
+        updateTaskStatus('data', '✅ تم', '📊');
+    } catch (e) {
+        console.warn('⚠️ Data loading issue:', e);
+        updateTaskStatus('data', '⚠️ جزئي', '📂');
+        updateProgress(50, '⚠️ تحميل جزئي', 'بعض البيانات قد تكون غير محدثة');
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // ============================================================
+    // 6. بناء واجهة المستخدم
+    // ============================================================
+    updateProgress(60, '📚 جاري التحميل...', 'بناء واجهة المستخدم');
+    updateTaskStatus('ui', '🔄 جاري...', '🎨');
+
+    this._buildLayout();
+    this._setupUI();
+    updateProgress(75, '✅ واجهة المستخدم جاهزة', 'تم تجهيز جميع الشاشات');
+    updateTaskStatus('ui', '✅ تم', '🖼️');
+
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // ============================================================
+    // 7. تهيئة محرك اللعبة
+    // ============================================================
+    updateProgress(80, '📚 جاري التحميل...', 'تهيئة محرك اللعبة');
+    updateTaskStatus('game', '🔄 جاري...', '🎮');
+
+    GameEngine.init();
+    updateProgress(88, '✅ الذكاء الاصطناعي نشط', 'محرك اللعبة جاهز للتشغيل');
+    updateTaskStatus('game', '✅ تم', '⚡');
+
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // ============================================================
+    // 8. تهيئة الإنجازات
+    // ============================================================
+    updateProgress(90, '📚 جاري التحميل...', 'تحميل الإنجازات والمكافآت');
+    updateTaskStatus('achievements', '🔄 جاري...', '🏆');
+
     if (typeof AchievementManager !== 'undefined' && AchievementManager.init) {
         AchievementManager.init();
-        console.log('✅ AchievementManager initialized');
+        const unlocked = AchievementManager.getUnlockedAchievements();
+        updateTaskStatus('achievements', `✅ تم (${unlocked.length})`, '🏅');
+    } else {
+        updateTaskStatus('achievements', '⚠️ غير متاح', '⏳');
     }
+    updateProgress(94, '🏅 نظام المكافآت جاهز', 'تم تحميل الإنجازات');
 
+    await new Promise(resolve => setTimeout(resolve, 200));
 
-    DataManager.addListener((data) => {
-        this._onDataUpdate(data);
-    });
+    // ============================================================
+    // 9. تحميل المتجر والعناصر
+    // ============================================================
+    updateProgress(95, '📚 جاري التحميل...', 'تحميل المتجر والعناصر');
+    updateTaskStatus('store', '🔄 جاري...', '🛒');
 
-    AuthService.addListener((user) => {
-        this._onUserUpdate(user);
-    });
+    const storeItems = DataManager.data.storeItems || [];
+    if (storeItems.length > 0) {
+        this._renderStore(storeItems);
+        updateTaskStatus('store', `✅ تم (${storeItems.length})`, '📦');
+    } else {
+        updateTaskStatus('store', '⏳ في انتظار البيانات', '📦');
+    }
+    updateProgress(97, '🛒 المتجر جاهز', `تم تحميل ${storeItems.length} عنصر`);
 
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // ============================================================
+    // 10. تسجيل المستمعين النهائيين
+    // ============================================================
+    DataManager.addListener((data) => { this._onDataUpdate(data); });
+    AuthService.addListener((user) => { this._onUserUpdate(user); });
+
+    // ============================================================
+    // 11. فتح نافذة الدخول إذا لم يكن مستخدم
+    // ============================================================
     if (!AuthService.currentUser) {
         setTimeout(() => {
             document.getElementById('loginModal').classList.add('open');
@@ -7840,7 +8836,7 @@ setTimeout(() => {
     }
 
     // ============================================================
-    // 9. تهيئة نظام الصوتيات (يجب أن يكون هنا)
+    // 12. تهيئة نظام الصوتيات
     // ============================================================
     SoundSystem.init();
     
@@ -7851,43 +8847,68 @@ setTimeout(() => {
         }, 300);
     }
 
-window.addEventListener('online', () => {
-    if (MatchmakingSystem._matchId) {
-        MatchmakingSystem._handleReconnection();
-    }
-});
+    // ============================================================
+    // 13. الأحداث الإضافية (online/offline)
+    // ============================================================
+    window.addEventListener('online', () => {
+        this._isOnline = true;
+        this._updateConnectionStatusUI();
+        if (this.currentSection === 'admin') {
+            this._refreshAdmin();
+        }
+        showToast('🟢 تم استعادة الاتصال بالإنترنت', 'success');
+    });
 
-window.addEventListener('online', () => {
-    this._isOnline = true;
-    this._updateConnectionStatusUI();
-    // إذا كان المستخدم في لوحة المشرفين، حاول تحديث البيانات
-    if (this.currentSection === 'admin') {
-        this._refreshAdmin();
-    }
-    showToast('🟢 تم استعادة الاتصال بالإنترنت', 'success');
-});
+    window.addEventListener('offline', () => {
+        this._isOnline = false;
+        this._updateConnectionStatusUI();
+        showToast('🔴 تم فقدان الاتصال بالإنترنت', 'error');
+    });
 
-window.addEventListener('offline', () => {
-    this._isOnline = false;
-    this._updateConnectionStatusUI();
-    showToast('🔴 تم فقدان الاتصال بالإنترنت', 'error');
-});
+    // ============================================================
+    // 14. إنهاء التحميل - إظهار التطبيق
+    // ============================================================
+    updateProgress(100, '✅ جاهز!', 'مرحباً بك في معركة العقول 🚀');
+    
+    // تحديث جميع المهام إلى ✅
+    document.querySelectorAll('.loading-task').forEach(task => {
+        const statusEl = task.querySelector('.task-status');
+        const iconEl = task.querySelector('.task-icon');
+        if (statusEl && !statusEl.textContent.includes('⚠️') && !statusEl.textContent.includes('❌')) {
+            if (!statusEl.textContent.includes('✅')) {
+                statusEl.textContent = '✅ تم';
+                statusEl.style.color = '#2ecc71';
+            }
+            if (iconEl && !iconEl.textContent.includes('🟢')) {
+                iconEl.textContent = '✅';
+            }
+        }
+    });
 
+    // تحديث الوقت والتاريخ
     updateFirebaseStatus(isFirebaseReady);
     this._updateLastUpdateTime();
 
-    // ✅ تهيئة نظام الصوتيات
-    SoundSystem.init();
-    // ✅ عرض القوائم بعد تحميل البيانات
-    this._renderStore(DataManager.data.storeItems || []);
-
+    // تحديث التعزيزات النشطة
     setTimeout(() => {
         if (typeof this._refreshActiveBoosts === 'function') {
             this._refreshActiveBoosts();
         }
     }, 500);
+
+    // تحديث واجهة الداشبورد
     this._updateDashboardUI();
-    showToast('مرحباً بك في مدير كرة القدم المتطور! 🚀', 'success');
+
+    // ✅ إخفاء شاشة التحميل بعد تأخير قصير لإظهار اكتمال التقدم
+    setTimeout(() => {
+        if (loadingScreen) {
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+            }, 500);
+        }
+        showToast('مرحباً بك في معركة العقول المتطورة! 🚀', 'success', 3000);
+    }, 600);
 },
 
 
@@ -8106,28 +9127,38 @@ _buildModals() {
         <div style="padding: 0.2rem 0 0.8rem;">
 
             <!-- ===== تبويبات ===== -->
-            <div style="display:flex; gap:0.5rem; margin-bottom:1rem; border-bottom:2px solid var(--glass-border); padding-bottom:0.3rem;">
-                <button class="settings-tab active" data-tab="competitive" style="
-                    padding:0.4rem 1.2rem; border-radius:30px; border:none; background:var(--primary); color:#fff; font-weight:700; font-size:0.85rem; cursor:pointer; transition:all 0.3s ease;
+               <div class="settings-tabs-container" style="display:flex; gap:0.5rem; margin-bottom:1rem; border-bottom:2px solid var(--glass-border); padding-bottom:0.3rem;">
+                <button class="settings-tab active" data-tab="ranked" style="
+                    padding:0.4rem 1.2rem; border-radius:8px; border:none; background:var(--primary); color:#fff; font-weight:700; font-size:0.85rem; cursor:pointer; transition:all 0.3s ease;
                 ">
                     <i class="fas fa-trophy"></i> تصنيفي
                 </button>
-                <button class="settings-tab" data-tab="friendly" style="
-                    padding:0.4rem 1.2rem; border-radius:30px; border:none; background:transparent; color:var(--gray); font-weight:700; font-size:0.85rem; cursor:pointer; transition:all 0.3s ease;
+                <button class="settings-tab" data-tab="unranked" style="
+                    padding:0.4rem 1.2rem; border-radius:8px; border:none; background:transparent; color:var(--gray); font-weight:700; font-size:0.85rem; cursor:pointer; transition:all 0.3s ease;
                 ">
                     <i class="fas fa-handshake"></i> ودي
+                </button>
+                <button class="settings-tab" data-tab="training" style="
+                    padding:0.4rem 1.2rem; border-radius:8px; border:none; background:transparent; color:var(--gray); font-weight:700; font-size:0.85rem; cursor:pointer; transition:all 0.3s ease;
+                ">
+                    <i class="fas fa-graduation-cap"></i> تدريب
+                </button>
+                <button class="settings-tab" data-tab="rooms" style="
+                    padding:0.4rem 1.2rem; border-radius:8px; border:none; background:transparent; color:var(--gray); font-weight:700; font-size:0.85rem; cursor:pointer; transition:all 0.3s ease;
+                ">
+                    <i class="fas fa-door-open"></i> غرف
                 </button>
             </div>
 
             <!-- ===== محتوى التبويب التصنيفي ===== -->
-            <div id="tab-competitive" class="settings-tab-content">
+            <div id="tab-ranked" class="settings-tab-content">
                 <div class="modes-scroll-wrapper">
                     <div class="modes-horizontal-scroll">
-                        <!-- 1. عادي 1v1 -->
-                        <div class="mode-card-horizontal" data-mode="normal_1v1" data-competitive="true">
+                        <!-- 1. كلاسيكي مصنف -->
+                        <div class="mode-card-horizontal" data-mode="ranked_classic" data-competitive="true">
                             <div class="mode-icon">⚔️</div>
                             <div class="mode-info">
-                                <div class="mode-title">عادي 1v1</div>
+                                <div class="mode-title">كلاسيكي مصنف</div>
                                 <div class="mode-desc">مواجهة مباشرة، تزيد الرتبة</div>
                             </div>
                             <div class="mode-badges">
@@ -8136,12 +9167,25 @@ _buildModals() {
                             </div>
                         </div>
 
-                        <!-- 2. كلمات متقاطعة -->
-                        <div class="mode-card-horizontal" data-mode="crossword" data-competitive="true" style="opacity:0.6; cursor:not-allowed;">
+                        <!-- 2. تحدي فردي مصنف -->
+                        <div class="mode-card-horizontal" data-mode="ranked_individual" data-competitive="true">
+                            <div class="mode-icon">🎯</div>
+                            <div class="mode-info">
+                                <div class="mode-title">تحدي فردي مصنف</div>
+                                <div class="mode-desc">كل لاعب سؤال مختلف، يزيد الرتبة</div>
+                            </div>
+                            <div class="mode-badges">
+                                <span class="badge badge-primary">🏅 تصنيفي</span>
+                                <span class="mode-status-dot"></span>
+                            </div>
+                        </div>
+
+                        <!-- 3. كلمات متقاطعة مصنف -->
+                        <div class="mode-card-horizontal" data-mode="ranked_crossword" data-competitive="true" style="opacity:0.6; cursor:not-allowed;">
                             <div class="mode-icon">🔤</div>
                             <div class="mode-info">
-                                <div class="mode-title">كلمات متقاطعة</div>
-                                <div class="mode-desc">حل الكلمات، يزيد الرتبة</div>
+                                <div class="mode-title">كلمات متقاطعة مصنف</div>
+                                <div class="mode-desc">نفس الشبكة للجميع، يزيد الرتبة</div>
                             </div>
                             <div class="mode-badges">
                                 <span class="badge badge-primary">🏅 تصنيفي</span>
@@ -8149,12 +9193,38 @@ _buildModals() {
                             </div>
                         </div>
 
-                        <!-- 3. بطولة -->
-                        <div class="mode-card-horizontal" data-mode="tournament" data-competitive="true" style="opacity:0.6; cursor:not-allowed;">
+                        <!-- 4. كلمات متقاطعة مختلفة -->
+                        <div class="mode-card-horizontal" data-mode="ranked_crossword_diff" data-competitive="true" style="opacity:0.6; cursor:not-allowed;">
+                            <div class="mode-icon">🔀</div>
+                            <div class="mode-info">
+                                <div class="mode-title">كلمات متقاطعة مختلفة</div>
+                                <div class="mode-desc">شبكة مختلفة لكل لاعب، يزيد الرتبة</div>
+                            </div>
+                            <div class="mode-badges">
+                                <span class="badge badge-primary">🏅 تصنيفي</span>
+                                <span class="badge badge-danger">🔒 قريباً</span>
+                            </div>
+                        </div>
+
+                        <!-- 5. بطولة مصنفة -->
+                        <div class="mode-card-horizontal" data-mode="ranked_tournament" data-competitive="true" style="opacity:0.6; cursor:not-allowed;">
                             <div class="mode-icon">🏆</div>
                             <div class="mode-info">
-                                <div class="mode-title">بطولة</div>
-                                <div class="mode-desc">منافسة مجدولة، تزيد الرتبة</div>
+                                <div class="mode-title">بطولة مصنفة</div>
+                                <div class="mode-desc">بطولات مجدولة، يزيد الرتبة</div>
+                            </div>
+                            <div class="mode-badges">
+                                <span class="badge badge-primary">🏅 تصنيفي</span>
+                                <span class="badge badge-danger">🔒 قريباً</span>
+                            </div>
+                        </div>
+
+                        <!-- 6. بطولة القبائل -->
+                        <div class="mode-card-horizontal" data-mode="ranked_clan_tournament" data-competitive="true" style="opacity:0.6; cursor:not-allowed;">
+                            <div class="mode-icon">🏰</div>
+                            <div class="mode-info">
+                                <div class="mode-title">بطولة القبائل</div>
+                                <div class="mode-desc">منافسات بين القبائل، يزيد الرتبة</div>
                             </div>
                             <div class="mode-badges">
                                 <span class="badge badge-primary">🏅 تصنيفي</span>
@@ -8166,14 +9236,14 @@ _buildModals() {
             </div>
 
             <!-- ===== محتوى التبويب الودي ===== -->
-            <div id="tab-friendly" class="settings-tab-content" style="display:none;">
+            <div id="tab-unranked" class="settings-tab-content" style="display:none;">
                 <div class="modes-scroll-wrapper">
                     <div class="modes-horizontal-scroll">
-                        <!-- 4. عادي غير مصنف -->
-                        <div class="mode-card-horizontal" data-mode="normal_1v1_unranked" data-competitive="false">
+                        <!-- 1. كلاسيكي ودي -->
+                        <div class="mode-card-horizontal" data-mode="unranked_classic" data-competitive="false">
                             <div class="mode-icon">⚔️</div>
                             <div class="mode-info">
-                                <div class="mode-title">عادي غير مصنف</div>
+                                <div class="mode-title">كلاسيكي ودي</div>
                                 <div class="mode-desc">مواجهة ودية، لا تزيد الرتبة</div>
                             </div>
                             <div class="mode-badges">
@@ -8182,12 +9252,12 @@ _buildModals() {
                             </div>
                         </div>
 
-                        <!-- 5. فردي -->
-                        <div class="mode-card-horizontal" data-mode="single_player" data-competitive="false">
-                            <div class="mode-icon">🧠</div>
+                        <!-- 2. تحدي فردي ودي -->
+                        <div class="mode-card-horizontal" data-mode="unranked_individual" data-competitive="false">
+                            <div class="mode-icon">🎯</div>
                             <div class="mode-info">
-                                <div class="mode-title">فردي</div>
-                                <div class="mode-desc">تحدي ذاتي، إعدادات قابلة للتعديل</div>
+                                <div class="mode-title">تحدي فردي ودي</div>
+                                <div class="mode-desc">كل لاعب سؤال مختلف، لا تزيد الرتبة</div>
                             </div>
                             <div class="mode-badges">
                                 <span class="badge badge-success">🎮 ودي</span>
@@ -8195,17 +9265,110 @@ _buildModals() {
                             </div>
                         </div>
 
-                        <!-- 6. غرفة مدفوعة -->
-                        <div class="mode-card-horizontal" data-mode="create_room" data-competitive="false">
-                            <div class="mode-icon">🏠</div>
+                        <!-- 3. كلمات متقاطعة ودي -->
+                        <div class="mode-card-horizontal" data-mode="unranked_crossword" data-competitive="false" style="opacity:0.6; cursor:not-allowed;">
+                            <div class="mode-icon">🔤</div>
                             <div class="mode-info">
-                                <div class="mode-title">غرفة مدفوعة</div>
-                                <div class="mode-desc">أنشئ غرفة خاصة مع الأصدقاء</div>
+                                <div class="mode-title">كلمات متقاطعة ودي</div>
+                                <div class="mode-desc">نفس الشبكة للجميع، لا تزيد الرتبة</div>
                             </div>
                             <div class="mode-badges">
                                 <span class="badge badge-success">🎮 ودي</span>
+                                <span class="badge badge-danger">🔒 قريباً</span>
+                            </div>
+                        </div>
+
+                        <!-- 4. كلمات متقاطعة مختلفة ودي -->
+                        <div class="mode-card-horizontal" data-mode="unranked_crossword_diff" data-competitive="false" style="opacity:0.6; cursor:not-allowed;">
+                            <div class="mode-icon">🔀</div>
+                            <div class="mode-info">
+                                <div class="mode-title">كلمات متقاطعة مختلفة ودي</div>
+                                <div class="mode-desc">شبكة مختلفة لكل لاعب، لا تزيد الرتبة</div>
+                            </div>
+                            <div class="mode-badges">
+                                <span class="badge badge-success">🎮 ودي</span>
+                                <span class="badge badge-danger">🔒 قريباً</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== محتوى التبويب التدريب ===== -->
+            <div id="tab-training" class="settings-tab-content" style="display:none;">
+                <div class="modes-scroll-wrapper">
+                    <div class="modes-horizontal-scroll">
+                        <!-- 1. تدريب كلاسيكي -->
+                        <div class="mode-card-horizontal" data-mode="training_classic" data-competitive="false">
+                            <div class="mode-icon">📚</div>
+                            <div class="mode-info">
+                                <div class="mode-title">تدريب كلاسيكي</div>
+                                <div class="mode-desc">تحدي ذاتي عادي، لا يزيد الرتبة</div>
+                            </div>
+                            <div class="mode-badges">
+                                <span class="badge badge-info">📚 تدريب</span>
+                                <span class="mode-status-dot"></span>
+                            </div>
+                        </div>
+
+                        <!-- 2. تحدي الصمود -->
+                        <div class="mode-card-horizontal" data-mode="training_survival" data-competitive="false">
+                            <div class="mode-icon">❤️</div>
+                            <div class="mode-info">
+                                <div class="mode-title">تحدي الصمود</div>
+                                <div class="mode-desc">3 قلوب، كل خطأ يذهب قلب</div>
+                            </div>
+                            <div class="mode-badges">
+                                <span class="badge badge-info">📚 تدريب</span>
+                                <span class="mode-status-dot"></span>
+                            </div>
+                        </div>
+
+                        <!-- 3. تحدي السرعة -->
+                        <div class="mode-card-horizontal" data-mode="training_speed" data-competitive="false">
+                            <div class="mode-icon">⚡</div>
+                            <div class="mode-info">
+                                <div class="mode-title">تحدي السرعة</div>
+                                <div class="mode-desc">60 ثانية، أكبر عدد من الإجابات</div>
+                            </div>
+                            <div class="mode-badges">
+                                <span class="badge badge-info">📚 تدريب</span>
+                                <span class="mode-status-dot"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== محتوى التبويب الغرف ===== -->
+            <div id="tab-rooms" class="settings-tab-content" style="display:none;">
+                <div class="modes-scroll-wrapper">
+                    <div class="modes-horizontal-scroll">
+                        <!-- 1. غرفة عادية -->
+                        <div class="mode-card-horizontal" data-mode="room_standard" data-competitive="false">
+                            <div class="mode-icon">🏠</div>
+                            <div class="mode-info">
+                                <div class="mode-title">غرفة عادية</div>
+                                <div class="mode-desc">2-8 لاعبين، 600 عملة</div>
+                            </div>
+                            <div class="mode-badges">
                                 <span class="badge badge-warning">💰 600</span>
                                 <span class="ticket-count-badge">🎫 0</span>
+                                <span class="mode-status-dot"></span>
+                            </div>
+                        </div>
+
+                        <!-- 2. غرفة ميجا -->
+                        <div class="mode-card-horizontal" data-mode="room_mega" data-competitive="false">
+                            <div class="mode-icon">🏟️</div>
+                            <div class="mode-info">
+                                <div class="mode-title">غرفة ميجا</div>
+                                <div class="mode-desc">16-32 لاعباً، 1200 عملة</div>
+                            </div>
+                            <div class="mode-badges">
+                                <span class="badge badge-warning">💰 1200</span>
+                                <span class="ticket-count-badge">🎫 0</span>
+                                <span class="mode-status-dot"></span>
                             </div>
                         </div>
                     </div>
@@ -8232,68 +9395,28 @@ _buildModals() {
                 </div>
             </div>
 
-            <!-- ===== منطقة الإعدادات الخاصة (تظهر فقط للفردي) ===== -->
-            <div id="modeSettingsArea" style="display: none; background: var(--glass); border-radius: var(--radius-sm); padding: 0.8rem; margin: 0.5rem 0; border: 1px solid var(--glass-border);">
-                <div style="font-weight:600; font-size:0.85rem; margin-bottom:0.5rem; color:var(--gray);">
-                    <i class="fas fa-sliders-h"></i> إعدادات اللعب الفردي
-                </div>
-                <!-- نفس الحقول السابقة (الصعوبة، الفئة، نوع السؤال، عدد الأسئلة، نمط اللعبة) -->
-                <div class="form-group" style="margin-bottom:0.5rem;">
-                    <label style="font-size:0.75rem;">المستوى</label>
-                    <select id="settingsGameDifficulty" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
-                        <option value="easy">🟢 سهل (20 ثانية)</option>
-                        <option value="medium" selected>🟡 متوسط (15 ثانية)</option>
-                        <option value="hard">🔴 صعب (10 ثوانٍ)</option>
-                        <option value="expert">💀 خبير (5 ثوانٍ)</option>
-                    </select>
-                </div>
-                <div class="form-group" style="margin-bottom:0.5rem;">
-                    <label style="font-size:0.75rem;">الفئة</label>
-                    <select id="settingsGameCategory" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
-                        <option value="all">📚 كل الفئات</option>
-                        ${GENERAL_CATEGORIES.map(cat => 
-                            `<option value="${cat.id}">${cat.icon} ${cat.label}</option>`
-                        ).join('')}
-                    </select>
-                </div>
-                <div class="form-group" style="margin-bottom:0.5rem;">
-                    <label style="font-size:0.75rem;">نوع السؤال</label>
-                    <select id="settingsGameQuestionType" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
-                        <option value="all">📚 الكل</option>
-                        <option value="multiple_choice">📝 اختيار من متعدد</option>
-                        <option value="true_false">✅ صح / خطأ</option>
-                        <option value="fill_blank">✏️ ملء الفراغ</option>
-                        <option value="matching">🔗 مطابقة</option>
-                        <option value="ordering">🔢 ترتيب</option>
-                    </select>
-                </div>
-                <div class="form-group" style="margin-bottom:0.5rem;">
-                    <label style="font-size:0.75rem;">عدد الأسئلة</label>
-                    <select id="settingsGameCount" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
-                        <option value="5">5 أسئلة</option>
-                        <option value="10" selected>10 أسئلة</option>
-                        <option value="15">15 سؤال</option>
-                        <option value="20">20 سؤال</option>
-                        <option value="30">30 سؤال</option>
-                    </select>
-                </div>
-                <div class="form-group" style="margin-bottom:0.5rem;">
-                    <label style="font-size:0.75rem;">نمط اللعبة</label>
-                    <select id="settingsGameMode" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
-                        <option value="normal">🎯 عادي</option>
-                        <option value="timed">⏱ زمني (تحدي الوقت)</option>
-                        <option value="survival">💪 صمود (تنتهي بخطأ)</option>
-                        <option value="time_attack">⚡ تحدي الزمن المفتوح (60s)</option>
-                    </select>
-                </div>
-            </div>
+<!-- ===== منطقة الإعدادات الخاصة (تظهر حسب الطور المختار) ===== -->
+<div id="modeSpecificSettingsContainer" style="background: var(--glass); border-radius: var(--radius-sm); padding: 0.8rem; margin: 0.5rem 0; border: 1px solid var(--glass-border);">
+    <div style="font-weight:600; font-size:0.85rem; margin-bottom:0.5rem; color:var(--gray);">
+        <i class="fas fa-sliders-h"></i> <span id="modeSpecificTitle">إعدادات خاصة</span>
+    </div>
+    <div id="modeSpecificContent">
+        <!-- سيتم تعبئته بواسطة JavaScript حسب الطور -->
+        <div class="text-gray" style="font-size:0.85rem; text-align:center; padding:0.5rem;">
+            <i class="fas fa-info-circle" style="color:var(--accent);"></i>
+            اختر طوراً لعرض إعداداته
+        </div>
+    </div>
+</div>
 
             <!-- ===== عرض الطور المختار والإعدادات ===== -->
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.3rem; padding:0.3rem 0.5rem; background:var(--glass); border-radius:8px; margin:0.5rem 0;">
                 <span style="font-size:0.8rem; color:var(--gray);">الطور المختار:</span>
-                <span style="font-weight:700; font-size:1rem; color:var(--accent);" id="selectedModeDisplay">⚔️ عادي 1v1</span>
+                <span style="font-weight:700; font-size:1rem; color:var(--accent);" id="selectedModeDisplay">⚔️ كلاسيكي مصنف</span>
                 <span id="competitiveBadge" style="font-size:0.7rem; padding:0.1rem 0.6rem; border-radius:30px; background:var(--primary); color:#fff; display:none;">🏅 تصنيفي</span>
                 <span id="friendlyBadge" style="font-size:0.7rem; padding:0.1rem 0.6rem; border-radius:30px; background:var(--success); color:#fff; display:none;">🎮 ودي</span>
+                <span id="trainingBadge" style="font-size:0.7rem; padding:0.1rem 0.6rem; border-radius:30px; background:var(--info); color:#fff; display:none;">📚 تدريب</span>
+                <span id="roomBadge" style="font-size:0.7rem; padding:0.1rem 0.6rem; border-radius:30px; background:var(--accent); color:var(--dark); display:none;">🏠 غرفة</span>
             </div>
 
             <!-- زر التحديد -->
@@ -9408,6 +10531,31 @@ async _openUserProfileModal(userId) {
     }
 },
 
+_selectGameMode(mode) {
+    if (!MODE_DESCRIPTIONS[mode]) {
+        console.warn(`⚠️ الطور "${mode}" غير موجود، سيتم استخدام الطور الافتراضي`);
+        mode = 'ranked_classic';
+    }
+    if (!ACTIVE_MODES.includes(mode)) {
+        showToast('⚠️ هذا الطور غير مفعل حالياً، سيتم إطلاقه قريباً!', 'info', 3000);
+        return;
+    }
+    selectedGameMode = mode;
+    this._saveSelectedGameMode(mode);   // ✅ إضافة هذه الدالة
+
+    try {
+        this._updateModalWithCurrentMode();
+    } catch (e) {
+        console.warn('⚠️ Error updating modal:', e);
+    }
+    try {
+        this._updatePlayButtonMode();
+    } catch (e) {
+        console.warn('⚠️ Error updating play button:', e);
+    }
+    console.log(`🎯 Mode selected: ${mode}`);
+},
+
 /**
  * عرض مودال ملف المستخدم
  */
@@ -9912,44 +11060,6 @@ _modeSettings: {
     specific: {}
 },
 
-// ===== فتح مودال إعدادات الطور =====
-_openModeSettings(mode) {
-    const modeNames = {
-        'normal_1v1': '⚔️ عادي 1v1',
-        'single_player': '🧠 فردي',
-        'create_room': '🏠 غرفة لعب',
-        'crossword': '🔤 كلمات متقاطعة',
-        'tournament': '🏆 بطولة'
-    };
-    
-    const modeDescriptions = {
-        'normal_1v1': 'إعدادات المواجهة المباشرة بين لاعبين',
-        'single_player': 'إعدادات التحدي الذاتي',
-        'create_room': 'إعدادات إنشاء الغرفة',
-        'crossword': 'إعدادات الكلمات المتقاطعة',
-        'tournament': 'إعدادات البطولة'
-    };
-    
-    // تحديث عنوان المودال
-    const titleEl = document.getElementById('modeSettingsTitle');
-    if (titleEl) titleEl.textContent = `إعدادات ${modeNames[mode] || mode}`;
-    
-    const nameEl = document.getElementById('modeSettingsModeName');
-    if (nameEl) nameEl.textContent = modeNames[mode] || mode;
-    
-    // تخزين الطور الحالي
-    this._modeSettings.currentMode = mode;
-    
-    // تحميل الإعدادات المحفوظة
-    this._loadModeSettings(mode);
-    
-    // تحديث المحتوى الخاص حسب الطور
-    this._updateModeSpecificSettings(mode);
-    
-    // فتح المودال
-    this._openModal('modeSettingsModal');
-},
-
 // ===== تحميل إعدادات الطور =====
 _loadModeSettings(mode) {
         // ✅ إذا كان الطور normal_1v1، استخدم القيم التلقائية مباشرة
@@ -9992,81 +11102,529 @@ _loadModeSettings(mode) {
     if (timeEl) timeEl.value = this._modeSettings.timeLimit || 15;
 },
 
-// ===== تحديث الإعدادات الخاصة حسب الطور =====
 _updateModeSpecificSettings(mode) {
     const container = document.getElementById('modeSpecificContent');
     const titleEl = document.getElementById('modeSpecificTitle');
+    if (!container) {
+        console.warn('⚠️ modeSpecificContent not found');
+        return;
+    }
     
-    if (!container) return;
-    
+    const modeInfo = MODE_DESCRIPTIONS[mode];
+    if (!modeInfo) {
+        container.innerHTML = `<div class="text-gray" style="font-size:0.85rem; text-align:center; padding:0.5rem;">الطور غير موجود</div>`;
+        return;
+    }
+
     let html = '';
     let title = 'إعدادات خاصة';
     
-    switch(mode) {            
-        case 'single_player':
-            title = '🧠 إعدادات التحدي الذاتي';
+    // جلب الإعدادات المحفوظة من Firebase/الكاش
+    const savedSettings = this._getModeSettings(mode);
+    const settings = { ...modeInfo.settings, ...savedSettings };
+    
+    console.log('📊 Loading settings for mode:', mode, settings);
+
+    // ===== أطوار التدريب =====
+    if (modeInfo.isTraining) {
+        const trainingTitles = {
+            'training_classic': '📚 إعدادات التدريب الكلاسيكي',
+            'training_survival': '❤️ إعدادات تحدي الصمود',
+            'training_speed': '⚡ إعدادات تحدي السرعة'
+        };
+        title = trainingTitles[mode] || '📚 إعدادات التدريب';
+        
+        // ===== تدريب كلاسيكي =====
+        if (mode === 'training_classic') {
             html = `
                 <div class="form-group" style="margin-bottom:0.5rem;">
-                    <label style="font-size:0.75rem;">وضع الصعوبة</label>
-                    <select id="modeSpecificDifficulty" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
-                        <option value="auto">تلقائي</option>
-                        <option value="easy">🟢 سهل</option>
-                        <option value="medium">🟡 متوسط</option>
-                        <option value="hard">🔴 صعب</option>
-                        <option value="expert">💀 خبير</option>
+                    <label style="font-size:0.75rem;">المستوى</label>
+                    <select id="modeSpecificDifficulty" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                        <option value="easy" ${settings.difficulty === 'easy' ? 'selected' : ''}>🟢 سهل</option>
+                        <option value="medium" ${settings.difficulty === 'medium' ? 'selected' : ''}>🟡 متوسط</option>
+                        <option value="hard" ${settings.difficulty === 'hard' ? 'selected' : ''}>🔴 صعب</option>
+                        <option value="expert" ${settings.difficulty === 'expert' ? 'selected' : ''}>💀 خبير</option>
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom:0.5rem;">
-                    <label style="font-size:0.75rem;">إظهار التلميحات</label>
-                    <select id="modeSpecificHints" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
-                        <option value="on">مفعل</option>
-                        <option value="off">معطل</option>
+                    <label style="font-size:0.75rem;">الفئة</label>
+                    <select id="modeSpecificCategory" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                        <option value="all" ${settings.category === 'all' ? 'selected' : ''}>📚 كل الفئات</option>
+                        ${GENERAL_CATEGORIES.map(cat => 
+                            `<option value="${cat.id}" ${settings.category === cat.id ? 'selected' : ''}>${cat.icon} ${cat.label}</option>`
+                        ).join('')}
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom:0.5rem;">
-                    <label style="font-size:0.75rem;">تصحيح الأخطاء</label>
-                    <select id="modeSpecificCorrection" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
-                        <option value="on">إظهار الإجابة الصحيحة</option>
-                        <option value="off">عدم الإظهار</option>
+                    <label style="font-size:0.75rem;">نوع السؤال</label>
+                    <select id="modeSpecificQuestionType" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                        <option value="all" ${settings.questionType === 'all' ? 'selected' : ''}>📚 الكل</option>
+                        <option value="multiple_choice" ${settings.questionType === 'multiple_choice' ? 'selected' : ''}>📝 اختيار من متعدد</option>
+                        <option value="true_false" ${settings.questionType === 'true_false' ? 'selected' : ''}>✅ صح / خطأ</option>
+                        <option value="fill_blank" ${settings.questionType === 'fill_blank' ? 'selected' : ''}>✏️ ملء الفراغ</option>
+                        <option value="matching" ${settings.questionType === 'matching' ? 'selected' : ''}>🔗 مطابقة</option>
+                        <option value="ordering" ${settings.questionType === 'ordering' ? 'selected' : ''}>🔢 ترتيب</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">عدد الأسئلة</label>
+                    <select id="modeSpecificCount" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                        <option value="5" ${settings.questionCount == 5 ? 'selected' : ''}>5 أسئلة</option>
+                        <option value="10" ${settings.questionCount == 10 ? 'selected' : ''}>10 أسئلة</option>
+                        <option value="15" ${settings.questionCount == 15 ? 'selected' : ''}>15 سؤال</option>
+                        <option value="20" ${settings.questionCount == 20 ? 'selected' : ''}>20 سؤال</option>
+                        <option value="30" ${settings.questionCount == 30 ? 'selected' : ''}>30 سؤال</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">الوقت لكل سؤال (ثانية)</label>
+                    <select id="modeSpecificTimeLimit" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                        <option value="10" ${settings.timeLimit == 10 ? 'selected' : ''}>10 ثوان</option>
+                        <option value="15" ${settings.timeLimit == 15 ? 'selected' : ''}>15 ثانية</option>
+                        <option value="20" ${settings.timeLimit == 20 ? 'selected' : ''}>20 ثانية</option>
+                        <option value="30" ${settings.timeLimit == 30 ? 'selected' : ''}>30 ثانية</option>
                     </select>
                 </div>
             `;
-            break;
-            
-        case 'create_room':
-            title = '🏠 إعدادات الغرفة';
+        }
+        
+        // ===== تحدي الصمود =====
+        else if (mode === 'training_survival') {
             html = `
                 <div class="form-group" style="margin-bottom:0.5rem;">
-                    <label style="font-size:0.75rem;">الحد الأقصى للاعبين</label>
-                    <select id="modeSpecificMaxPlayers" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
-                        <option value="2">2 لاعبين</option>
-                        <option value="4" selected>4 لاعبين</option>
-                        <option value="6">6 لاعبين</option>
-                        <option value="8">8 لاعبين</option>
+                    <label style="font-size:0.75rem;">المستوى</label>
+                    <select id="modeSpecificDifficulty" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                        <option value="easy" ${settings.difficulty === 'easy' ? 'selected' : ''}>🟢 سهل</option>
+                        <option value="medium" ${settings.difficulty === 'medium' ? 'selected' : ''}>🟡 متوسط</option>
+                        <option value="hard" ${settings.difficulty === 'hard' ? 'selected' : ''}>🔴 صعب</option>
+                        <option value="expert" ${settings.difficulty === 'expert' ? 'selected' : ''}>💀 خبير</option>
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom:0.5rem;">
-                    <label style="font-size:0.75rem;">الغرفة عامة أو خاصة</label>
-                    <select id="modeSpecificRoomPrivacy" class="game-select" style="font-size:0.8rem; padding:4px 10px;">
-                        <option value="public">عامة (الكل يمكنه الانضمام)</option>
-                        <option value="private">خاصة (برمز)</option>
-                        <option value="friends">الأصدقاء فقط</option>
+                    <label style="font-size:0.75rem;">الفئة</label>
+                    <select id="modeSpecificCategory" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                        <option value="all" ${settings.category === 'all' ? 'selected' : ''}>📚 كل الفئات</option>
+                        ${GENERAL_CATEGORIES.map(cat => 
+                            `<option value="${cat.id}" ${settings.category === cat.id ? 'selected' : ''}>${cat.icon} ${cat.label}</option>`
+                        ).join('')}
                     </select>
                 </div>
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">نوع السؤال</label>
+                    <select id="modeSpecificQuestionType" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                        <option value="all" ${settings.questionType === 'all' ? 'selected' : ''}>📚 الكل</option>
+                        <option value="multiple_choice" ${settings.questionType === 'multiple_choice' ? 'selected' : ''}>📝 اختيار من متعدد</option>
+                        <option value="true_false" ${settings.questionType === 'true_false' ? 'selected' : ''}>✅ صح / خطأ</option>
+                        <option value="fill_blank" ${settings.questionType === 'fill_blank' ? 'selected' : ''}>✏️ ملء الفراغ</option>
+                        <option value="matching" ${settings.questionType === 'matching' ? 'selected' : ''}>🔗 مطابقة</option>
+                        <option value="ordering" ${settings.questionType === 'ordering' ? 'selected' : ''}>🔢 ترتيب</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">عدد الأسئلة</label>
+                    <select id="modeSpecificCount" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                        <option value="5" ${settings.questionCount == 5 ? 'selected' : ''}>5 أسئلة</option>
+                        <option value="10" ${settings.questionCount == 10 ? 'selected' : ''}>10 أسئلة</option>
+                        <option value="15" ${settings.questionCount == 15 ? 'selected' : ''}>15 سؤال</option>
+                        <option value="20" ${settings.questionCount == 20 ? 'selected' : ''}>20 سؤال</option>
+                        <option value="30" ${settings.questionCount == 30 ? 'selected' : ''}>30 سؤال</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">الوقت لكل سؤال (ثانية)</label>
+                    <select id="modeSpecificTimeLimit" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                        <option value="5" ${settings.timeLimit == 5 ? 'selected' : ''}>5 ثوان (تحدي)</option>
+                        <option value="10" ${settings.timeLimit == 10 ? 'selected' : ''}>10 ثوان</option>
+                        <option value="15" ${settings.timeLimit == 15 ? 'selected' : ''}>15 ثانية</option>
+                        <option value="20" ${settings.timeLimit == 20 ? 'selected' : ''}>20 ثانية</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0.5rem; background:rgba(255,107,107,0.05); border-radius:8px; padding:0.3rem 0.5rem; border:1px solid rgba(255,107,107,0.1);">
+                    <label style="font-size:0.75rem; color:var(--secondary);">❤️ القلوب</label>
+                    <div style="font-weight:700; font-size:0.9rem; color:var(--secondary);">❤️❤️❤️ 3 قلوب (ثابتة)</div>
+                    <div style="font-size:0.6rem; color:var(--gray);">كل إجابة خاطئة تفقد قلباً واحداً</div>
+                </div>
             `;
-            break;            
-        default:
-            html = `<div class="text-gray" style="font-size:0.8rem; text-align:center;">لا توجد إعدادات خاصة لهذا الطور</div>`;
+        }
+        
+        // ===== تحدي السرعة =====
+        else if (mode === 'training_speed') {
+            html = `
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">المستوى</label>
+                    <select id="modeSpecificDifficulty" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                        <option value="easy" ${settings.difficulty === 'easy' ? 'selected' : ''}>🟢 سهل</option>
+                        <option value="medium" ${settings.difficulty === 'medium' ? 'selected' : ''}>🟡 متوسط</option>
+                        <option value="hard" ${settings.difficulty === 'hard' ? 'selected' : ''}>🔴 صعب</option>
+                        <option value="expert" ${settings.difficulty === 'expert' ? 'selected' : ''}>💀 خبير</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">الفئة</label>
+                    <select id="modeSpecificCategory" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                        <option value="all" ${settings.category === 'all' ? 'selected' : ''}>📚 كل الفئات</option>
+                        ${GENERAL_CATEGORIES.map(cat => 
+                            `<option value="${cat.id}" ${settings.category === cat.id ? 'selected' : ''}>${cat.icon} ${cat.label}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label style="font-size:0.75rem;">نوع السؤال</label>
+                    <select id="modeSpecificQuestionType" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                        <option value="all" ${settings.questionType === 'all' ? 'selected' : ''}>📚 الكل</option>
+                        <option value="multiple_choice" ${settings.questionType === 'multiple_choice' ? 'selected' : ''}>📝 اختيار من متعدد</option>
+                        <option value="true_false" ${settings.questionType === 'true_false' ? 'selected' : ''}>✅ صح / خطأ</option>
+                        <option value="fill_blank" ${settings.questionType === 'fill_blank' ? 'selected' : ''}>✏️ ملء الفراغ</option>
+                        <option value="matching" ${settings.questionType === 'matching' ? 'selected' : ''}>🔗 مطابقة</option>
+                        <option value="ordering" ${settings.questionType === 'ordering' ? 'selected' : ''}>🔢 ترتيب</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0.5rem; background:rgba(108,99,255,0.05); border-radius:8px; padding:0.3rem 0.5rem; border:1px solid rgba(108,99,255,0.1);">
+                    <label style="font-size:0.75rem; color:var(--primary);">⏱️ مدة التحدي</label>
+                    <div style="font-weight:700; font-size:0.9rem; color:var(--primary);">60 ثانية (ثابتة)</div>
+                    <div style="font-size:0.6rem; color:var(--gray);">أجب على أكبر عدد من الأسئلة خلال 60 ثانية</div>
+                </div>
+            `;
+        }
     }
     
+    // ===== أطوار الغرف =====
+    else if (modeInfo.category === 'rooms') {
+        title = '🏠 إعدادات الغرفة';
+        const user = AuthService.currentUser;
+        let ticketCount = 0;
+        const ticketId = modeInfo.ticket || 'room_ticket';
+        if (user) {
+            const inventory = user.inventory || [];
+            const ticket = inventory.find(i => i.itemId === ticketId);
+            ticketCount = ticket ? ticket.quantity : 0;
+        }
+        
+        html = `
+            <div class="form-group" style="margin-bottom:0.5rem;">
+                <label style="font-size:0.75rem;">الحد الأقصى للاعبين</label>
+                <div style="font-weight:700; font-size:1rem; color:var(--accent);">
+                    ${modeInfo.maxPlayers || 8} لاعب
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:0.5rem;">
+                <label style="font-size:0.75rem;">التكلفة</label>
+                <div style="font-weight:700; font-size:1rem; color:var(--accent);">
+                    💰 ${modeInfo.cost || 600} عملة
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:0.5rem;">
+                <label style="font-size:0.75rem;">البطاقات المتوفرة</label>
+                <div style="font-weight:700; font-size:1rem; color:${ticketCount > 0 ? 'var(--success)' : 'var(--secondary)'};">
+                    🎫 ${ticketCount} بطاقة ${ticketCount === 0 ? '(غير كافية)' : ''}
+                </div>
+            </div>
+            <div style="display:flex; gap:0.5rem; margin-top:0.5rem; flex-wrap:wrap;">
+                <button class="btn btn-sm btn-primary" onclick="App._activateSection('store')">
+                    <i class="fas fa-store"></i> شراء بطاقات
+                </button>
+                <button class="btn btn-sm btn-outline" onclick="App._refreshRoomTicketCount()">
+                    <i class="fas fa-sync"></i> تحديث
+                </button>
+            </div>
+        `;
+    }
+    
+    // ===== الأطوار المصنفة وغير المصنفة (لا توجد إعدادات خاصة) =====
+    else {
+        title = '⚙️ الإعدادات العامة';
+        html = `
+            <div style="color:var(--gray); font-size:0.85rem; text-align:center; padding:0.5rem;">
+                <i class="fas fa-info-circle" style="color:var(--accent);"></i>
+                هذا الطور إعداداته ثابتة ولا تحتاج إلى تعديل
+                ${modeInfo.competitive ? '<br>🏅 هذا طور تصنيفي يزيد الرتبة' : '<br>🎮 هذا طور ودي لا يزيد الرتبة'}
+                ${modeInfo.supportsPlayerCount ? '<br>👥 يدعم 1v1 أو 2v2' : ''}
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.3rem; margin-top:0.5rem;">
+                <div style="padding:0.3rem 0.5rem; background:var(--dark); border-radius:6px; text-align:center;">
+                    <span style="font-size:0.6rem; color:var(--gray);">عدد الأسئلة</span>
+                    <div style="font-weight:700; font-size:0.9rem; color:var(--light);">${settings.questionCount || 10}</div>
+                </div>
+                <div style="padding:0.3rem 0.5rem; background:var(--dark); border-radius:6px; text-align:center;">
+                    <span style="font-size:0.6rem; color:var(--gray);">الوقت لكل سؤال</span>
+                    <div style="font-weight:700; font-size:0.9rem; color:var(--light);">${settings.timeLimit || 15}s</div>
+                </div>
+                <div style="padding:0.3rem 0.5rem; background:var(--dark); border-radius:6px; text-align:center; grid-column:1/-1;">
+                    <span style="font-size:0.6rem; color:var(--gray);">الصعوبة</span>
+                    <div style="font-weight:700; font-size:0.9rem; color:var(--accent);">${settings.difficulty || 'متوسط'}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    // تحديث العنوان والمحتوى
     if (titleEl) titleEl.textContent = title;
     container.innerHTML = html;
+
+    // ربط أحداث التغيير لحفظ الإعدادات تلقائياً
+    container.querySelectorAll('select').forEach(select => {
+        // إزالة المستمعات القديمة (لتجنب التكرار)
+        const newSelect = select.cloneNode(true);
+        select.parentNode.replaceChild(newSelect, select);
+        
+        newSelect.addEventListener('change', function(e) {
+            console.log('🔄 Setting changed:', this.id, '=', this.value);
+            // حفظ الإعدادات الخاصة بالطور الحالي
+            App._saveModeSpecificSettings(mode);
+        });
+    });
     
-    // تحميل الإعدادات المحفوظة للخاصة
-    this._loadModeSpecificSettings(mode);
+    console.log('✅ Mode specific settings rendered for:', mode);
 },
 
-// ===== تحميل الإعدادات الخاصة =====
+// ============================================================
+// حفظ واسترجاع إعدادات الطور
+// ============================================================
+
+_getModeSettings(mode) {
+    let settings = {};
+    
+    console.log('🔍 Getting settings for mode:', mode);
+    
+    // ✅ محاولة جلب من الكاش (المحمّل من Firebase)
+    if (this._modeSettingsCache && this._modeSettingsCache[mode]) {
+        const cached = this._modeSettingsCache[mode];
+        if (cached.specific) {
+            settings = { ...cached.specific };
+            console.log('📊 Settings from Firebase cache:', settings);
+            return settings;
+        } else if (typeof cached === 'object') {
+            settings = { ...cached };
+            console.log('📊 Settings from Firebase cache (direct):', settings);
+            return settings;
+        }
+    }
+    
+    // ✅ محاولة جلب من localStorage
+    try {
+        const saved = localStorage.getItem(`modeSettings_${mode}`);
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed.specific && parsed.specific[mode]) {
+                settings = { ...parsed.specific[mode] };
+                console.log('📊 Settings from localStorage:', settings);
+                return settings;
+            } else if (typeof parsed === 'object') {
+                settings = { ...parsed };
+                console.log('📊 Settings from localStorage (direct):', settings);
+                return settings;
+            }
+        }
+    } catch (e) {
+        console.warn('⚠️ Error loading mode settings from localStorage:', e);
+    }
+    
+    // ✅ محاولة جلب من localStorage القديم (بدون specific)
+    try {
+        const saved = localStorage.getItem(`modeSettings_${mode}`);
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed.difficulty || parsed.category || parsed.questionType) {
+                settings = { ...parsed };
+                console.log('📊 Settings from localStorage (legacy):', settings);
+                return settings;
+            }
+        }
+    } catch (e) {}
+    
+    console.log('📊 No settings found, returning empty:', settings);
+    return settings;
+},
+
+_debugModeSettings() {
+    const mode = selectedGameMode;
+    console.log('🔍 === DEBUG MODE SETTINGS ===');
+    console.log('📌 Selected mode:', mode);
+    
+    const settings = this._getModeSettings(mode);
+    console.log('📊 Retrieved settings:', settings);
+    
+    const modeInfo = MODE_DESCRIPTIONS[mode];
+    console.log('📋 Mode info:', modeInfo);
+    
+    console.log('💾 Firebase cache:', this._modeSettingsCache);
+    console.log('🔍 === END DEBUG ===');
+    
+    // عرض الإعدادات في واجهة المستخدم
+    let msg = `الطور: ${mode}\n`;
+    msg += `الإعدادات:\n`;
+    Object.entries(settings).forEach(([key, value]) => {
+        const labels = {
+            'modeSpecificDifficulty': 'المستوى',
+            'modeSpecificCategory': 'الفئة',
+            'modeSpecificQuestionType': 'نوع السؤال',
+            'modeSpecificCount': 'عدد الأسئلة',
+            'modeSpecificTimeLimit': 'الوقت'
+        };
+        const label = labels[key] || key;
+        msg += `  ${label}: ${value}\n`;
+    });
+    showToast(`📊 الإعدادات الحالية:\n${msg}`, 'info', 5000);
+},
+
+_saveModeSpecificSettings(mode) {
+    console.log('💾 Saving mode specific settings for:', mode);
+    
+    // جمع جميع الإعدادات من عناصر الـ select في حاوية الإعدادات الخاصة
+    const specific = {};
+    
+    // قائمة بجميع المعرفات الممكنة للإعدادات
+    const settingIds = [
+        'modeSpecificDifficulty',
+        'modeSpecificCategory', 
+        'modeSpecificQuestionType',
+        'modeSpecificCount',
+        'modeSpecificTimeLimit'
+    ];
+    
+    // جمع القيم من كل عنصر
+    settingIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.value !== undefined) {
+            specific[id] = el.value;
+            console.log(`✅ Collected ${id}: ${el.value}`);
+        } else {
+            console.warn(`⚠️ Element ${id} not found`);
+        }
+    });
+    
+    // إذا لم يتم العثور على أي إعدادات، حاول جمعها من الحاوية مباشرة
+    if (Object.keys(specific).length === 0) {
+        const container = document.getElementById('modeSpecificContent');
+        if (container) {
+            container.querySelectorAll('select[id^="modeSpecific"]').forEach(el => {
+                if (el.id && el.value !== undefined) {
+                    specific[el.id] = el.value;
+                    console.log(`✅ Collected from container ${el.id}: ${el.value}`);
+                }
+            });
+        }
+    }
+    
+    // إذا كانت الإعدادات فارغة، لا نحفظ
+    if (Object.keys(specific).length === 0) {
+        console.warn('⚠️ No specific settings found to save');
+        showToast('⚠️ لم يتم العثور على إعدادات للحفظ', 'warning', 2000);
+        return;
+    }
+    
+    console.log('📦 Collected settings:', specific);
+    
+    // ✅ حفظ في Firebase والكاش المحلي
+    this._saveModeSettingsToFirebase(mode, specific);
+    
+    // ✅ حفظ في localStorage القديم للتوافق
+    try {
+        const saved = localStorage.getItem(`modeSettings_${mode}`);
+        let data = saved ? JSON.parse(saved) : {};
+        data.specific = data.specific || {};
+        data.specific[mode] = specific;
+        localStorage.setItem(`modeSettings_${mode}`, JSON.stringify(data));
+        console.log('✅ Mode settings saved to localStorage');
+    } catch (e) {
+        console.warn('⚠️ Could not save mode settings to localStorage:', e);
+    }
+    
+    // ✅ تحديث عرض الإعدادات في صفحة اللعبة
+    this._updateGameSettingsDisplay();
+    
+    // عرض رسالة نجاح مع تفاصيل الإعدادات المحفوظة
+    const modeNames = {
+        'training_classic': 'التدريب الكلاسيكي',
+        'training_survival': 'تحدي الصمود',
+        'training_speed': 'تحدي السرعة'
+    };
+    const name = modeNames[mode] || mode;
+    
+    // عرض تفاصيل الإعدادات في رسالة النجاح
+    const settingsSummary = Object.entries(specific).map(([key, value]) => {
+        const labels = {
+            'modeSpecificDifficulty': 'المستوى',
+            'modeSpecificCategory': 'الفئة',
+            'modeSpecificQuestionType': 'نوع السؤال',
+            'modeSpecificCount': 'عدد الأسئلة',
+            'modeSpecificTimeLimit': 'الوقت'
+        };
+        const label = labels[key] || key;
+        return `${label}: ${value}`;
+    }).join(' • ');
+    
+    showToast(`✅ تم حفظ إعدادات ${name} (${settingsSummary})`, 'success', 3000);
+},
+
+// أضف هذه الدالة داخل كائن App
+_updateGameSettingsDisplay() {
+    const mode = selectedGameMode || 'ranked_classic';
+    const modeInfo = MODE_DESCRIPTIONS[mode];
+    if (!modeInfo) return;
+    
+    const settings = this._getModeSettings(mode);
+    const currentModeTitle = modeInfo.title || 'كلاسيكي مصنف';
+    const currentModeIcon = modeInfo.icon || '⚔️';
+    const currentModeType = modeInfo.competitive ? '🏅 تصنيفي' : '🎮 ودي';
+    const questionCount = settings.questionCount || modeInfo.settings?.questionCount || 10;
+    const timeLimit = settings.timeLimit || modeInfo.settings?.timeLimit || 15;
+    const difficulty = settings.difficulty || modeInfo.settings?.difficulty || 'medium';
+    const category = settings.category || modeInfo.settings?.category || 'all';
+    const questionType = settings.questionType || modeInfo.settings?.questionType || 'all';
+    
+    const diffLabels = { easy: '🟢 سهل', medium: '🟡 متوسط', hard: '🔴 صعب', expert: '💀 خبير' };
+    const catLabel = category === 'all' ? '📚 كل الفئات' : GENERAL_CATEGORIES.find(c => c.id === category)?.label || category;
+    const typeLabel = questionType === 'all' ? '📚 الكل' : (QUESTION_TYPES[questionType]?.name || questionType);
+    
+    // تحديث العناصر في صفحة اللعبة
+    const container = document.getElementById('gameSettingsDisplay');
+    if (container) {
+        container.innerHTML = `
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; text-align:right; background:var(--glass); padding:0.8rem; border-radius:var(--radius-sm);">
+                <div>
+                    <span style="color:var(--gray); font-size:0.7rem;">الطور</span>
+                    <div style="font-weight:700; font-size:0.95rem; color:var(--accent);">${currentModeIcon} ${currentModeTitle}</div>
+                </div>
+                <div>
+                    <span style="color:var(--gray); font-size:0.7rem;">النوع</span>
+                    <div style="font-weight:700; font-size:0.95rem;">${currentModeType}</div>
+                </div>
+                <div>
+                    <span style="color:var(--gray); font-size:0.7rem;">عدد الأسئلة</span>
+                    <div style="font-weight:700; font-size:0.95rem;">${mode === 'training_speed' ? '♾️ مفتوح' : questionCount}</div>
+                </div>
+                <div>
+                    <span style="color:var(--gray); font-size:0.7rem;">الوقت لكل سؤال</span>
+                    <div style="font-weight:700; font-size:0.95rem;">${mode === 'training_speed' ? '60s (ثابت)' : timeLimit + 's'}</div>
+                </div>
+                <div>
+                    <span style="color:var(--gray); font-size:0.7rem;">المستوى</span>
+                    <div style="font-weight:700; font-size:0.95rem;">${diffLabels[difficulty] || '🟡 متوسط'}</div>
+                </div>
+                <div>
+                    <span style="color:var(--gray); font-size:0.7rem;">الفئة</span>
+                    <div style="font-weight:700; font-size:0.95rem;">${catLabel}</div>
+                </div>
+                <div style="grid-column:1/-1;">
+                    <span style="color:var(--gray); font-size:0.7rem;">نوع السؤال</span>
+                    <div style="font-weight:700; font-size:0.95rem;">${typeLabel}</div>
+                </div>
+                ${mode === 'training_survival' ? `
+                <div style="grid-column:1/-1; background:rgba(255,107,107,0.1); padding:0.3rem; border-radius:6px; border:1px solid var(--secondary);">
+                    <span style="color:var(--secondary); font-size:0.7rem;">❤️ القلوب</span>
+                    <div style="font-weight:700; font-size:0.95rem; color:var(--secondary);">❤️❤️❤️ 3 قلوب (ثابتة)</div>
+                </div>
+                ` : ''}
+            </div>
+        `;
+    }
+},
+
+// ============================================================
+// تحميل الإعدادات الخاصة
+// ============================================================
+
 _loadModeSpecificSettings(mode) {
     const specific = this._modeSettings.specific || {};
     const modeSpecific = specific[mode] || {};
@@ -10080,7 +11638,9 @@ _loadModeSpecificSettings(mode) {
     });
 },
 
-// في _saveModeSettings
+// ============================================================
+// حفظ إعدادات الطور
+// ============================================================
 
 _saveModeSettings() {
     const mode = this._modeSettings.currentMode;
@@ -10088,39 +11648,25 @@ _saveModeSettings() {
         showToast('⚠️ لم يتم تحديد طور', 'error');
         return;
     }
-    
-    // ✅ منع حفظ إعدادات normal_1v1 (تلقائية)
-    if (mode === 'normal_1v1') {
-        showToast('⚡ طور عادي 1v1 إعداداته تلقائية ولا تحتاج للحفظ', 'info', 3000);
-        this._closeModal('modeSettingsModal');
+
+    const modeInfo = MODE_DESCRIPTIONS[mode];
+    if (!modeInfo) {
+        showToast('⚠️ الطور غير موجود', 'error');
         return;
     }
-    
-    // جمع الإعدادات العامة
-    const settings = {
-        questionCount: parseInt(document.getElementById('modeSettingsQuestionCount')?.value) || 10,
-        timeLimit: parseInt(document.getElementById('modeSettingsTimeLimit')?.value) || 15,
+
+    // حفظ الإعدادات الخاصة
+    this._saveModeSpecificSettings(mode);
+
+    // عرض رسالة نجاح
+    const modeNames = {
+        'training_classic': 'التدريب الكلاسيكي',
+        'training_survival': 'تحدي الصمود',
+        'training_speed': 'تحدي السرعة'
     };
-    
-    // جمع الإعدادات الخاصة
-    const specific = {};
-    document.querySelectorAll('#modeSpecificContent select').forEach(el => {
-        specific[el.id] = el.value;
-    });
-    
-    settings.specific = {
-        [mode]: specific
-    };
-    
-    // حفظ في localStorage
-    try {
-        localStorage.setItem(`modeSettings_${mode}`, JSON.stringify(settings));
-        showToast(`✅ تم حفظ إعدادات ${mode}`, 'success', 2000);
-    } catch (e) {
-        console.error('Error saving mode settings:', e);
-        showToast('❌ خطأ في حفظ الإعدادات', 'error');
-    }
-    
+    const name = modeNames[mode] || modeInfo.title || mode;
+    showToast(`✅ تم حفظ إعدادات ${name}`, 'success', 2000);
+
     // إغلاق المودال
     this._closeModal('modeSettingsModal');
 },
@@ -10712,6 +12258,24 @@ _toggleResultSection(section) {
 },
 
 _renderGameSection() {
+    const user = AuthService.currentUser;
+    const modeInfo = MODE_DESCRIPTIONS[selectedGameMode] || MODE_DESCRIPTIONS['ranked_classic'];
+    const settings = this._getModeSettings(selectedGameMode) || {};
+    
+    // عرض الإعدادات الحالية
+    const currentModeTitle = modeInfo.title || 'كلاسيكي مصنف';
+    const currentModeIcon = modeInfo.icon || '⚔️';
+    const currentModeType = modeInfo.competitive ? '🏅 تصنيفي' : '🎮 ودي';
+    const questionCount = settings.questionCount || 10;
+    const timeLimit = settings.timeLimit || 15;
+    const difficulty = settings.difficulty || 'medium';
+    const category = settings.category || 'all';
+    const questionType = settings.questionType || 'all';
+    
+    const diffLabels = { easy: '🟢 سهل', medium: '🟡 متوسط', hard: '🔴 صعب', expert: '💀 خبير' };
+    const catLabel = category === 'all' ? '📚 كل الفئات' : GENERAL_CATEGORIES.find(c => c.id === category)?.label || category;
+    const typeLabel = questionType === 'all' ? '📚 الكل' : (QUESTION_TYPES[questionType]?.name || questionType);
+    
     return `
         <div class="game-page">
             <!-- رأس الصفحة -->
@@ -10725,45 +12289,45 @@ _renderGameSection() {
                 </div>
                 <div class="flex-center" style="flex-wrap:wrap;gap:8px;">
                     <span class="currency-display">
-                        <i class="fas fa-coins"></i> <span id="gameCoins">0</span>
+                        <i class="fas fa-coins"></i> <span id="gameCoins">${user?.coins || 0}</span>
                     </span>
-                    <span class="badge badge-primary" id="gameLevel">🌟 مبتدئ</span>
+                    <span class="badge badge-primary" id="gameLevel">${user ? `🌟 المستوى ${getLevel(user.totalScore || 0).level}` : '🌟 مبتدئ'}</span>
                 </div>
             </div>
 
             <!-- إحصائيات اللاعب -->
             <div class="game-stats-grid mb-2" id="gameStats">
                 <div class="stat-card">
-                    <div class="stat-number" id="gameTotalPlayed">0</div>
+                    <div class="stat-number" id="gameTotalPlayed">${user?.stats?.gamesPlayed || 0}</div>
                     <div class="stat-label">🎮 مباريات لعبت</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number" id="gameTotalWon">0</div>
+                    <div class="stat-number" id="gameTotalWon">${user?.stats?.gamesWon || 0}</div>
                     <div class="stat-label">🏆 مباريات فاز</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number" id="gameWinRate">0%</div>
+                    <div class="stat-number" id="gameWinRate">${user?.stats?.gamesPlayed > 0 ? Math.round((user.stats.gamesWon / user.stats.gamesPlayed) * 100) : 0}%</div>
                     <div class="stat-label">📈 نسبة الفوز</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number" id="gameTotalPoints">0</div>
+                    <div class="stat-number" id="gameTotalPoints">${user?.totalScore || 0}</div>
                     <div class="stat-label">⭐ إجمالي النقاط</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number" id="gameBestScore">0</div>
+                    <div class="stat-number" id="gameBestScore">${parseInt(localStorage.getItem('bestGameScore') || '0')}</div>
                     <div class="stat-label">🏅 أفضل نتيجة</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number" id="gameStreak">0</div>
+                    <div class="stat-number" id="gameStreak">${parseInt(localStorage.getItem('gameStreak') || '0')}</div>
                     <div class="stat-label">🔥 السلسلة الحالية</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number" id="gameBestStreak">0</div>
+                    <div class="stat-number" id="gameBestStreak">${parseInt(localStorage.getItem('bestStreak') || '0')}</div>
                     <div class="stat-label">🏆 أفضل سلسلة</div>
                 </div>
             </div>
 
-            <!-- ✅ عرض المضاعفات النشطة -->
+            <!-- عرض المضاعفات النشطة -->
             <div id="gameActiveBoostsContainer" style="margin:1rem 0; padding:0.8rem; background:var(--glass); border-radius:var(--radius-sm); border:1px solid var(--border-color);">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
                     <span style="font-weight:700; font-size:0.9rem;">
@@ -10778,69 +12342,52 @@ _renderGameSection() {
                 </div>
             </div>
 
-            <!-- شاشة البداية -->
+            <!-- ===== شاشة البداية (بدون إعدادات قديمة) ===== -->
             <div id="gameStartScreen">
                 <div class="card" style="max-width:600px;margin:0 auto;">
                     <div style="text-align:center;padding:0.5rem 0;">
                         <div style="font-size:4rem;margin-bottom:0.5rem;">⚽</div>
                         <h3 style="font-size:1.8rem;font-weight:800;margin-bottom:0.3rem;">تحدى معرفتك</h3>
-                        <p class="text-gray" style="margin-bottom:1.5rem;">اختر الإعدادات وابدأ التحدي</p>
+                        <p class="text-gray" style="margin-bottom:1rem;">الإعدادات الحالية للعب</p>
                         
-                        <!-- إعدادات اللعبة -->
-                        <div class="game-settings">
-                            <div class="form-group">
-                                <label>المستوى</label>
-                                <select id="gameDifficulty" class="game-select">
-                                    <option value="easy">🟢 سهل (20 ثانية)</option>
-                                    <option value="medium" selected>🟡 متوسط (15 ثانية)</option>
-                                    <option value="hard">🔴 صعب (10 ثوانٍ)</option>
-                                    <option value="expert">💀 خبير (5 ثوانٍ)</option>
-                                </select>
+                        <!-- عرض الإعدادات الحالية بشكل معلوماتي -->
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; text-align:right; margin-bottom:1rem; background:var(--glass); padding:0.8rem; border-radius:var(--radius-sm);">
+                            <div>
+                                <span style="color:var(--gray); font-size:0.7rem;">الطور</span>
+                                <div style="font-weight:700; font-size:0.95rem; color:var(--accent);">${currentModeIcon} ${currentModeTitle}</div>
                             </div>
-                            <div class="form-group">
-                                <label>الفئة</label>
-<select id="gameCategory" class="game-select">
-    <option value="all">📚 كل الفئات</option>
-    ${GENERAL_CATEGORIES.map(cat => 
-        `<option value="${cat.id}">${cat.icon} ${cat.label}</option>`
-    ).join('')}
-</select>
+                            <div>
+                                <span style="color:var(--gray); font-size:0.7rem;">النوع</span>
+                                <div style="font-weight:700; font-size:0.95rem;">${currentModeType}</div>
                             </div>
-                            <div class="form-group">
-                                <label>نوع السؤال</label>
-                                <select id="gameQuestionType" class="game-select">
-                                    <option value="all">📚 الكل</option>
-                                    <option value="multiple_choice">📝 اختيار من متعدد</option>
-                                    <option value="true_false">✅ صح / خطأ</option>
-                                    <option value="fill_blank">✏️ ملء الفراغ</option>
-                                    <option value="matching">🔗 مطابقة</option>
-                                    <option value="ordering">🔢 ترتيب</option>
-                                </select>
+                            <div>
+                                <span style="color:var(--gray); font-size:0.7rem;">عدد الأسئلة</span>
+                                <div style="font-weight:700; font-size:0.95rem;">${questionCount}</div>
                             </div>
-                            <div class="form-group">
-                                <label>عدد الأسئلة</label>
-                                <select id="gameCount" class="game-select">
-                                    <option value="5">5 أسئلة</option>
-                                    <option value="10" selected>10 أسئلة</option>
-                                    <option value="15">15 سؤال</option>
-                                    <option value="20">20 سؤال</option>
-                                    <option value="30">30 سؤال</option>
-                                </select>
+                            <div>
+                                <span style="color:var(--gray); font-size:0.7rem;">الوقت لكل سؤال</span>
+                                <div style="font-weight:700; font-size:0.95rem;">${timeLimit}s</div>
                             </div>
-                            <div class="form-group">
-                                <label>نمط اللعبة</label>
-                                <select id="gameMode" class="game-select">
-                                    <option value="normal">🎯 عادي</option>
-                                    <option value="timed">⏱ زمني (تحدي الوقت)</option>
-                                    <option value="survival">💪 صمود (تنتهي بخطأ)</option>
-                                    <option value="time_attack">⚡ تحدي الزمن المفتوح (60s)</option>
-                                </select>
+                            <div>
+                                <span style="color:var(--gray); font-size:0.7rem;">المستوى</span>
+                                <div style="font-weight:700; font-size:0.95rem;">${diffLabels[difficulty] || '🟡 متوسط'}</div>
+                            </div>
+                            <div>
+                                <span style="color:var(--gray); font-size:0.7rem;">الفئة</span>
+                                <div style="font-weight:700; font-size:0.95rem;">${catLabel}</div>
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <span style="color:var(--gray); font-size:0.7rem;">نوع السؤال</span>
+                                <div style="font-weight:700; font-size:0.95rem;">${typeLabel}</div>
                             </div>
                         </div>
                         
                         <button class="btn btn-primary w-100" id="startGameBtn" style="justify-content:center;font-size:1.1rem;padding:14px;margin-top:0.5rem;">
                             <i class="fas fa-play"></i> ابدأ اللعبة
                         </button>
+                        <div style="margin-top:0.5rem; font-size:0.7rem; color:var(--gray);">
+                            ⚡ لتغيير الإعدادات، استخدم زر الإعدادات ⚙️ في الصفحة الرئيسية
+                        </div>
                     </div>
                 </div>
             </div>
@@ -11016,24 +12563,130 @@ _renderProfileSection() {
                             </div>
                         </div>
                     </div>
-                    <div class="profile-actions">
-                        <button class="btn btn-primary" id="editProfileBtn"><i class="fas fa-edit"></i> تعديل الملف</button>
-                        <button class="btn btn-outline" id="shareProfileBtn"><i class="fas fa-share-alt"></i> مشاركة</button>
-                        <button class="btn btn-outline" id="profileFriendsBtn">
-                            <i class="fas fa-user-friends"></i> الأصدقاء 
-                            <span class="badge" id="friendsCount">0</span>
+                    
+                    <!-- ============================================================ -->
+                    <!-- ✅ أزرار الإجراءات مع تمرير أفقي للهواتف -->
+                    <!-- ============================================================ -->
+                    <div class="profile-actions" style="
+                        display: flex;
+                        gap: 0.5rem;
+                        flex-wrap: nowrap;
+                        overflow-x: auto;
+                        -webkit-overflow-scrolling: touch;
+                        scrollbar-width: none;
+                        padding: 0.3rem 0.2rem 0.5rem;
+                        width: 100%;
+                        max-width: 100%;
+                    ">
+                        <!-- زر تعديل الملف -->
+                        <button class="btn btn-primary" id="editProfileBtn" style="
+                            flex-shrink: 0;
+                            white-space: nowrap;
+                            font-size: 0.85rem;
+                            padding: 8px 16px;
+                            min-height: 40px;
+                        ">
+                            <i class="fas fa-edit"></i> تعديل الملف
                         </button>
-                        <!-- ✅ زر الإحصائيات الجديد -->
-                        <button class="btn btn-outline" id="profileStatsBtn">
+                        
+                        <!-- زر الإحصائيات -->
+                        <button class="btn btn-outline" id="profileStatsBtn" style="
+                            flex-shrink: 0;
+                            white-space: nowrap;
+                            font-size: 0.85rem;
+                            padding: 8px 16px;
+                            min-height: 40px;
+                        ">
                             <i class="fas fa-chart-line"></i> الإحصائيات
                         </button>
-                        <button class="btn btn-outline" id="showFollowersBtn">
-                            <i class="fas fa-user-plus"></i> المتابعين 
-                            <span class="badge" id="followersCount">0</span>
+                        
+                        <!-- ✅ زر الإنجازات (جديد) -->
+                        <button class="btn btn-outline" id="profileAchievementsBtn" style="
+                            flex-shrink: 0;
+                            white-space: nowrap;
+                            font-size: 0.85rem;
+                            padding: 8px 16px;
+                            min-height: 40px;
+                            border-color: var(--accent);
+                            color: var(--accent);
+                        ">
+                            <i class="fas fa-star"></i> الإنجازات
+                            <span class="badge" id="profileAchievementsBadge" style="
+                                background: var(--accent);
+                                color: var(--dark);
+                                font-size: 0.6rem;
+                                padding: 1px 8px;
+                                border-radius: 30px;
+                                margin-right: 4px;
+                            ">0</span>
                         </button>
-                        <button class="btn btn-outline" id="showFollowingBtn">
-                            <i class="fas fa-user-check"></i> المتابَعين 
-                            <span class="badge" id="followingCount">0</span>
+                        
+                        <!-- زر الأصدقاء -->
+                        <button class="btn btn-outline" id="profileFriendsBtn" style="
+                            flex-shrink: 0;
+                            white-space: nowrap;
+                            font-size: 0.85rem;
+                            padding: 8px 16px;
+                            min-height: 40px;
+                        ">
+                            <i class="fas fa-user-friends"></i> الأصدقاء
+                            <span class="badge" id="friendsCount" style="
+                                background: var(--primary);
+                                color: #fff;
+                                font-size: 0.6rem;
+                                padding: 1px 8px;
+                                border-radius: 30px;
+                                margin-right: 4px;
+                            ">0</span>
+                        </button>
+                        
+                        <!-- زر المتابعين -->
+                        <button class="btn btn-outline" id="showFollowersBtn" style="
+                            flex-shrink: 0;
+                            white-space: nowrap;
+                            font-size: 0.85rem;
+                            padding: 8px 16px;
+                            min-height: 40px;
+                        ">
+                            <i class="fas fa-user-plus"></i> المتابعين
+                            <span class="badge" id="followersCount" style="
+                                background: var(--info);
+                                color: #fff;
+                                font-size: 0.6rem;
+                                padding: 1px 8px;
+                                border-radius: 30px;
+                                margin-right: 4px;
+                            ">0</span>
+                        </button>
+                        
+                        <!-- زر المتابَعين -->
+                        <button class="btn btn-outline" id="showFollowingBtn" style="
+                            flex-shrink: 0;
+                            white-space: nowrap;
+                            font-size: 0.85rem;
+                            padding: 8px 16px;
+                            min-height: 40px;
+                        ">
+                            <i class="fas fa-user-check"></i> المتابَعين
+                            <span class="badge" id="followingCount" style="
+                                background: var(--success);
+                                color: #fff;
+                                font-size: 0.6rem;
+                                padding: 1px 8px;
+                                border-radius: 30px;
+                                margin-right: 4px;
+                            ">0</span>
+                        </button>
+                        
+                        <!-- زر مشاركة الملف -->
+                        <button class="btn btn-outline" id="shareProfileBtn" style="
+                            flex-shrink: 0;
+                            white-space: nowrap;
+                            font-size: 0.85rem;
+                            padding: 8px 16px;
+                            min-height: 40px;
+                        ">
+                            <i class="fas fa-share-alt"></i> مشاركة
                         </button>
                     </div>
                 </div>
@@ -11077,7 +12730,7 @@ _renderProfileSection() {
             <div class="profile-tabs">
                 <button class="tab-btn" data-tab="activity"><i class="fas fa-clock"></i> النشاطات</button>
                 <button class="tab-btn" data-tab="achievements"><i class="fas fa-medal"></i> الإنجازات</button>
-                <button class="tab-btn" data-tab="inventory"><i class="fas fa-box"></i> المخزون</button>
+                <button class="tab-btn active" data-tab="inventory"><i class="fas fa-box"></i> المخزون</button>
                 <button class="tab-btn" data-tab="stats"><i class="fas fa-chart-bar"></i> الإحصائيات</button>
                 <button class="tab-btn" data-tab="friends"><i class="fas fa-user-friends"></i> الأصدقاء</button>
             </div>
@@ -11101,10 +12754,15 @@ _renderProfileSection() {
                 </div>
 
                 <!-- المخزون -->
-                <div class="tab-panel" id="tab-inventory">
+                <div class="tab-panel active" id="tab-inventory">
                     <div class="card">
-                        <div class="card-title"><i class="fas fa-box"></i> العناصر المملوكة <span class="badge badge-primary" id="inventoryCount">0</span></div>
-                        <div class="grid-4" id="profileInventoryGrid"><div class="text-gray">لا توجد عناصر</div></div>
+                        <div class="card-title">
+                            <i class="fas fa-box"></i> المخزون 
+                            <span class="badge badge-primary" id="inventoryCount">0</span>
+                        </div>
+                        <div id="profileInventoryGrid" class="inventory-grid">
+                            <div class="text-gray">جاري التحميل...</div>
+                        </div>
                     </div>
                 </div>
 
@@ -11148,14 +12806,15 @@ _renderProfileSection() {
 
 _updateProfileTabContent(user) {
     if (!user) return;
-    this._updateProfileLevel(user);        // <- بدلاً من _updateLevelProgress
+    
+    this._updateProfileLevel(user);
     this._updateProfileActivity(user);
-    this._updateProfileInventory(user);
+    this._updateProfileInventory(user);  // ✅ تحديث المخزون
     this._updateProfileStats(user);
     this._updateProfileFriends(user);
     this._updateProfileBadges(user);
     this._updateProfileChart(user);
-    this._updateProfileAchievements(user);  // ✅ الآن تستخدم AchievementManager
+    this._updateProfileAchievements(user);
 },
 
 _updateProfileActivity(user) {
@@ -11192,12 +12851,18 @@ _updateProfileAchievements(user) {
         return;
     }
     
-    // ✅ استخدام AchievementManager الجديد
+    // ✅ استخدام AchievementManager
     const allAchievements = AchievementManager.getAllAchievements();
     const unlocked = allAchievements.filter(a => a.unlocked);
     
-    // تحديث العدد
+    // تحديث عدد الإنجازات في الشارة
     document.getElementById('achievementCount').textContent = unlocked.length;
+    
+    // ✅ تحديث شارة زر الإنجازات
+    const badge = document.getElementById('profileAchievementsBadge');
+    if (badge) {
+        badge.textContent = unlocked.length;
+    }
     
     if (allAchievements.length === 0) {
         container.innerHTML = '<div class="text-gray">لا توجد إنجازات</div>';
@@ -11230,18 +12895,20 @@ _updateProfileInventory(user) {
     const container = document.getElementById('profileInventoryGrid');
     if (!container) return;
     
-    const inventory = user.inventory || [];
-    const activeItems = user.activeItems || [];
+    const inventory = user?.inventory || [];
+    const activeItems = user?.activeItems || [];
     const storeItems = DataManager.data.storeItems || [];
     
-    document.getElementById('inventoryCount').textContent = inventory.length;
+    // تحديث العدد
+    const countEl = document.getElementById('inventoryCount');
+    if (countEl) countEl.textContent = inventory.length;
     
     if (inventory.length === 0) {
         container.innerHTML = `
-            <div class="empty-state" style="grid-column:1/-1;padding:2rem 0;">
+            <div class="empty-state" style="grid-column:1/-1;padding:2rem 0;text-align:center;">
                 <i class="fas fa-box-open" style="font-size:2.5rem;color:var(--gray-dark);"></i>
-                <h3 style="font-size:1.2rem;">المخزون فارغ</h3>
-                <p class="text-gray" style="font-size:0.9rem;">اذهب إلى المتجر لشراء المقتنيات!</p>
+                <h3 style="font-size:1.1rem;">المخزون فارغ</h3>
+                <p class="text-gray" style="font-size:0.85rem;">اذهب إلى المتجر لشراء المقتنيات!</p>
                 <button class="btn btn-primary btn-sm mt-1" onclick="App._activateSection('store')">
                     <i class="fas fa-store"></i> زيارة المتجر
                 </button>
@@ -11250,146 +12917,101 @@ _updateProfileInventory(user) {
         return;
     }
     
-    // تجميع العناصر مع بياناتها من المتجر
-    const itemsWithData = inventory.map(inv => {
+    // ✅ تعيين أنماط الشبكة مباشرة على الحاوية
+    container.style.display = 'grid';
+    container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(140px, 1fr))';
+    container.style.gap = '0.8rem';
+    container.style.padding = '0.2rem 0';
+    
+    let html = '';
+    
+    inventory.forEach(inv => {
         const item = storeItems.find(i => i.id === inv.itemId);
-        return item ? { ...inv, ...item } : null;
-    }).filter(Boolean);
-    
-    // تصنيف العناصر
-    const categories = {};
-    itemsWithData.forEach(item => {
-        const cat = item.category || 'أخرى';
-        if (!categories[cat]) categories[cat] = [];
-        categories[cat].push(item);
-    });
-    
-    // ترتيب الفئات
-    const categoryOrder = ['boosts', 'room_boosts', 'frames', 'backgrounds', 'badges', 'emotes', 'themes', 'loot_boxes', 'أخرى'];
-    const categoryNames = {
-        'boosts': '⚡ تعزيزات',
-        'room_boosts': '🏠 غرف',
-        'frames': '🖼️ إطارات',
-        'backgrounds': '🌄 خلفيات',
-        'badges': '🏅 شارات',
-        'emotes': '💬 رموز',
-        'themes': '🎨 سمات',
-        'loot_boxes': '📦 صناديق',
-        tickets: '🎫 تذاكر',
-        'أخرى': '📌 أخرى'
-    };
-    
-    const sortedCategories = Object.keys(categories).sort((a, b) => {
-        const indexA = categoryOrder.indexOf(a);
-        const indexB = categoryOrder.indexOf(b);
-        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
-    });
-    
-    // بناء HTML - أزرار الفئات في صف واحد فوق العناصر
-    let html = `
-        <div class="inventory-controls" style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:1rem;padding:0.5rem 0;border-bottom:1px solid var(--glass-border);">
-            <button class="btn btn-sm ${sortedCategories.length > 1 ? 'btn-primary' : 'btn-primary'}" 
-                    onclick="document.getElementById('inventoryAll').scrollIntoView({behavior:'smooth',block:'start'})"
-                    style="font-size:0.7rem;padding:4px 12px;border-radius:30px;">
-                📦 الكل (${inventory.length})
-            </button>
-            ${sortedCategories.map(cat => `
-                <button class="btn btn-sm btn-outline" 
-                        onclick="document.getElementById('inventory-${cat}').scrollIntoView({behavior:'smooth',block:'start'})" 
-                        style="font-size:0.7rem;padding:4px 12px;border-radius:30px;border-color:var(--glass-border);">
-                    ${categoryNames[cat] || cat} (${categories[cat].length})
-                </button>
-            `).join('')}
-        </div>
-        <div id="inventoryAll" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:0.6rem;">
-    `;
-    
-    // عرض العناصر مباشرة (جميع الفئات معاً)
-    const allItems = [];
-    sortedCategories.forEach(cat => {
-        categories[cat].forEach(item => {
-            allItems.push({ ...item, category: cat });
-        });
-    });
-    
-    // عرض كل العناصر دفعة واحدة مع تصنيفات مخفية (لعرضها معاً ولكن مع فواصل)
-    // بدلاً من ذلك، نعرض كل فئة على حدة مع عنوان صغير
-    sortedCategories.forEach((cat, catIndex) => {
-        const items = categories[cat];
-        html += `
-            <div class="inventory-category" id="inventory-${cat}" style="grid-column:1/-1;scroll-margin-top:80px;margin-top:${catIndex === 0 ? '0' : '0.8rem'};">
-                <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem;">
-                    <span style="font-size:0.8rem;font-weight:600;color:var(--gray);">${categoryNames[cat] || cat}</span>
-                    <span style="font-size:0.6rem;color:var(--gray-dark);background:var(--glass);padding:0 8px;border-radius:30px;">${items.length}</span>
-                </div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:0.6rem;">
-        `;
-        
-        items.forEach(item => {
-            const isActive = activeItems.includes(item.id);
-            const rarityMap = {
-                common: { label: 'عادي', color: '#8e8e8e' },
-                uncommon: { label: 'نادر', color: '#2ecc71' },
-                rare: { label: 'مميز', color: '#3498db' },
-                epic: { label: 'أسطوري', color: '#9b59b6' },
-                legendary: { label: 'خرافي', color: '#f1c40f' }
-            };
-            const rarity = rarityMap[item.rarity] || rarityMap.common;
-            const quantity = item.quantity || 1;
-            const isEquippable = item.duration === 'permanent';
-            
-            // أيقونة حقيقية أو افتراضية
-            let icon = item.icon;
-            if (!icon) {
-                const defaultIcons = {
-                    'boosts': '⚡',
-                    'room_boosts': '🏠',
-                    'frames': '🖼️',
-                    'backgrounds': '🌄',
-                    'badges': '🏅',
-                    'emotes': '💬',
-                    'themes': '🎨',
-                    'loot_boxes': '📦'
-                };
-                icon = defaultIcons[item.category] || '📦';
-            }
-            
-            // تصميم البطاقة الصغيرة
+        if (!item) {
             html += `
-                <div class="inventory-item ${isActive ? 'active' : ''}" 
-                     style="background:var(--card-bg);border:1.5px solid ${isActive ? 'var(--accent)' : rarity.color}44;
-                            border-radius:10px;padding:0.5rem;text-align:center;
-                            transition:all 0.2s ease;position:relative;
-                            ${isActive ? 'box-shadow:0 0 15px rgba(255,217,61,0.1);' : ''}
-                            cursor:default;">
-                    ${isActive ? '<span style="position:absolute;top:2px;right:2px;font-size:0.5rem;background:var(--accent);color:#000;padding:0 6px;border-radius:20px;font-weight:700;">مفعل</span>' : ''}
-                    <div style="font-size:1.8rem;line-height:1.2;margin-bottom:0.1rem;filter:${item.rarity === 'legendary' ? 'drop-shadow(0 0 10px rgba(241,196,15,0.3))' : 'none'};">
-                        ${icon}
-                    </div>
-                    <div style="font-weight:600;font-size:0.7rem;color:${rarity.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                        ${item.name}
-                    </div>
-                    <div style="font-size:0.55rem;color:var(--gray);margin-top:0.1rem;display:flex;justify-content:center;gap:0.3rem;flex-wrap:wrap;">
-                        <span style="background:${rarity.color}22;padding:0 6px;border-radius:10px;font-size:0.5rem;">${rarity.label}</span>
-                        ${quantity > 1 ? `<span>×${quantity}</span>` : ''}
-                    </div>
-                    ${isEquippable ? `
-                        <button class="btn btn-xs ${isActive ? 'btn-danger' : 'btn-primary'}" 
-                                onclick="App._toggleActiveItem('${item.id}');" 
-                                style="font-size:0.5rem;padding:1px 8px;margin-top:0.2rem;border-radius:30px;min-height:20px;">
-                            ${isActive ? 'إلغاء' : 'تفعيل'}
-                        </button>
-                    ` : `
-                        ${quantity > 0 ? `<span style="font-size:0.5rem;color:var(--success);">✅</span>` : `<span style="font-size:0.5rem;color:var(--secondary);">❌</span>`}
-                    `}
+                <div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:0.5rem;text-align:center;">
+                    <div style="font-size:2rem;">📦</div>
+                    <div style="font-weight:700;font-size:0.7rem;">${inv.itemId || 'عنصر غير معروف'}</div>
+                    <div style="font-size:0.6rem;color:var(--gray);">الكمية: ${inv.quantity || 0}</div>
                 </div>
             `;
-        });
+            return;
+        }
         
-        html += `</div></div>`;
+        const isActive = activeItems.includes(item.id);
+        const quantity = inv.quantity || 0;
+        const rarityColor = this._getRarityColor(item.rarity);
+        const rarityLabel = this._getRarityLabel(item.rarity);
+        const isEquippable = item.duration === 'permanent';
+        const imagePath = item.imagePath || item.image || '';
+        
+        // ✅ بناء بطاقة العنصر
+        html += `
+            <div class="inventory-item-card" 
+                 style="background-image: url('${imagePath}'); 
+                        background-size: cover; 
+                        background-position: center;
+                        background-color: var(--glass);
+                        aspect-ratio: 1 / 1.4;
+                        min-height: 180px;
+                        border-radius: var(--radius-sm);
+                        overflow: hidden;
+                        position: relative;
+                        display: flex;
+                        align-items: flex-end;
+                        justify-content: center;
+                        border: 2px solid ${isActive ? 'var(--accent)' : rarityColor}44;
+                        cursor: default;">
+
+                <!-- طبقة تعتيم -->
+                <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.1) 100%);z-index:1;pointer-events:none;"></div>
+                
+                <!-- شارة مفعل -->
+                ${isActive ? `<span style="position:absolute;top:6px;right:6px;font-size:0.45rem;padding:0.1rem 0.4rem;border-radius:30px;background:var(--accent);color:var(--dark);font-weight:700;z-index:3;box-shadow:0 2px 10px rgba(0,0,0,0.3);">مفعل</span>` : ''}
+                
+                <!-- شارة الكمية -->
+                ${quantity > 1 ? `<span style="position:absolute;top:6px;left:6px;font-size:0.4rem;padding:0.05rem 0.3rem;border-radius:30px;background:rgba(0,0,0,0.7);color:#fff;font-weight:700;z-index:3;">×${quantity}</span>` : ''}
+                
+                <!-- المحتوى -->
+                <div style="position:relative;z-index:2;width:100%;padding:0.6rem 0.4rem;display:flex;flex-direction:column;align-items:center;gap:0.2rem;">
+                    <div style="font-weight:800;font-size:0.75rem;color:#ffffff;text-shadow:0 2px 8px rgba(0,0,0,0.8);text-align:center;line-height:1.2;width:100%;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+                        ${item.name}
+                    </div>
+                    
+                    <div style="font-size:0.45rem;padding:0.05rem 0.4rem;border-radius:30px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:${rarityColor};background:${rarityColor}33;border:1px solid ${rarityColor}66;backdrop-filter:blur(4px);text-shadow:0 1px 4px rgba(0,0,0,0.5);">
+                        ${rarityLabel}
+                    </div>
+                    
+                    <div style="display:flex;gap:0.2rem;flex-wrap:wrap;justify-content:center;width:100%;margin-top:0.1rem;">
+                        ${isEquippable ? `
+                            <button class="btn ${isActive ? 'btn-danger' : 'btn-primary'}" 
+                                    onclick="App._toggleActiveItem('${item.id}');"
+                                    style="font-size:0.45rem;padding:0.1rem 0.3rem;min-height:18px;border-radius:30px;backdrop-filter:blur(4px);background:${isActive ? 'rgba(255,107,107,0.7)' : 'rgba(108,99,255,0.7)'} !important;border:1px solid rgba(255,255,255,0.1);color:#fff !important;text-shadow:0 1px 4px rgba(0,0,0,0.5);">
+                                ${isActive ? 'إلغاء' : 'تفعيل'}
+                            </button>
+                        ` : ''}
+                        
+                        ${item.category === 'loot_boxes' && quantity > 0 ? `
+                            <button class="btn btn-warning" 
+                                    onclick="App._openLootBox('${item.id}');"
+                                    style="font-size:0.45rem;padding:0.1rem 0.3rem;min-height:18px;border-radius:30px;backdrop-filter:blur(4px);background:rgba(255,217,61,0.7) !important;border:1px solid rgba(255,255,255,0.1);color:var(--dark) !important;">
+                                فتح
+                            </button>
+                        ` : ''}
+                        
+                        ${item.effectType && quantity > 0 && !isEquippable ? `
+                            <button class="btn btn-success" 
+                                    onclick="App._useBoostItem('${item.id}');"
+                                    style="font-size:0.45rem;padding:0.1rem 0.3rem;min-height:18px;border-radius:30px;backdrop-filter:blur(4px);background:rgba(46,204,113,0.7) !important;border:1px solid rgba(255,255,255,0.1);color:#fff !important;">
+                                استخدام
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
     });
     
-    html += `</div>`;
     container.innerHTML = html;
 },
 
@@ -11416,12 +13038,9 @@ _renderStoreSection() {
                     <button class="btn-inventory" onclick="App._renderInventory()" title="مخزوني">
                         <i class="fas fa-box"></i>
                     </button>
-                    <button class="btn-inventory" onclick="App._checkStoreImages()" title="فحص الصور" style="font-size:0.7rem;">
-                        <i class="fas fa-image"></i>
+                    <button class="btn-inventory" onclick="App._forceRefreshStore()" title="تحديث المتجر" style="font-size:0.7rem;">
+                        <i class="fas fa-sync"></i>
                     </button>
-<button class="btn-inventory" onclick="App._resetStoreItems()" title="إعادة تعيين المتجر" style="font-size:0.7rem;color:var(--secondary);">
-    <i class="fas fa-undo"></i>
-</button>
                 </div>
             </div>
 
@@ -14814,10 +16433,11 @@ _activateSection(id) {
     if (id === 'store') {
         this._renderStore(DataManager.data.storeItems || []);
     }
-    if (id === 'game') {
-        document.getElementById('gameStartScreen').style.display = 'block';
-        document.getElementById('gamePlayScreen').style.display = 'none';
-    }
+if (id === 'game') {
+    this._updateGameSettingsDisplay();
+    document.getElementById('gameStartScreen').style.display = 'block';
+    document.getElementById('gamePlayScreen').style.display = 'none';
+}
 },
 
 _waitForElement(selector, callback, timeout = 5000) {
@@ -15173,29 +16793,26 @@ document.getElementById('checkDuplicatesBtn')?.addEventListener('click', () => {
         App._openModal('matchSettingsModal');
     });
 
-    // ===== زر بدء اللعبة الفردية =====
-    const startGameBtn = document.getElementById('startGameBtn');
-    if (startGameBtn) {
-        // إزالة أي مستمعات قديمة
-        const newBtn = startGameBtn.cloneNode(true);
-        startGameBtn.parentNode.replaceChild(newBtn, startGameBtn);
+const startGameBtn = document.getElementById('startGameBtn');
+if (startGameBtn) {
+    const newBtn = startGameBtn.cloneNode(true);
+    startGameBtn.parentNode.replaceChild(newBtn, startGameBtn);
+    
+    newBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('🎮 زر بدء اللعبة clicked');
         
-        newBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('🎮 زر بدء اللعبة clicked');
-            
-            // التحقق من تسجيل الدخول
-            if (!AuthService.currentUser) {
-                showToast('⚠️ يرجى تسجيل الدخول أولاً', 'error');
-                document.getElementById('loginModal').classList.add('open');
-                return;
-            }
-            
-            // بدء اللعبة
-            GameEngine.start();
-        });
-    }
+        if (!AuthService.currentUser) {
+            showToast('⚠️ يرجى تسجيل الدخول أولاً', 'error');
+            document.getElementById('loginModal').classList.add('open');
+            return;
+        }
+        
+        // بدء اللعبة بالطور المختار والإعدادات المحفوظة
+        App._executeGameMode(selectedGameMode);
+    });
+}
 
     // ===== زر إعادة اللعب =====
     const replayBtn = document.getElementById('gameReplayBtn');
@@ -15203,7 +16820,7 @@ document.getElementById('checkDuplicatesBtn')?.addEventListener('click', () => {
         replayBtn.addEventListener('click', function(e) {
             e.preventDefault();
             console.log('🔄 زر إعادة اللعب clicked');
-            GameEngine.start();
+            GameEngine.start(settings);
         });
     }
 
@@ -15298,6 +16915,18 @@ document.getElementById('settingsLogoutBtn')?.addEventListener('click', function
             window.location.reload(true);
         }, 500);
     }
+});
+
+// ===== زر الإنجازات في الملف الشخصي =====
+document.getElementById('profileAchievementsBtn')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    // التوجيه إلى صفحة الإنجازات
+    App._activateSection('achievements');
+    // تحديث الإنجازات فوراً
+    setTimeout(() => {
+        App._renderAchievements();
+    }, 100);
+    showToast('🏆 جاري تحميل الإنجازات...', 'info', 1000);
 });
 
 // ============================================================
@@ -16566,66 +18195,6 @@ _getDefaultStoreItems() {
     // 1. تعزيزات اللعبة (Boosts)
     // ============================================================
     const boosts = [
-        { 
-            id: 'boost_x2_points', 
-            name: 'مضاعف النقاط ×2', 
-            imagePath: 'images/store/boosts/boost_x2_points.png',
-            desc: 'ضعف النقاط في جولة واحدة (3 استخدامات)', 
-            price: 150, 
-            currency: 'coins', 
-            rarity: 'uncommon', 
-            effect: 'point_multiplier', 
-            value: 2, 
-            uses: 3 
-        },
-        { 
-            id: 'boost_x3_points', 
-            name: 'مضاعف النقاط ×3', 
-            imagePath: 'images/store/boosts/boost_x3_points.png',
-            desc: 'ثلاثة أضعاف النقاط (2 استخدامات)', 
-            price: 300, 
-            currency: 'coins', 
-            rarity: 'rare', 
-            effect: 'point_multiplier', 
-            value: 3, 
-            uses: 2 
-        },
-        { 
-            id: 'boost_x5_points', 
-            name: 'مضاعف النقاط ×5', 
-            imagePath: 'images/store/boosts/boost_x5_points.png',
-            desc: 'خمسة أضعاف النقاط (استخدام واحد)', 
-            price: 50, 
-            currency: 'gems', 
-            rarity: 'epic', 
-            effect: 'point_multiplier', 
-            value: 5, 
-            uses: 1 
-        },
-        { 
-            id: 'boost_x2_coins', 
-            name: 'مضاعف العملات ×2', 
-            imagePath: 'images/store/boosts/boost_x2_coins.png',
-            desc: 'ضعف العملات في جولة (3 استخدامات)', 
-            price: 120, 
-            currency: 'coins', 
-            rarity: 'uncommon', 
-            effect: 'coin_multiplier', 
-            value: 2, 
-            uses: 3 
-        },
-        { 
-            id: 'boost_x3_coins', 
-            name: 'مضاعف العملات ×3', 
-            imagePath: 'images/store/boosts/boost_x3_coins.png',
-            desc: 'ثلاثة أضعاف العملات (2 استخدامات)', 
-            price: 250, 
-            currency: 'coins', 
-            rarity: 'rare', 
-            effect: 'coin_multiplier', 
-            value: 3, 
-            uses: 2 
-        },
         { 
             id: 'boost_freeze_5s', 
             name: 'تجميد 5 ثوانٍ', 
@@ -18092,48 +19661,159 @@ _renderInventory() {
         return;
     }
 
+    // إنشاء مودال المخزون
     const modal = document.createElement('div');
     modal.className = 'modal-overlay open';
+    
     let html = `
-        <div class="modal-card" style="max-width:700px;max-height:90vh;">
+        <div class="modal-card" style="max-width:700px;max-height:90vh;padding:1.2rem;">
             <div class="modal-header">
                 <h3><i class="fas fa-box"></i> مخزوني (${inventory.length})</h3>
                 <button class="modal-close-btn" onclick="this.closest('.modal-overlay').remove()">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <div style="max-height:60vh;overflow-y:auto;">
-                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.8rem;">
+            
+            <!-- إحصائيات سريعة -->
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.8rem; padding:0.5rem; background:var(--glass); border-radius:var(--radius-sm);">
+                <span style="font-size:0.75rem; color:var(--gray);">
+                    📦 العناصر: <strong style="color:var(--light);">${inventory.length}</strong>
+                </span>
+                <span style="font-size:0.75rem; color:var(--gray);">
+                    ⚡ المفعلة: <strong style="color:var(--accent);">${activeItems.length}</strong>
+                </span>
+                <span style="font-size:0.75rem; color:var(--gray);">
+                    🏷️ الفئات: <strong style="color:var(--light);">${new Set(inventory.map(i => storeItems.find(s => s.id === i.itemId)?.category || 'أخرى')).size}</strong>
+                </span>
+            </div>
+            
+            <div style="max-height:60vh;overflow-y:auto;padding:0.2rem 0;">
+                <div class="store-grid" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));">
     `;
 
+    // عرض العناصر بنفس تنسيق المتجر
     inventory.forEach(inv => {
         const item = storeItems.find(i => i.id === inv.itemId);
         if (!item) return;
+        
         const isActive = activeItems.includes(item.id);
-        const isEquippable = item.duration === 'permanent';
         const quantity = inv.quantity || 0;
-
+        const rarityColor = this._getRarityColor(item.rarity);
+        const rarityLabel = this._getRarityLabel(item.rarity);
+        const isEquippable = item.duration === 'permanent';
+        const imagePath = item.imagePath || item.image || '';
+        
+        // بناء بطاقة العنصر (نفس تنسيق المتجر)
         html += `
-            <div style="background:var(--card-bg);border:1px solid ${isActive ? 'var(--accent)' : 'var(--border-color)'};border-radius:var(--radius-sm);padding:0.8rem;text-align:center;">
-                <div style="font-size:2.5rem;">${item.icon || '📦'}</div>
-                <div style="font-weight:700;font-size:0.9rem;">${item.name}</div>
-                <div style="font-size:0.7rem;color:var(--gray);">${item.description || ''}</div>
-                ${quantity !== Infinity ? `<div style="font-size:0.7rem;color:var(--gray-dark);">الكمية: ${quantity}</div>` : ''}
-                ${isEquippable ? `
-                    <button class="btn btn-xs ${isActive ? 'btn-danger' : 'btn-primary'} mt-1" onclick="App._toggleActiveItem('${item.id}'); this.closest('.modal-card').closest('.modal-overlay').remove(); App._renderInventory();" style="font-size:0.65rem;">
-                        ${isActive ? 'إلغاء التفعيل' : 'تفعيل'}
-                    </button>
-                ` : `
-                    ${quantity > 0 ? `<span style="font-size:0.6rem;color:var(--success);">✅ جاهز للاستخدام</span>` : `<span style="font-size:0.6rem;color:var(--secondary);">❌ مستنفذ</span>`}
-                `}
+            <div class="store-item-image" 
+                 style="background-image: url('${imagePath}'); 
+                        background-size: cover; 
+                        background-position: center;
+                        background-color: var(--glass);
+                        aspect-ratio: 1 / 1.4;
+                        min-height: 180px;
+                        border-radius: var(--radius-sm);
+                        overflow: hidden;
+                        position: relative;
+                        display: flex;
+                        align-items: flex-end;
+                        justify-content: center;">
+
+                ${!imagePath ? `<div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:3rem;color:var(--gray);background:var(--glass);">📦</div>` : ''}
+                
+                <!-- طبقة تعتيم -->
+                <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.1) 100%);z-index:1;pointer-events:none;"></div>
+                
+                <!-- شارة مفعل -->
+                ${isActive ? `<span style="position:absolute;top:6px;right:6px;font-size:0.45rem;padding:0.1rem 0.4rem;border-radius:30px;background:var(--accent);color:var(--dark);font-weight:700;z-index:3;box-shadow:0 2px 10px rgba(0,0,0,0.3);">مفعل</span>` : ''}
+                
+                <!-- شارة الكمية -->
+                ${quantity > 1 ? `<span style="position:absolute;top:6px;left:6px;font-size:0.4rem;padding:0.05rem 0.3rem;border-radius:30px;background:rgba(0,0,0,0.7);color:#fff;font-weight:700;z-index:3;">×${quantity}</span>` : ''}
+                
+                <!-- المحتوى -->
+                <div style="position:relative;z-index:2;width:100%;padding:0.6rem 0.4rem;display:flex;flex-direction:column;align-items:center;gap:0.2rem;">
+                    <div style="font-weight:800;font-size:0.75rem;color:#ffffff;text-shadow:0 2px 8px rgba(0,0,0,0.8);text-align:center;line-height:1.2;width:100%;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+                        ${item.name}
+                    </div>
+                    
+                    <div style="font-size:0.45rem;padding:0.05rem 0.4rem;border-radius:30px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:${rarityColor};background:${rarityColor}33;border:1px solid ${rarityColor}66;backdrop-filter:blur(4px);text-shadow:0 1px 4px rgba(0,0,0,0.5);">
+                        ${rarityLabel}
+                    </div>
+                    
+                    <div style="display:flex;gap:0.2rem;flex-wrap:wrap;justify-content:center;width:100%;margin-top:0.1rem;">
+                        ${isEquippable ? `
+                            <button class="btn ${isActive ? 'btn-danger' : 'btn-primary'}" 
+                                    onclick="App._toggleActiveItem('${item.id}'); this.closest('.modal-overlay').remove(); setTimeout(() => App._renderInventory(), 300);"
+                                    style="font-size:0.45rem;padding:0.1rem 0.3rem;min-height:18px;border-radius:30px;backdrop-filter:blur(4px);background:${isActive ? 'rgba(255,107,107,0.7)' : 'rgba(108,99,255,0.7)'} !important;border:1px solid rgba(255,255,255,0.1);color:#fff !important;text-shadow:0 1px 4px rgba(0,0,0,0.5);">
+                                ${isActive ? 'إلغاء' : 'تفعيل'}
+                            </button>
+                        ` : ''}
+                        
+                        ${item.category === 'loot_boxes' && quantity > 0 ? `
+                            <button class="btn btn-warning" 
+                                    onclick="App._openLootBox('${item.id}'); this.closest('.modal-overlay').remove();"
+                                    style="font-size:0.45rem;padding:0.1rem 0.3rem;min-height:18px;border-radius:30px;backdrop-filter:blur(4px);background:rgba(255,217,61,0.7) !important;border:1px solid rgba(255,255,255,0.1);color:var(--dark) !important;">
+                                فتح
+                            </button>
+                        ` : ''}
+                        
+                        ${item.effectType && quantity > 0 && !isEquippable ? `
+                            <button class="btn btn-success" 
+                                    onclick="App._useBoostItem('${item.id}'); this.closest('.modal-overlay').remove();"
+                                    style="font-size:0.45rem;padding:0.1rem 0.3rem;min-height:18px;border-radius:30px;backdrop-filter:blur(4px);background:rgba(46,204,113,0.7) !important;border:1px solid rgba(255,255,255,0.1);color:#fff !important;">
+                                استخدام
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
             </div>
         `;
     });
 
-    html += `</div></div></div>`;
+    html += `
+                </div>
+            </div>
+            <div class="modal-footer" style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--glass-border);">
+                <button class="btn btn-primary btn-sm" onclick="this.closest('.modal-overlay').remove(); App._activateSection('store');">
+                    <i class="fas fa-store"></i> الذهاب إلى المتجر
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="this.closest('.modal-overlay').remove();">
+                    <i class="fas fa-times"></i> إغلاق
+                </button>
+            </div>
+        </div>
+    `;
+
     modal.innerHTML = html;
     document.body.appendChild(modal);
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    
+    // إغلاق المودال عند النقر خارج المحتوى
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+},
+
+// ===== دوال مساعدة للألوان =====
+_getRarityColor(rarity) {
+    const colors = {
+        common: '#8e8e8e',
+        uncommon: '#2ecc71',
+        rare: '#3498db',
+        epic: '#9b59b6',
+        legendary: '#f1c40f'
+    };
+    return colors[rarity] || '#8e8e8e';
+},
+
+_getRarityLabel(rarity) {
+    const labels = {
+        common: 'عادي',
+        uncommon: 'غير عادي',
+        rare: 'نادر',
+        epic: 'أسطوري',
+        legendary: 'خرافي'
+    };
+    return labels[rarity] || 'عادي';
 },
 
 _renderAdminData() {
@@ -18437,9 +20117,27 @@ _onDataUpdate(data) {
 _onUserUpdate(user) {
     // 1️⃣ تحديث واجهة المستخدم الأساسية
     this._updateUserUI(user);
-    this._updateDashboardUI(); // ✅ تحديث الداشبورد
+    this._updateDashboardUI();
 
     if (user) {
+        // تحديث شارة الإنجازات في الملف الشخصي
+        const unlockedAchievements = AchievementManager.getUnlockedAchievements();
+        const badge = document.getElementById('profileAchievementsBadge');
+        if (badge) {
+            badge.textContent = unlockedAchievements.length;
+        }
+                // ✅ تحميل إعدادات الأطوار من Firebase (إذا لم تكن محملة)
+        if (!this._modeSettingsLoaded) {
+            this._loadModeSettingsFromFirebase().then(() => {
+                console.log('✅ Mode settings loaded from Firebase');
+                // تحديث عرض الإعدادات في صفحة اللعبة
+                this._updateGameSettingsDisplay();
+            });
+        } else {
+            // تحديث عرض الإعدادات في صفحة اللعبة
+            this._updateGameSettingsDisplay();
+        }
+        
         // مزامنة الإنجازات مع المستخدم الحالي
         if (typeof AchievementManager !== 'undefined' && AchievementManager.syncWithUser) {
             AchievementManager.syncWithUser(user);
@@ -18567,6 +20265,28 @@ _listenNotifications(userId) {
         }, (error) => {
             console.warn('Notification listener error:', error);
         });
+},
+
+/**
+ * حفظ الطور المختار في Firebase و localStorage
+ */
+_saveSelectedGameMode(mode) {
+    if (!AuthService.currentUser) {
+        // حفظ في localStorage مؤقتاً للمستخدم غير المسجل
+        localStorage.setItem('selectedGameMode', mode);
+        return;
+    }
+    try {
+        const user = AuthService.currentUser;
+        db.collection('userSettings').doc(user.uid).set({
+            selectedGameMode: mode,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true }).catch(e => console.warn('⚠️ Firebase save error:', e));
+        localStorage.setItem('selectedGameMode', mode);
+    } catch (e) {
+        console.warn('⚠️ Could not save selectedGameMode:', e);
+        localStorage.setItem('selectedGameMode', mode); // حفظ محلياً كنسخة احتياطية
+    }
 },
 
 // ============================================================
@@ -19187,6 +20907,41 @@ _handleEscKey(e) {
             App._closeModal(openModal.id);
         }
     }
+},
+
+_selectGameModeFromSettings() {
+    const mode = selectedGameMode;
+    const modeInfo = MODE_DESCRIPTIONS[mode];
+    if (!modeInfo) {
+        showToast('⚠️ الطور غير موجود', 'error');
+        return;
+    }
+
+    // ✅ حفظ الإعدادات الخاصة بالطور الحالي (مثل التدريب)
+    this._saveModeSpecificSettings(mode);
+
+    // حفظ الطور المختار
+    this._saveSelectedGameMode(mode);
+
+    // عرض رسالة تأكيد
+    const modeNames = {
+        'training_classic': '📚 تدريب كلاسيكي',
+        'training_survival': '❤️ تحدي الصمود',
+        'training_speed': '⚡ تحدي السرعة',
+        'ranked_classic': '⚔️ كلاسيكي مصنف',
+        'ranked_individual': '🎯 تحدي فردي مصنف',
+        'unranked_classic': '⚔️ كلاسيكي ودي',
+        'unranked_individual': '🎯 تحدي فردي ودي',
+        'room_standard': '🏠 غرفة عادية',
+        'room_mega': '🏟️ غرفة ميجا'
+    };
+    showToast(`✅ تم تحديد الطور: ${modeNames[mode] || mode}`, 'success', 3000);
+
+    // إغلاق المودال
+    this._closeModal('matchSettingsModal');
+
+    // تحديث زر اللعب
+    this._updatePlayButtonMode();
 },
 
 // ============================================================
@@ -20679,6 +22434,129 @@ _renderQuestionsAdvanced() {
     this._updateSelectedCount();
 },
 
+_executeGameMode(mode) {
+    const modeInfo = MODE_DESCRIPTIONS[mode];
+    if (!modeInfo) {
+        showToast('⚠️ طور غير معروف', 'error');
+        return;
+    }
+
+    const playerCount = selectedPlayerCount || 1;
+    const isCompetitive = modeInfo.competitive || false;
+    const isTraining = modeInfo.isTraining || false;
+    const isRoom = modeInfo.category === 'rooms';
+
+    // ===== أطوار التدريب =====
+    if (isTraining) {
+        showToast(`🎮 بدء ${modeInfo.title}...`, 'success', 2000);
+        App._activateSection('game');
+        
+// تحميل الإعدادات الخاصة بالطور من Firebase/الكاش
+const savedSettings = this._getModeSettings(mode);
+// دمج الإعدادات الافتراضية مع المحفوظة
+const settings = { ...modeInfo.settings, ...savedSettings };
+
+// تنظيف المفاتيح وتحويلها إلى التنسيق المطلوب
+const cleanSettings = {};
+for (const [key, value] of Object.entries(settings)) {
+    // استخراج اسم الحقل الأساسي (بدون البادئة modeSpecific)
+    let baseKey = key;
+    if (key.startsWith('modeSpecific')) {
+        baseKey = key.replace('modeSpecific', '').toLowerCase();
+    }
+    // تعيين القيم حسب المفاتيح المعروفة
+    switch (baseKey) {
+        case 'difficulty':
+            cleanSettings.difficulty = value;
+            break;
+        case 'category':
+            cleanSettings.category = value;
+            break;
+        case 'questiontype':
+            cleanSettings.questionType = value;
+            break;
+        case 'count':
+            cleanSettings.questionCount = parseInt(value) || 10;
+            break;
+        case 'timelimit':
+            cleanSettings.timeLimit = parseInt(value) || 15;
+            break;
+        case 'gamemode':
+            cleanSettings.gameMode = value;
+            break;
+        default:
+            // إذا كان المفتاح غير معروف، نحتفظ به كما هو (للتوسع المستقبلي)
+            if (!cleanSettings[baseKey]) {
+                cleanSettings[baseKey] = value;
+            }
+            break;
+    }
+}
+
+// الإعدادات النهائية للعبة
+const finalSettings = {
+    difficulty: cleanSettings.difficulty || settings.difficulty || 'medium',
+    category: cleanSettings.category || settings.category || 'all',
+    questionType: cleanSettings.questionType || settings.questionType || 'all',
+    questionCount: parseInt(cleanSettings.questionCount || settings.questionCount || 10),
+    timeLimit: parseInt(cleanSettings.timeLimit || settings.timeLimit || 15),
+    gameMode: cleanSettings.gameMode || settings.gameMode || 'normal'
+};
+        
+        console.log('📊 Final training settings:', finalSettings);
+        
+        // ✅ بدء اللعبة مع تمرير الإعدادات
+        setTimeout(() => {
+            GameEngine.start(finalSettings);
+        }, 300);
+        return;
+    }
+
+    // ===== الغرف =====
+    if (isRoom) {
+        const user = AuthService.currentUser;
+        if (!user) {
+            showToast('يجب تسجيل الدخول أولاً', 'error');
+            return;
+        }
+        
+        const ticketId = modeInfo.ticket || 'room_ticket';
+        const inventory = user.inventory || [];
+        const ticket = inventory.find(i => i.itemId === ticketId);
+        const ticketCount = ticket ? ticket.quantity : 0;
+        
+        if (ticketCount < 1) {
+            showToast(`⚠️ ليس لديك بطاقات ${modeInfo.title}! اشترِ من المتجر.`, 'error', 4000);
+            setTimeout(() => App._activateSection('store'), 500);
+            return;
+        }
+        
+        showToast(`🏠 جاري إنشاء ${modeInfo.title}...`, 'info', 2000);
+        App._activateSection('multiplayer');
+        
+        const maxPlayers = modeInfo.maxPlayers || 8;
+        if (MultiplayerManager) {
+            MultiplayerManager._maxPlayers = maxPlayers;
+            MultiplayerManager._roomType = mode;
+        }
+        return;
+    }
+
+    // ===== الأطوار المصنفة وغير المصنفة =====
+    const modeType = isCompetitive ? 'تصنيفي' : 'ودي';
+    showToast(`🔍 جاري البحث عن خصم (${modeType})...`, 'info', 3000);
+    
+    if (typeof MatchmakingSystem !== 'undefined' && MatchmakingSystem.startMatchmaking) {
+        MatchmakingSystem.startMatchmaking(mode, { 
+            competitive: isCompetitive, 
+            playerCount: playerCount,
+            modeInfo: modeInfo
+        });
+    } else {
+        showToast('⚠️ نظام المطابقة غير جاهز', 'error');
+    }
+},
+
 _renderFriendsPage() {
     // ✅ نستخدم AuthService.currentUser مباشرة
     const user = AuthService.currentUser;
@@ -21703,22 +23581,36 @@ App._modeDescriptions = {
 App._updateModalWithCurrentMode = function() {
     const mode = selectedGameMode;
     const modeInfo = MODE_DESCRIPTIONS[mode];
-    if (!modeInfo) return;
+    if (!modeInfo) {
+        console.warn(`⚠️ Mode "${mode}" not found in MODE_DESCRIPTIONS`);
+        return;
+    }
 
     const isCompetitive = modeInfo.competitive || false;
+    const isTraining = modeInfo.isTraining || false;
+    const isRoom = modeInfo.category === 'rooms';
     const supportsPlayerCount = modeInfo.supportsPlayerCount || false;
+    const cost = modeInfo.cost || 0;
 
-    // تحديث التبويب النشط
-    document.querySelectorAll('.settings-tab').forEach(tab => {
+    // تحديد التبويب النشط
+    let tabId = 'ranked';
+    if (isTraining) tabId = 'training';
+    else if (isRoom) tabId = 'rooms';
+    else if (!isCompetitive) tabId = 'unranked';
+
+    // تحديث التبويبات
+    const tabs = document.querySelectorAll('.settings-tab');
+    const contents = document.querySelectorAll('.settings-tab-content');
+    
+    tabs.forEach(tab => {
         tab.classList.remove('active');
         tab.style.background = 'transparent';
         tab.style.color = 'var(--gray)';
     });
-    document.querySelectorAll('.settings-tab-content').forEach(content => {
+    contents.forEach(content => {
         content.style.display = 'none';
     });
 
-    const tabId = isCompetitive ? 'competitive' : 'friendly';
     const activeTab = document.querySelector(`.settings-tab[data-tab="${tabId}"]`);
     if (activeTab) {
         activeTab.classList.add('active');
@@ -21734,40 +23626,56 @@ App._updateModalWithCurrentMode = function() {
     document.querySelectorAll('.mode-card-horizontal').forEach(card => {
         const cardMode = card.dataset.mode;
         card.classList.remove('active');
+        card.style.borderColor = 'var(--glass-border)';
+        const status = card.querySelector('.mode-status-dot');
+        if (status) {
+            status.style.background = 'var(--gray)';
+        }
         if (cardMode === mode) {
             card.classList.add('active');
+            card.style.borderColor = 'var(--primary)';
+            if (status) {
+                status.style.background = 'var(--success)';
+                status.style.boxShadow = '0 0 12px rgba(46, 204, 113, 0.4)';
+            }
         }
     });
 
     // تحديث العرض العلوي
-    const modeNames = {
-        'normal_1v1': '⚔️ عادي 1v1 (تصنيفي)',
-        'crossword': '🔤 كلمات متقاطعة',
-        'tournament': '🏆 بطولة',
-        'normal_1v1_unranked': '⚔️ عادي غير مصنف',
-        'single_player': '🧠 فردي',
-        'create_room': '🏠 غرفة مدفوعة'
-    };
+    const modeNames = {};
+    Object.keys(MODE_DESCRIPTIONS).forEach(key => {
+        modeNames[key] = MODE_DESCRIPTIONS[key].title;
+    });
     const display = document.getElementById('selectedModeDisplay');
     if (display) {
         display.textContent = modeNames[mode] || mode;
     }
 
-    // تحديث شارات التصنيف/ودي
+    // تحديث الشارات
     const compBadge = document.getElementById('competitiveBadge');
     const friendBadge = document.getElementById('friendlyBadge');
+    const trainingBadge = document.getElementById('trainingBadge');
+    const roomBadge = document.getElementById('roomBadge');
+    
+    if (compBadge) compBadge.style.display = 'none';
+    if (friendBadge) friendBadge.style.display = 'none';
+    if (trainingBadge) trainingBadge.style.display = 'none';
+    if (roomBadge) roomBadge.style.display = 'none';
+
     if (isCompetitive) {
-        compBadge.style.display = 'inline-block';
-        friendBadge.style.display = 'none';
+        if (compBadge) compBadge.style.display = 'inline-block';
+    } else if (isTraining) {
+        if (trainingBadge) trainingBadge.style.display = 'inline-block';
+    } else if (isRoom) {
+        if (roomBadge) roomBadge.style.display = 'inline-block';
     } else {
-        compBadge.style.display = 'none';
-        friendBadge.style.display = 'inline-block';
+        if (friendBadge) friendBadge.style.display = 'inline-block';
     }
 
     // إظهار/إخفاء خيار عدد اللاعبين
     const playerCountSelector = document.getElementById('playerCountSelector');
     if (playerCountSelector) {
-        if (supportsPlayerCount) {
+        if (supportsPlayerCount && !isTraining && !isRoom) {
             playerCountSelector.style.display = 'block';
             const hint = document.getElementById('playerCountHint');
             if (hint) {
@@ -21778,13 +23686,19 @@ App._updateModalWithCurrentMode = function() {
         }
     }
 
-    // إظهار/إخفاء منطقة الإعدادات الخاصة (للفردي فقط)
-    const settingsArea = document.getElementById('modeSettingsArea');
-    if (settingsArea) {
-        if (mode === 'single_player') {
-            settingsArea.style.display = 'block';
-        } else {
-            settingsArea.style.display = 'none';
+    // ✅ تحديث الإعدادات الخاصة - الأهم
+    const settingsContainer = document.getElementById('modeSpecificSettingsContainer');
+    const contentDiv = document.getElementById('modeSpecificContent');
+    const titleEl = document.getElementById('modeSpecificTitle');
+    
+    if (settingsContainer && contentDiv) {
+        // إظهار حاوية الإعدادات فقط للأطوار التي لها إعدادات قابلة للتعديل
+        const hasSettings = isTraining || isRoom;
+        settingsContainer.style.display = hasSettings ? 'block' : 'none';
+        
+        if (hasSettings) {
+            // تحديث المحتوى حسب الطور
+            this._updateModeSpecificSettings(mode);
         }
     }
 
@@ -21801,24 +23715,23 @@ App._updateModalWithCurrentMode = function() {
         }
     });
 
-    // عرض عدد بطاقات الغرف - قراءة من AuthService.currentUser مباشرة
-    if (mode === 'create_room') {
-        const user = AuthService.currentUser; // ✅ قراءة محدثة
+    // عرض عدد البطاقات للغرف
+    if (isRoom) {
+        const user = AuthService.currentUser;
         let ticketCount = 0;
+        const ticketId = modeInfo.ticket || 'room_ticket';
         if (user) {
             const inventory = user.inventory || [];
-            const ticket = inventory.find(i => i.itemId === 'room_ticket');
+            const ticket = inventory.find(i => i.itemId === ticketId);
             ticketCount = ticket ? ticket.quantity : 0;
         }
 
-        const roomCard = document.querySelector('.mode-card-horizontal[data-mode="create_room"]');
+        const roomCard = document.querySelector(`.mode-card-horizontal[data-mode="${mode}"]`);
         if (roomCard) {
-            // تحديث شارة العدد
             const countBadge = roomCard.querySelector('.ticket-count-badge');
             if (countBadge) {
                 countBadge.textContent = `🎫 ${ticketCount}`;
             }
-            // تحديث لون البطاقة
             if (ticketCount === 0) {
                 roomCard.style.borderColor = 'var(--secondary)';
                 roomCard.style.opacity = '0.6';
@@ -21828,6 +23741,42 @@ App._updateModalWithCurrentMode = function() {
             }
         }
     }
+    // ===== إضافة صور الخلفية لبطاقات الأطوار =====
+    const modeCards = document.querySelectorAll('.mode-card-horizontal');
+    modeCards.forEach(card => {
+        const cardMode = card.dataset.mode;
+        if (!cardMode) return;
+        
+        // مسار الصورة
+        const imgPath = `images/modes/${cardMode}.jpg`;
+        
+        // محاولة تحميل الصورة
+        const img = new Image();
+        img.onload = function() {
+            card.style.backgroundImage = `url('${imgPath}')`;
+            card.style.backgroundSize = 'cover';
+            card.style.backgroundPosition = 'center';
+            card.style.backgroundRepeat = 'no-repeat';
+        };
+        img.onerror = function() {
+            // إذا لم توجد الصورة، استخدم خلفية لونية بديلة حسب نوع الطور
+            const fallbackColors = {
+                'ranked': 'linear-gradient(135deg, #6C63FF, #4a3fcf)',
+                'unranked': 'linear-gradient(135deg, #2ecc71, #1a8a4a)',
+                'training': 'linear-gradient(135deg, #f39c12, #d68910)',
+                'rooms': 'linear-gradient(135deg, #3498db, #1a5276)'
+            };
+            const category = MODE_DESCRIPTIONS[cardMode]?.category || 'ranked';
+            const color = fallbackColors[category] || fallbackColors.ranked;
+            card.style.backgroundImage = color;
+        };
+        img.src = imgPath;
+    });
+
+    // ===== تحديث البطاقات النشطة =====
+    modeCards.forEach(card => {
+        card.classList.toggle('active', card.dataset.mode === mode);
+    });
 };
 
 // ============================================================
@@ -21868,8 +23817,11 @@ App._showModeDescription = function(mode) {
     const isActive = ACTIVE_MODES.includes(mode);
     const statusText = isActive ? '✅ مفعل' : '🔒 قريباً';
     const statusColor = isActive ? 'var(--success)' : 'var(--secondary)';
+    const isCompetitive = desc.competitive ? '🏅 مصنف' : '🎮 ودي';
+    const isTraining = desc.isTraining ? '📚 تدريب' : '';
+    const isRoom = desc.category === 'rooms' ? '🏠 غرفة' : '';
+    const cost = desc.cost ? `💰 ${desc.cost} عملة` : '';
     
-    // إنشاء مودال شرح
     const modal = document.createElement('div');
     modal.className = 'modal-overlay open';
     modal.innerHTML = `
@@ -21884,22 +23836,28 @@ App._showModeDescription = function(mode) {
                 <div style="font-size:0.95rem; color:var(--gray); line-height:1.8; margin-bottom:1rem;">
                     ${desc.desc}
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; background:var(--glass); border-radius:8px;">
-                    <span style="font-size:0.8rem; color:var(--gray);">الحالة:</span>
-                    <span style="font-weight:700; color:${statusColor};">${statusText}</span>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.3rem;">
+                    <div style="padding:0.3rem 0.5rem; background:var(--glass); border-radius:6px;">
+                        <span style="font-size:0.7rem; color:var(--gray);">النوع</span>
+                        <div style="font-weight:700; font-size:0.85rem;">${isCompetitive} ${isTraining} ${isRoom}</div>
+                    </div>
+                    <div style="padding:0.3rem 0.5rem; background:var(--glass); border-radius:6px;">
+                        <span style="font-size:0.7rem; color:var(--gray);">الحالة</span>
+                        <div style="font-weight:700; font-size:0.85rem; color:${statusColor};">${statusText}</div>
+                    </div>
+                    ${cost ? `
+                    <div style="padding:0.3rem 0.5rem; background:var(--glass); border-radius:6px; grid-column:1/-1;">
+                        <span style="font-size:0.7rem; color:var(--gray);">التكلفة</span>
+                        <div style="font-weight:700; font-size:0.85rem; color:var(--accent);">${cost}</div>
+                    </div>
+                    ` : ''}
+                    ${desc.maxPlayers ? `
+                    <div style="padding:0.3rem 0.5rem; background:var(--glass); border-radius:6px; grid-column:1/-1;">
+                        <span style="font-size:0.7rem; color:var(--gray);">الحد الأقصى للاعبين</span>
+                        <div style="font-weight:700; font-size:0.85rem;">${desc.maxPlayers}</div>
+                    </div>
+                    ` : ''}
                 </div>
-                ${mode === 'create_room' ? `
-                    <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; background:var(--glass); border-radius:8px; margin-top:0.3rem;">
-                        <span style="font-size:0.8rem; color:var(--gray);">التكلفة:</span>
-                        <span style="font-weight:700; color:var(--accent);">💰 600 عملة</span>
-                    </div>
-                ` : ''}
-                ${mode === 'tournament' ? `
-                    <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; background:var(--glass); border-radius:8px; margin-top:0.3rem;">
-                        <span style="font-size:0.8rem; color:var(--gray);">الأوقات:</span>
-                        <span style="font-weight:700; color:var(--info);">📅 سيتم الإعلان قريباً</span>
-                    </div>
-                ` : ''}
             </div>
             <div class="modal-footer">
                 <button class="btn btn-primary" onclick="this.closest('.modal-overlay').remove()">
@@ -23711,7 +25669,6 @@ App._initStoreImages = function() {
     });
 };
 
-// ✅ استبدال دالة _renderAnalyticsSection بالنسخة المحدثة
 App._renderAnalyticsSection = function() {
     const user = AuthService.currentUser;
     if (!user) {
@@ -23749,6 +25706,7 @@ App._renderAnalyticsSection = function() {
 
     // بناء كائن الإحصائيات
     const stats = {
+        // ... الإحصائيات الموجودة ...
         general: {
             totalMatches: getStat(userStats, 'general.totalMatches', 0),
             completedMatches: getStat(userStats, 'general.completedMatches', 0),
@@ -23821,6 +25779,46 @@ App._renderAnalyticsSection = function() {
         },
         power: getStat(userStats, 'power', 0),
         accuracy: getStat(userStats, 'accuracy', 0),
+        
+        // ============================================================
+        // ✅ إحصائيات الأطوار الجديدة
+        // ============================================================
+        ranked: {
+            matches: getStat(userStats, 'ranked.matches', 0),
+            wins: getStat(userStats, 'ranked.wins', 0),
+            streak: getStat(userStats, 'ranked.streak', 0),
+            bestStreak: getStat(userStats, 'ranked.bestStreak', 0),
+            perfect: getStat(userStats, 'ranked.perfect', 0),
+            totalScore: getStat(userStats, 'ranked.totalScore', 0),
+            avgScore: getStat(userStats, 'ranked.avgScore', 0)
+        },
+        unranked: {
+            matches: getStat(userStats, 'unranked.matches', 0),
+            wins: getStat(userStats, 'unranked.wins', 0),
+            streak: getStat(userStats, 'unranked.streak', 0),
+            perfect: getStat(userStats, 'unranked.perfect', 0),
+            totalScore: getStat(userStats, 'unranked.totalScore', 0),
+            avgScore: getStat(userStats, 'unranked.avgScore', 0)
+        },
+        training: {
+            completed: getStat(userStats, 'training.completed', 0),
+            bestScore: getStat(userStats, 'training.bestScore', 0),
+            survivalWins: getStat(userStats, 'training.survivalWins', 0),
+            speedWins: getStat(userStats, 'training.speedWins', 0),
+            survivalStreak: getStat(userStats, 'training.survivalStreak', 0),
+            speedCorrect: getStat(userStats, 'training.speedCorrect', 0),
+            totalScore: getStat(userStats, 'training.totalScore', 0),
+            avgScore: getStat(userStats, 'training.avgScore', 0)
+        },
+        rooms: {
+            joined: getStat(userStats, 'rooms.joined', 0),
+            hosted: getStat(userStats, 'rooms.hosted', 0),
+            wins: getStat(userStats, 'rooms.wins', 0),
+            bestScore: getStat(userStats, 'rooms.bestScore', 0),
+            megaJoined: getStat(userStats, 'rooms.megaJoined', 0),
+            totalScore: getStat(userStats, 'rooms.totalScore', 0),
+            avgScore: getStat(userStats, 'rooms.avgScore', 0)
+        }
     };
 
     // دالة عرض بطاقة إحصائية
@@ -23854,7 +25852,44 @@ App._renderAnalyticsSection = function() {
         `;
     };
 
-    // بناء محتوى كل قسم
+    // ============================================================
+    // ✅ بناء محتوى إحصائيات الأطوار
+    // ============================================================
+    const rankedContent = `
+        ${statCard('rankedMatches', stats.ranked.matches)}
+        ${statCard('rankedWins', stats.ranked.wins)}
+        ${statCard('rankedStreak', stats.ranked.streak)}
+        ${statCard('rankedBestStreak', stats.ranked.bestStreak)}
+        ${statCard('rankedPerfect', stats.ranked.perfect)}
+    `;
+
+    const unrankedContent = `
+        ${statCard('unrankedMatches', stats.unranked.matches)}
+        ${statCard('unrankedWins', stats.unranked.wins)}
+        ${statCard('unrankedStreak', stats.unranked.streak)}
+        ${statCard('unrankedPerfect', stats.unranked.perfect)}
+    `;
+
+    const trainingContent = `
+        ${statCard('trainingCompleted', stats.training.completed)}
+        ${statCard('trainingBestScore', stats.training.bestScore)}
+        ${statCard('trainingSurvivalWins', stats.training.survivalWins)}
+        ${statCard('trainingSpeedWins', stats.training.speedWins)}
+        ${statCard('trainingSurvivalStreak', stats.training.survivalStreak)}
+        ${statCard('trainingSpeedCorrect', stats.training.speedCorrect)}
+    `;
+
+    const roomsContent = `
+        ${statCard('roomsJoined', stats.rooms.joined)}
+        ${statCard('roomsHosted', stats.rooms.hosted)}
+        ${statCard('roomWins', stats.rooms.wins)}
+        ${statCard('roomBestScore', stats.rooms.bestScore)}
+        ${statCard('megaRoomsJoined', stats.rooms.megaJoined)}
+    `;
+
+    // ============================================================
+    // بناء المحتوى العام الموجود مسبقاً
+    // ============================================================
     const generalContent = `
         ${statCard('totalMatches', stats.general.totalMatches)}
         ${statCard('completedMatches', stats.general.completedMatches)}
@@ -23944,7 +25979,7 @@ App._renderAnalyticsSection = function() {
         ${statCard('seasonHighestRank', stats.currentSeason.highestRank)}
     `;
 
-    // الدقة والقوة (عرض خاص)
+    // الدقة والقوة
     const accuracy = stats.accuracy || 0;
     const accuracyColor = accuracy >= 80 ? '#2ecc71' : accuracy >= 60 ? '#FFD93D' : accuracy >= 40 ? '#f39c12' : '#FF6B6B';
     
@@ -23990,7 +26025,9 @@ App._renderAnalyticsSection = function() {
         </div>
     `;
 
+    // ============================================================
     // تجميع الصفحة مع الأقسام القابلة للنقر
+    // ============================================================
     return `
         <div class="analytics-page" style="max-width:1200px;margin:0 auto;padding:0.5rem;">
             <div class="flex-between mb-2" style="flex-wrap:wrap;gap:0.5rem;">
@@ -24020,6 +26057,14 @@ App._renderAnalyticsSection = function() {
                 ${App._renderStatsSection('الأرقام القياسية', '👑', recordsContent, 'records')}
                 ${App._renderStatsSection('الموسم الحالي', '📅', seasonContent, 'season')}
                 ${App._renderStatsSection('الدقة والقوة', '🎯', specialContent, 'special')}
+                
+                <!-- ============================================================ -->
+                <!-- ✅ أقسام إحصائيات الأطوار الجديدة -->
+                <!-- ============================================================ -->
+                ${App._renderStatsSection('الأطوار التصنيفية', '🏅', rankedContent, 'ranked')}
+                ${App._renderStatsSection('الأطوار الودية', '🎮', unrankedContent, 'unranked')}
+                ${App._renderStatsSection('أطوار التدريب', '📚', trainingContent, 'training')}
+                ${App._renderStatsSection('الغرف', '🏠', roomsContent, 'rooms')}
             </div>
             
             <div style="text-align:center;margin-top:1rem;font-size:0.7rem;color:var(--gray);">
@@ -24028,8 +26073,6 @@ App._renderAnalyticsSection = function() {
         </div>
     `;
 };
-console.log('✅ تم تحديث نظام عرض الإحصائيات بالأقسام القابلة للنقر');
-console.log('✅ تم إصلاح عرض صور الإحصائيات');
 
 // ============================================================
 // نظام اللعب المباشر - النسخة المصححة مع المزامنة الكاملة
@@ -26513,22 +28556,25 @@ App._renderDashboard = function() {
             <!-- ===== مساحة فارغة تدفع الأزرار للأسفل ===== -->
             <div style="flex: 1;"></div>
             
-            <!-- ===== زر اللعب الكبير + زر الإعدادات (في الأسفل) ===== -->
-            <div class="play-section" style="margin-bottom: 0.5rem; padding: 0.5rem 1rem;">
-                <button class="play-btn-large" id="dashboardPlayBtn" title="ابدأ اللعب (الطور المختار: ${modeDisplayName})">
-                    <div class="btn-bg" style="background-image: url('${imgPath}play-bg.png');"></div>
-                    <div class="btn-content">
-                        <div class="play-icon" style="background-image: url('${imgPath}play-icon.png');"></div>
-                        <span>العب الآن</span>
-                        <span class="mode-badge" style="font-size:0.6rem; background:rgba(255,255,255,0.15); padding:0.1rem 0.6rem; border-radius:30px; margin-right:0.5rem; font-weight:400;">
-                            ${modeIcon} ${modeDisplayName}
-                        </span>
-                    </div>
-                </button>
-                <button class="settings-btn-small" id="dashboardMatchSettingsBtn" title="إعدادات اللعب">
-                    <div class="btn-bg" style="background-image: url('${imgPath}settings-play-icon.png');"></div>
-                </button>
+<div class="play-section-wrapper">
+    <!-- اسم الطور المختار -->
+    <div class="selected-mode-label" id="selectedModeLabel"></div>
+    
+    <!-- حاوية زر الإعدادات -->
+    <div style="display: flex; flex-direction: column; align-items: center; width: 100%; margin: 0.5rem 0 0.8rem 0;">
+        <!-- زر الإعدادات -->
+        <button id="dashboardMatchSettingsBtn" title="إعدادات اللعب">
+            <img id="modeIconImg" src="images/modes/ranked_classic.png" alt="شعار الطور" 
+                 onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\\'fallback-icon\\'>⚙️</span>'">
+        </button>
+        
+        <!-- زر اللعب (مع صورة خلفية) -->
+        <button id="dashboardPlayBtn" title="ابدأ اللعب">
+            <div class="btn-content">
             </div>
+        </button>
+    </div>
+</div>
             
 <!-- ===== القائمة السفلية ===== -->
 <div class="bottom-nav">
@@ -26588,154 +28634,72 @@ App._renderDashboard = function() {
 
 App._selectGameMode = function(mode) {
     if (!MODE_DESCRIPTIONS[mode]) {
-        showToast('⚠️ هذا الطور غير موجود', 'error');
+        console.warn(`⚠️ الطور "${mode}" غير موجود، سيتم استخدام الطور الافتراضي`);
+        mode = 'ranked_classic';
+    }
+    
+    if (!ACTIVE_MODES.includes(mode)) {
+        showToast('⚠️ هذا الطور غير مفعل حالياً، سيتم إطلاقه قريباً!', 'info', 3000);
         return;
     }
+    
     selectedGameMode = mode;
-    this._updateModalWithCurrentMode();
-    this._updatePlayButtonMode();
+    
+    try {
+        this._updateModalWithCurrentMode();
+    } catch (e) {
+        console.warn('⚠️ Error updating modal:', e);
+    }
+    
+    try {
+        this._updatePlayButtonMode();
+    } catch (e) {
+        console.warn('⚠️ Error updating play button:', e);
+    }
+    
     console.log(`🎯 Mode selected: ${mode}`);
 };
 
 App._updatePlayButtonMode = function() {
-    const playBtn = document.getElementById('dashboardPlayBtn');
-    if (!playBtn) return;
+    const modeLabel = document.getElementById('selectedModeLabel');
+    const modeIconImg = document.getElementById('modeIconImg');
+    if (!modeLabel || !modeIconImg) return;
 
     const modeInfo = MODE_DESCRIPTIONS[selectedGameMode] || MODE_DESCRIPTIONS['normal_1v1'];
     const modeDisplayName = modeInfo.title || 'عادي 1v1';
     const modeIcon = modeInfo.icon || '⚔️';
-    const isCompetitive = modeInfo.competitive || false;
 
-    const contentDiv = playBtn.querySelector('.btn-content');
-    if (contentDiv) {
-        const oldBadge = contentDiv.querySelector('.mode-badge');
-        if (oldBadge) oldBadge.remove();
+    // تحديث التسمية
+    modeLabel.textContent = `${modeIcon} ${modeDisplayName}`;
 
-        const textSpan = contentDiv.querySelector('span:not(.play-icon)');
-        if (textSpan) textSpan.textContent = 'العب الآن';
-
-        const badge = document.createElement('span');
-        badge.className = 'mode-badge';
-        badge.style.cssText = 'font-size:0.6rem; background:rgba(255,255,255,0.15); padding:0.1rem 0.6rem; border-radius:30px; margin-right:0.5rem; font-weight:400;';
-        badge.textContent = `${modeIcon} ${modeDisplayName} ${isCompetitive ? '🏅' : '🎮'}`;
-        contentDiv.appendChild(badge);
-    }
-
-    playBtn.title = `ابدأ اللعب (الطور المختار: ${modeDisplayName})`;
-};
-
-App._selectGameModeFromSettings = function() {
-    const mode = selectedGameMode;
-    const modeInfo = MODE_DESCRIPTIONS[mode];
-    if (!modeInfo) return;
-
-    // إذا كان الطور فردي، نحفظ الإعدادات
-    if (mode === 'single_player') {
-        const difficulty = document.getElementById('settingsGameDifficulty')?.value || 'medium';
-        const category = document.getElementById('settingsGameCategory')?.value || 'all';
-        const questionType = document.getElementById('settingsGameQuestionType')?.value || 'all';
-        const count = parseInt(document.getElementById('settingsGameCount')?.value) || 10;
-        const gameMode = document.getElementById('settingsGameMode')?.value || 'normal';
-
-        localStorage.setItem('singlePlayerSettings', JSON.stringify({
-            difficulty, category, questionType, count, gameMode
-        }));
-
-        // تحديث عناصر صفحة اللعبة
-        const gameDifficulty = document.getElementById('gameDifficulty');
-        const gameCategory = document.getElementById('gameCategory');
-        const gameQuestionType = document.getElementById('gameQuestionType');
-        const gameCount = document.getElementById('gameCount');
-        const gameModeEl = document.getElementById('gameMode');
-        if (gameDifficulty) gameDifficulty.value = difficulty;
-        if (gameCategory) gameCategory.value = category;
-        if (gameQuestionType) gameQuestionType.value = questionType;
-        if (gameCount) gameCount.value = count;
-        if (gameModeEl) gameModeEl.value = gameMode;
-    }
-
-    // عرض رسالة تأكيد
-    const modeNames = {
-        'normal_1v1': '⚔️ عادي 1v1 (تصنيفي)',
-        'crossword': '🔤 كلمات متقاطعة',
-        'tournament': '🏆 بطولة',
-        'normal_1v1_unranked': '⚔️ عادي غير مصنف',
-        'single_player': '🧠 فردي',
-        'create_room': '🏠 غرفة مدفوعة'
+    // تحديث صورة شعار الطور
+    const modeImagePath = `images/modes/${selectedGameMode}.png`;
+    
+    const img = new Image();
+    img.onload = function() {
+        modeIconImg.src = modeImagePath;
+        modeIconImg.style.display = 'block';
     };
-    showToast(`✅ تم تحديد الطور: ${modeNames[mode] || mode}`, 'success', 3000);
+    img.onerror = function() {
+        modeIconImg.style.display = 'none';
+        const parent = modeIconImg.parentElement;
+        // إزالة الأيقونة القديمة إذا وجدت
+        const oldFallback = parent.querySelector('.fallback-icon');
+        if (oldFallback) oldFallback.remove();
+        // إضافة أيقونة جديدة
+        const span = document.createElement('span');
+        span.className = 'fallback-icon';
+        span.textContent = modeIcon || '⚙️';
+        parent.appendChild(span);
+    };
+    img.src = modeImagePath;
 
-    App._closeModal('matchSettingsModal');
-};
-
-App._executeGameMode = function(mode) {
-    const playerCount = selectedPlayerCount; // 1 أو 2
-    switch(mode) {
-        case 'normal_1v1':
-            // تصنيفي 1v1 أو 2v2
-            showToast(`🔍 جاري البحث عن خصم (تصنيفي ${playerCount}v${playerCount})...`, 'info', 3000);
-            MatchmakingSystem.startMatchmaking('normal_1v1', { competitive: true, playerCount: playerCount });
-            break;
-
-        case 'normal_1v1_unranked':
-            // ودي غير مصنف
-            showToast(`🔍 جاري البحث عن خصم (ودي ${playerCount}v${playerCount})...`, 'info', 3000);
-            MatchmakingSystem.startMatchmaking('normal_1v1_unranked', { competitive: false, playerCount: playerCount });
-            break;
-
-        case 'crossword':
-            showToast('🔤 الكلمات المتقاطعة التصنيفية قادمة قريباً!', 'info', 3000);
-            break;
-
-        case 'tournament':
-            showToast('🏆 البطولات التصنيفية قادمة قريباً!', 'info', 3000);
-            break;
-
-        case 'single_player':
-            // فردي
-            showToast('🎮 بدء اللعب الفردي...', 'success', 2000);
-            App._activateSection('game');
-            const savedSettings = JSON.parse(localStorage.getItem('singlePlayerSettings') || '{}');
-            if (savedSettings) {
-                const gameDifficulty = document.getElementById('gameDifficulty');
-                const gameCategory = document.getElementById('gameCategory');
-                const gameQuestionType = document.getElementById('gameQuestionType');
-                const gameCount = document.getElementById('gameCount');
-                const gameModeEl = document.getElementById('gameMode');
-                if (gameDifficulty) gameDifficulty.value = savedSettings.difficulty || 'medium';
-                if (gameCategory) gameCategory.value = savedSettings.category || 'all';
-                if (gameQuestionType) gameQuestionType.value = savedSettings.questionType || 'all';
-                if (gameCount) gameCount.value = savedSettings.count || 10;
-                if (gameModeEl) gameModeEl.value = savedSettings.gameMode || 'normal';
-            }
-            setTimeout(() => {
-                const startBtn = document.getElementById('startGameBtn');
-                if (startBtn) startBtn.click();
-                else GameEngine.start();
-            }, 300);
-            break;
-
-    case 'create_room':
-    const user = AuthService.currentUser;
-    if (!user) {
-        showToast('يجب تسجيل الدخول أولاً', 'error');
-        return;
-    }
-    const inventory = user.inventory || [];
-    const ticket = inventory.find(i => i.itemId === 'room_ticket');
-    const ticketCount = ticket ? ticket.quantity : 0;
-    if (ticketCount < 1) {
-        showToast('⚠️ ليس لديك بطاقات غرفة! اشترِ من المتجر.', 'error', 4000);
-        // توجيه المستخدم إلى المتجر
-        setTimeout(() => App._activateSection('store'), 500);
-        return;
-    }
-    showToast('🏠 جاري فتح صفحة الغرف...', 'info', 2000);
-    App._activateSection('multiplayer');
-    break;
-
-        default:
-            showToast('⚠️ طور غير معروف', 'error');
+    // تحديث عنوان الزر
+    const settingsBtn = document.getElementById('dashboardMatchSettingsBtn');
+    if (settingsBtn) {
+        const isCompetitive = modeInfo.competitive || false;
+        const modeType = isCompetitive ? '🏅 تصنيفي' : '🎮 ودي';
+        settingsBtn.title = `${modeIcon} ${modeDisplayName} (${modeType})`;
     }
 };
 
@@ -26756,7 +28720,10 @@ App._setupGameSettingsEvents = function() {
             document.querySelectorAll('.settings-tab-content').forEach(content => {
                 content.style.display = 'none';
             });
-            document.getElementById(`tab-${tabId}`).style.display = 'block';
+            const targetContent = document.getElementById(`tab-${tabId}`);
+            if (targetContent) {
+                targetContent.style.display = 'block';
+            }
 
             const firstCard = document.querySelector(`#tab-${tabId} .mode-card-horizontal:not([style*="cursor: not-allowed"])`);
             if (firstCard) {
@@ -26777,7 +28744,16 @@ App._setupGameSettingsEvents = function() {
         });
     });
 
-    // 3. أزرار عدد اللاعبين
+    // 3. أزرار شرح الطور
+    document.querySelectorAll('.mode-desc-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const mode = this.dataset.mode;
+            App._showModeDescription(mode);
+        });
+    });
+
+    // 4. أزرار عدد اللاعبين
     document.querySelectorAll('.player-count-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const count = parseInt(this.dataset.count);
@@ -26785,17 +28761,28 @@ App._setupGameSettingsEvents = function() {
         });
     });
 
-    // 4. زر تحديد الطور
-    document.getElementById('selectGameModeBtn')?.addEventListener('click', function() {
-        App._selectGameModeFromSettings();
-    });
+    // 5. زر تحديد الطور
+    const selectBtn = document.getElementById('selectGameModeBtn');
+    if (selectBtn) {
+        const newSelectBtn = selectBtn.cloneNode(true);
+        selectBtn.parentNode.replaceChild(newSelectBtn, selectBtn);
+        
+        newSelectBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            App._selectGameModeFromSettings();
+        });
+    }
 
-    // 5. عند فتح المودال، نحدّث الواجهة
+    // 6. عند فتح المودال، نحدّث الواجهة
     const modal = document.getElementById('matchSettingsModal');
     if (modal) {
         const observer = new MutationObserver(() => {
             if (modal.classList.contains('open')) {
-                App._updateModalWithCurrentMode();
+                if (typeof App._updateModalWithCurrentMode === 'function') {
+                    App._updateModalWithCurrentMode();
+                } else {
+                    console.warn('⚠️ App._updateModalWithCurrentMode is not a function');
+                }
             }
         });
         observer.observe(modal, { attributes: true, attributeFilter: ['class'] });

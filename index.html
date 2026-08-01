@@ -499,7 +499,233 @@
     </main>
 
     <!-- Modals Container -->
-    <div id="modalsContainer"></div>
+    <div id="modalsContainer">
+        <!-- ============================================================
+     مودال إعدادات اللعبة الفردية
+     ============================================================ -->
+<div class="modal-overlay" id="gameSettingsModal">
+    <div class="modal-card" style="max-width: 550px; max-height: 90vh; overflow-y: auto;">
+        <div class="modal-header">
+            <h3><i class="fas fa-sliders-h" style="color: var(--accent);"></i> إعدادات اللعبة</h3>
+            <button class="modal-close-btn" onclick="App._closeModal('gameSettingsModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div style="padding: 0.2rem 0 0.8rem;">
+            <!-- عدد الأسئلة -->
+            <div class="form-group">
+                <label style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>📝 عدد الأسئلة</span>
+                    <span id="settingsQuestionCountDisplay" style="font-weight: 700; color: var(--accent); font-size: 1.1rem;">10</span>
+                </label>
+                <input type="range" id="settingsQuestionCount" min="5" max="30" value="10" step="1" 
+                       style="width: 100%; accent-color: var(--primary);">
+                <div style="display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--gray);">
+                    <span>5</span>
+                    <span>30</span>
+                </div>
+            </div>
+            
+            <!-- الصعوبة -->
+            <div class="form-group">
+                <label>🎯 الصعوبة</label>
+                <div style="display: flex; gap: 0.3rem; flex-wrap: wrap;">
+                    <button class="settings-option-btn active" data-value="easy" style="
+                        padding: 0.3rem 0.8rem;
+                        border-radius: 30px;
+                        border: 2px solid var(--success);
+                        background: rgba(46, 204, 113, 0.1);
+                        color: var(--success);
+                        font-weight: 700;
+                        font-size: 0.75rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                    ">
+                        🟢 سهل (20s)
+                    </button>
+                    <button class="settings-option-btn" data-value="medium" style="
+                        padding: 0.3rem 0.8rem;
+                        border-radius: 30px;
+                        border: 2px solid var(--glass-border);
+                        background: transparent;
+                        color: var(--gray);
+                        font-weight: 700;
+                        font-size: 0.75rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                    ">
+                        🟡 متوسط (15s)
+                    </button>
+                    <button class="settings-option-btn" data-value="hard" style="
+                        padding: 0.3rem 0.8rem;
+                        border-radius: 30px;
+                        border: 2px solid var(--glass-border);
+                        background: transparent;
+                        color: var(--gray);
+                        font-weight: 700;
+                        font-size: 0.75rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                    ">
+                        🔴 صعب (10s)
+                    </button>
+                    <button class="settings-option-btn" data-value="expert" style="
+                        padding: 0.3rem 0.8rem;
+                        border-radius: 30px;
+                        border: 2px solid var(--glass-border);
+                        background: transparent;
+                        color: var(--gray);
+                        font-weight: 700;
+                        font-size: 0.75rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                    ">
+                        💀 خبير (5s)
+                    </button>
+                </div>
+            </div>
+            
+            <!-- الفئة -->
+            <div class="form-group">
+                <label>📚 الفئة</label>
+                <select id="settingsCategory" style="
+                    width: 100%;
+                    padding: 8px 14px;
+                    border-radius: 10px;
+                    background: var(--glass);
+                    border: 1px solid var(--glass-border);
+                    color: var(--light);
+                    font-size: 0.9rem;
+                    font-family: var(--font);
+                ">
+                    <option value="all">📚 كل الفئات</option>
+                    ${GENERAL_CATEGORIES.map(cat => 
+                        `<option value="${cat.id}">${cat.icon} ${cat.label}</option>`
+                    ).join('')}
+                </select>
+            </div>
+            
+            <!-- نوع السؤال -->
+            <div class="form-group">
+                <label>📝 نوع السؤال</label>
+                <select id="settingsQuestionType" style="
+                    width: 100%;
+                    padding: 8px 14px;
+                    border-radius: 10px;
+                    background: var(--glass);
+                    border: 1px solid var(--glass-border);
+                    color: var(--light);
+                    font-size: 0.9rem;
+                    font-family: var(--font);
+                ">
+                    <option value="all">📚 الكل</option>
+                    <option value="multiple_choice">📝 اختيار من متعدد</option>
+                    <option value="true_false">✅ صح / خطأ</option>
+                    <option value="fill_blank">✏️ ملء الفراغ</option>
+                    <option value="matching">🔗 مطابقة</option>
+                    <option value="ordering">🔢 ترتيب</option>
+                </select>
+            </div>
+            
+            <!-- نمط اللعبة -->
+            <div class="form-group">
+                <label>🎮 نمط اللعبة</label>
+                <div style="display: flex; gap: 0.3rem; flex-wrap: wrap;">
+                    <button class="settings-mode-btn active" data-value="normal" style="
+                        padding: 0.4rem 0.8rem;
+                        border-radius: 30px;
+                        border: 2px solid var(--primary);
+                        background: rgba(108, 99, 255, 0.1);
+                        color: var(--primary);
+                        font-weight: 700;
+                        font-size: 0.75rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                    ">
+                        🎯 عادي
+                    </button>
+                    <button class="settings-mode-btn" data-value="timed" style="
+                        padding: 0.4rem 0.8rem;
+                        border-radius: 30px;
+                        border: 2px solid var(--glass-border);
+                        background: transparent;
+                        color: var(--gray);
+                        font-weight: 700;
+                        font-size: 0.75rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                    ">
+                        ⏱ زمني
+                    </button>
+                    <button class="settings-mode-btn" data-value="survival" style="
+                        padding: 0.4rem 0.8rem;
+                        border-radius: 30px;
+                        border: 2px solid var(--glass-border);
+                        background: transparent;
+                        color: var(--gray);
+                        font-weight: 700;
+                        font-size: 0.75rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                    ">
+                        💪 صمود
+                    </button>
+                    <button class="settings-mode-btn" data-value="time_attack" style="
+                        padding: 0.4rem 0.8rem;
+                        border-radius: 30px;
+                        border: 2px solid var(--glass-border);
+                        background: transparent;
+                        color: var(--gray);
+                        font-weight: 700;
+                        font-size: 0.75rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                    ">
+                        ⚡ تحدي الزمن
+                    </button>
+                </div>
+            </div>
+            
+            <!-- ملخص الإعدادات -->
+            <div style="
+                margin-top: 0.8rem;
+                padding: 0.5rem 0.8rem;
+                background: var(--glass);
+                border-radius: 10px;
+                border: 1px solid var(--glass-border);
+                font-size: 0.8rem;
+                color: var(--gray);
+            ">
+                <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.3rem;">
+                    <span>📝 <span id="settingsSummaryCount">10</span> سؤال</span>
+                    <span>🎯 <span id="settingsSummaryDifficulty">سهل</span></span>
+                    <span>📚 <span id="settingsSummaryCategory">كل الفئات</span></span>
+                    <span>🎮 <span id="settingsSummaryMode">عادي</span></span>
+                </div>
+            </div>
+            
+            <!-- أزرار التحكم -->
+            <div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;">
+                <button class="btn btn-primary" id="applyGameSettingsBtn" style="flex: 1; justify-content: center; min-width: 120px;">
+                    <i class="fas fa-check"></i> تطبيق وبدء اللعب
+                </button>
+                <button class="btn btn-outline" onclick="App._closeModal('gameSettingsModal')" style="justify-content: center;">
+                    <i class="fas fa-times"></i> إلغاء
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+    </div>
 
 <!-- Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
