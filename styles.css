@@ -14038,3 +14038,168 @@ body.light-theme .selected-mode-label {
     transform: translateY(-2px);
     border-color: var(--primary);
 }
+
+/* ============================================================
+   شبكة الكلمات المتقاطعة - عرض متجاوب
+   ============================================================ */
+
+/* ✅ حاوية الشبكة - تعمل على جميع الأحجام */
+#crosswordGameOptions,
+#crosswordMatchContent #crosswordGameOptions {
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 0.2rem 0 !important;
+    margin: 0 auto !important;
+    max-width: 100% !important;
+}
+
+/* ✅ شريط التمرير - يظهر فقط عند الحاجة */
+#crosswordGameOptions::-webkit-scrollbar,
+#crosswordMatchContent #crosswordGameOptions::-webkit-scrollbar {
+    height: 4px;
+}
+
+#crosswordGameOptions::-webkit-scrollbar-track,
+#crosswordMatchContent #crosswordGameOptions::-webkit-scrollbar-track {
+    background: var(--glass);
+    border-radius: 10px;
+}
+
+#crosswordGameOptions::-webkit-scrollbar-thumb,
+#crosswordMatchContent #crosswordGameOptions::-webkit-scrollbar-thumb {
+    background: var(--primary);
+    border-radius: 10px;
+}
+
+/* ✅ إخفاء شريط التمرير على الهواتف (للمظهر النظيف) */
+@media (max-width: 768px) {
+    #crosswordGameOptions::-webkit-scrollbar,
+    #crosswordMatchContent #crosswordGameOptions::-webkit-scrollbar {
+        display: none;
+    }
+    
+    #crosswordGameOptions,
+    #crosswordMatchContent #crosswordGameOptions {
+        scrollbar-width: none !important;
+    }
+}
+
+/* ✅ خلايا الشبكة */
+.crossword-cell {
+    transition: all 0.15s ease !important;
+    touch-action: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    will-change: transform;
+}
+
+.crossword-cell.active {
+    transform: scale(1.05) !important;
+    box-shadow: 0 0 20px rgba(255, 217, 61, 0.3) !important;
+    z-index: 2 !important;
+}
+
+.crossword-cell.completed {
+    opacity: 0.85 !important;
+    cursor: default !important;
+}
+
+.crossword-cell:hover:not(.completed):not(.active) {
+    transform: scale(1.03);
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 15px rgba(108, 99, 255, 0.15);
+}
+
+/* ============================================================
+   استجابة للشاشات المتوسطة (أجهزة لوحية)
+   ============================================================ */
+@media (min-width: 768px) and (max-width: 1024px) {
+    #crosswordGameOptions,
+    #crosswordMatchContent #crosswordGameOptions {
+        padding: 0.3rem 0.1rem !important;
+    }
+}
+
+/* ============================================================
+   استجابة للشاشات الصغيرة (هواتف)
+   ============================================================ */
+@media (max-width: 768px) {
+    #crosswordGameOptions,
+    #crosswordMatchContent #crosswordGameOptions {
+        padding: 0.1rem 0 !important;
+    }
+    
+    .crossword-cell {
+        min-height: 32px !important;
+        min-width: 32px !important;
+    }
+    
+    .crossword-cell.active {
+        transform: scale(1.04) !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .crossword-cell {
+        min-height: 28px !important;
+        min-width: 28px !important;
+        border-width: 1.5px !important;
+        font-size: 0.7rem !important;
+    }
+    
+    .crossword-cell.active {
+        transform: scale(1.06) !important;
+    }
+    
+    #crosswordGameOptions .clue-item,
+    #crosswordMatchContent .clue-item {
+        font-size: 0.6rem !important;
+        padding: 1px 0 !important;
+    }
+}
+
+@media (max-width: 380px) {
+    .crossword-cell {
+        min-height: 24px !important;
+        min-width: 24px !important;
+        border-width: 1px !important;
+        font-size: 0.6rem !important;
+    }
+}
+
+/* ============================================================
+   مودال الحل - متجاوب
+   ============================================================ */
+@media (max-width: 480px) {
+    .crossword-solve-cell {
+        width: 38px !important;
+        height: 38px !important;
+        font-size: 1rem !important;
+        border-radius: 8px !important;
+        border-width: 2px !important;
+    }
+    
+    .crossword-solve-cell .cell-number {
+        font-size: 0.35rem !important;
+        bottom: 1px !important;
+        right: 3px !important;
+    }
+    
+    #crosswordCurrentLetters {
+        gap: 0.3rem !important;
+    }
+}
+
+@media (max-width: 380px) {
+    .crossword-solve-cell {
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 0.85rem !important;
+        border-radius: 6px !important;
+        border-width: 1.5px !important;
+    }
+    
+    #crosswordCurrentLetters {
+        gap: 0.2rem !important;
+    }
+}
