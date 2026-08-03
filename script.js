@@ -8823,7 +8823,8 @@ _startRound() {
     }
 },
 
-_renderCrosswordRound: function(question) {
+    // عرض الجولة في واجهة المباراة
+    _renderCrosswordRound(question) {
     const container = document.getElementById('crosswordMatchContent');
     if (!container) return;
 
@@ -8831,9 +8832,8 @@ _renderCrosswordRound: function(question) {
     const total = this._rounds.length;
     const timeLeft = this._timeLeft;
     const totalPoints = this._results.reduce((s, r) => s + (r.points || 0), 0);
-    const isMobile = window.innerWidth < 768;
 
-    // حساب عدد الكلمات
+    // ✅ حساب عدد الكلمات في هذه الشبكة
     let totalWords = 0;
     try {
         const data = question.crosswordData;
@@ -8849,94 +8849,48 @@ _renderCrosswordRound: function(question) {
     }
 
     container.innerHTML = `
-        <div class="game-info-bar" style="
-            display: flex;
-            flex-direction: column;
-            gap: 0.3rem;
-            margin-bottom: 0.5rem;
-            padding: 0.4rem 0.6rem;
-            background: var(--glass);
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border-color);
-        ">
-            <div style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                flex-wrap: wrap;
-                gap: 0.2rem;
-            ">
-                <span class="badge badge-primary" style="font-size: ${isMobile ? '0.65rem' : '0.8rem'};padding:2px 10px;">
-                    الجولة ${roundNum}/${total}
-                </span>
-                <span class="badge ${timeLeft <= 30 ? 'badge-danger' : 'badge-warning'}" 
-                      id="cwMatchTimer" 
-                      style="font-size: ${isMobile ? '0.65rem' : '0.8rem'};padding:2px 10px;">
-                    ⏱ ${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2,'0')}
-                </span>
-                <span class="badge badge-info" style="font-size: ${isMobile ? '0.65rem' : '0.8rem'};padding:2px 10px;">
-                    📚 ${question.category || 'عام'}
-                </span>
-                <span class="badge" style="
-                    font-size: ${isMobile ? '0.65rem' : '0.8rem'};
-                    padding:2px 10px;
-                    background:var(--glass);
-                ">
-                    ⭐ ${totalPoints}
-                </span>
+        <div class="game-info-bar" style="display:flex;flex-direction:column;gap:0.3rem;margin-bottom:0.8rem;padding:0.5rem 1rem;background:var(--glass);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.3rem;">
+                <span class="badge badge-primary">الجولة ${roundNum}/${total}</span>
+                <span class="badge ${timeLeft <= 30 ? 'badge-danger' : 'badge-warning'}" id="cwMatchTimer">⏱ ${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2,'0')}</span>
+                <span class="badge badge-info">📚 ${question.category || 'عام'}</span>
+                <span class="badge" style="background:var(--glass);">⭐ ${totalPoints}</span>
             </div>
-            <!-- شريط التقدم -->
-            <div style="display:flex;align-items:center;gap:0.3rem;">
-                <span style="font-size:0.6rem;color:var(--gray);">📝</span>
-                <div style="flex:1;height:4px;background:var(--glass);border-radius:10px;overflow:hidden;">
-                    <div id="cwMatchProgress" style="
-                        height:100%;
-                        width:0%;
-                        background:linear-gradient(90deg, var(--primary), var(--accent));
-                        border-radius:10px;
-                        transition:width 0.5s ease;
-                    "></div>
+            <!-- ✅ شريط تقدم الكلمات المكتملة -->
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span style="font-size:0.7rem;color:var(--gray);">📝 التقدم:</span>
+                <div style="flex:1;height:6px;background:var(--glass);border-radius:10px;overflow:hidden;">
+                    <div id="cwMatchProgress" style="height:100%;width:0%;background:linear-gradient(90deg, var(--primary), var(--accent));border-radius:10px;transition:width 0.5s ease;"></div>
                 </div>
-                <span id="cwProgressText" style="font-size:0.6rem;color:var(--gray);">0/${totalWords}</span>
+                <span id="cwProgressText" style="font-size:0.7rem;color:var(--gray);">0/${totalWords}</span>
             </div>
         </div>
-        <div id="crosswordGameOptions" style="margin-bottom:0.5rem;overflow-x:auto;max-width:100%;"></div>
-        <div style="display:flex;justify-content:center;gap:0.3rem;flex-wrap:wrap;">
-            <button class="btn btn-success" id="cwMatchVerifyBtn" onclick="CrosswordEngine._checkAll()" style="
-                font-size: ${isMobile ? '0.7rem' : '0.85rem'};
-                padding: ${isMobile ? '4px 12px' : '6px 16px'};
-            ">
-                ✅ تحقق من الحل الكامل
-            </button>
-            <button class="btn btn-outline" onclick="CrosswordMatchEngine._skipRound()" style="
-                font-size: ${isMobile ? '0.7rem' : '0.85rem'};
-                padding: ${isMobile ? '4px 12px' : '6px 16px'};
-            ">
-                ⏭ تخطي الجولة
-            </button>
+        <div id="crosswordGameOptions" style="margin-bottom:1rem;"></div>
+        <div style="display:flex;justify-content:center;gap:0.5rem;flex-wrap:wrap;">
+            <button class="btn btn-success" id="cwMatchVerifyBtn" onclick="CrosswordEngine._checkAll()">✅ تحقق من الحل الكامل</button>
+            <button class="btn btn-outline" onclick="CrosswordMatchEngine._skipRound()">⏭ تخطي الجولة</button>
         </div>
-        <div id="verifyResultContainer" style="margin-top:0.3rem;min-height:30px;"></div>
+        <div id="verifyResultContainer" style="margin-top:0.5rem;min-height:40px;"></div>
     `;
 
     // عرض الشبكة باستخدام CrosswordEngine
     try {
         CrosswordEngine.renderWithEmptyHidden('crosswordGameOptions');
         
+        // ✅ تحديث التقدم الأولي
         setTimeout(() => {
             this._updateProgressUI(0, totalWords);
         }, 100);
     } catch (e) {
         console.error('❌ Error rendering crossword:', e);
         container.innerHTML += `
-            <div style="background:rgba(255,107,107,0.1);border:1px solid var(--secondary);border-radius:8px;padding:0.5rem;text-align:center;margin-top:0.3rem;">
-                <span style="color:var(--secondary);font-size:0.85rem;">⚠️ خطأ في عرض الشبكة</span>
-                <button class="btn btn-primary btn-sm" onclick="CrosswordMatchEngine._skipRound()" style="margin-right:0.5rem;font-size:0.7rem;padding:2px 12px;">
-                    تخطي الجولة
-                </button>
+            <div style="background:rgba(255,107,107,0.1);border:1px solid var(--secondary);border-radius:8px;padding:1rem;text-align:center;margin-top:1rem;">
+                <span style="color:var(--secondary);">⚠️ خطأ في عرض الشبكة</span>
+                <button class="btn btn-primary btn-sm" onclick="CrosswordMatchEngine._skipRound()" style="margin-right:1rem;">تخطي الجولة</button>
             </div>
         `;
     }
-},
+    },
 
     // التحقق من الجولة الحالية
     _verifyCurrentRound() {
@@ -10186,336 +10140,189 @@ _updateStats() {
         return { total, correct, percentage, isComplete };
     },
 
-renderWithEmptyHidden: function(containerId) {
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.warn(`⚠️ Container "${containerId}" not found`);
-        return;
-    }
-
-    if (!this._words || this._words.length === 0) {
-        container.innerHTML = `<div class="text-gray" style="text-align:center;padding:2rem;">⚠️ لا توجد كلمات في هذه الشبكة</div>`;
-        return;
-    }
-
-    if (!this._fullGrid || this._fullGrid.length === 0) {
-        container.innerHTML = `<div class="text-gray" style="text-align:center;padding:2rem;">⚠️ بيانات الشبكة غير صالحة</div>`;
-        return;
-    }
-
-    // ✅ حساب الخلايا التي تحتوي على حروف
-    const cellsWithLetters = new Set();
-    for (const w of this._words) {
-        if (!w || !w.word) continue;
-        for (let i = 0; i < w.word.length; i++) {
-            let r, c;
-            if (w.direction === 'across') {
-                r = w.row;
-                c = w.col - i;
-            } else {
-                r = w.row + i;
-                c = w.col;
-            }
-            if (r >= 0 && r < this._gridSize && c >= 0 && c < this._gridSize) {
-                cellsWithLetters.add(`${r},${c}`);
-            }
+    // ===== عرض الشبكة =====
+    renderWithEmptyHidden(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) {
+            console.warn(`⚠️ Container "${containerId}" not found`);
+            return;
         }
-    }
 
-    if (cellsWithLetters.size === 0) {
-        container.innerHTML = `<div class="text-gray" style="text-align:center;padding:2rem;">⚠️ لا توجد حروف في الشبكة</div>`;
-        return;
-    }
+        if (!this._words || this._words.length === 0) {
+            container.innerHTML = `<div class="text-gray" style="text-align:center;padding:2rem;">⚠️ لا توجد كلمات في هذه الشبكة</div>`;
+            return;
+        }
 
-    const gridSize = this._gridSize;
+        if (!this._fullGrid || this._fullGrid.length === 0) {
+            container.innerHTML = `<div class="text-gray" style="text-align:center;padding:2rem;">⚠️ بيانات الشبكة غير صالحة</div>`;
+            return;
+        }
 
-    // ============================================================
-    // ✅ ✅ ✅ حساب حجم الخلية حسب حجم الشاشة ✅ ✅ ✅
-    // ============================================================
-    const screenWidth = window.innerWidth;
-    const isMobile = screenWidth < 768;
-    const isTablet = screenWidth >= 768 && screenWidth < 1024;
-    const isDesktop = screenWidth >= 1024;
-    const isSmallMobile = screenWidth < 480;
-    const isVerySmallMobile = screenWidth < 380;
-
-    // ✅ حجم الخلية الأساسي حسب نوع الجهاز
-    let baseCellSize = 52; // حجم افتراضي للكمبيوتر
-    
-    if (isVerySmallMobile) {
-        baseCellSize = 28;
-    } else if (isSmallMobile) {
-        baseCellSize = 34;
-    } else if (isMobile) {
-        baseCellSize = 40;
-    } else if (isTablet) {
-        baseCellSize = 46;
-    } else {
-        baseCellSize = 52; // كمبيوتر
-    }
-
-    // ✅ ضبط الحجم حسب حجم الشبكة
-    let cellSize = baseCellSize;
-    if (gridSize >= 10) {
-        cellSize = Math.min(baseCellSize * 0.65, 38);
-    } else if (gridSize >= 9) {
-        cellSize = Math.min(baseCellSize * 0.7, 40);
-    } else if (gridSize >= 8) {
-        cellSize = Math.min(baseCellSize * 0.75, 42);
-    } else if (gridSize >= 7) {
-        cellSize = Math.min(baseCellSize * 0.8, 44);
-    } else if (gridSize >= 6) {
-        cellSize = Math.min(baseCellSize * 0.85, 46);
-    }
-
-    // ✅ الحد الأدنى والأقصى لحجم الخلية
-    if (isDesktop) {
-        cellSize = Math.max(cellSize, 40);
-        cellSize = Math.min(cellSize, 56);
-    } else if (isTablet) {
-        cellSize = Math.max(cellSize, 36);
-        cellSize = Math.min(cellSize, 48);
-    } else {
-        cellSize = Math.max(cellSize, 24);
-        cellSize = Math.min(cellSize, 44);
-    }
-
-    // ✅ ضبط إضافي للشاشات الصغيرة جداً
-    if (isVerySmallMobile) {
-        cellSize = Math.min(cellSize, 32);
-        if (gridSize >= 8) cellSize = 24;
-        else if (gridSize >= 6) cellSize = 26;
-    }
-
-    console.log(`📐 Cell size: ${cellSize}px (grid: ${gridSize}x${gridSize}, screen: ${screenWidth}px)`);
-
-    // ============================================================
-    // ✅ إنشاء الشبكة
-    // ============================================================
-    const gap = isSmallMobile ? '2px' : (isMobile ? '3px' : '4px');
-    const borderRadius = isSmallMobile ? '4px' : (isMobile ? '6px' : '8px');
-    const fontSize = Math.max(cellSize * 0.5, isSmallMobile ? 12 : (isMobile ? 14 : 16));
-
-    let html = `
-        <div style="
-            max-width: 100%;
-            overflow-x: auto;
-            overflow-y: visible;
-            padding: ${isMobile ? '0.1rem 0.05rem' : '0.3rem 0.2rem'};
-            margin: 0 auto;
-            display: flex;
-            justify-content: center;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: ${isMobile ? 'none' : 'thin'};
-        ">
-            <div style="
-                display: grid;
-                grid-template-columns: repeat(${gridSize}, ${cellSize}px);
-                gap: ${gap};
-                direction: ltr;
-                margin: 0 auto;
-                max-width: 100%;
-            ">
-    `;
-
-    for (let r = 0; r < gridSize; r++) {
-        for (let c = 0; c < gridSize; c++) {
-            const cellKey = `${r},${c}`;
-            const isInWord = cellsWithLetters.has(cellKey);
-
-            if (!isInWord) {
-                html += `
-                    <div style="
-                        aspect-ratio: 1;
-                        width: ${cellSize}px;
-                        height: ${cellSize}px;
-                        visibility: hidden;
-                        pointer-events: none;
-                    "></div>
-                `;
-                continue;
-            }
-
-            const userChar = this._userGrid?.[r]?.[c] || '';
-            const gridChar = this._fullGrid?.[r]?.[c] || '';
-            const isFilled = userChar !== '';
-            const isCorrect = isFilled && userChar.toUpperCase() === gridChar.toUpperCase();
-            const isWrong = isFilled && userChar.toUpperCase() !== gridChar.toUpperCase();
-            const isActive = (r === this._selectedRow && c === this._selectedCol);
-            const isCompleted = this._isCellInVerifiedWord(r, c);
-
-            let bgColor, textColor, borderColor;
-            if (isCompleted) {
-                bgColor = 'rgba(46, 204, 113, 0.25)';
-                textColor = 'var(--success)';
-                borderColor = 'var(--success)';
-            } else if (isActive) {
-                bgColor = 'var(--accent)';
-                textColor = 'var(--dark)';
-                borderColor = 'var(--accent)';
-            } else if (isFilled) {
-                if (isCorrect) {
-                    bgColor = 'rgba(46, 204, 113, 0.15)';
-                    textColor = 'var(--success)';
-                    borderColor = 'var(--success)';
-                } else if (isWrong) {
-                    bgColor = 'rgba(255, 107, 107, 0.15)';
-                    textColor = 'var(--secondary)';
-                    borderColor = 'var(--secondary)';
+        const cellsWithLetters = new Set();
+        for (const w of this._words) {
+            if (!w || !w.word) continue;
+            for (let i = 0; i < w.word.length; i++) {
+                let r, c;
+                if (w.direction === 'across') {
+                    r = w.row;
+                    c = w.col - i;
                 } else {
-                    bgColor = 'var(--primary)';
-                    textColor = 'var(--light)';
-                    borderColor = 'var(--primary-light)';
+                    r = w.row + i;
+                    c = w.col;
                 }
-            } else {
-                bgColor = 'var(--glass)';
-                textColor = 'var(--gray)';
-                borderColor = 'var(--border-color)';
+                if (r >= 0 && r < this._gridSize && c >= 0 && c < this._gridSize) {
+                    cellsWithLetters.add(`${r},${c}`);
+                }
             }
-
-            const borderWidth = isSmallMobile ? '1.5px' : (isMobile ? '2px' : '2px');
-
-            html += `
-                <div class="crossword-cell ${isActive ? 'active' : ''} ${isFilled ? 'filled' : ''} ${isCompleted ? 'completed' : ''}"
-                     data-row="${r}" data-col="${c}"
-                     data-editable="${isCompleted ? 'false' : 'true'}"
-                     style="
-                        aspect-ratio: 1;
-                        width: ${cellSize}px;
-                        height: ${cellSize}px;
-                        background: ${bgColor};
-                        border: ${borderWidth} solid ${borderColor};
-                        border-radius: ${borderRadius};
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: ${fontSize}px;
-                        font-weight: 700;
-                        color: ${textColor};
-                        cursor: ${isCompleted ? 'default' : 'pointer'};
-                        transition: all 0.15s ease;
-                        user-select: none;
-                        touch-action: none;
-                        position: relative;
-                        ${isFilled ? 'animation: fadeUp 0.15s ease;' : ''}
-                     "
-                     onclick="${isCompleted ? '' : `CrosswordEngine._openSolveModal(${r},${c})`}"
-                     contenteditable="false"
-                     tabindex="${isCompleted ? '-1' : '0'}"
-                >
-                    ${isFilled ? userChar : ''}
-                    ${isCompleted ? '<span style="position:absolute;top:-2px;right:-2px;font-size:8px;color:var(--success);font-weight:900;">✓</span>' : ''}
-                </div>
-            `;
         }
-    }
 
-    html += `
-            </div>
-        </div>
-    `;
+        if (cellsWithLetters.size === 0) {
+            container.innerHTML = `<div class="text-gray" style="text-align:center;padding:2rem;">⚠️ لا توجد حروف في الشبكة</div>`;
+            return;
+        }
 
-    // ============================================================
-    // ✅ الأدلة وشريط التقدم
-    // ============================================================
-    const totalWords = this._words.length;
-    const completedWords = this._words.filter(w => this._isWordComplete(w)).length;
-    const isAllComplete = completedWords === totalWords && totalWords > 0;
+        const gridSize = this._gridSize;
 
-    html += `
-        <div style="
-            margin-top: ${isMobile ? '0.5rem' : '0.8rem'};
-            text-align: right;
-            background: var(--glass);
-            border-radius: 10px;
-            padding: ${isMobile ? '0.4rem 0.6rem' : '0.6rem 0.8rem'};
-            border: 1px solid var(--border-color);
-            max-height: ${isMobile ? '100px' : '150px'};
-            overflow-y: auto;
-        ">
-            <div style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 0.2rem;
-                font-size: ${isMobile ? '0.7rem' : '0.85rem'};
-            ">
-                <span style="font-weight: 700; color: var(--accent);">
-                    📖 الأدلة (${completedWords}/${totalWords})
-                </span>
-                <span style="color: ${isAllComplete ? 'var(--success)' : 'var(--gray)'};">
-                    ${isAllComplete ? '✅ مكتمل' : `${completedWords}/${totalWords}`}
-                </span>
-            </div>
-            ${this._words.map((w, idx) => {
-                if (!w || !w.word) return '';
-                const completed = this._isWordComplete(w);
-                const dirText = w.direction === 'across' ? '←' : '↓';
-                return `
-                    <div class="clue-item" style="
-                        display: flex;
-                        justify-content: space-between;
-                        padding: ${isMobile ? '1px 0' : '2px 0'};
-                        border-bottom: 1px solid var(--glass-border);
-                        font-size: ${isMobile ? '0.6rem' : '0.75rem'};
-                        color: var(--gray);
-                        ${completed ? 'background:rgba(46,204,113,0.05);border-right:2px solid var(--success);' : ''}
-                    ">
-                        <span style="display:flex;align-items:center;gap:0.2rem;">
-                            <span style="color:var(--gray-dark);font-size:0.55rem;">${dirText}</span>
-                            ${w.clue || 'دليل'}
-                        </span>
-                        <span class="clue-status" style="font-weight:600;color:${completed ? 'var(--success)' : 'var(--light)'};">
-                            ${completed ? '✅' : w.word.length + ' حروف'}
-                        </span>
+        let html = `
+            <div style="max-width:500px;margin:0 auto;text-align:center;direction:ltr;padding:0.5rem;">
+                <div style="margin-bottom:0.5rem;color:var(--gray);font-size:0.85rem;">
+                    <i class="fas fa-info-circle"></i> املأ الخلايا الفارغة بالحروف المناسبة
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(${gridSize},1fr);gap:4px;max-width:400px;margin:0 auto;direction:ltr;">
+        `;
+
+        for (let r = 0; r < gridSize; r++) {
+            for (let c = 0; c < gridSize; c++) {
+                const cellKey = `${r},${c}`;
+                const isInWord = cellsWithLetters.has(cellKey);
+
+                if (!isInWord) {
+                    html += `
+                        <div style="
+                            aspect-ratio:1;
+                            min-height:36px;
+                            visibility:hidden;
+                            pointer-events:none;
+                        "></div>
+                    `;
+                    continue;
+                }
+
+                const userChar = this._userGrid?.[r]?.[c] || '';
+                const gridChar = this._fullGrid?.[r]?.[c] || '';
+                const isFilled = userChar !== '';
+                const isCorrect = isFilled && userChar.toUpperCase() === gridChar.toUpperCase();
+                const isWrong = isFilled && userChar.toUpperCase() !== gridChar.toUpperCase();
+                const isActive = (r === this._selectedRow && c === this._selectedCol);
+
+                let bgColor, textColor, borderColor, cursor;
+
+                if (isActive) {
+                    bgColor = 'var(--accent)';
+                    textColor = 'var(--dark)';
+                    borderColor = 'var(--accent)';
+                    cursor = 'pointer';
+                } else if (isFilled) {
+                    if (isCorrect) {
+                        bgColor = 'rgba(46, 204, 113, 0.25)';
+                        textColor = 'var(--success)';
+                        borderColor = 'var(--success)';
+                    } else if (isWrong) {
+                        bgColor = 'rgba(255, 107, 107, 0.25)';
+                        textColor = 'var(--secondary)';
+                        borderColor = 'var(--secondary)';
+                    } else {
+                        bgColor = 'var(--primary)';
+                        textColor = 'var(--light)';
+                        borderColor = 'var(--primary-light)';
+                    }
+                    cursor = 'pointer';
+                } else {
+                    bgColor = 'var(--glass)';
+                    textColor = 'var(--gray)';
+                    borderColor = 'var(--border-color)';
+                    cursor = 'pointer';
+                }
+
+                html += `
+                    <div class="crossword-cell ${isActive ? 'active' : ''} ${isFilled ? 'filled' : ''}"
+                         data-row="${r}" data-col="${c}"
+                         data-editable="true"
+                         style="
+                            aspect-ratio:1;
+                            background:${bgColor};
+                            border:2px solid ${borderColor};
+                            border-radius:8px;
+                            display:flex;
+                            align-items:center;
+                            justify-content:center;
+                            font-size:1.5rem;
+                            font-weight:700;
+                            color:${textColor};
+                            cursor:${cursor};
+                            transition:all 0.2s ease;
+                            user-select:none;
+                            min-height:50px;
+                            ${isFilled ? 'animation: fadeUp 0.2s ease;' : ''}
+                            touch-action: none;
+                         "
+                         onclick="CrosswordEngine._openSolveModal(${r},${c})"
+                         contenteditable="false"
+                         tabindex="0"
+                    >
+                        ${isFilled ? userChar : ' '}
                     </div>
                 `;
-            }).join('')}
-        </div>
-        <div style="
-            display: flex;
-            justify-content: space-between;
-            margin-top: 0.5rem;
-            font-size: ${isMobile ? '0.6rem' : '0.75rem'};
-            color: var(--gray);
-        ">
-            <span>✅ المكتملة: <strong id="crosswordCompletedCount" style="color:${isAllComplete ? 'var(--success)' : 'var(--accent)'};">${completedWords}</strong>/${totalWords}</span>
-            <span>📏 ${gridSize}×${gridSize}</span>
-        </div>
-        <button class="btn btn-success mt-1" onclick="CrosswordEngine._checkAll()" style="
-            width: 100%;
-            justify-content: center;
-            font-size: ${isMobile ? '0.75rem' : '0.9rem'};
-            padding: ${isMobile ? '6px 12px' : '10px 20px'};
-            margin-top: 0.5rem;
-        ">
-            <i class="fas fa-check-circle"></i> تحقق من الحل الكامل
-        </button>
-    `;
-
-    container.innerHTML = html;
-    this._updateStats();
-    this._startTimer();
-
-    // ✅ تركيز الخلية النشطة
-    setTimeout(() => {
-        const activeCell = container.querySelector('.crossword-cell.active');
-        if (activeCell && activeCell.dataset.editable === 'true') {
-            activeCell.focus();
-            activeCell.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        } else {
-            const firstEditable = container.querySelector('.crossword-cell[data-editable="true"]');
-            if (firstEditable) {
-                firstEditable.focus();
-                const row = parseInt(firstEditable.dataset.row);
-                const col = parseInt(firstEditable.dataset.col);
-                this._selectedRow = row;
-                this._selectedCol = col;
-                setTimeout(() => this.renderWithEmptyHidden(containerId), 50);
             }
         }
-    }, 100);
-},
+
+        html += `
+                </div>
+                <div style="margin-top:1rem;text-align:right;background:var(--glass);border-radius:12px;padding:0.8rem;border:1px solid var(--border-color);max-height:150px;overflow-y:auto;">
+                    <div style="font-weight:700;color:var(--accent);margin-bottom:0.3rem;">📖 الأدلة</div>
+                    ${this._words.map((w, idx) => {
+                        if (!w || !w.word) return '';
+                        const completed = this._isWordComplete(w);
+                        return `
+                            <div class="clue-item" style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--glass-border);font-size:0.8rem;color:var(--gray);${completed ? 'background:rgba(46,204,113,0.05);border-right:3px solid var(--success);' : ''}">
+                                <span>${w.clue || 'دليل'}</span>
+                                <span class="clue-status" style="font-weight:600;color:${completed ? 'var(--success)' : 'var(--light)'};">${completed ? '✅' : w.word.length + ' حروف'}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-top:0.8rem;font-size:0.8rem;color:var(--gray);">
+                    <span>✅ المكتملة: <strong id="crosswordCompletedCount" style="color:var(--success);">0</strong>/${this._words.length}</span>
+                    <span>⏱ <span id="crosswordTimer">${this._currentData?.timeLimit || 120}</span>s</span>
+                </div>
+                <button class="btn btn-success mt-1" onclick="CrosswordEngine._checkAll()" style="width:100%;justify-content:center;">
+                    <i class="fas fa-check-circle"></i> تحقق من الحل
+                </button>
+            </div>
+        `;
+
+        container.innerHTML = html;
+        this._updateStats();
+        this._startTimer();
+
+        setTimeout(() => {
+            const activeCell = container.querySelector('.crossword-cell.active');
+            if (activeCell && activeCell.dataset.editable === 'true') {
+                activeCell.focus();
+                activeCell.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            } else {
+                const firstEditable = container.querySelector('.crossword-cell[data-editable="true"]');
+                if (firstEditable) {
+                    firstEditable.focus();
+                    const row = parseInt(firstEditable.dataset.row);
+                    const col = parseInt(firstEditable.dataset.col);
+                    this._selectedRow = row;
+                    this._selectedCol = col;
+                    this.renderWithEmptyHidden(containerId);
+                }
+            }
+        }, 100);
+    },
 
     // ===== المودال =====
     _openSolveModal(row, col) {
