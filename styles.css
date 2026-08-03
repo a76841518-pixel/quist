@@ -14038,3 +14038,67 @@ body.light-theme .selected-mode-label {
     transform: translateY(-2px);
     border-color: var(--primary);
 }
+
+/* ============================================================
+   تحسين استقرار مودال الحل
+   ============================================================ */
+
+/* ✅ منع إعادة تدفق الصفحة عند تحديث الخلايا */
+#crosswordCurrentLetters {
+    min-height: 70px;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+    justify-content: center !important;
+    align-items: center !important;
+    transition: none !important;
+}
+
+.crossword-solve-cell {
+    flex-shrink: 0 !important;
+    transition: background 0.15s ease, border-color 0.15s ease !important;
+    /* منع أي تغييرات في الحجم */
+    width: 52px !important;
+    height: 52px !important;
+    min-width: 52px !important;
+    min-height: 52px !important;
+    max-width: 52px !important;
+    max-height: 52px !important;
+}
+
+/* ✅ تحسين التركيز على الهواتف */
+.crossword-cell-input {
+    -webkit-tap-highlight-color: transparent !important;
+    outline: none !important;
+}
+
+/* ✅ منع التمرير عند التركيز على الهواتف */
+@media (max-width: 768px) {
+    .crossword-solve-cell {
+        width: 42px !important;
+        height: 42px !important;
+        min-width: 42px !important;
+        min-height: 42px !important;
+        max-width: 42px !important;
+        max-height: 42px !important;
+        font-size: 1.2rem !important;
+    }
+    
+    #crosswordCurrentLetters {
+        gap: 0.3rem !important;
+        min-height: 60px;
+    }
+}
+
+@media (max-width: 480px) {
+    .crossword-solve-cell {
+        width: 36px !important;
+        height: 36px !important;
+        min-width: 36px !important;
+        min-height: 36px !important;
+        max-width: 36px !important;
+        max-height: 36px !important;
+        font-size: 1rem !important;
+        border-radius: 8px !important;
+    }
+}
