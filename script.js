@@ -4600,6 +4600,28 @@ const MODE_DESCRIPTIONS = {
             questionType: 'crossword'
         }
     },
+    'ranked_invasion': {
+    id: 'ranked_invasion',
+    title: 'الغزو',
+    desc: 'طور الغزو القادم قريباً!',
+    icon: '⚔️',
+    competitive: true,
+    active: false,
+    supportsPlayerCount: true,
+    category: 'ranked',
+    settings: { questionCount: 10, timeLimit: 15, difficulty: 'medium', category: 'all', questionType: 'all' }
+},
+'ranked_journey': {
+    id: 'ranked_journey',
+    title: 'الرحلة',
+    desc: 'طور الرحلة القادم قريباً!',
+    icon: '🗺️',
+    competitive: true,
+    active: false,
+    supportsPlayerCount: true,
+    category: 'ranked',
+    settings: { questionCount: 10, timeLimit: 15, difficulty: 'medium', category: 'all', questionType: 'all' }
+},
     'ranked_tournament': {
         id: 'ranked_tournament',
         title: 'بطولة مصنفة',
@@ -4704,6 +4726,28 @@ const MODE_DESCRIPTIONS = {
             questionType: 'crossword'
         }
     },
+'unranked_invasion': {
+    id: 'unranked_invasion',
+    title: 'الغزو',
+    desc: 'طور الغزو الودي القادم قريباً!',
+    icon: '⚔️',
+    competitive: false,
+    active: false,
+    supportsPlayerCount: true,
+    category: 'unranked',
+    settings: { questionCount: 10, timeLimit: 15, difficulty: 'medium', category: 'all', questionType: 'all' }
+},
+'unranked_journey': {
+    id: 'unranked_journey',
+    title: 'الرحلة',
+    desc: 'طور الرحلة الودي القادم قريباً!',
+    icon: '🗺️',
+    competitive: false,
+    active: false,
+    supportsPlayerCount: true,
+    category: 'unranked',
+    settings: { questionCount: 10, timeLimit: 15, difficulty: 'medium', category: 'all', questionType: 'all' }
+},
 
     // ===== أطوار التدريب (فردي) =====
     'training_classic': {
@@ -4765,6 +4809,88 @@ const MODE_DESCRIPTIONS = {
         }
     },
 
+'training_crossword': {
+    id: 'training_crossword',
+    title: 'كلمات متقاطعة (مباريات)',
+    desc: 'مباريات كلمات متقاطعة متعددة الجولات مع إحصائيات متقدمة',
+    icon: '🔤',
+    competitive: false,
+    active: true,
+    supportsPlayerCount: false,
+    category: 'training',
+    isTraining: true,
+    settings: {
+        questionCount: 1, // تجاهل
+        timeLimit: 120, // سيتم استبداله
+        difficulty: 'medium', // سيتم استبداله
+        category: 'all',
+        questionType: 'crossword',
+        gameMode: 'crossword_match', // وضع خاص
+        // الإعدادات الجديدة
+        crosswordLevel: 'gradual',   // easy, medium, hard, expert, gradual
+        crosswordTime: 5,            // 2, 5, 10 (دقائق)
+        crosswordRounds: 5,          // 3, 5, 10, 20
+    }
+},
+
+'training_invasion': {
+    id: 'training_invasion',
+    title: 'الغزو',
+    desc: 'طور الغزو في التدريب (قريباً)',
+    icon: '⚔️',
+    competitive: false,
+    active: false,
+    supportsPlayerCount: false,
+    category: 'training',
+    isTraining: true,
+    settings: {
+        questionCount: 10,
+        timeLimit: 15,
+        difficulty: 'medium',
+        category: 'all',
+        questionType: 'all',
+        gameMode: 'normal'
+    }
+},
+'training_journey': {
+    id: 'training_journey',
+    title: 'الرحلة',
+    desc: 'طور الرحلة في التدريب (قريباً)',
+    icon: '🗺️',
+    competitive: false,
+    active: false,
+    supportsPlayerCount: false,
+    category: 'training',
+    isTraining: true,
+    settings: {
+        questionCount: 10,
+        timeLimit: 15,
+        difficulty: 'medium',
+        category: 'all',
+        questionType: 'all',
+        gameMode: 'normal'
+    }
+},
+'training_impossible': {
+    id: 'training_impossible',
+    title: 'التحدي المستحيل',
+    desc: 'تحدٍ لا يُصدق في التدريب الفردي (قريباً)',
+    icon: '💀',
+    competitive: false,
+    active: false,
+    supportsPlayerCount: false,
+    category: 'training',
+    isTraining: true,
+    settings: {
+        questionCount: 15,
+        timeLimit: 10,
+        difficulty: 'expert',
+        category: 'all',
+        questionType: 'all',
+        gameMode: 'normal'
+    }
+},
+
     // ===== الغرف =====
     'room_standard': {
         id: 'room_standard',
@@ -4820,6 +4946,7 @@ const ACTIVE_MODES = [
     'training_classic', 
     'training_survival', 
     'training_speed',
+    'training_crossword',
     // غرف
     'room_standard', 
     'room_mega'
@@ -4892,6 +5019,7 @@ const GameEngine = {
         });
         
         this._updateGameStats();
+        this._verifiedWords = [];
     },
 
 start(settings = null) {
@@ -4944,8 +5072,11 @@ start(settings = null) {
     
     // ✅ تصفية حسب نوع السؤال
     if (questionType !== 'all') {
-        pool = pool.filter(q => q.type === questionType);
-        console.log(`📊 Filtered by question type "${questionType}": ${pool.length} questions`);
+        if (questionType === 'crossword' || mode === 'training_crossword') {
+            pool = pool.filter(q => q.type === 'crossword');
+        } else {
+            pool = pool.filter(q => q.type === questionType);
+        }
     }
     
     pool = shuffleArray(pool);
@@ -4967,7 +5098,7 @@ start(settings = null) {
     
     // ===== اختيار عدد الأسئلة =====
     let selectedQuestions = [];
-    const isTraining = mode === 'training_classic' || mode === 'training_survival' || mode === 'training_speed';
+    const isTraining = mode === 'training_classic' || mode === 'training_survival' || mode === 'training_speed' || mode === 'training_crossword';
     
     if (mode === 'training_speed' || gameMode === 'time_attack') {
         // تحدي السرعة: جميع الأسئلة المتاحة (مفتوح)
@@ -5071,6 +5202,13 @@ start(settings = null) {
         hintBtn.style.display = this.isTimeAttack ? 'none' : 'inline-flex';
     }
     
+    // ✅ ===== إخفاء الإحصائيات العلوية في أطوار التدريب =====
+    if (isTraining) {
+        this._hideGameStatsForTraining();
+    } else {
+        this._showGameStats();
+    }
+    
     // عرض الصعوبة والرتبة
     const diffDisplay = document.getElementById('gameDifficultyDisplay');
     if (diffDisplay) {
@@ -5105,23 +5243,202 @@ start(settings = null) {
     console.log('✅ بدأت اللعبة بنجاح!');
 },
 
+/**
+ * إخفاء الإحصائيات العلوية في أطوار التدريب
+ */
+_hideGameStatsForTraining() {
+    // إخفاء شريط الإحصائيات العلوي
+    const statsGrid = document.getElementById('gameStats');
+    if (statsGrid) {
+        statsGrid.style.display = 'none';
+    }
+    
+    // إخفاء شريط المضاعفات النشطة
+    const boostsContainer = document.getElementById('gameActiveBoostsContainer');
+    if (boostsContainer) {
+        boostsContainer.style.display = 'none';
+    }
+    
+    // إخفاء شريط العملات والمستوى في رأس الصفحة
+    const currencyDisplay = document.querySelector('.game-page .flex-between .currency-display');
+    if (currencyDisplay) {
+        currencyDisplay.style.display = 'none';
+    }
+    
+    const levelBadge = document.querySelector('.game-page .flex-between .badge-primary');
+    if (levelBadge) {
+        levelBadge.style.display = 'none';
+    }
+    
+    // إخفاء أي عناصر إضافية قد تظهر
+    const extraStats = document.querySelectorAll('.game-stats-grid, .game-stats, .stats-row');
+    extraStats.forEach(el => {
+        if (el.closest('#gamePlayScreen') || el.closest('.game-play-container')) {
+            // لا نخفي العناصر داخل شاشة اللعب
+            return;
+        }
+        el.style.display = 'none';
+    });
+    
+    console.log('✅ تم إخفاء الإحصائيات العلوية لطور التدريب');
+},
+
+/**
+ * إظهار الإحصائيات العلوية (للأطوار الأخرى)
+ */
+_showGameStats() {
+    const statsGrid = document.getElementById('gameStats');
+    if (statsGrid) {
+        statsGrid.style.display = '';
+    }
+    
+    const boostsContainer = document.getElementById('gameActiveBoostsContainer');
+    if (boostsContainer) {
+        boostsContainer.style.display = '';
+    }
+    
+    const currencyDisplay = document.querySelector('.game-page .flex-between .currency-display');
+    if (currencyDisplay) {
+        currencyDisplay.style.display = '';
+    }
+    
+    const levelBadge = document.querySelector('.game-page .flex-between .badge-primary');
+    if (levelBadge) {
+        levelBadge.style.display = '';
+    }
+},
+
+// استبدال دالة _renderCrossword بأكملها
+_renderCrossword(q) {
+    const container = document.getElementById('gameOptions');
+    if (!container) return;
+
+    if (!q.crosswordData) {
+        container.innerHTML = '<div class="text-gray">⚠️ بيانات الشبكة غير موجودة</div>';
+        return;
+    }
+
+    let crosswordData = q.crosswordData;
+    let grid = [];
+    let words = [];
+    let gridSize = crosswordData.gridSize || 5;
+    
+    // معالجة grid
+    try {
+        if (typeof crosswordData.grid === 'string') {
+            grid = JSON.parse(crosswordData.grid);
+        } else {
+            grid = crosswordData.grid || [];
+        }
+    } catch (e) {
+        grid = [];
+    }
+    
+    // التأكد من أن grid هي مصفوفة 2D بالحجم الصحيح
+    if (!Array.isArray(grid) || grid.length === 0) {
+        grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(''));
+    } else {
+        grid = grid.map(row => {
+            if (!Array.isArray(row)) return Array(gridSize).fill('');
+            while (row.length < gridSize) row.push('');
+            return row.slice(0, gridSize);
+        });
+        while (grid.length < gridSize) grid.push(Array(gridSize).fill(''));
+    }
+
+    // معالجة words
+    try {
+        if (typeof crosswordData.words === 'string') {
+            words = JSON.parse(crosswordData.words);
+        } else {
+            words = crosswordData.words || [];
+        }
+    } catch (e) {
+        words = [];
+    }
+    if (!Array.isArray(words) || words.length === 0) {
+        container.innerHTML = '<div class="text-gray">⚠️ لا توجد كلمات في هذه الشبكة</div>';
+        return;
+    }
+
+    const processedData = {
+        gridSize: gridSize,
+        grid: grid,
+        words: words
+    };
+
+    this._crosswordData = processedData;
+
+    // ✅ تهيئة محرك الكلمات المتقاطعة مع البيانات المعالجة
+    CrosswordEngine.init(processedData, (success, totalWords) => {
+        if (success) {
+            this._handleCrosswordComplete(true, totalWords);
+        } else {
+            this._handleCrosswordComplete(false, 0);
+        }
+    });
+
+    // ✅ عرض الشبكة مع إخفاء الخلايا الفارغة تماماً
+    CrosswordEngine.renderWithEmptyHidden('gameOptions');
+
+    document.getElementById('gameQCounter').textContent = `1 / 1`;
+    document.getElementById('gameQCategory').textContent = `📚 ${q.category || 'عام'}`;
+    document.getElementById('gameQType').textContent = '🔤 كلمات متقاطعة';
+    document.getElementById('gameQText').textContent = q.question || 'شبكة كلمات متقاطعة';
+},
+
+/**
+ * معالجة اكتمال الكلمات المتقاطعة
+ */
+_handleCrosswordComplete(success, totalWords) {
+    if (this._crosswordAnswered) return;
+    this._crosswordAnswered = true;
+
+    if (success) {
+        // حساب النقاط
+        const pointsEarned = 50 + (totalWords * 5); // 50 أساسي + 5 لكل كلمة
+        this.score += pointsEarned;
+        this.correctCount += totalWords;
+        this.totalAnswered += totalWords;
+        this.streak += 1;
+        if (this.streak > this.bestStreak) this.bestStreak = this.streak;
+
+        // عملات
+        const coinsEarned = 20 + (totalWords * 2);
+        this.coinsEarned += coinsEarned;
+
+        SoundSystem.playCorrect();
+        SoundSystem.playPoints();
+        SoundSystem.playCoins();
+
+        showToast(`✅ حل مثالي! +${pointsEarned} نقطة, +${coinsEarned} عملة`, 'success', 4000);
+    } else {
+        this.wrongCount += 1;
+        this.streak = 0;
+        SoundSystem.playWrong();
+        showToast('❌ لم تكمل الكلمات المتقاطعة في الوقت المحدد', 'error', 4000);
+    }
+
+    // الانتقال إلى النتيجة بعد 2 ثانية
+    setTimeout(() => {
+        this.endGame();
+    }, 2000);
+},
+
+/**
+ * تعديل دالة renderQuestion لإضافة دعم crossword
+ */
 renderQuestion() {
     const q = this.gameQuestions[this.currentIndex];
     if (!q) {
-        if (this.isTimeAttack) {
-            if (this.questionPool.length === 0) {
-                this.endGame();
-                return;
-            }
-            const newBatch = shuffleArray(this.questionPool).slice(0, 30);
-            this.gameQuestions = newBatch;
-            this.currentIndex = 0;
-            this.renderQuestion();
-            return;
-        } else {
-            this.endGame();
-            return;
-        }
+        this.endGame();
+        return;
+    }
+
+    // ✅ إذا كان النوع crossword، استخدم المحرك المخصص
+    if (q.type === 'crossword') {
+        this._renderCrossword(q);
+        return;
     }
     
     // ✅ تسجيل وقت بداية السؤال لحساب سرعة الإجابة
@@ -6553,7 +6870,6 @@ _showStatsScreen(data) {
             achievementDetails = []
         } = data;
         
-        // ✅ حساب النقاط الأساسية (بدون الإنجازات) للعرض التوضيحي
         const basePoints = points - achievementPoints;
         
         screen.innerHTML = `
@@ -6563,7 +6879,6 @@ _showStatsScreen(data) {
                     إحصائيات المباراة
                 </h2>
                 
-                <!-- ✅ عرض نقاط الإنجازات بشكل مميز -->
                 ${achievementCount > 0 ? `
                     <div style="background:rgba(255,217,61,0.15); border:2px solid #FFD93D; border-radius:12px; padding:0.6rem; margin-bottom:0.8rem;">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -6582,7 +6897,6 @@ _showStatsScreen(data) {
                     </div>
                 ` : ''}
                 
-                <!-- الإحصائيات الأساسية -->
                 <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; margin-bottom:1rem;">
                     <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem;">
                         <div style="font-size:1.5rem; font-weight:900; color:#2ecc71;">${correct || 0}</div>
@@ -6598,7 +6912,6 @@ _showStatsScreen(data) {
                     </div>
                 </div>
                 
-                <!-- النقاط والعملات والسلسلة -->
                 <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; margin-bottom:1.5rem;">
                     <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem; border:${achievementCount > 0 ? '1px solid #FFD93D' : 'none'};">
                         <div style="font-size:1.2rem; font-weight:900; color:#FFD93D;">${points || 0}</div>
@@ -6619,7 +6932,6 @@ _showStatsScreen(data) {
                     </div>
                 </div>
                 
-                <!-- أزرار التحكم -->
                 <div style="display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:center;">
                     <button id="statsShowDetailsBtn" style="display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:10px 24px; border-radius:40px; font-weight:600; font-size:0.9rem; background:#6C63FF; color:#fff; border:none; cursor:pointer; min-width:120px;">
                         <i class="fas fa-eye"></i> عرض التفاصيل
@@ -6634,7 +6946,6 @@ _showStatsScreen(data) {
         document.body.appendChild(screen);
         console.log('✅ Stats screen added to DOM');
         
-        // تشغيل صوت الإحصائيات
         if (typeof SoundSystem !== 'undefined') {
             SoundSystem.playStatIncrease();
         }
@@ -6981,6 +7292,24 @@ async endGame() {
     });
 
     // ============================================================
+    // ✅ إعداد زر عرض الإحصائيات العامة
+    // ============================================================
+    const showStatsBtn = document.getElementById('showGameStatsBtn');
+    if (showStatsBtn) {
+        // إزالة المستمعات القديمة
+        const newBtn = showStatsBtn.cloneNode(true);
+        showStatsBtn.parentNode.replaceChild(newBtn, showStatsBtn);
+        
+        newBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            GameEngine._showGameStatsInResult();
+        });
+        
+        // إظهار الزر دائماً
+        newBtn.style.display = 'inline-flex';
+    }
+
+    // ============================================================
     // 7. تحديث بيانات المستخدم في الخلفية
     // ============================================================
     try {
@@ -7323,9 +7652,9 @@ _displayResultDetails(details) {
         total = 0,
         coinDetails = [],
         pointDetails = [],
-        achievementPoints = 0,      // ✅ إضافة
-        achievementCount = 0,       // ✅ إضافة
-        achievementDetails = []     // ✅ إضافة
+        achievementPoints = 0,
+        achievementCount = 0,
+        achievementDetails = []
     } = details;
 
     this._resultValues = { coins, points, streak, bestStreak, accuracy, correct, wrong, total, achievementPoints, achievementCount, achievementDetails };
@@ -7357,7 +7686,7 @@ _displayResultDetails(details) {
     }
     html += `</div></div>`;
 
-    // ===== قسم النقاط (معدل ليشمل الإنجازات) =====
+    // ===== قسم النقاط =====
     html += `<div class="result-section" id="resultPointsSection">`;
     html += `<div class="result-section-header" onclick="App._toggleResultSection('points')">`;
     html += `<span>⭐ النقاط</span>`;
@@ -7366,7 +7695,6 @@ _displayResultDetails(details) {
     html += `</div>`;
     html += `<div class="result-section-details" id="resultPointsDetails">`;
     
-    // تفاصيل النقاط من المباراة
     if (pointDetails && pointDetails.length > 0) {
         pointDetails.forEach((item, idx) => {
             const sign = item.value > 0 ? '+' : '';
@@ -7378,9 +7706,7 @@ _displayResultDetails(details) {
         });
     }
     
-    // ✅ تفاصيل الإنجازات (كجزء من النقاط)
     if (achievementDetails && achievementDetails.length > 0) {
-        // خط فاصل
         html += `<div style="border-top:1px solid rgba(255,217,61,0.2); margin:0.3rem 0;"></div>`;
         
         achievementDetails.forEach((item, idx) => {
@@ -7390,7 +7716,6 @@ _displayResultDetails(details) {
             html += `</div>`;
         });
         
-        // إجمالي نقاط الإنجازات
         html += `<div class="result-detail-item" style="border-top:1px solid #FFD93D; margin-top:0.3rem; padding-top:0.3rem; border-bottom:1px solid rgba(255,217,61,0.2);">`;
         html += `<span class="detail-label" style="color:#FFD93D; font-weight:700;">🏆 إجمالي نقاط الإنجازات (${achievementCount})</span>`;
         html += `<span class="detail-value positive">+<span class="detail-number" id="achievementTotalNum">0</span></span>`;
@@ -7441,43 +7766,28 @@ _displayResultDetails(details) {
 
     container.innerHTML = html;
 
-    // ============================================================
-    // ✅ تشغيل صوت عند زيادة الإحصائيات
-    // ============================================================
-    setTimeout(() => {
-        const statElements = document.querySelectorAll('.result-detail-item .detail-number, .result-section-total');
-        statElements.forEach((el, index) => {
-            const target = parseInt(el.textContent) || 0;
-            if (target > 0) {
-                setTimeout(() => {
-                    if (typeof SoundSystem !== 'undefined') {
-                        SoundSystem.playStatIncrease();
-                    }
-                }, index * 100);
-            }
-        });
-    }, 300);
-
-    // ============================================================
-    // ✅ مراقبة اكتمال شريط التقدم
-    // ============================================================
-    setTimeout(() => {
-        const progressFill = document.getElementById('levelProgressFillResult');
-        if (progressFill) {
-            const observer = new MutationObserver(() => {
-                const width = parseFloat(progressFill.style.width) || 0;
-                if (width >= 100 && typeof SoundSystem !== 'undefined') {
-                    SoundSystem.playLevelUp();
-                    observer.disconnect();
-                }
-            });
-            observer.observe(progressFill, { attributes: true, attributeFilter: ['style'] });
+    // ✅ إخفاء الإحصائيات العلوية في النتيجة أيضاً إذا كان طور تدريب
+    const mode = selectedGameMode || 'ranked_classic';
+    const isTraining = mode === 'training_classic' || mode === 'training_survival' || mode === 'training_speed' || mode === 'training_crossword';
+    
+    if (isTraining) {
+        // إخفاء لوحة المتصدرين في النتيجة
+        const leaderboard = document.querySelector('.game-result .leaderboard');
+        if (leaderboard) {
+            leaderboard.style.display = 'none';
         }
-    }, 100);
+        
+        // إخفاء أي إحصائيات إضافية
+        const extraStats = document.querySelectorAll('.game-result .result-stats, .game-result .stat-card');
+        extraStats.forEach(el => {
+            if (el.closest('#resultDetailsContainer')) {
+                return; // لا نخفي تفاصيل النتيجة
+            }
+            el.style.display = 'none';
+        });
+    }
 
-    // ============================================================
-    // ✅ بدء العد التصاعدي
-    // ============================================================
+    // بدء العد التصاعدي
     setTimeout(() => {
         this._startSequentialCounting();
     }, 400);
@@ -7521,6 +7831,111 @@ _animateNumberDynamic(elementId, targetValue, duration = 800, onComplete = null)
     }
     
     this._animateNumberElement(element, targetValue, dynamicDuration, onComplete);
+},
+
+_showGameStatsInResult() {
+    const container = document.getElementById('gameStatsContent');
+    const statsContainer = document.getElementById('gameStatsContainer');
+    const showBtn = document.getElementById('showGameStatsBtn');
+    
+    if (!container) return;
+    
+    // إظهار الحاوية وإخفاء الزر
+    if (statsContainer) statsContainer.style.display = 'block';
+    if (showBtn) showBtn.style.display = 'none';
+    
+    // بناء الإحصائيات من بيانات المباراة
+    const user = AuthService.currentUser;
+    const stats = user?.stats || {};
+    
+    // دالة مساعدة للحصول على القيم
+    const getStat = (obj, path, defaultValue = 0) => {
+        try {
+            const parts = path.split('.');
+            let current = obj;
+            for (const part of parts) {
+                if (current === undefined || current === null) return defaultValue;
+                current = current[part];
+            }
+            return current !== undefined && current !== null ? current : defaultValue;
+        } catch (e) {
+            return defaultValue;
+        }
+    };
+    
+    // جمع الإحصائيات
+    const generalStats = {
+        totalMatches: getStat(stats, 'general.totalMatches', 0),
+        wins: getStat(stats, 'general.wins', 0),
+        draws: getStat(stats, 'general.draws', 0),
+        losses: getStat(stats, 'general.losses', 0),
+        firstPlace: getStat(stats, 'general.firstPlace', 0),
+        correct: getStat(stats, 'questions.correct', 0),
+        wrong: getStat(stats, 'questions.wrong', 0),
+        accuracy: getStat(stats, 'accuracy', 0),
+        power: getStat(stats, 'power', 0),
+        highestStreak: getStat(stats, 'records.highestStreak', 0),
+        coins: user?.coins || 0,
+        totalScore: user?.totalScore || 0,
+        level: getLevel(user?.totalScore || 0).level,
+        rank: getRank(user?.rankPoints || 0).name,
+        rankPoints: user?.rankPoints || 0,
+        // إحصائيات الأطوار
+        rankedMatches: getStat(stats, 'ranked.matches', 0),
+        rankedWins: getStat(stats, 'ranked.wins', 0),
+        unrankedMatches: getStat(stats, 'unranked.matches', 0),
+        unrankedWins: getStat(stats, 'unranked.wins', 0),
+        trainingCompleted: getStat(stats, 'training.completed', 0),
+        trainingBestScore: getStat(stats, 'training.bestScore', 0),
+        roomsJoined: getStat(stats, 'rooms.joined', 0),
+        roomWins: getStat(stats, 'rooms.wins', 0),
+    };
+    
+    // عرض الإحصائيات في شبكة
+    const statItems = [
+        { label: '🏆 المباريات', value: generalStats.totalMatches },
+        { label: '✅ الفوز', value: generalStats.wins },
+        { label: '🤝 التعادل', value: generalStats.draws },
+        { label: '❌ الخسارة', value: generalStats.losses },
+        { label: '🥇 المركز الأول', value: generalStats.firstPlace },
+        { label: '✅ إجابات صحيحة', value: generalStats.correct },
+        { label: '❌ إجابات خاطئة', value: generalStats.wrong },
+        { label: '🎯 الدقة', value: generalStats.accuracy + '%' },
+        { label: '💪 القوة', value: generalStats.power + '%' },
+        { label: '🔥 أفضل سلسلة', value: generalStats.highestStreak },
+        { label: '⭐ النقاط', value: generalStats.totalScore },
+        { label: '🪙 العملات', value: generalStats.coins },
+        { label: '🏅 المستوى', value: generalStats.level },
+        { label: '👑 الرتبة', value: generalStats.rank },
+        { label: '📊 نقاط الرتبة', value: generalStats.rankPoints },
+        { label: '🏅 مباريات مصنفة', value: generalStats.rankedMatches },
+        { label: '🏆 انتصارات مصنفة', value: generalStats.rankedWins },
+        { label: '🎮 مباريات ودية', value: generalStats.unrankedMatches },
+        { label: '🏆 انتصارات ودية', value: generalStats.unrankedWins },
+        { label: '📚 جولات تدريب', value: generalStats.trainingCompleted },
+        { label: '⭐ أفضل نقاط تدريب', value: generalStats.trainingBestScore },
+        { label: '🏠 غرف انضم', value: generalStats.roomsJoined },
+        { label: '🏆 انتصارات غرف', value: generalStats.roomWins },
+    ];
+    
+    let html = '';
+    statItems.forEach(item => {
+        if (item.value !== undefined && item.value !== null && item.value !== '') {
+            html += `
+                <div style="background:var(--glass); border-radius:8px; padding:0.4rem 0.6rem; text-align:center; border:1px solid var(--border-color);">
+                    <div style="font-size:0.6rem; color:var(--gray);">${item.label}</div>
+                    <div style="font-weight:700; font-size:0.9rem; color:var(--light);">${item.value}</div>
+                </div>
+            `;
+        }
+    });
+    
+    container.innerHTML = html;
+    
+    // تشغيل صوت
+    if (typeof SoundSystem !== 'undefined') {
+        SoundSystem.playStatIncrease();
+    }
 },
 
 _resetAllNumbersToZero() {
@@ -8063,6 +8478,2339 @@ quit() {
         this._isQuitting = false;
     }
 },
+};
+
+// ============================================================
+// CrosswordMatchEngine – إدارة مباريات الكلمات المتقاطعة (نسخة مصححة)
+// ============================================================
+const CrosswordMatchEngine = {
+    _settings: null,
+    _rounds: [],
+    _currentRoundIndex: 0,
+    _results: [],
+    _startTime: null,
+    _endTime: null,
+    _timerInterval: null,
+    _timeLeft: 0,
+    _totalTime: 0,
+    _isRunning: false,
+    _onComplete: null,
+    _lastData: null,
+    _isWaitingForNext: false,
+
+    // بدء المباراة
+    start(settings, onComplete) {
+        console.log('🎯 CrosswordMatchEngine.start() called with settings:', settings);
+        
+        this._settings = settings;
+        this._onComplete = onComplete || null;
+        this._results = [];
+        this._currentRoundIndex = 0;
+        this._isRunning = true;
+        this._isWaitingForNext = false;
+
+        // تحميل الشبكات بناءً على التصنيف والمستوى
+        this._loadRounds();
+
+        if (this._rounds.length === 0) {
+            showToast('⚠️ لا توجد شبكات كلمات متقاطعة متاحة لهذه الإعدادات', 'error');
+            this._isRunning = false;
+            return;
+        }
+
+        console.log(`✅ Loaded ${this._rounds.length} crossword rounds`);
+
+        this._totalTime = (settings.crosswordTime || 5) * 60;
+        this._timeLeft = this._totalTime;
+        this._startTime = Date.now();
+
+        // عرض واجهة المباراة
+        this._showMatchUI();
+        
+        // بدء الجولة الأولى بعد تأخير بسيط
+        setTimeout(() => {
+            this._startRound();
+        }, 300);
+        
+        this._startTimer();
+    },
+
+    // عرض واجهة المباراة
+    _showMatchUI() {
+        let container = document.getElementById('crosswordMatchContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'crosswordMatchContainer';
+            container.style.cssText = `
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                z-index: 1050;
+                background: var(--dark);
+                padding: 1rem;
+                overflow-y: auto;
+            `;
+            document.body.appendChild(container);
+        }
+        container.style.display = 'block';
+        container.innerHTML = `
+            <div style="max-width:700px;margin:0 auto;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+                    <button class="btn btn-danger btn-sm" onclick="CrosswordMatchEngine._quitMatch()">
+                        <i class="fas fa-times"></i> إنهاء
+                    </button>
+                    <span id="cwMatchTitle" style="font-weight:700;color:var(--accent);">🔤 مباراة كلمات متقاطعة</span>
+                    <span id="cwMatchScore" style="font-weight:700;color:var(--accent);">⭐ 0</span>
+                </div>
+                <div id="crosswordMatchContent">
+                    <div style="text-align:center;padding:2rem;color:var(--gray);">
+                        <i class="fas fa-spinner fa-spin"></i> جاري تحميل الجولة...
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    // الخروج من المباراة
+    _quitMatch() {
+        if (!this._isRunning) return;
+        if (confirm('هل تريد إنهاء المباراة الحالية؟')) {
+            this._isRunning = false;
+            clearInterval(this._timerInterval);
+            this._timerInterval = null;
+            const container = document.getElementById('crosswordMatchContainer');
+            if (container) container.style.display = 'none';
+            showToast('⏹️ تم إلغاء المباراة', 'info');
+            App._activateSection('dashboard');
+        }
+    },
+
+    // تحميل الشبكات
+_loadRounds() {
+    const allQuestions = DataManager.data.questions || [];
+    let pool = allQuestions.filter(q => q.type === 'crossword' && q.crosswordData);
+    
+    console.log(`📚 Total crossword questions: ${pool.length}`);
+
+    // ✅ التحقق من صحة كل شبكة قبل استخدامها
+    pool = pool.filter(q => {
+        try {
+            const data = q.crosswordData;
+            if (!data) return false;
+            
+            // التحقق من وجود كلمات
+            let words = [];
+            if (typeof data.words === 'string') {
+                words = JSON.parse(data.words);
+            } else {
+                words = data.words || [];
+            }
+            
+            // التحقق من وجود شبكة
+            let grid = [];
+            if (typeof data.grid === 'string') {
+                grid = JSON.parse(data.grid);
+            } else {
+                grid = data.grid || [];
+            }
+            
+            // الشبكة صالحة إذا كان هناك كلمات وخلايا
+            return words.length > 0 && grid.length > 0;
+        } catch (e) {
+            console.warn(`⚠️ Invalid crossword data for question ${q.id}:`, e);
+            return false;
+        }
+    });
+    
+    console.log(`📚 After validation: ${pool.length} valid crosswords`);
+
+    // ✅ تصفية حسب التصنيف
+    const category = this._settings.category || 'all';
+    if (category !== 'all') {
+        pool = pool.filter(q => q.category === category);
+        console.log(`📚 After category filter (${category}): ${pool.length}`);
+    }
+
+    // ✅ إذا لم نجد شبكات، نأخذ كل الشبكات المتاحة
+    if (pool.length === 0) {
+        pool = allQuestions.filter(q => q.type === 'crossword' && q.crosswordData);
+        // ✅ إعادة التحقق من الصحة
+        pool = pool.filter(q => {
+            try {
+                const data = q.crosswordData;
+                let words = [];
+                if (typeof data.words === 'string') {
+                    words = JSON.parse(data.words);
+                } else {
+                    words = data.words || [];
+                }
+                return words.length > 0;
+            } catch (e) {
+                return false;
+            }
+        });
+        console.log(`⚠️ No matches for category, using all valid crosswords: ${pool.length}`);
+    }
+
+    // ✅ ترتيب عشوائي
+    pool = shuffleArray(pool);
+
+    // ✅ عدد الجولات المطلوبة
+    let roundsNeeded = parseInt(this._settings.crosswordRounds) || 5;
+    console.log(`🔢 Rounds needed: ${roundsNeeded}`);
+
+    // ✅ مستوى الصعوبة
+    const level = this._settings.crosswordLevel || 'medium';
+
+    // ✅ دالة مساعدة لتحديد نطاق الرتب حسب المستوى
+    const getRankRange = (lvl) => {
+        switch(lvl) {
+            case 'easy': return { min: 0, max: 600 };
+            case 'medium': return { min: 0, max: 1700 };
+            case 'hard': return { min: 600, max: 3200 };
+            case 'expert': return { min: 1700, max: Infinity };
+            case 'gradual': return null; // تدريجي
+            default: return { min: 0, max: 1700 };
+        }
+    };
+
+    const range = getRankRange(level);
+
+    if (level === 'gradual') {
+        // ✅ تدريجي: نختار شبكات من مستويات مختلفة
+        const levels = ['easy', 'easy', 'medium', 'medium', 'hard', 'hard', 'expert', 'expert'];
+        const selected = [];
+        const allAvailable = [...pool];
+        
+        for (let i = 0; i < roundsNeeded && i < allAvailable.length * 2; i++) {
+            const lvl = levels[i % levels.length];
+            const r = getRankRange(lvl);
+            let subPool = allAvailable.filter(q => {
+                const rankReq = q.rankRequired || 0;
+                if (r) {
+                    return rankReq >= r.min && rankReq < r.max;
+                }
+                return true;
+            });
+            
+            if (subPool.length === 0) {
+                subPool = allAvailable;
+            }
+            
+            const shuffled = shuffleArray(subPool);
+            let found = false;
+            for (const q of shuffled) {
+                if (!selected.some(s => s.id === q.id)) {
+                    selected.push(q);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found && shuffled.length > 0) {
+                selected.push(shuffled[0]);
+            }
+        }
+        this._rounds = selected;
+    } else {
+        // ✅ مستوى محدد: نأخذ شبكات ضمن نطاق الرتب المطلوب
+        let filtered = pool;
+        if (range) {
+            filtered = pool.filter(q => {
+                const rankReq = q.rankRequired || 0;
+                return rankReq >= range.min && rankReq < range.max;
+            });
+            console.log(`📚 After rank filter (${level}): ${filtered.length} questions`);
+            
+            // إذا لم نجد شبكات كافية، نوسع النطاق
+            if (filtered.length < roundsNeeded) {
+                console.log(`⚠️ Not enough questions for ${level}, expanding range`);
+                filtered = pool;
+            }
+        }
+        this._rounds = filtered.slice(0, roundsNeeded);
+    }
+
+    // ✅ إذا لم نجد شبكات كافية، نكرر بعض الشبكات
+    if (this._rounds.length < roundsNeeded && this._rounds.length > 0) {
+        const original = [...this._rounds];
+        while (this._rounds.length < roundsNeeded) {
+            for (const q of original) {
+                if (this._rounds.length >= roundsNeeded) break;
+                // ✅ نسخ عميق للبيانات
+                const copy = JSON.parse(JSON.stringify(q));
+                copy.id = q.id + '_copy_' + this._rounds.length;
+                this._rounds.push(copy);
+            }
+        }
+    }
+
+    console.log(`✅ Final rounds: ${this._rounds.length} (needed: ${roundsNeeded})`);
+},
+
+    // بدء جولة
+_startRound() {
+    if (this._currentRoundIndex >= this._rounds.length || !this._isRunning) {
+        this._endMatch();
+        return;
+    }
+
+    const question = this._rounds[this._currentRoundIndex];
+    console.log(`🔄 Starting round ${this._currentRoundIndex + 1}/${this._rounds.length}: ${question.question || 'شبكة'}`);
+    
+    // ✅ التحقق من صحة بيانات الشبكة
+    if (!question || !question.crosswordData) {
+        console.warn(`⚠️ Round ${this._currentRoundIndex + 1} has no crossword data, skipping`);
+        this._currentRoundIndex++;
+        setTimeout(() => this._startRound(), 300);
+        return;
+    }
+    
+    // ✅ التحقق من وجود كلمات في الشبكة
+    let words = [];
+    try {
+        if (typeof question.crosswordData.words === 'string') {
+            words = JSON.parse(question.crosswordData.words);
+        } else {
+            words = question.crosswordData.words || [];
+        }
+    } catch (e) {
+        words = [];
+    }
+    
+    if (words.length === 0) {
+        console.warn(`⚠️ Round ${this._currentRoundIndex + 1} has no words, skipping`);
+        this._currentRoundIndex++;
+        setTimeout(() => this._startRound(), 300);
+        return;
+    }
+    
+    // ✅ إعادة تعيين CrosswordEngine بالكامل
+    try {
+        // إعادة تعيين جميع المتغيرات
+        CrosswordEngine._currentData = null;
+        CrosswordEngine._userGrid = null;
+        CrosswordEngine._gridSize = 0;
+        CrosswordEngine._words = [];
+        CrosswordEngine._isAnswered = false;
+        CrosswordEngine._onComplete = null;
+        CrosswordEngine._verifiedWords = [];
+        CrosswordEngine._selectedWord = null;
+        CrosswordEngine._selectedWordCells = [];
+        CrosswordEngine._fullGrid = [];
+        CrosswordEngine._fixedGrid = [];
+        CrosswordEngine._selectedRow = -1;
+        CrosswordEngine._selectedCol = -1;
+        CrosswordEngine._timerInterval = null;
+        CrosswordEngine._timeLeft = 0;
+        CrosswordEngine._isAnswered = false;
+        
+        // تهيئة جديدة
+        CrosswordEngine.init(question.crosswordData, (success, totalWords) => {
+            console.log(`✅ Round ${this._currentRoundIndex + 1} completed: success=${success}, totalWords=${totalWords}`);
+            this._handleRoundComplete(success, totalWords);
+        });
+
+        // عرض الشبكة في واجهة المباراة
+        this._renderCrosswordRound(question);
+        
+    } catch (e) {
+        console.error('❌ Error starting round:', e);
+        showToast(`❌ خطأ في تحميل الجولة ${this._currentRoundIndex + 1}، يتم تخطيها`, 'error', 2000);
+        // تخطي هذه الجولة
+        this._currentRoundIndex++;
+        setTimeout(() => {
+            this._startRound();
+        }, 500);
+    }
+},
+
+    // عرض الجولة في واجهة المباراة
+    _renderCrosswordRound(question) {
+    const container = document.getElementById('crosswordMatchContent');
+    if (!container) return;
+
+    const roundNum = this._currentRoundIndex + 1;
+    const total = this._rounds.length;
+    const timeLeft = this._timeLeft;
+    const totalPoints = this._results.reduce((s, r) => s + (r.points || 0), 0);
+
+    // ✅ حساب عدد الكلمات في هذه الشبكة
+    let totalWords = 0;
+    try {
+        const data = question.crosswordData;
+        if (data) {
+            if (typeof data.words === 'string') {
+                totalWords = JSON.parse(data.words).length;
+            } else {
+                totalWords = (data.words || []).length;
+            }
+        }
+    } catch (e) {
+        totalWords = 0;
+    }
+
+    container.innerHTML = `
+        <div class="game-info-bar" style="display:flex;flex-direction:column;gap:0.3rem;margin-bottom:0.8rem;padding:0.5rem 1rem;background:var(--glass);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.3rem;">
+                <span class="badge badge-primary">الجولة ${roundNum}/${total}</span>
+                <span class="badge ${timeLeft <= 30 ? 'badge-danger' : 'badge-warning'}" id="cwMatchTimer">⏱ ${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2,'0')}</span>
+                <span class="badge badge-info">📚 ${question.category || 'عام'}</span>
+                <span class="badge" style="background:var(--glass);">⭐ ${totalPoints}</span>
+            </div>
+            <!-- ✅ شريط تقدم الكلمات المكتملة -->
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span style="font-size:0.7rem;color:var(--gray);">📝 التقدم:</span>
+                <div style="flex:1;height:6px;background:var(--glass);border-radius:10px;overflow:hidden;">
+                    <div id="cwMatchProgress" style="height:100%;width:0%;background:linear-gradient(90deg, var(--primary), var(--accent));border-radius:10px;transition:width 0.5s ease;"></div>
+                </div>
+                <span id="cwProgressText" style="font-size:0.7rem;color:var(--gray);">0/${totalWords}</span>
+            </div>
+        </div>
+        <div id="crosswordGameOptions" style="margin-bottom:1rem;"></div>
+        <div style="display:flex;justify-content:center;gap:0.5rem;flex-wrap:wrap;">
+            <button class="btn btn-success" id="cwMatchVerifyBtn" onclick="CrosswordEngine._checkAll()">✅ تحقق من الحل الكامل</button>
+            <button class="btn btn-outline" onclick="CrosswordMatchEngine._skipRound()">⏭ تخطي الجولة</button>
+        </div>
+        <div id="verifyResultContainer" style="margin-top:0.5rem;min-height:40px;"></div>
+    `;
+
+    // عرض الشبكة باستخدام CrosswordEngine
+    try {
+        CrosswordEngine.renderWithEmptyHidden('crosswordGameOptions');
+        
+        // ✅ تحديث التقدم الأولي
+        setTimeout(() => {
+            this._updateProgressUI(0, totalWords);
+        }, 100);
+    } catch (e) {
+        console.error('❌ Error rendering crossword:', e);
+        container.innerHTML += `
+            <div style="background:rgba(255,107,107,0.1);border:1px solid var(--secondary);border-radius:8px;padding:1rem;text-align:center;margin-top:1rem;">
+                <span style="color:var(--secondary);">⚠️ خطأ في عرض الشبكة</span>
+                <button class="btn btn-primary btn-sm" onclick="CrosswordMatchEngine._skipRound()" style="margin-right:1rem;">تخطي الجولة</button>
+            </div>
+        `;
+    }
+    },
+
+    // التحقق من الجولة الحالية
+    _verifyCurrentRound() {
+        if (!this._isRunning) return;
+        try {
+            CrosswordEngine._checkAll();
+        } catch (e) {
+            console.error('❌ Error verifying round:', e);
+            showToast('❌ خطأ في التحقق من الحل', 'error');
+        }
+    },
+
+_updateProgressUI (completed, total) {
+    // تحديث عداد الكلمات المكتملة في الشبكة
+    const countEl = document.getElementById('crosswordCompletedCount');
+    if (countEl) {
+        countEl.textContent = completed;
+        countEl.style.color = completed === total ? 'var(--success)' : 'var(--accent)';
+    }
+    
+    // تحديث شريط التقدم في رأس المباراة
+    const progressEl = document.querySelector('#cwMatchProgress .fill');
+    if (progressEl) {
+        const progress = total > 0 ? (completed / total) * 100 : 0;
+        progressEl.style.width = `${Math.min(progress, 100)}%`;
+        if (completed === total) {
+            progressEl.style.background = 'linear-gradient(90deg, var(--success), var(--accent))';
+        }
+    }
+    
+    // تحديث النص في شريط التقدم
+    const progressText = document.getElementById('cwProgressText');
+    if (progressText) {
+        progressText.textContent = `${completed}/${total} كلمات`;
+        progressText.style.color = completed === total ? 'var(--success)' : 'var(--gray)';
+    }
+},
+
+    // تخطي الجولة
+    _skipRound() {
+        if (!this._isRunning || this._isWaitingForNext) return;
+        
+        try {
+            const result = CrosswordEngine.getResult ? CrosswordEngine.getResult() : { total: 0, correct: 0 };
+            const total = result.total || 0;
+            
+            // نعطي نقاط تشجيعية قليلة
+            let points = 0;
+            const fullGrid = CrosswordEngine._fullGrid || [];
+            const userGrid = CrosswordEngine._userGrid || [];
+            let correctLetters = 0;
+            
+            if (fullGrid && fullGrid.length > 0) {
+                for (let r = 0; r < fullGrid.length; r++) {
+                    const row = fullGrid[r] || [];
+                    for (let c = 0; c < row.length; c++) {
+                        if (row[c] && userGrid[r] && userGrid[r][c] === row[c]) {
+                            correctLetters++;
+                        }
+                    }
+                }
+            }
+            points = correctLetters * 2; // نقاط تشجيعية
+
+            this._results.push({
+                round: this._currentRoundIndex + 1,
+                correct: 0,
+                wrong: total,
+                total: total,
+                accuracy: 0,
+                points: points,
+                coins: 0,
+                timeTaken: this._totalTime - this._timeLeft,
+                correctLetters: correctLetters,
+                success: false
+            });
+
+            this._currentRoundIndex++;
+            if (this._currentRoundIndex < this._rounds.length) {
+                setTimeout(() => {
+                    if (this._isRunning) this._startRound();
+                }, 500);
+            } else {
+                setTimeout(() => {
+                    this._endMatch();
+                }, 500);
+            }
+            
+        } catch (e) {
+            console.error('❌ Error skipping round:', e);
+            this._currentRoundIndex++;
+            if (this._currentRoundIndex < this._rounds.length) {
+                setTimeout(() => this._startRound(), 300);
+            } else {
+                setTimeout(() => this._endMatch(), 300);
+            }
+        }
+    },
+
+    // المؤقت العام للمباراة
+    _startTimer() {
+        if (this._timerInterval) clearInterval(this._timerInterval);
+        this._timerInterval = setInterval(() => {
+            this._timeLeft--;
+            
+            const timerEl = document.getElementById('cwMatchTimer');
+            if (timerEl) {
+                const mins = Math.floor(this._timeLeft / 60);
+                const secs = this._timeLeft % 60;
+                timerEl.textContent = `⏱ ${mins}:${String(secs).padStart(2,'0')}`;
+                if (this._timeLeft <= 30) {
+                    timerEl.className = 'badge badge-danger';
+                } else {
+                    timerEl.className = 'badge badge-warning';
+                }
+            }
+            
+            if (this._timeLeft <= 0) {
+                clearInterval(this._timerInterval);
+                this._timerInterval = null;
+                if (this._isRunning) {
+                    this._endMatch();
+                }
+            }
+        }, 1000);
+    },
+
+_endMatch: function() {
+    // ✅ منع التكرار - إذا كانت المباراة منتهية بالفعل
+    if (!this._isRunning) {
+        console.log('⏹️ _endMatch: المباراة منتهية بالفعل');
+        return;
+    }
+    
+    console.log('🏁 _endMatch: بدء إنهاء المباراة');
+    
+    // ✅ إيقاف جميع المؤقتات فوراً
+    this._stopTimer();
+    
+    // ✅ منع أي عمليات أخرى
+    this._isRunning = false;
+    this._isWaitingForNext = false;
+    this._endTime = Date.now();
+
+    // ✅ حساب الإحصائيات النهائية بدقة
+    const totalCorrect = this._results.reduce((sum, r) => sum + (r.correct || 0), 0);
+    const totalWrong = this._results.reduce((sum, r) => sum + (r.wrong || 0), 0);
+    const totalQuestions = this._results.reduce((sum, r) => sum + (r.total || 0), 0);
+    const accuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+    const totalPoints = this._results.reduce((sum, r) => sum + (r.points || 0), 0);
+    const totalCoins = this._results.reduce((sum, r) => sum + (r.coins || 0), 0);
+    const totalTime = Math.round((this._endTime - this._startTime) / 1000);
+    
+    // ✅ تفاصيل إضافية
+    const totalRounds = this._results.length;
+    const completedRounds = this._results.filter(r => r.success).length;
+    const totalCorrectLetters = this._results.reduce((sum, r) => sum + (r.correctLetters || 0), 0);
+    const totalLetters = this._results.reduce((sum, r) => sum + (r.totalLetters || 0), 0);
+
+    console.log('📊 Match results:', {
+        totalCorrect,
+        totalWrong,
+        totalQuestions,
+        accuracy,
+        totalPoints,
+        totalCoins,
+        totalTime,
+        rounds: this._results.length,
+        completedRounds,
+        totalCorrectLetters,
+        totalLetters
+    });
+
+    // ✅ إزالة حاوية المباراة من الشاشة
+    const container = document.getElementById('crosswordMatchContainer');
+    if (container) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+    }
+
+    // ✅ عرض رسالة للمستخدم
+    if (totalPoints > 0 || totalCorrect > 0) {
+        showToast(`🏁 انتهت المباراة! ${totalPoints} نقطة • ${totalCoins} عملة • ${accuracy}% دقة`, 'success', 5000);
+    } else {
+        showToast('⏹️ انتهت المباراة دون إجابات صحيحة', 'info', 4000);
+    }
+
+    // ✅ حفظ الإحصائيات مع جميع التفاصيل
+    this._saveStats({
+        totalCorrect,
+        totalWrong,
+        totalQuestions,
+        accuracy,
+        totalPoints,
+        totalCoins,
+        totalTime,
+        totalRounds,
+        completedRounds,
+        totalCorrectLetters,
+        totalLetters,
+        rounds: this._results,
+    });
+
+    // ✅ عرض النتائج المتسلسلة
+    this._showResultsSequence({
+        totalCorrect,
+        totalWrong,
+        totalQuestions,
+        accuracy,
+        totalPoints,
+        totalCoins,
+        totalTime,
+        totalRounds,
+        completedRounds,
+        totalCorrectLetters,
+        totalLetters,
+        rounds: this._results,
+    });
+
+    // ✅ استدعاء onComplete إن وجد
+    if (this._onComplete) {
+        this._onComplete();
+    }
+    
+    console.log('✅ مباراة الكلمات المتقاطعة انتهت بنجاح');
+},
+
+_stopTimer: function() {
+    if (this._timerInterval) {
+        clearInterval(this._timerInterval);
+        this._timerInterval = null;
+        console.log('⏹️ تم إيقاف المؤقت العام');
+    }
+    // ✅ إلغاء أي مؤقتات أخرى (مثل setInterval من _startTimer)
+    if (this._roundTimerInterval) {
+        clearInterval(this._roundTimerInterval);
+        this._roundTimerInterval = null;
+    }
+},
+
+    // عرض النتائج المتسلسلة
+    _showResultsSequence(data) {
+        const user = AuthService.currentUser;
+        const oldTotal = user?.totalScore || 0;
+        const newTotal = oldTotal + data.totalPoints;
+        const oldLevel = getLevel(oldTotal);
+        const newLevel = getLevel(newTotal);
+        const levelsGained = newLevel.level - oldLevel.level;
+
+        // عرض شاشة المستوى
+        if (typeof GameEngine._showLevelScreen === 'function') {
+            GameEngine._showLevelScreen({
+                pointsEarned: data.totalPoints,
+                oldTotal,
+                newTotal,
+                oldLevel,
+                newLevel,
+                levelsGained,
+                onComplete: () => {
+                    this._showQuickStats(data);
+                }
+            });
+        } else {
+            // Fallback: عرض الإحصائيات مباشرة
+            this._showQuickStats(data);
+        }
+    },
+
+    // شاشة الإحصائيات السريعة
+    _showQuickStats(data) {
+        const oldScreen = document.getElementById('crosswordStatsScreen');
+        if (oldScreen) oldScreen.remove();
+
+        const container = document.createElement('div');
+        container.id = 'crosswordStatsScreen';
+        container.style.cssText = `
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 10001;
+            background: #0f0e17;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            animation: fadeUp 0.5s ease;
+            overflow-y: auto;
+        `;
+
+        container.innerHTML = `
+            <div style="max-width:550px;width:100%;text-align:center;">
+                <div style="font-size:3rem;margin-bottom:0.5rem;">📊</div>
+                <h2 style="font-size:1.8rem;font-weight:900;color:#FFD93D;">إحصائيات المباراة</h2>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;margin:1rem 0;">
+                    <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:0.5rem;">
+                        <div style="font-size:1.5rem;font-weight:900;color:#2ecc71;">${data.totalCorrect}</div>
+                        <div style="font-size:0.7rem;color:#a7a9be;">✅ صحيح</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:0.5rem;">
+                        <div style="font-size:1.5rem;font-weight:900;color:#FF6B6B;">${data.totalWrong}</div>
+                        <div style="font-size:0.7rem;color:#a7a9be;">❌ خاطئ</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:0.5rem;">
+                        <div style="font-size:1.5rem;font-weight:900;color:#FFD93D;">${data.accuracy}%</div>
+                        <div style="font-size:0.7rem;color:#a7a9be;">🎯 الدقة</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:0.5rem;grid-column:1/2;">
+                        <div style="font-size:1.2rem;font-weight:900;color:#4fc3f7;">${data.totalTime}s</div>
+                        <div style="font-size:0.7rem;color:#a7a9be;">⏱ الوقت</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:0.5rem;grid-column:2/3;">
+                        <div style="font-size:1.2rem;font-weight:900;color:#FFD93D;">${data.totalPoints}</div>
+                        <div style="font-size:0.7rem;color:#a7a9be;">⭐ النقاط</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:0.5rem;grid-column:3/4;">
+                        <div style="font-size:1.2rem;font-weight:900;color:#FFD93D;">${data.totalCoins}</div>
+                        <div style="font-size:0.7rem;color:#a7a9be;">🪙 النقود</div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;margin-top:0.5rem;">
+                    <button class="btn btn-primary" id="cwShowDetailsBtn">📋 عرض التفاصيل</button>
+                    <button class="btn btn-outline" id="cwShowGeneralStatsBtn">📊 الإحصائيات العامة</button>
+                    <button class="btn btn-success" id="cwFinishBtn">🏠 إنهاء</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(container);
+
+        // ربط الأزرار
+        document.getElementById('cwShowDetailsBtn').addEventListener('click', () => {
+            container.remove();
+            this._showDetailedStats(data);
+        });
+
+        document.getElementById('cwShowGeneralStatsBtn').addEventListener('click', () => {
+            container.remove();
+            this._showGeneralStats();
+        });
+
+        document.getElementById('cwFinishBtn').addEventListener('click', () => {
+            container.remove();
+            const matchContainer = document.getElementById('crosswordMatchContainer');
+            if (matchContainer) matchContainer.style.display = 'none';
+            App._activateSection('dashboard');
+        });
+    },
+
+    // شاشة التفاصيل
+    _showDetailedStats(data) {
+        const oldScreen = document.getElementById('crosswordDetailedStats');
+        if (oldScreen) oldScreen.remove();
+
+        const container = document.createElement('div');
+        container.id = 'crosswordDetailedStats';
+        container.style.cssText = `
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 10002;
+            background: #0f0e17;
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem;
+            overflow-y: auto;
+            animation: fadeUp 0.5s ease;
+        `;
+
+        let roundsHtml = '';
+        if (data.rounds && data.rounds.length > 0) {
+            roundsHtml = data.rounds.map((r, idx) => `
+                <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:0.5rem 1rem;margin-bottom:0.3rem;border-right:3px solid ${(r.success !== false && r.correct === r.total && r.total > 0) ? 'var(--success)' : 'var(--secondary)'};">
+                    <div style="display:flex;justify-content:space-between;font-size:0.85rem;flex-wrap:wrap;gap:0.3rem;">
+                        <span>الجولة ${idx+1}</span>
+                        <span>✅ ${r.correct || 0} / ${r.total || 0}</span>
+                        <span>⭐ ${r.points || 0}</span>
+                        <span>🪙 ${r.coins || 0}</span>
+                        <span style="color:${(r.accuracy || 0) >= 70 ? 'var(--success)' : 'var(--secondary)'};">${r.accuracy || 0}%</span>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            roundsHtml = '<div style="color:var(--gray);text-align:center;padding:1rem;">لا توجد تفاصيل للجولات</div>';
+        }
+
+        container.innerHTML = `
+            <div style="max-width:650px;margin:0 auto;width:100%;">
+                <h2 style="font-size:1.6rem;font-weight:900;color:#FFD93D;text-align:center;margin-bottom:0.5rem;">📋 تفاصيل المباراة</h2>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;margin-bottom:1rem;">
+                    <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:0.5rem;text-align:center;">
+                        <div style="font-size:0.7rem;color:#a7a9be;">الجولات</div>
+                        <div style="font-weight:700;">${data.rounds ? data.rounds.length : 0}</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:0.5rem;text-align:center;">
+                        <div style="font-size:0.7rem;color:#a7a9be;">إجمالي الحروف الصحيحة</div>
+                        <div style="font-weight:700;">${data.rounds ? data.rounds.reduce((s,r) => s + (r.correctLetters || 0), 0) : 0}</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:0.5rem;text-align:center;">
+                        <div style="font-size:0.7rem;color:#a7a9be;">المتوسط</div>
+                        <div style="font-weight:700;">${data.rounds && data.rounds.length > 0 ? Math.round(data.rounds.reduce((s,r) => s + (r.points || 0), 0) / data.rounds.length) : 0} نقطة</div>
+                    </div>
+                </div>
+                <div style="margin-bottom:1rem;max-height:50vh;overflow-y:auto;">
+                    ${roundsHtml}
+                </div>
+                <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;">
+                    <button class="btn btn-outline" id="cwBackToStatsBtn">🔙 العودة</button>
+                    <button class="btn btn-success" id="cwFinishFromDetailsBtn">🏠 الرئيسية</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(container);
+
+        document.getElementById('cwBackToStatsBtn').addEventListener('click', () => {
+            container.remove();
+            this._showQuickStats(data);
+        });
+
+        document.getElementById('cwFinishFromDetailsBtn').addEventListener('click', () => {
+            container.remove();
+            const matchContainer = document.getElementById('crosswordMatchContainer');
+            if (matchContainer) matchContainer.style.display = 'none';
+            App._activateSection('dashboard');
+        });
+        
+        this._lastData = data;
+    },
+
+    // الإحصائيات العامة
+    _showGeneralStats() {
+        const container = document.getElementById('gameStatsContainer');
+        if (container) {
+            container.style.display = 'block';
+            if (typeof GameEngine._showGameStatsInResult === 'function') {
+                GameEngine._showGameStatsInResult();
+            } else {
+                const user = AuthService.currentUser;
+                const stats = user?.stats || {};
+                let html = '';
+                const items = [
+                    { label: 'المباريات', value: stats.general?.totalMatches || 0 },
+                    { label: 'الفوز', value: stats.general?.wins || 0 },
+                    { label: 'الدقة', value: (stats.accuracy || 0) + '%' },
+                    { label: 'أفضل سلسلة', value: stats.records?.highestStreak || 0 },
+                    { label: 'النقاط', value: user?.totalScore || 0 },
+                    { label: 'العملات', value: user?.coins || 0 },
+                ];
+                items.forEach(item => {
+                    html += `<div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;"><div style="font-size:0.6rem;color:var(--gray);">${item.label}</div><div style="font-weight:700;">${item.value}</div></div>`;
+                });
+                const contentEl = document.getElementById('gameStatsContent');
+                if (contentEl) contentEl.innerHTML = html;
+                const containerEl = document.getElementById('gameStatsContainer');
+                if (containerEl) containerEl.style.display = 'block';
+                const btnEl = document.getElementById('showGameStatsBtn');
+                if (btnEl) btnEl.style.display = 'none';
+                showToast('📊 الإحصائيات العامة', 'info', 2000);
+            }
+        } else {
+            showToast('📊 الإحصائيات العامة متوفرة في الملف الشخصي', 'info');
+            App._activateSection('profile');
+        }
+    },
+
+_saveStats(data) {
+    if (typeof updateStatistics === 'function') {
+        const user = AuthService.currentUser;
+        if (user) {
+            try {
+                // ✅ حساب الإحصائيات الإضافية للكلمات المتقاطعة
+                const totalRounds = data.rounds ? data.rounds.length : 0;
+                const totalCorrectWords = data.totalCorrect || 0;
+                const totalWrongWords = data.totalWrong || 0;
+                const totalWords = data.totalQuestions || 0;
+                const accuracy = totalWords > 0 ? Math.round((totalCorrectWords / totalWords) * 100) : 0;
+                
+                // ✅ حساب عدد الحروف الصحيحة الإجمالية
+                const totalCorrectLetters = data.rounds ? data.rounds.reduce((s, r) => s + (r.correctLetters || 0), 0) : 0;
+                
+                const matchData = {
+                    completed: true,
+                    position: 1,
+                    totalPlayers: 1,
+                    win: accuracy >= 70,
+                    draw: false,
+                    answeredCount: totalCorrectWords + totalWrongWords,
+                    correctCount: totalCorrectWords,
+                    wrongCount: totalWrongWords,
+                    skippedCount: 0,
+                    timeoutCount: 0,
+                    firstAnswer: false,
+                    lastAnswer: false,
+                    answersInFirstSecond: 0,
+                    answersInLastSecond: 0,
+                    fastestMatch: 0,
+                    slowestMatch: 0,
+                    allCorrect: totalCorrectWords === totalWords && totalWords > 0,
+                    allWrong: totalCorrectWords === 0 && totalWords > 0,
+                    streak: 0,
+                    matchDuration: data.totalTime || 0,
+                    points: data.totalPoints || 0,
+                    coins: data.totalCoins || 0,
+                    rankPoints: 0,
+                    winStreak: 0,
+                    avgAnswerTime: 0,
+                    avgCorrectAnswerTime: 0,
+                    avgWrongAnswerTime: 0,
+                    speedRank: 0,
+                    mode: 'crossword_match',
+                    isTraining: true,
+                    // ✅ إحصائيات خاصة بالكلمات المتقاطعة
+                    crosswordStats: {
+                        rounds: totalRounds,
+                        correctWords: totalCorrectWords,
+                        wrongWords: totalWrongWords,
+                        totalWords: totalWords,
+                        accuracy: accuracy,
+                        correctLetters: totalCorrectLetters,
+                        points: data.totalPoints,
+                        coins: data.totalCoins,
+                        // ✅ تفاصيل كل جولة
+                        roundDetails: data.rounds ? data.rounds.map(r => ({
+                            round: r.round,
+                            correct: r.correct,
+                            wrong: r.wrong,
+                            total: r.total,
+                            accuracy: r.accuracy,
+                            points: r.points,
+                            coins: r.coins,
+                            timeTaken: r.timeTaken,
+                            success: r.success
+                        })) : []
+                    },
+                    training: {
+                        completed: 1,
+                        bestScore: data.totalPoints || 0,
+                        crosswordRounds: totalRounds,
+                        crosswordCorrect: totalCorrectWords,
+                        crosswordAccuracy: accuracy,
+                    }
+                };
+                updateStatistics(user.uid, matchData);
+                console.log('✅ Statistics saved for crossword match:', matchData);
+            } catch (e) {
+                console.warn('⚠️ Could not save statistics:', e);
+            }
+        }
+    }
+},
+};
+
+// ============================================================
+// CrosswordEngine – محرك الكلمات المتقاطعة (نسخة مصححة)
+// ============================================================
+const CrosswordEngine = {
+    _currentData: null,
+    _userGrid: null,
+    _gridSize: 0,
+    _words: [],
+    _fullGrid: [],
+    _fixedGrid: [],
+    _selectedRow: -1,
+    _selectedCol: -1,
+    _selectedDirection: 'across',
+    _isAnswered: false,
+    _onComplete: null,
+    _verifiedWords: [],
+    _selectedWord: null,
+    _selectedWordCells: [],
+    _timerInterval: null,
+    _timeLeft: 0,
+    _completedCount: 0,
+
+    // ===== التهيئة =====
+    init(crosswordData, onComplete) {
+    if (!crosswordData) {
+        console.error('❌ CrosswordEngine: No data provided');
+        if (onComplete) onComplete(false, 0);
+        return;
+    }
+
+    // ✅ استخراج الكلمات
+    let words = [];
+    try {
+        if (typeof crosswordData.words === 'string') {
+            words = JSON.parse(crosswordData.words);
+        } else {
+            words = crosswordData.words || [];
+        }
+    } catch (e) {
+        console.error('❌ CrosswordEngine: Error parsing words:', e);
+        words = [];
+    }
+
+    if (!words || words.length === 0) {
+        console.error('❌ CrosswordEngine: No words found');
+        if (onComplete) onComplete(false, 0);
+        return;
+    }
+
+    // ✅ إعادة تعيين جميع المتغيرات
+    this._currentData = crosswordData;
+    this._gridSize = crosswordData.gridSize || 5;
+    this._words = words;
+    this._isAnswered = false;
+    this._onComplete = onComplete || null;
+    this._completedCount = 0;
+    this._selectedRow = -1;
+    this._selectedCol = -1;
+    this._selectedDirection = 'across';
+    this._timerInterval = null;
+    this._timeLeft = 0;
+    this._verifiedWords = [];
+    this._selectedWord = null;
+    this._selectedWordCells = [];
+
+    // ✅ ============================================================
+    // ✅ بناء الشبكة الكاملة من البيانات - مع التحقق من الصحة
+    // ✅ ============================================================
+    let rawGrid = crosswordData.grid || [];
+    
+    // التأكد من أن rawGrid هي مصفوفة
+    if (!Array.isArray(rawGrid)) {
+        rawGrid = [];
+    }
+    
+    // إذا كانت rawGrid مصفوفة مسطحة (1D)، نحولها إلى 2D
+    if (rawGrid.length > 0 && !Array.isArray(rawGrid[0])) {
+        const flat = rawGrid;
+        rawGrid = [];
+        for (let r = 0; r < this._gridSize; r++) {
+            const row = [];
+            for (let c = 0; c < this._gridSize; c++) {
+                const idx = r * this._gridSize + c;
+                row.push(idx < flat.length ? flat[idx] : '');
+            }
+            rawGrid.push(row);
+        }
+    }
+    
+    // ✅ التأكد من أن rawGrid لها الحجم الصحيح (this._gridSize × this._gridSize)
+    while (rawGrid.length < this._gridSize) {
+        rawGrid.push(new Array(this._gridSize).fill(''));
+    }
+    for (let r = 0; r < this._gridSize; r++) {
+        if (!Array.isArray(rawGrid[r])) {
+            rawGrid[r] = new Array(this._gridSize).fill('');
+        }
+        while (rawGrid[r].length < this._gridSize) {
+            rawGrid[r].push('');
+        }
+        // اقتصاص الزيادة إذا لزم الأمر
+        if (rawGrid[r].length > this._gridSize) {
+            rawGrid[r] = rawGrid[r].slice(0, this._gridSize);
+        }
+    }
+
+    // ✅ الآن أصبحت rawGrid مصفوفة 2D بالحجم الصحيح
+    this._fullGrid = rawGrid.map(row => [...row]);
+
+    // ✅ ============================================================
+    // ✅ تصحيح fullGrid بناءً على الكلمات المخزونة
+    // ✅ ============================================================
+    for (const w of this._words) {
+        if (!w || !w.word) continue;
+        if (w.row === undefined || w.col === undefined || w.direction === undefined) continue;
+        
+        for (let i = 0; i < w.word.length; i++) {
+            let r, c;
+            if (w.direction === 'across') {
+                r = w.row;
+                c = w.col - i;
+            } else {
+                r = w.row + i;
+                c = w.col;
+            }
+            
+            // ✅ التحقق من أن الخلية ضمن حدود الشبكة
+            if (r >= 0 && r < this._gridSize && c >= 0 && c < this._gridSize) {
+                // ✅ التأكد من وجود الصف
+                if (!this._fullGrid[r]) {
+                    this._fullGrid[r] = new Array(this._gridSize).fill('');
+                }
+                // ✅ التأكد من وجود العمود
+                if (this._fullGrid[r][c] === undefined) {
+                    this._fullGrid[r][c] = '';
+                }
+                // ✅ تصحيح الحرف
+                if (this._fullGrid[r][c] !== w.word[i]) {
+                    console.log(`🔧 تعديل الحرف في fullGrid عند (${r},${c}) من "${this._fullGrid[r][c]}" إلى "${w.word[i]}"`);
+                    this._fullGrid[r][c] = w.word[i];
+                }
+            } else {
+                console.warn(`⚠️ الخلية (${r},${c}) خارج حدود الشبكة (${this._gridSize}x${this._gridSize}) لكلمة "${w.word}"`);
+            }
+        }
+    }
+
+    // ✅ ============================================================
+    // ✅ تهيئة userGrid و fixedGrid
+    // ✅ ============================================================
+    this._userGrid = Array.from({ length: this._gridSize }, () => Array(this._gridSize).fill(''));
+    this._fixedGrid = this._calculateFixedLetters();
+    this._selectFirstEditableCell();
+    this._completedCount = 0;
+
+    console.log(`✅ CrosswordEngine initialized with ${this._words.length} words, grid ${this._gridSize}x${this._gridSize}`);
+    },
+
+_verifyWord: function() {
+    if (this._isAnswered) {
+        showToast('⚠️ هذه الكلمة تم حلها بالفعل', 'info', 1500);
+        return;
+    }
+
+    const cells = this._selectedWordCells || [];
+    const userGrid = this._userGrid || [];
+    const correctWord = this._selectedWord?.word || '';
+    const resultContainer = document.getElementById('verifyResultContainer');
+
+    if (!resultContainer) return;
+
+    // بناء الكلمة من الخلايا بالترتيب الصحيح
+    let userWord = '';
+    for (const cell of cells) {
+        const char = userGrid[cell.row]?.[cell.col] || '';
+        userWord += char;
+    }
+
+    // إذا كانت الكلمة فارغة أو ناقصة
+    if (userWord.length < cells.length) {
+        resultContainer.innerHTML = `
+            <div style="font-size:0.85rem;padding:0.4rem 1rem;background:rgba(255,107,107,0.1);border-radius:8px;border:1px solid var(--secondary);">
+                ⚠️ لم تكتمل جميع الحروف (${userWord.length}/${cells.length})
+            </div>
+        `;
+        showToast(`⚠️ تحتاج إلى ملء ${cells.length - userWord.length} حرفاً آخر`, 'error', 2000);
+        return;
+    }
+
+    // توحيد الحالة
+    const userWordUpper = userWord.toUpperCase();
+    const correctWordUpper = correctWord.toUpperCase();
+
+    // محاولة عكس الكلمة إذا لزم الأمر (للحالات التي يكون فيها الترتيب معكوساً)
+    let isCorrect = userWordUpper === correctWordUpper;
+    if (!isCorrect) {
+        const reversed = userWordUpper.split('').reverse().join('');
+        isCorrect = reversed === correctWordUpper;
+    }
+
+    console.log(`🔍 Verifying word: "${userWord}" vs "${correctWord}" - ${isCorrect ? '✅ Correct' : '❌ Wrong'}`);
+
+    if (isCorrect) {
+        // ... باقي الكود كما هو (عند النجاح)
+        resultContainer.innerHTML = `
+            <div style="font-size:1rem;padding:0.5rem 1rem;background:rgba(46,204,113,0.1);border-radius:8px;border:1px solid var(--success);">
+                🎉 تهانينا! الكلمة "${correctWord}" صحيحة تماماً!
+            </div>
+        `;
+        showToast(`✅ الكلمة "${correctWord}" صحيحة!`, 'success', 3000);
+        if (typeof SoundSystem !== 'undefined') SoundSystem.playCorrect();
+
+        // تثبيت الخلايا في الشبكة الرئيسية
+        for (const cell of cells) {
+            const char = userGrid[cell.row]?.[cell.col] || '';
+            if (char) {
+                const cellEl = document.querySelector(`.crossword-cell[data-row="${cell.row}"][data-col="${cell.col}"]`);
+                if (cellEl) {
+                    cellEl.style.background = 'rgba(46, 204, 113, 0.25)';
+                    cellEl.style.borderColor = 'var(--success)';
+                    cellEl.style.color = 'var(--success)';
+                    cellEl.dataset.completed = 'true';
+                    if (!cellEl.querySelector('.completed-check')) {
+                        const check = document.createElement('span');
+                        check.className = 'completed-check';
+                        check.textContent = '✓';
+                        check.style.cssText = 'position:absolute;top:-4px;right:-4px;font-size:0.5rem;color:var(--success);font-weight:700;background:var(--dark);border-radius:50%;padding:0 2px;';
+                        cellEl.style.position = 'relative';
+                        cellEl.appendChild(check);
+                    }
+                }
+            }
+        }
+
+        // تحديث الإحصائيات
+        const completedCount = this._updateStats();
+        if (typeof CrosswordMatchEngine !== 'undefined' && CrosswordMatchEngine._updateProgressUI) {
+            const totalWords = this._words ? this._words.length : 0;
+            CrosswordMatchEngine._updateProgressUI(completedCount, totalWords);
+        }
+
+        const verifyBtn = document.getElementById('crosswordVerifyBtn');
+        if (verifyBtn) {
+            verifyBtn.disabled = true;
+            verifyBtn.innerHTML = '✅ تم الحل';
+            verifyBtn.style.opacity = '0.6';
+        }
+
+        this._isAnswered = true;
+        if (!this._verifiedWords) this._verifiedWords = [];
+        this._verifiedWords.push({
+            word: this._selectedWord.word,
+            row: this._selectedWord.row,
+            col: this._selectedWord.col,
+            direction: this._selectedWord.direction
+        });
+
+        setTimeout(() => {
+            this._closeSolveModal();
+            this.renderWithEmptyHidden('crosswordGameOptions');
+            let allCompleted = true;
+            for (const w of this._words) {
+                if (!this._isWordComplete(w)) {
+                    allCompleted = false;
+                    break;
+                }
+            }
+            if (allCompleted && this._onComplete) {
+                this._onComplete(true, this._words.length);
+            } else if (this._onComplete) {
+                const currentCompleted = this._words.filter(w => this._isWordComplete(w)).length;
+                this._onComplete(false, currentCompleted);
+            }
+        }, 1500);
+
+    } else {
+        // ... الحالة الخاطئة
+        resultContainer.innerHTML = `
+            <div style="font-size:0.9rem;padding:0.4rem 1rem;background:rgba(255,107,107,0.1);border-radius:8px;border:1px solid var(--secondary);">
+                ❌ الكلمة غير صحيحة. حاول مرة أخرى!
+            </div>
+        `;
+        showToast('❌ الكلمة غير صحيحة، حاول مرة أخرى', 'error', 2500);
+        if (typeof SoundSystem !== 'undefined') SoundSystem.playWrong();
+
+        // تمييز الخلايا الخاطئة مؤقتاً
+        for (const cell of cells) {
+            const userChar = userGrid[cell.row]?.[cell.col] || '';
+            if (userChar) {
+                const cellEl = document.querySelector(`.crossword-cell[data-row="${cell.row}"][data-col="${cell.col}"]`);
+                if (cellEl) {
+                    cellEl.style.background = 'rgba(255, 107, 107, 0.25)';
+                    cellEl.style.borderColor = 'var(--secondary)';
+                    cellEl.style.color = 'var(--secondary)';
+                    setTimeout(() => {
+                        const currentChar = userGrid[cell.row]?.[cell.col] || '';
+                        if (currentChar) {
+                            cellEl.style.background = 'var(--primary)';
+                            cellEl.style.borderColor = 'var(--primary-light)';
+                            cellEl.style.color = 'var(--light)';
+                        } else {
+                            cellEl.style.background = 'var(--glass)';
+                            cellEl.style.borderColor = 'var(--border-color)';
+                            cellEl.style.color = 'var(--gray)';
+                        }
+                    }, 1500);
+                }
+            }
+        }
+
+        const verifyBtn = document.getElementById('crosswordVerifyBtn');
+        if (verifyBtn) {
+            verifyBtn.disabled = false;
+            verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> تحقق من الكلمة';
+            verifyBtn.style.opacity = '1';
+        }
+        this._isAnswered = false;
+    }
+},
+
+    // ===== دوال مساعدة =====
+    _calculateFixedLetters() {
+        return Array.from({ length: this._gridSize }, () => Array(this._gridSize).fill(''));
+    },
+
+    _selectFirstEditableCell() {
+        if (!this._words || this._words.length === 0) {
+            console.warn('⚠️ No words available');
+            this._selectedRow = 0;
+            this._selectedCol = 0;
+            return;
+        }
+
+        for (const w of this._words) {
+            if (!w || !w.word) continue;
+            for (let i = 0; i < w.word.length; i++) {
+                let r, c;
+                if (w.direction === 'across') {
+                    r = w.row;
+                    c = w.col - i;
+                } else {
+                    r = w.row + i;
+                    c = w.col;
+                }
+                if (r >= 0 && r < this._gridSize && c >= 0 && c < this._gridSize) {
+                    this._selectedRow = r;
+                    this._selectedCol = c;
+                    this._selectedDirection = w.direction || 'across';
+                    return;
+                }
+            }
+        }
+
+        if (this._words.length > 0) {
+            const w = this._words[0];
+            this._selectedRow = w.row || 0;
+            this._selectedCol = w.col || 0;
+            this._selectedDirection = w.direction || 'across';
+        } else {
+            this._selectedRow = 0;
+            this._selectedCol = 0;
+            this._selectedDirection = 'across';
+        }
+    },
+
+    _isCellInWord(row, col) {
+        if (!this._words) return false;
+        for (const w of this._words) {
+            if (w.direction === 'across') {
+                if (row === w.row && col <= w.col && col > w.col - w.word.length) {
+                    return true;
+                }
+            } else {
+                if (col === w.col && row >= w.row && row < w.row + w.word.length) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    },
+
+_isWordComplete: function(wordObj) {
+    if (!wordObj || !wordObj.word) return false;
+    if (wordObj.row === undefined || wordObj.col === undefined || wordObj.direction === undefined) return false;
+
+    const userGrid = this._userGrid || [];
+    const correctWord = wordObj.word;
+
+    // بناء الكلمة من الخلايا حسب الاتجاه
+    let userWord = '';
+    for (let i = 0; i < correctWord.length; i++) {
+        let r, c;
+        if (wordObj.direction === 'across') {
+            r = wordObj.row;
+            c = wordObj.col - i; // من اليمين إلى اليسار
+        } else {
+            r = wordObj.row + i;
+            c = wordObj.col;
+        }
+        if (r < 0 || r >= this._gridSize || c < 0 || c >= this._gridSize) return false;
+        const char = userGrid[r]?.[c] || '';
+        userWord += char;
+    }
+
+    // مقارنة مع تجاهل الحالة، مع محاولة عكس الترتيب إذا لزم الأمر
+    const userWordUpper = userWord.toUpperCase();
+    const correctWordUpper = correctWord.toUpperCase();
+    if (userWordUpper === correctWordUpper) return true;
+    // محاولة معكوسة
+    const reversed = userWordUpper.split('').reverse().join('');
+    return reversed === correctWordUpper;
+},
+
+// استبدال دالة _updateStats بأكملها
+_updateStats() {
+    if (!this._words || this._words.length === 0) {
+        console.warn('⚠️ No words found in _updateStats');
+        return 0;
+    }
+
+    // ✅ حساب الكلمات المكتملة باستخدام _isWordComplete
+    let completed = 0;
+    for (const w of this._words) {
+        if (this._isWordComplete(w)) {
+            completed++;
+        }
+    }
+
+    console.log(`📊 _updateStats: ${completed}/${this._words.length} words completed`);
+    console.log('📊 User grid:', JSON.stringify(this._userGrid));
+    console.log('📊 Full grid:', JSON.stringify(this._fullGrid));
+
+    // ✅ تحديث عداد الكلمات المكتملة في الشبكة
+    const el = document.getElementById('crosswordCompletedCount');
+    if (el) {
+        el.textContent = completed;
+        if (completed === this._words.length && this._words.length > 0) {
+            el.style.color = 'var(--success)';
+            el.style.fontWeight = '900';
+        } else {
+            el.style.color = 'var(--accent)';
+            el.style.fontWeight = '700';
+        }
+    }
+
+    // ✅ تحديث شريط التقدم
+    const progressEl = document.getElementById('cwMatchProgress');
+    if (progressEl) {
+        const total = this._words.length;
+        const progress = total > 0 ? (completed / total) * 100 : 0;
+        progressEl.style.width = `${Math.min(progress, 100)}%`;
+        if (completed === total && total > 0) {
+            progressEl.style.background = 'linear-gradient(90deg, var(--success), var(--accent))';
+            progressEl.style.boxShadow = '0 0 20px rgba(46, 204, 113, 0.3)';
+        } else {
+            progressEl.style.background = 'linear-gradient(90deg, var(--primary), var(--accent))';
+            progressEl.style.boxShadow = 'none';
+        }
+    }
+
+    // ✅ تحديث النص
+    const progressText = document.getElementById('cwProgressText');
+    if (progressText) {
+        if (completed === this._words.length && this._words.length > 0) {
+            progressText.textContent = `✅ ${completed}/${this._words.length} كلمات`;
+            progressText.style.color = 'var(--success)';
+        } else {
+            progressText.textContent = `${completed}/${this._words.length} كلمات`;
+            progressText.style.color = 'var(--gray)';
+        }
+    }
+
+    return completed;
+},
+
+    // ===== تحديث ألوان الخلايا =====
+    _updateGridColors(correctWords, wrongWords) {
+        // ✅ تلوين الخلايا الصحيحة باللون الأخضر
+        for (const w of correctWords) {
+            for (let i = 0; i < w.word.length; i++) {
+                let r, c;
+                if (w.direction === 'across') {
+                    r = w.row;
+                    c = w.col - i;
+                } else {
+                    r = w.row + i;
+                    c = w.col;
+                }
+                if (r >= 0 && r < this._gridSize && c >= 0 && c < this._gridSize) {
+                    const cellEl = document.querySelector(`.crossword-cell[data-row="${r}"][data-col="${c}"]`);
+                    if (cellEl) {
+                        cellEl.style.background = 'rgba(46, 204, 113, 0.25)';
+                        cellEl.style.borderColor = 'var(--success)';
+                        cellEl.style.color = 'var(--success)';
+                        cellEl.dataset.completed = 'true';
+                        if (!cellEl.querySelector('.completed-check')) {
+                            const check = document.createElement('span');
+                            check.className = 'completed-check';
+                            check.textContent = '✓';
+                            check.style.cssText = 'position:absolute;top:-4px;right:-4px;font-size:0.5rem;color:var(--success);font-weight:700;background:var(--dark);border-radius:50%;padding:0 2px;';
+                            cellEl.style.position = 'relative';
+                            cellEl.appendChild(check);
+                        }
+                    }
+                }
+            }
+        }
+
+        // ✅ تلوين الخلايا الخاطئة باللون الأحمر
+        for (const w of wrongWords) {
+            for (let i = 0; i < w.word.length; i++) {
+                let r, c;
+                if (w.direction === 'across') {
+                    r = w.row;
+                    c = w.col - i;
+                } else {
+                    r = w.row + i;
+                    c = w.col;
+                }
+                if (r >= 0 && r < this._gridSize && c >= 0 && c < this._gridSize) {
+                    const userChar = this._userGrid?.[r]?.[c] || '';
+                    if (userChar) {
+                        const cellEl = document.querySelector(`.crossword-cell[data-row="${r}"][data-col="${c}"]`);
+                        if (cellEl) {
+                            cellEl.style.background = 'rgba(255, 107, 107, 0.25)';
+                            cellEl.style.borderColor = 'var(--secondary)';
+                            cellEl.style.color = 'var(--secondary)';
+                        }
+                    }
+                }
+            }
+        }
+    },
+
+    // ===== التحقق من الحل =====
+    _checkAll() {
+    if (!this._words || this._words.length === 0) {
+        showToast('⚠️ لا توجد كلمات للتحقق', 'info');
+        return;
+    }
+
+    // ✅ حساب الكلمات المكتملة
+    let completedCount = 0;
+    const completionStatus = [];
+    
+    for (const w of this._words) {
+        const isComplete = this._isWordComplete(w);
+        if (isComplete) {
+            completedCount++;
+        }
+        completionStatus.push({ word: w.word, complete: isComplete });
+    }
+    
+    const totalWords = this._words.length;
+    const allComplete = (completedCount === totalWords);
+
+    console.log(`🔍 _checkAll: ${completedCount}/${totalWords} words completed`);
+    console.log('📊 Completion status:', completionStatus);
+
+    // ✅ تحديث الإحصائيات
+    this._updateStats();
+    
+    // ✅ تحديث التقدم في واجهة المباراة
+    if (typeof CrosswordMatchEngine !== 'undefined' && CrosswordMatchEngine._updateProgressUI) {
+        CrosswordMatchEngine._updateProgressUI(completedCount, totalWords);
+    }
+
+    if (allComplete) {
+        this._isAnswered = true;
+        showToast(`🎉 تهانينا! لقد حللت جميع الكلمات! (${completedCount}/${totalWords})`, 'success', 5000);
+        
+        if (typeof SoundSystem !== 'undefined') {
+            SoundSystem.playCorrect();
+            SoundSystem.playLevelUp();
+        }
+
+        // ✅ تعطيل جميع الخلايا
+        document.querySelectorAll('.crossword-cell[data-editable="true"]').forEach(el => {
+            el.style.cursor = 'default';
+            el.dataset.editable = 'false';
+            el.tabIndex = '-1';
+        });
+
+        this._stopTimer();
+
+        const checkBtn = document.getElementById('cwMatchVerifyBtn');
+        if (checkBtn) {
+            checkBtn.disabled = true;
+            checkBtn.textContent = '✅ تم الحل';
+            checkBtn.style.opacity = '0.6';
+        }
+
+        // ✅ إعلام المحرك باكتمال الجولة
+        if (this._onComplete) {
+            this._onComplete(true, this._words.length);
+        }
+    } else {
+        const remaining = totalWords - completedCount;
+        showToast(`⚠️ لم تكتمل بعد! تبقى ${remaining} كلمة`, 'error', 3000);
+        
+        if (typeof SoundSystem !== 'undefined') {
+            SoundSystem.playWrong();
+        }
+        
+        // ✅ إعلام المحرك بالتقدم
+        if (this._onComplete) {
+            this._onComplete(false, completedCount);
+        }
+    }
+    },
+
+    // ===== الحصول على النتيجة =====
+    getResult() {
+        if (!this._words || this._words.length === 0) {
+            return { total: 0, correct: 0, percentage: 0, isComplete: false };
+        }
+
+        const total = this._words.length;
+        let correct = 0;
+
+        for (const w of this._words) {
+            if (this._isWordComplete(w)) {
+                correct++;
+            }
+        }
+
+        const percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
+        const isComplete = correct === total;
+
+        return { total, correct, percentage, isComplete };
+    },
+
+    // ===== عرض الشبكة =====
+    renderWithEmptyHidden(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) {
+            console.warn(`⚠️ Container "${containerId}" not found`);
+            return;
+        }
+
+        if (!this._words || this._words.length === 0) {
+            container.innerHTML = `<div class="text-gray" style="text-align:center;padding:2rem;">⚠️ لا توجد كلمات في هذه الشبكة</div>`;
+            return;
+        }
+
+        if (!this._fullGrid || this._fullGrid.length === 0) {
+            container.innerHTML = `<div class="text-gray" style="text-align:center;padding:2rem;">⚠️ بيانات الشبكة غير صالحة</div>`;
+            return;
+        }
+
+        const cellsWithLetters = new Set();
+        for (const w of this._words) {
+            if (!w || !w.word) continue;
+            for (let i = 0; i < w.word.length; i++) {
+                let r, c;
+                if (w.direction === 'across') {
+                    r = w.row;
+                    c = w.col - i;
+                } else {
+                    r = w.row + i;
+                    c = w.col;
+                }
+                if (r >= 0 && r < this._gridSize && c >= 0 && c < this._gridSize) {
+                    cellsWithLetters.add(`${r},${c}`);
+                }
+            }
+        }
+
+        if (cellsWithLetters.size === 0) {
+            container.innerHTML = `<div class="text-gray" style="text-align:center;padding:2rem;">⚠️ لا توجد حروف في الشبكة</div>`;
+            return;
+        }
+
+        const gridSize = this._gridSize;
+
+        let html = `
+            <div style="max-width:500px;margin:0 auto;text-align:center;direction:ltr;padding:0.5rem;">
+                <div style="margin-bottom:0.5rem;color:var(--gray);font-size:0.85rem;">
+                    <i class="fas fa-info-circle"></i> املأ الخلايا الفارغة بالحروف المناسبة
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(${gridSize},1fr);gap:4px;max-width:400px;margin:0 auto;direction:ltr;">
+        `;
+
+        for (let r = 0; r < gridSize; r++) {
+            for (let c = 0; c < gridSize; c++) {
+                const cellKey = `${r},${c}`;
+                const isInWord = cellsWithLetters.has(cellKey);
+
+                if (!isInWord) {
+                    html += `
+                        <div style="
+                            aspect-ratio:1;
+                            min-height:36px;
+                            visibility:hidden;
+                            pointer-events:none;
+                        "></div>
+                    `;
+                    continue;
+                }
+
+                const userChar = this._userGrid?.[r]?.[c] || '';
+                const gridChar = this._fullGrid?.[r]?.[c] || '';
+                const isFilled = userChar !== '';
+                const isCorrect = isFilled && userChar.toUpperCase() === gridChar.toUpperCase();
+                const isWrong = isFilled && userChar.toUpperCase() !== gridChar.toUpperCase();
+                const isActive = (r === this._selectedRow && c === this._selectedCol);
+
+                let bgColor, textColor, borderColor, cursor;
+
+                if (isActive) {
+                    bgColor = 'var(--accent)';
+                    textColor = 'var(--dark)';
+                    borderColor = 'var(--accent)';
+                    cursor = 'pointer';
+                } else if (isFilled) {
+                    if (isCorrect) {
+                        bgColor = 'rgba(46, 204, 113, 0.25)';
+                        textColor = 'var(--success)';
+                        borderColor = 'var(--success)';
+                    } else if (isWrong) {
+                        bgColor = 'rgba(255, 107, 107, 0.25)';
+                        textColor = 'var(--secondary)';
+                        borderColor = 'var(--secondary)';
+                    } else {
+                        bgColor = 'var(--primary)';
+                        textColor = 'var(--light)';
+                        borderColor = 'var(--primary-light)';
+                    }
+                    cursor = 'pointer';
+                } else {
+                    bgColor = 'var(--glass)';
+                    textColor = 'var(--gray)';
+                    borderColor = 'var(--border-color)';
+                    cursor = 'pointer';
+                }
+
+                html += `
+                    <div class="crossword-cell ${isActive ? 'active' : ''} ${isFilled ? 'filled' : ''}"
+                         data-row="${r}" data-col="${c}"
+                         data-editable="true"
+                         style="
+                            aspect-ratio:1;
+                            background:${bgColor};
+                            border:2px solid ${borderColor};
+                            border-radius:8px;
+                            display:flex;
+                            align-items:center;
+                            justify-content:center;
+                            font-size:1.5rem;
+                            font-weight:700;
+                            color:${textColor};
+                            cursor:${cursor};
+                            transition:all 0.2s ease;
+                            user-select:none;
+                            min-height:50px;
+                            ${isFilled ? 'animation: fadeUp 0.2s ease;' : ''}
+                            touch-action: none;
+                         "
+                         onclick="CrosswordEngine._openSolveModal(${r},${c})"
+                         contenteditable="false"
+                         tabindex="0"
+                    >
+                        ${isFilled ? userChar : ' '}
+                    </div>
+                `;
+            }
+        }
+
+        html += `
+                </div>
+                <div style="margin-top:1rem;text-align:right;background:var(--glass);border-radius:12px;padding:0.8rem;border:1px solid var(--border-color);max-height:150px;overflow-y:auto;">
+                    <div style="font-weight:700;color:var(--accent);margin-bottom:0.3rem;">📖 الأدلة</div>
+                    ${this._words.map((w, idx) => {
+                        if (!w || !w.word) return '';
+                        const completed = this._isWordComplete(w);
+                        return `
+                            <div class="clue-item" style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--glass-border);font-size:0.8rem;color:var(--gray);${completed ? 'background:rgba(46,204,113,0.05);border-right:3px solid var(--success);' : ''}">
+                                <span>${w.clue || 'دليل'}</span>
+                                <span class="clue-status" style="font-weight:600;color:${completed ? 'var(--success)' : 'var(--light)'};">${completed ? '✅' : w.word.length + ' حروف'}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-top:0.8rem;font-size:0.8rem;color:var(--gray);">
+                    <span>✅ المكتملة: <strong id="crosswordCompletedCount" style="color:var(--success);">0</strong>/${this._words.length}</span>
+                    <span>⏱ <span id="crosswordTimer">${this._currentData?.timeLimit || 120}</span>s</span>
+                </div>
+                <button class="btn btn-success mt-1" onclick="CrosswordEngine._checkAll()" style="width:100%;justify-content:center;">
+                    <i class="fas fa-check-circle"></i> تحقق من الحل
+                </button>
+            </div>
+        `;
+
+        container.innerHTML = html;
+        this._updateStats();
+        this._startTimer();
+
+        setTimeout(() => {
+            const activeCell = container.querySelector('.crossword-cell.active');
+            if (activeCell && activeCell.dataset.editable === 'true') {
+                activeCell.focus();
+                activeCell.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            } else {
+                const firstEditable = container.querySelector('.crossword-cell[data-editable="true"]');
+                if (firstEditable) {
+                    firstEditable.focus();
+                    const row = parseInt(firstEditable.dataset.row);
+                    const col = parseInt(firstEditable.dataset.col);
+                    this._selectedRow = row;
+                    this._selectedCol = col;
+                    this.renderWithEmptyHidden(containerId);
+                }
+            }
+        }, 100);
+    },
+
+    // ===== المودال =====
+    _openSolveModal(row, col) {
+        if (this._isAnswered) return;
+
+        let foundWord = null;
+        let foundCells = [];
+
+        for (const w of this._words) {
+            if (!w || !w.word) continue;
+            const cells = [];
+            let isInWord = false;
+
+            for (let i = 0; i < w.word.length; i++) {
+                let r, c;
+                if (w.direction === 'across') {
+                    r = w.row;
+                    c = w.col - i;
+                } else {
+                    r = w.row + i;
+                    c = w.col;
+                }
+                if (r >= 0 && r < this._gridSize && c >= 0 && c < this._gridSize) {
+                    cells.push({ row: r, col: c, char: w.word[i], index: i });
+                    if (r === row && c === col) {
+                        isInWord = true;
+                    }
+                }
+            }
+
+            if (isInWord) {
+                foundWord = w;
+                foundCells = cells;
+                break;
+            }
+        }
+
+        if (!foundWord) {
+            showToast('⚠️ هذه الخلية لا تنتمي لأي كلمة', 'info');
+            return;
+        }
+
+        const wordCompleted = foundCells.every(cell => {
+            const userChar = this._userGrid?.[cell.row]?.[cell.col] || '';
+            return userChar === cell.char;
+        });
+
+        if (wordCompleted) {
+            showToast('✅ هذه الكلمة تم حلها بالفعل!', 'success', 2000);
+            return;
+        }
+
+        this._selectedWord = foundWord;
+        this._selectedWordCells = foundCells;
+
+        let selectedRow = row;
+        let selectedCol = col;
+        const firstEmpty = foundCells.find(cell => !this._userGrid?.[cell.row]?.[cell.col]);
+        if (firstEmpty) {
+            selectedRow = firstEmpty.row;
+            selectedCol = firstEmpty.col;
+        }
+        this._selectedRow = selectedRow;
+        this._selectedCol = selectedCol;
+
+        const verifyBtn = document.getElementById('crosswordVerifyBtn');
+        if (verifyBtn) {
+            verifyBtn.disabled = false;
+            verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> تحقق من الكلمة';
+            verifyBtn.style.opacity = '1';
+        }
+
+        const resultContainer = document.getElementById('verifyResultContainer');
+        if (resultContainer) {
+            resultContainer.innerHTML = '';
+        }
+
+        this._isAnswered = false;
+
+        this._fillSolveModal(foundWord, foundCells);
+
+        const modal = document.getElementById('crosswordSolveModal');
+        if (modal) {
+            modal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+
+            setTimeout(() => {
+                this._updateSolveModalLetters();
+                const inputs = document.querySelectorAll('.crossword-cell-input:not([disabled])');
+                if (inputs.length > 0) {
+                    inputs[0].focus();
+                    inputs[0].select();
+                }
+            }, 100);
+        }
+    },
+
+    _fillSolveModal(word, cells) {
+        const modal = document.getElementById('crosswordSolveModal');
+        if (!modal) return;
+
+        document.getElementById('crosswordClueDisplay').textContent = word.clue || 'لا يوجد دليل';
+        document.getElementById('crosswordWordLength').textContent = word.word.length;
+
+        const dirText = word.direction === 'across' ? '← أفقي (يمين→يسار)' : '↓ عمودي (أعلى→أسفل)';
+        document.getElementById('crosswordDirectionText').textContent = dirText;
+
+        this._updateSolveModalLetters();
+
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+
+        setTimeout(() => {
+            const input = document.querySelector('.crossword-cell-input:not([disabled])');
+            if (input) {
+                input.focus();
+                input.select();
+            }
+        }, 300);
+    },
+
+    _updateSolveModalLetters() {
+        const container = document.getElementById('crosswordCurrentLetters');
+        if (!container) return;
+
+        const cells = this._selectedWordCells || [];
+        const userGrid = this._userGrid || [];
+
+        if (cells.length === 0) {
+            container.innerHTML = '<div class="text-gray" style="font-size:0.8rem;padding:0.5rem;">لا توجد خلايا</div>';
+            return;
+        }
+
+        const verifyBtn = document.getElementById('crosswordVerifyBtn');
+        if (verifyBtn && !this._isAnswered) {
+            verifyBtn.disabled = false;
+            verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> تحقق من الكلمة';
+            verifyBtn.style.opacity = '1';
+        }
+
+        let html = '';
+        let filledCount = 0;
+
+        cells.forEach((cell, index) => {
+            const userChar = userGrid[cell.row]?.[cell.col] || '';
+            const isSelected = (cell.row === this._selectedRow && cell.col === this._selectedCol);
+            const isFilled = userChar !== '';
+            if (isFilled) filledCount++;
+
+            const isInVerifiedWord = this._isCellInVerifiedWord(cell.row, cell.col);
+            const isVerifiedChar = isInVerifiedWord && isFilled;
+
+            let bgColor, borderColor, textColor;
+            let isDisabled = false;
+
+            if (isVerifiedChar) {
+                bgColor = 'rgba(46, 204, 113, 0.25)';
+                borderColor = 'var(--success)';
+                textColor = 'var(--success)';
+                isDisabled = true;
+            } else if (isSelected) {
+                bgColor = 'var(--accent)';
+                borderColor = 'var(--accent)';
+                textColor = 'var(--dark)';
+            } else if (isFilled) {
+                bgColor = 'var(--primary)';
+                borderColor = 'var(--primary-light)';
+                textColor = 'var(--light)';
+            } else {
+                bgColor = 'var(--glass)';
+                borderColor = 'var(--border-color)';
+                textColor = 'var(--gray)';
+            }
+
+            const displayChar = isFilled ? userChar : '';
+
+            html += `
+                <div class="crossword-solve-cell"
+                     data-row="${cell.row}"
+                     data-col="${cell.col}"
+                     style="
+                        background: ${bgColor};
+                        border-color: ${borderColor};
+                        color: ${textColor};
+                        aspect-ratio:1;
+                        width:52px;
+                        height:52px;
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
+                        border:2px solid ${borderColor};
+                        border-radius:12px;
+                        font-size:1.6rem;
+                        font-weight:800;
+                        transition:all 0.25s ease;
+                        cursor:pointer;
+                        user-select:none;
+                        position:relative;
+                        font-family:var(--font);
+                        text-transform:uppercase;
+                        ${isDisabled ? 'cursor:default;' : ''}
+                     "
+                     onclick="${isDisabled ? '' : `CrosswordEngine._handleCellClick(${cell.row},${cell.col})`}"
+                >
+                    <input type="text"
+                           class="crossword-cell-input"
+                           data-row="${cell.row}"
+                           data-col="${cell.col}"
+                           maxlength="1"
+                           value="${isFilled ? userChar : ''}"
+                           style="
+                               position:absolute;
+                               top:0;left:0;
+                               width:100%;height:100%;
+                               background:transparent;
+                               border:none;
+                               outline:none;
+                               text-align:center;
+                               font-size:inherit;
+                               font-weight:inherit;
+                               font-family:inherit;
+                               color:inherit;
+                               text-transform:uppercase;
+                               cursor:${isDisabled ? 'default' : 'pointer'};
+                               padding:0;margin:0;
+                               border-radius:inherit;
+                               caret-color:transparent;
+                               -webkit-user-select:none;
+                               user-select:none;
+                               pointer-events:${isDisabled ? 'none' : 'auto'};
+                           "
+                           onfocus="this.select()"
+                           oninput="CrosswordEngine._handleCellInput(this)"
+                           onkeydown="CrosswordEngine._handleCellKeydown(event, this)"
+                           autocomplete="off"
+                           spellcheck="false"
+                           ${isDisabled ? 'disabled' : ''}
+                    >
+                    <span class="cell-number" style="position:absolute;bottom:2px;right:6px;font-size:0.45rem;color:var(--gray-dark);font-weight:600;opacity:0.6;">${index + 1}</span>
+                    ${isVerifiedChar ? '<span style="position:absolute;top:-4px;right:-4px;font-size:0.5rem;color:var(--success);font-weight:700;">✓</span>' : ''}
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+
+        const filledEl = document.getElementById('crosswordFilledCount');
+        if (filledEl) {
+            filledEl.textContent = `${filledCount}/${cells.length} مملوءة`;
+            filledEl.style.color = filledCount === cells.length ? 'var(--success)' : 'var(--gray)';
+        }
+
+        const lenEl = document.getElementById('crosswordWordLength');
+        if (lenEl) lenEl.textContent = cells.length;
+
+        if (this._selectedRow >= 0 && this._selectedCol >= 0 && !this._isAnswered) {
+            setTimeout(() => {
+                const input = container.querySelector(`.crossword-cell-input[data-row="${this._selectedRow}"][data-col="${this._selectedCol}"]`);
+                if (input && !input.disabled) {
+                    input.focus();
+                    input.select();
+                }
+            }, 50);
+        }
+    },
+
+    _isCellInVerifiedWord(row, col) {
+        if (!this._verifiedWords) return false;
+        for (const w of this._verifiedWords) {
+            for (let i = 0; i < w.word.length; i++) {
+                let r, c;
+                if (w.direction === 'across') {
+                    r = w.row;
+                    c = w.col - i;
+                } else {
+                    r = w.row + i;
+                    c = w.col;
+                }
+                if (r === row && c === col) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    },
+
+    _handleCellClick(row, col) {
+        if (this._isAnswered) return;
+
+        const isInWord = this._selectedWordCells.some(cell =>
+            cell.row === row && cell.col === col
+        );
+
+        if (!isInWord) {
+            showToast('⚠️ هذه الخلية ليست ضمن الكلمة المحددة', 'info', 1500);
+            return;
+        }
+
+        this._selectedRow = row;
+        this._selectedCol = col;
+
+        const resultContainer = document.getElementById('verifyResultContainer');
+        if (resultContainer) {
+            resultContainer.innerHTML = '';
+        }
+
+        this._updateSolveModalLetters();
+    },
+
+    _handleCellInput(input) {
+        if (this._isAnswered) return;
+
+        const row = parseInt(input.dataset.row);
+        const col = parseInt(input.dataset.col);
+        const value = input.value.trim();
+
+        if (!value) {
+            this._userGrid[row][col] = '';
+            this.renderWithEmptyHidden('crosswordGameOptions');
+            this._updateStats();
+            this._updateSolveModalLetters();
+            return;
+        }
+
+        const char = value.charAt(0).toUpperCase();
+
+        const isInWord = this._selectedWordCells.some(cell =>
+            cell.row === row && cell.col === col
+        );
+
+        if (!isInWord) {
+            showToast('⚠️ الخلية المحددة ليست ضمن هذه الكلمة', 'error', 1500);
+            input.value = '';
+            return;
+        }
+
+        this._userGrid[row][col] = char;
+
+        if (typeof SoundSystem !== 'undefined') {
+            SoundSystem.playClick();
+        }
+
+        this.renderWithEmptyHidden('crosswordGameOptions');
+        this._updateStats();
+
+        const resultContainer = document.getElementById('verifyResultContainer');
+        if (resultContainer) {
+            resultContainer.innerHTML = '';
+        }
+
+        this._updateSolveModalLetters();
+
+        setTimeout(() => {
+            this._moveToNextEmptyCell();
+            this._updateSolveModalLetters();
+        }, 50);
+    },
+
+    _handleCellKeydown(event, input) {
+        const row = parseInt(input.dataset.row);
+        const col = parseInt(input.dataset.col);
+        const cells = this._selectedWordCells || [];
+
+        let currentIndex = -1;
+        for (let i = 0; i < cells.length; i++) {
+            if (cells[i].row === row && cells[i].col === col) {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        if (currentIndex === -1) return;
+
+        const key = event.key;
+
+        if (key === 'ArrowRight' || key === 'ArrowLeft' || key === 'ArrowUp' || key === 'ArrowDown') {
+            event.preventDefault();
+
+            let nextIndex = -1;
+            const dir = this._selectedWord?.direction || 'across';
+
+            if (dir === 'across') {
+                if (key === 'ArrowLeft') {
+                    nextIndex = (currentIndex + 1) % cells.length;
+                } else if (key === 'ArrowRight') {
+                    nextIndex = (currentIndex - 1 + cells.length) % cells.length;
+                } else {
+                    nextIndex = key === 'ArrowUp' ? 0 : cells.length - 1;
+                }
+            } else {
+                if (key === 'ArrowUp') {
+                    nextIndex = (currentIndex - 1 + cells.length) % cells.length;
+                } else if (key === 'ArrowDown') {
+                    nextIndex = (currentIndex + 1) % cells.length;
+                } else {
+                    nextIndex = key === 'ArrowLeft' ? 0 : cells.length - 1;
+                }
+            }
+
+            if (nextIndex >= 0 && nextIndex < cells.length) {
+                const nextCell = cells[nextIndex];
+                this._selectedRow = nextCell.row;
+                this._selectedCol = nextCell.col;
+
+                const resultContainer = document.getElementById('verifyResultContainer');
+                if (resultContainer) {
+                    resultContainer.innerHTML = '';
+                }
+
+                this._updateSolveModalLetters();
+            }
+            return;
+        }
+
+        if (key === 'Backspace' || key === 'Delete') {
+            event.preventDefault();
+            this._userGrid[row][col] = '';
+            this.renderWithEmptyHidden('crosswordGameOptions');
+            this._updateStats();
+
+            const resultContainer = document.getElementById('verifyResultContainer');
+            if (resultContainer) {
+                resultContainer.innerHTML = '';
+            }
+
+            this._updateSolveModalLetters();
+
+            setTimeout(() => {
+                const prevIndex = (currentIndex - 1 + cells.length) % cells.length;
+                const prevCell = cells[prevIndex];
+                this._selectedRow = prevCell.row;
+                this._selectedCol = prevCell.col;
+                this._updateSolveModalLetters();
+            }, 50);
+            return;
+        }
+    },
+
+    _moveToNextEmptyCell() {
+        const cells = this._selectedWordCells || [];
+        const userGrid = this._userGrid || [];
+
+        if (cells.length === 0) return;
+
+        let currentIndex = -1;
+        for (let i = 0; i < cells.length; i++) {
+            if (cells[i].row === this._selectedRow && cells[i].col === this._selectedCol) {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        let foundEmpty = false;
+        for (let i = 0; i < cells.length; i++) {
+            const idx = (currentIndex + 1 + i) % cells.length;
+            const cell = cells[idx];
+            const userChar = userGrid[cell.row]?.[cell.col] || '';
+            if (userChar === '') {
+                this._selectedRow = cell.row;
+                this._selectedCol = cell.col;
+                foundEmpty = true;
+                break;
+            }
+        }
+
+        if (!foundEmpty) {
+            const filledCount = cells.filter(c => userGrid[c.row]?.[c.col]).length;
+            if (filledCount === cells.length) {
+                const resultContainer = document.getElementById('verifyResultContainer');
+                if (resultContainer && !this._isAnswered) {
+                    resultContainer.innerHTML = `
+                        <div class="verify-result success" style="font-size:0.8rem;padding:0.3rem 0.8rem;background:rgba(46,204,113,0.1);border-radius:8px;border:1px solid var(--success);">
+                            ✅ جميع الحروف مملوءة! اضغط "تحقق من الكلمة" للتأكيد.
+                        </div>
+                    `;
+                }
+            }
+        }
+    },
+
+    _closeSolveModal() {
+        const modal = document.getElementById('crosswordSolveModal');
+        if (modal) {
+            modal.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        this._selectedWord = null;
+        this._selectedWordCells = [];
+
+        const verifyBtn = document.getElementById('crosswordVerifyBtn');
+        if (verifyBtn) {
+            verifyBtn.disabled = false;
+            verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> تحقق من الكلمة';
+            verifyBtn.style.opacity = '1';
+        }
+
+        const resultContainer = document.getElementById('verifyResultContainer');
+        if (resultContainer) {
+            resultContainer.innerHTML = '';
+        }
+
+        this._isAnswered = false;
+    },
+
+_startTimer: function() {
+    if (this._timerInterval) {
+        clearInterval(this._timerInterval);
+        this._timerInterval = null;
+    }
+
+    this._timerInterval = setInterval(() => {
+        // ✅ التحقق من انتهاء المباراة أو إلغائها
+        if (!this._isRunning || this._currentRoundIndex >= this._rounds.length) {
+            console.log('⏹️ إيقاف المؤقت: المباراة انتهت أو ملغاة');
+            this._stopTimer();
+            return;
+        }
+
+        this._timeLeft--;
+        
+        const timerEl = document.getElementById('cwMatchTimer');
+        if (timerEl) {
+            const mins = Math.floor(this._timeLeft / 60);
+            const secs = this._timeLeft % 60;
+            timerEl.textContent = `⏱ ${mins}:${String(secs).padStart(2,'0')}`;
+            if (this._timeLeft <= 30) {
+                timerEl.className = 'badge badge-danger';
+            } else {
+                timerEl.className = 'badge badge-warning';
+            }
+        }
+        
+        // ✅ إذا انتهى الوقت، ننهي المباراة فوراً
+        if (this._timeLeft <= 0) {
+            console.log('⏰ انتهى الوقت الإجمالي للمباراة!');
+            this._stopTimer();
+            if (this._isRunning) {
+                this._endMatch();
+            }
+        }
+    }, 1000);
+},
+
+    _stopTimer() {
+        if (this._timerInterval) {
+            clearInterval(this._timerInterval);
+            this._timerInterval = null;
+        }
+    },
+
+    // ===== دالة استدعاء من المودال =====
+    _closeSolveModalCallback() {
+        this._closeSolveModal();
+    }
 };
 
 // ============================================================
@@ -9206,6 +11954,31 @@ _buildModals() {
                             </div>
                         </div>
 
+<div class="mode-card-horizontal" data-mode="ranked_invasion" data-competitive="true" style="opacity:0.6; cursor:not-allowed;">
+    <div class="mode-icon">⚔️</div>
+    <div class="mode-info">
+        <div class="mode-title">الغزو</div>
+        <div class="mode-desc">طور جديد قادم قريباً</div>
+    </div>
+    <div class="mode-badges">
+        <span class="badge badge-primary">🏅 تصنيفي</span>
+        <span class="badge badge-danger">🔒 قريباً</span>
+    </div>
+</div>
+
+<!-- طور الرحلة (غير مفعل) -->
+<div class="mode-card-horizontal" data-mode="ranked_journey" data-competitive="true" style="opacity:0.6; cursor:not-allowed;">
+    <div class="mode-icon">🗺️</div>
+    <div class="mode-info">
+        <div class="mode-title">الرحلة</div>
+        <div class="mode-desc">طور جديد قادم قريباً</div>
+    </div>
+    <div class="mode-badges">
+        <span class="badge badge-primary">🏅 تصنيفي</span>
+        <span class="badge badge-danger">🔒 قريباً</span>
+    </div>
+</div>
+
                         <!-- 5. بطولة مصنفة -->
                         <div class="mode-card-horizontal" data-mode="ranked_tournament" data-competitive="true" style="opacity:0.6; cursor:not-allowed;">
                             <div class="mode-icon">🏆</div>
@@ -9290,6 +12063,30 @@ _buildModals() {
                                 <span class="badge badge-danger">🔒 قريباً</span>
                             </div>
                         </div>
+                        <div class="mode-card-horizontal" data-mode="unranked_invasion" data-competitive="false" style="opacity:0.6; cursor:not-allowed;">
+    <div class="mode-icon">⚔️</div>
+    <div class="mode-info">
+        <div class="mode-title">الغزو</div>
+        <div class="mode-desc">طور جديد قادم قريباً</div>
+    </div>
+    <div class="mode-badges">
+        <span class="badge badge-success">🎮 ودي</span>
+        <span class="badge badge-danger">🔒 قريباً</span>
+    </div>
+</div>
+
+<!-- طور الرحلة (غير مفعل) -->
+<div class="mode-card-horizontal" data-mode="unranked_journey" data-competitive="false" style="opacity:0.6; cursor:not-allowed;">
+    <div class="mode-icon">🗺️</div>
+    <div class="mode-info">
+        <div class="mode-title">الرحلة</div>
+        <div class="mode-desc">طور جديد قادم قريباً</div>
+    </div>
+    <div class="mode-badges">
+        <span class="badge badge-success">🎮 ودي</span>
+        <span class="badge badge-danger">🔒 قريباً</span>
+    </div>
+</div>
                     </div>
                 </div>
             </div>
@@ -9336,6 +12133,55 @@ _buildModals() {
                                 <span class="mode-status-dot"></span>
                             </div>
                         </div>
+<!-- كلمات متقاطعة (مفعل الآن) -->
+<div class="mode-card-horizontal" data-mode="training_crossword" data-competitive="false">
+    <div class="mode-info">
+        <div class="mode-title">كلمات متقاطعة</div>
+        <div class="mode-desc">حل الكلمات المتقاطعة في التدريب</div>
+    </div>
+    <div class="mode-badges">
+        <span class="badge badge-info">📚 تدريب</span>
+    </div>
+</div>
+
+<!-- الغزو (غير مفعل) -->
+<div class="mode-card-horizontal" data-mode="training_invasion" data-competitive="false" style="opacity:0.6; cursor:not-allowed;">
+    <div class="mode-icon">⚔️</div>
+    <div class="mode-info">
+        <div class="mode-title">الغزو</div>
+        <div class="mode-desc">طور جديد في التدريب</div>
+    </div>
+    <div class="mode-badges">
+        <span class="badge badge-info">📚 تدريب</span>
+        <span class="badge badge-danger">🔒 قريباً</span>
+    </div>
+</div>
+
+<!-- الرحلة (غير مفعل) -->
+<div class="mode-card-horizontal" data-mode="training_journey" data-competitive="false" style="opacity:0.6; cursor:not-allowed;">
+    <div class="mode-icon">🗺️</div>
+    <div class="mode-info">
+        <div class="mode-title">الرحلة</div>
+        <div class="mode-desc">طور جديد في التدريب</div>
+    </div>
+    <div class="mode-badges">
+        <span class="badge badge-info">📚 تدريب</span>
+        <span class="badge badge-danger">🔒 قريباً</span>
+    </div>
+</div>
+
+<!-- التحدي المستحيل (غير مفعل) -->
+<div class="mode-card-horizontal" data-mode="training_impossible" data-competitive="false" style="opacity:0.6; cursor:not-allowed;">
+    <div class="mode-icon">💀</div>
+    <div class="mode-info">
+        <div class="mode-title">التحدي المستحيل</div>
+        <div class="mode-desc">تحدٍ لا يُصدق في التدريب الفردي</div>
+    </div>
+    <div class="mode-badges">
+        <span class="badge badge-info">📚 تدريب</span>
+        <span class="badge badge-danger">🔒 قريباً</span>
+    </div>
+</div>
                     </div>
                 </div>
             </div>
@@ -9430,6 +12276,252 @@ _buildModals() {
             </div>
 
         </div>
+    </div>
+</div>
+
+<!-- ===== مودال حل الكلمات المتقاطعة – النسخة المطورة ===== -->
+<div class="modal-overlay" id="crosswordSolveModal">
+    <div class="modal-card" style="max-width: 480px; padding: 1.2rem 1.5rem;">
+        <div class="modal-header">
+            <h3><i class="fas fa-pencil-alt" style="color: var(--accent);"></i> حل الكلمة</h3>
+            <button class="modal-close-btn" onclick="CrosswordEngine._closeSolveModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div style="padding: 0.2rem 0 0.8rem;">
+
+            <!-- الدليل -->
+            <div style="margin-bottom: 0.8rem; padding: 0.6rem 1rem; background: var(--glass); border-radius: 12px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.65rem; color: var(--gray); margin-bottom: 0.1rem;">📖 الدليل</div>
+                <div id="crosswordClueDisplay" style="font-size: 1.1rem; font-weight: 700; color: var(--light);">...</div>
+            </div>
+
+            <!-- معلومات الكلمة -->
+            <div style="display: flex; gap: 0.8rem; flex-wrap: wrap; margin-bottom: 0.8rem; font-size: 0.8rem; color: var(--gray); justify-content: center;">
+                <span>📝 الحروف: <strong id="crosswordWordLength" style="color: var(--accent);">0</strong></span>
+                <span>•</span>
+                <span id="crosswordDirectionDisplay" style="display: flex; align-items: center; gap: 0.3rem;">
+                    <span>الاتجاه:</span>
+                    <span id="crosswordDirectionText" style="font-weight: 700; color: var(--primary);">أفقي</span>
+                </span>
+                <span>•</span>
+                <span id="crosswordFilledCount" style="font-weight: 600; color: var(--gray);">0/0 مملوءة</span>
+            </div>
+
+            <!-- خلايا الكلمة – قابلة للنقر والكتابة مباشرة -->
+            <div id="crosswordCurrentLetters" style="display: flex; gap: 0.6rem; justify-content: center; margin-bottom: 1rem; flex-wrap: wrap; min-height: 60px; padding: 0.3rem;">
+                <!-- سيتم تعبئتها بواسطة JavaScript -->
+            </div>
+
+            <!-- تعليمات إضافية -->
+            <div style="text-align: center; font-size: 0.7rem; color: var(--gray-dark); margin-bottom: 0.6rem; padding: 0.2rem; background: var(--glass); border-radius: 8px;">
+                <i class="fas fa-keyboard"></i> اضغط على أي خلية لكتابة الحرف مباشرة
+            </div>
+
+            <!-- أزرار الإجراءات -->
+            <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; justify-content: center; margin-bottom: 0.4rem;">
+<button class="btn btn-sm btn-success" onclick="CrosswordEngine._verifyWord()" 
+        id="crosswordVerifyBtn"
+        style="font-size: 0.8rem; padding: 0.4rem 1.2rem; min-height: 38px;">
+    <i class="fas fa-check-circle"></i> تحقق من الكلمة
+</button>
+                <button class="btn btn-sm btn-danger" onclick="CrosswordEngine._clearWordCells()" style="font-size: 0.7rem; padding: 0.3rem 0.8rem; min-height: 36px;">
+                    <i class="fas fa-eraser"></i> مسح الكل
+                </button>
+            </div>
+
+            <!-- منطقة عرض نتيجة التحقق -->
+            <div id="verifyResultContainer" style="margin-top: 0.4rem; min-height: 40px;">
+                <!-- تظهر هنا رسائل النجاح أو الخطأ -->
+            </div>
+
+            <!-- زر الإغلاق -->
+            <div style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px solid var(--glass-border);">
+                <button class="btn btn-outline" onclick="CrosswordEngine._closeSolveModal()" style="min-width: 120px; justify-content: center; font-size: 0.85rem;">
+                    <i class="fas fa-times"></i> إغلاق
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================
+     مودال إنشاء شبكة كلمات متقاطعة
+     ============================================================ -->
+<div class="modal-overlay" id="crosswordModal">
+    <div class="modal-card" style="max-width:900px; max-height:90vh; overflow-y:auto; padding:1.2rem 1.5rem;">
+        <div class="modal-header">
+            <h3 id="crosswordModalTitle"><i class="fas fa-th" style="color:var(--accent);"></i> شبكة كلمات متقاطعة جديدة</h3>
+            <button class="modal-close-btn" onclick="App._closeModal('crosswordModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <form id="crosswordForm" style="padding:0.2rem 0 0.8rem;">
+            <input type="hidden" id="cwFormId">
+
+            <!-- المعلومات الأساسية -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label>عنوان الشبكة *</label>
+                    <input type="text" id="cwTitle" placeholder="مثال: كلمات متقاطعة - كرة القدم" required>
+                </div>
+                <div class="form-group">
+                    <label>التصنيف *</label>
+                    <select id="cwCategory" required>
+                        ${GENERAL_CATEGORIES.map(cat => 
+                            `<option value="${cat.id}">${cat.icon} ${cat.label}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <!-- ✅ الرتبة المطلوبة بدلاً من الصعوبة -->
+                <div class="form-group">
+                    <label>🏅 الرتبة المطلوبة *</label>
+                    <select id="cwRankRequired" required>
+                        ${RANKS.map(rank => `<option value="${rank.min}">${rank.icon} ${rank.name} (${rank.min}+)</option>`).join('')}
+                    </select>
+                    <div style="font-size:0.65rem;color:var(--gray);margin-top:0.2rem;">
+                        ⚡ الشبكة ستظهر فقط للاعبين الذين وصلوا إلى هذه الرتبة أو أعلى
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>حجم الشبكة *</label>
+                    <select id="cwGridSize" required>
+                        <option value="5">5×5</option>
+                        <option value="6" selected>6×6</option>
+                        <option value="7">7×7</option>
+                        <option value="8">8×8</option>
+                        <option value="9">9×9</option>
+                        <option value="10">10×10</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>الوقت (ثانية) *</label>
+                    <input type="number" id="cwTimeLimit" value="120" min="30" max="600" required>
+                </div>
+                <div class="form-group">
+                    <label>النقاط *</label>
+                    <input type="number" id="cwPoints" value="50" min="10" max="500" required>
+                </div>
+            </div>
+
+            <!-- ✅ رسالة توضيحية عن الرتبة -->
+            <div style="background:var(--glass);padding:0.5rem 1rem;border-radius:var(--radius-sm);margin-bottom:1rem;border:1px solid var(--border-color);">
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <span style="font-size:1.2rem;">🎯</span>
+                    <div>
+                        <div style="font-weight:700;font-size:0.9rem;">الرتبة تُحدد صعوبة الشبكة تلقائياً</div>
+                        <div style="font-size:0.75rem;color:var(--gray);">
+                            🥉 برونزي (0-599) • 🥈 فضي (600-1699) • 🥇 ذهبي (1700-3199) • 💎 بلاتيني (3200+)
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== محرر الشبكة التفاعلي ===== -->
+            <div style="margin-top:1rem; border-top:2px solid var(--glass-border); padding-top:1rem;">
+                <h4 style="font-size:1rem; font-weight:700; margin-bottom:0.5rem;">
+                    <i class="fas fa-edit"></i> تحرير الشبكة والكلمات
+                </h4>
+
+                <!-- عرض الشبكة -->
+                <div id="crosswordEditorContainer" style="display:flex; flex-direction:column; align-items:center; margin-bottom:1rem;">
+                    <div id="crosswordGridEditor" style="display:grid; gap:4px; max-width:500px; width:100%; margin:0 auto; direction:ltr;">
+                        <!-- سيتم تعبئته بواسطة JavaScript -->
+                    </div>
+                    
+                    <div style="margin-top:0.5rem; font-size:0.8rem; color:var(--gray); display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; justify-content:center;">
+                        <span><i class="fas fa-info-circle"></i> انقر على خلية لتحديدها، ثم اكتب حرفاً</span>
+                        <span>•</span>
+                        <span><i class="fas fa-mouse-pointer"></i> نقر مزدوج لعرض الكلمات</span>
+                        <span>•</span>
+                        <span><i class="fas fa-eraser"></i> زر حذف لإزالة الحرف</span>
+                    </div>
+                    
+                    <div style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-top:0.3rem; justify-content:center;">
+                        <button class="btn btn-sm btn-danger" id="cwRemoveCellBtn" onclick="App._removeCellChar(App._cwSelectedRow, App._cwSelectedCol)" style="min-width:100px; justify-content:center;">
+                            <i class="fas fa-eraser"></i> حذف الحرف
+                        </button>
+                        <button class="btn btn-sm btn-success" id="cwDetectWordsBtn" onclick="App._autoDetectWords()" style="min-width:100px; justify-content:center;">
+                            <i class="fas fa-magic"></i> اكتشاف الكلمات
+                        </button>
+                    </div>
+                </div>
+
+                <!-- إدارة الكلمات -->
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.8rem;">
+                    <div>
+                        <label style="font-weight:600; font-size:0.85rem; color:var(--gray);">
+                            <i class="fas fa-plus-circle"></i> إضافة كلمة
+                        </label>
+                        <div style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-bottom:0.5rem;">
+                            <input type="text" id="cwWordInput" placeholder="الكلمة" style="flex:1; min-width:80px; padding:6px 10px; border-radius:8px; background:var(--glass); border:1px solid var(--glass-border); color:var(--light);">
+                            <input type="text" id="cwClueInput" placeholder="الدليل" style="flex:2; min-width:120px; padding:6px 10px; border-radius:8px; background:var(--glass); border:1px solid var(--glass-border); color:var(--light);">
+                            <select id="cwDirectionInput" style="padding:6px 10px; border-radius:8px; background:var(--glass); border:1px solid var(--glass-border); color:var(--light);">
+                                <option value="across">← أفقياً (يمين→يسار)</option>
+                                <option value="down">↓ عمودياً (أعلى→أسفل)</option>
+                            </select>
+                            <button class="btn btn-sm btn-primary" id="cwAddWordBtn" style="white-space:nowrap;">
+                                <i class="fas fa-plus"></i> إضافة
+                            </button>
+                        </div>
+                        <div style="font-size:0.65rem; color:var(--gray-dark);">
+                            💡 حدد <strong>أقصى يمين الكلمة</strong> في الشبكة (الحرف الأخير)، ثم اختر الاتجاه الأفقي.
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="font-weight:600; font-size:0.85rem; color:var(--gray);">
+                            <i class="fas fa-list"></i> الكلمات المضافة
+                        </label>
+                        <div id="cwWordsList" style="max-height:180px; overflow-y:auto; background:var(--glass); border-radius:8px; padding:0.3rem 0.5rem; border:1px solid var(--glass-border);">
+                            <div class="text-gray" style="font-size:0.8rem; text-align:center; padding:0.5rem;">لا توجد كلمات مضافة</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- زر إعادة ضبط الشبكة -->
+                <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:0.5rem;">
+                    <button type="button" class="btn btn-sm btn-outline" id="cwClearGridBtn">
+                        <i class="fas fa-undo"></i> إعادة ضبط الشبكة
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline" id="cwAutoFillBtn">
+                        <i class="fas fa-magic"></i> تعبئة تلقائية (تجريبي)
+                    </button>
+                </div>
+            </div>
+
+            <!-- معاينة الشبكة -->
+            <div style="margin-top:0.8rem; padding:0.8rem; background:var(--glass); border-radius:8px; border:1px solid var(--border-color);">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:600; font-size:0.85rem; color:var(--gray);">
+                        <i class="fas fa-eye"></i> معاينة الشبكة
+                    </span>
+                    <span id="cwPreviewStats" style="font-size:0.75rem; color:var(--gray);">0 كلمة</span>
+                </div>
+                <div id="crosswordPreview" style="display:grid; gap:4px; max-width:300px; margin:0.5rem auto; direction:ltr;">
+                    <!-- سيتم تعبئته بواسطة JavaScript -->
+                </div>
+            </div>
+
+            <!-- أزرار التحكم -->
+            <div style="display:flex; gap:0.5rem; justify-content:center; margin-top:1rem; flex-wrap:wrap;">
+                <button type="submit" class="btn btn-primary" style="min-width:140px; justify-content:center;">
+                    <i class="fas fa-save"></i> حفظ الشبكة
+                </button>
+                <button type="button" class="btn btn-outline" onclick="App._closeModal('crosswordModal')">
+                    <i class="fas fa-times"></i> إلغاء
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -11188,6 +14280,51 @@ _updateModeSpecificSettings(mode) {
             `;
         }
         
+    else if (mode === 'training_crossword') {
+    title = '🔤 إعدادات مباراة الكلمات المتقاطعة';
+    const savedSettings = this._getModeSettings(mode);
+    const settings = { ...modeInfo.settings, ...savedSettings };
+    
+    html = `
+        <div class="form-group" style="margin-bottom:0.5rem;">
+            <label style="font-size:0.75rem;">🎯 المستوى</label>
+            <select id="modeSpecificCrosswordLevel" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                <option value="easy" ${settings.crosswordLevel === 'easy' ? 'selected' : ''}>🟢 سهل</option>
+                <option value="medium" ${settings.crosswordLevel === 'medium' ? 'selected' : ''}>🟡 متوسط</option>
+                <option value="hard" ${settings.crosswordLevel === 'hard' ? 'selected' : ''}>🔴 صعب</option>
+                <option value="expert" ${settings.crosswordLevel === 'expert' ? 'selected' : ''}>💀 خبير</option>
+                <option value="gradual" ${settings.crosswordLevel === 'gradual' ? 'selected' : ''}>📈 تدريجي</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0.5rem;">
+            <label style="font-size:0.75rem;">⏱ الوقت</label>
+            <select id="modeSpecificCrosswordTime" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                <option value="2" ${settings.crosswordTime == 2 ? 'selected' : ''}>2 دقائق</option>
+                <option value="5" ${settings.crosswordTime == 5 ? 'selected' : ''}>5 دقائق</option>
+                <option value="10" ${settings.crosswordTime == 10 ? 'selected' : ''}>10 دقائق</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0.5rem;">
+            <label style="font-size:0.75rem;">📚 التصنيف</label>
+            <select id="modeSpecificCrosswordCategory" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                <option value="all" ${settings.category === 'all' ? 'selected' : ''}>📚 كل التصنيفات</option>
+                ${GENERAL_CATEGORIES.map(cat => 
+                    `<option value="${cat.id}" ${settings.category === cat.id ? 'selected' : ''}>${cat.icon} ${cat.label}</option>`
+                ).join('')}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0.5rem;">
+            <label style="font-size:0.75rem;">🔢 عدد الجولات</label>
+            <select id="modeSpecificCrosswordRounds" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                <option value="3" ${settings.crosswordRounds == 3 ? 'selected' : ''}>3 جولات</option>
+                <option value="5" ${settings.crosswordRounds == 5 ? 'selected' : ''}>5 جولات</option>
+                <option value="10" ${settings.crosswordRounds == 10 ? 'selected' : ''}>10 جولات</option>
+                <option value="20" ${settings.crosswordRounds == 20 ? 'selected' : ''}>20 جولة</option>
+            </select>
+        </div>
+    `;
+}
+
         // ===== تحدي الصمود =====
         else if (mode === 'training_survival') {
             html = `
@@ -11470,16 +14607,20 @@ _debugModeSettings() {
 _saveModeSpecificSettings(mode) {
     console.log('💾 Saving mode specific settings for:', mode);
     
-    // جمع جميع الإعدادات من عناصر الـ select في حاوية الإعدادات الخاصة
     const specific = {};
     
-    // قائمة بجميع المعرفات الممكنة للإعدادات
+    // ✅ قائمة بجميع المعرفات الممكنة للإعدادات (شاملة الكلمات المتقاطعة)
     const settingIds = [
         'modeSpecificDifficulty',
         'modeSpecificCategory', 
         'modeSpecificQuestionType',
         'modeSpecificCount',
-        'modeSpecificTimeLimit'
+        'modeSpecificTimeLimit',
+        // ✅ إعدادات الكلمات المتقاطعة
+        'modeSpecificCrosswordLevel',
+        'modeSpecificCrosswordTime',
+        'modeSpecificCrosswordCategory',
+        'modeSpecificCrosswordRounds',
     ];
     
     // جمع القيم من كل عنصر
@@ -11488,28 +14629,12 @@ _saveModeSpecificSettings(mode) {
         if (el && el.value !== undefined) {
             specific[id] = el.value;
             console.log(`✅ Collected ${id}: ${el.value}`);
-        } else {
-            console.warn(`⚠️ Element ${id} not found`);
         }
     });
-    
-    // إذا لم يتم العثور على أي إعدادات، حاول جمعها من الحاوية مباشرة
-    if (Object.keys(specific).length === 0) {
-        const container = document.getElementById('modeSpecificContent');
-        if (container) {
-            container.querySelectorAll('select[id^="modeSpecific"]').forEach(el => {
-                if (el.id && el.value !== undefined) {
-                    specific[el.id] = el.value;
-                    console.log(`✅ Collected from container ${el.id}: ${el.value}`);
-                }
-            });
-        }
-    }
     
     // إذا كانت الإعدادات فارغة، لا نحفظ
     if (Object.keys(specific).length === 0) {
         console.warn('⚠️ No specific settings found to save');
-        showToast('⚠️ لم يتم العثور على إعدادات للحفظ', 'warning', 2000);
         return;
     }
     
@@ -11518,7 +14643,7 @@ _saveModeSpecificSettings(mode) {
     // ✅ حفظ في Firebase والكاش المحلي
     this._saveModeSettingsToFirebase(mode, specific);
     
-    // ✅ حفظ في localStorage القديم للتوافق
+    // ✅ حفظ في localStorage
     try {
         const saved = localStorage.getItem(`modeSettings_${mode}`);
         let data = saved ? JSON.parse(saved) : {};
@@ -11533,22 +14658,26 @@ _saveModeSpecificSettings(mode) {
     // ✅ تحديث عرض الإعدادات في صفحة اللعبة
     this._updateGameSettingsDisplay();
     
-    // عرض رسالة نجاح مع تفاصيل الإعدادات المحفوظة
+    // عرض رسالة نجاح
     const modeNames = {
+        'training_crossword': 'الكلمات المتقاطعة',
         'training_classic': 'التدريب الكلاسيكي',
         'training_survival': 'تحدي الصمود',
         'training_speed': 'تحدي السرعة'
     };
     const name = modeNames[mode] || mode;
     
-    // عرض تفاصيل الإعدادات في رسالة النجاح
     const settingsSummary = Object.entries(specific).map(([key, value]) => {
         const labels = {
             'modeSpecificDifficulty': 'المستوى',
             'modeSpecificCategory': 'الفئة',
             'modeSpecificQuestionType': 'نوع السؤال',
             'modeSpecificCount': 'عدد الأسئلة',
-            'modeSpecificTimeLimit': 'الوقت'
+            'modeSpecificTimeLimit': 'الوقت',
+            'modeSpecificCrosswordLevel': 'مستوى الشبكات',
+            'modeSpecificCrosswordTime': 'الوقت',
+            'modeSpecificCrosswordCategory': 'التصنيف',
+            'modeSpecificCrosswordRounds': 'عدد الجولات'
         };
         const label = labels[key] || key;
         return `${label}: ${value}`;
@@ -12005,58 +15134,58 @@ _renderQuestionsSection() {
                             style="display:${AuthService.checkPermission('admin') ? 'inline-flex' : 'none'};">
                         <i class="fas fa-trash-alt"></i> حذف الكل
                     </button>
-${AuthService.checkPermission('admin') ? `
-    <button class="btn btn-sm btn-warning" id="fixAllTrueFalseBtn" style="background:#f39c12; color:#fff;">
-        <i class="fas fa-exchange-alt"></i> عكس صح/خطأ
-    </button>
-` : ''}
-<div class="import-queue-section" style="margin-top:0.5rem; padding:0.5rem 1rem; background:var(--glass); border-radius:var(--radius-sm); border:1px solid var(--glass-border);">
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
-        <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
-            <button class="btn btn-primary" id="batchImportBtn">
-                <i class="fas fa-file-import"></i> استيراد متعدد
-            </button>
-            <input type="file" id="batchImportFileInput" accept=".json" multiple style="display:none;">
-            <span class="text-gray" style="font-size:0.75rem;">(اختر عدة ملفات JSON)</span>
-            <span id="queueCountBadge" class="badge badge-primary" style="display:none;">0 في الانتظار</span>
-        </div>
-        <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
-            <button class="btn btn-sm btn-danger" id="clearQueueBtn" style="display:none;">
-                <i class="fas fa-times"></i> إلغاء الكل
-            </button>
-            <button class="btn btn-sm btn-success" id="startQueueBtn" style="display:none;">
-                <i class="fas fa-play"></i> بدء الاستيراد
-            </button>
-        </div>
-    </div>
-    
-    <!-- قائمة انتظار الملفات -->
-    <div id="fileQueueList" style="margin-top:0.5rem; max-height:150px; overflow-y:auto; display:none;">
-        <!-- سيتم تعبئتها بواسطة JavaScript -->
-    </div>
-    
-    <!-- شريط تقدم الاستيراد المتعدد -->
-    <div id="batchProgress" style="display:none; margin-top:0.5rem;">
-        <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--gray);">
-            <span id="batchProgressStatus">جاري الاستيراد...</span>
-            <span id="batchProgressText">0%</span>
-        </div>
-        <div style="height:6px; background:var(--glass); border-radius:10px; overflow:hidden;">
-            <div id="batchProgressFill" style="height:100%; width:0%; background:linear-gradient(90deg, var(--primary), var(--accent)); border-radius:10px; transition:width 0.3s ease;"></div>
-        </div>
-        <div style="display:flex; gap:0.5rem; font-size:0.7rem; color:var(--gray); margin-top:0.2rem;">
-            <span>✅ المنجز: <span id="batchCompletedCount">0</span></span>
-            <span>⏳ المتبقي: <span id="batchRemainingCount">0</span></span>
-            <span>❌ الأخطاء: <span id="batchErrorCount">0</span></span>
-        </div>
-    </div>
-</div>
+                    ${AuthService.checkPermission('admin') ? `
+                    <button class="btn btn-sm btn-warning" id="fixAllTrueFalseBtn" style="background:#f39c12; color:#fff;">
+                        <i class="fas fa-exchange-alt"></i> عكس صح/خطأ
+                    </button>
+                    ` : ''}
                 </div>
             </div>
 
-            <!-- ============================================================ -->
-            <!-- ✅ شريط تقدم الاستيراد -->
-            <!-- ============================================================ -->
+            <!-- استيراد متعدد -->
+            <div class="import-queue-section" style="margin-bottom:1rem; padding:0.5rem 1rem; background:var(--glass); border-radius:var(--radius-sm); border:1px solid var(--glass-border);">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+                    <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                        <button class="btn btn-primary" id="batchImportBtn">
+                            <i class="fas fa-file-import"></i> استيراد متعدد
+                        </button>
+                        <input type="file" id="batchImportFileInput" accept=".json" multiple style="display:none;">
+                        <span class="text-gray" style="font-size:0.75rem;">(اختر عدة ملفات JSON)</span>
+                        <span id="queueCountBadge" class="badge badge-primary" style="display:none;">0 في الانتظار</span>
+                    </div>
+                    <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
+                        <button class="btn btn-sm btn-danger" id="clearQueueBtn" style="display:none;">
+                            <i class="fas fa-times"></i> إلغاء الكل
+                        </button>
+                        <button class="btn btn-sm btn-success" id="startQueueBtn" style="display:none;">
+                            <i class="fas fa-play"></i> بدء الاستيراد
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- قائمة انتظار الملفات -->
+                <div id="fileQueueList" style="margin-top:0.5rem; max-height:150px; overflow-y:auto; display:none;">
+                    <!-- سيتم تعبئتها بواسطة JavaScript -->
+                </div>
+                
+                <!-- شريط تقدم الاستيراد المتعدد -->
+                <div id="batchProgress" style="display:none; margin-top:0.5rem;">
+                    <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--gray);">
+                        <span id="batchProgressStatus">جاري الاستيراد...</span>
+                        <span id="batchProgressText">0%</span>
+                    </div>
+                    <div style="height:6px; background:var(--glass); border-radius:10px; overflow:hidden;">
+                        <div id="batchProgressFill" style="height:100%; width:0%; background:linear-gradient(90deg, var(--primary), var(--accent)); border-radius:10px; transition:width 0.3s ease;"></div>
+                    </div>
+                    <div style="display:flex; gap:0.5rem; font-size:0.7rem; color:var(--gray); margin-top:0.2rem;">
+                        <span>✅ المنجز: <span id="batchCompletedCount">0</span></span>
+                        <span>⏳ المتبقي: <span id="batchRemainingCount">0</span></span>
+                        <span>❌ الأخطاء: <span id="batchErrorCount">0</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== شريط تقدم الاستيراد ===== -->
             <div id="importProgress" style="display:none; margin-bottom:1rem; background:var(--card-bg); padding:0.8rem 1rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
                 <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
                     <div style="display:flex;align-items:center;gap:0.5rem;">
@@ -12075,9 +15204,7 @@ ${AuthService.checkPermission('admin') ? `
                 </div>
             </div>
 
-            <!-- ============================================================ -->
-            <!-- ✅ شريط تقدم الحذف -->
-            <!-- ============================================================ -->
+            <!-- ===== شريط تقدم الحذف ===== -->
             <div id="deleteProgress" style="display:none; margin-bottom:1rem; background:var(--card-bg); padding:0.8rem 1rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
                 <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
                     <div style="display:flex;align-items:center;gap:0.5rem;">
@@ -12096,142 +15223,246 @@ ${AuthService.checkPermission('admin') ? `
                 </div>
             </div>
 
-<!-- ============================================================ -->
-<!-- ✅ شريط تقدم عكس الأسئلة -->
-<!-- ============================================================ -->
-<div id="fixProgress" style="display:none; margin-top:1rem; background:var(--card-bg); padding:0.8rem 1rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
-    <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
-        <div style="display:flex; align-items:center; gap:0.5rem;">
-            <i class="fas fa-exchange-alt" style="color:var(--accent); font-size:1.2rem;"></i>
-            <span style="font-weight:600; font-size:0.85rem; color:var(--gray);">عكس الإجابات:</span>
-        </div>
-        <div style="flex:1; min-width:150px;">
-            <div class="progress-bar" style="height:8px; background:var(--glass);">
-                <div class="fill" id="fixProgressFill" style="width:0%; height:100%; background:linear-gradient(90deg, var(--primary), var(--accent)); border-radius:10px; transition:width 0.3s ease;"></div>
-            </div>
-        </div>
-        <span id="fixProgressText" style="font-size:0.85rem; color:var(--gray); min-width:120px; text-align:center;">0%</span>
-        <button class="btn btn-sm btn-danger" id="cancelFixBtn" style="display:none;">
-            <i class="fas fa-times"></i> إلغاء
-        </button>
-    </div>
-    <div style="display:flex; gap:0.8rem; font-size:0.7rem; color:var(--gray); margin-top:0.3rem; flex-wrap:wrap;">
-        <span>✅ تم العكس: <span id="fixCompletedCount">0</span></span>
-        <span>⏳ المتبقي: <span id="fixRemainingCount">0</span></span>
-        <span>❌ الأخطاء: <span id="fixErrorCount">0</span></span>
-        <span>📊 الإجمالي: <span id="fixTotalCount">0</span></span>
-    </div>
-</div>
-
-            <!-- الإحصائيات -->
-            <div class="questions-stats-grid mb-2" id="questionsStats">
-                <div class="stat-card" style="border-left:4px solid var(--primary);">
-                    <div class="stat-number" id="qStatTotal">0</div>
-                    <div class="stat-label">📊 إجمالي الأسئلة</div>
+            <!-- ===== شريط تقدم عكس الأسئلة ===== -->
+            <div id="fixProgress" style="display:none; margin-bottom:1rem; background:var(--card-bg); padding:0.8rem 1rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+                <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <i class="fas fa-exchange-alt" style="color:var(--accent); font-size:1.2rem;"></i>
+                        <span style="font-weight:600; font-size:0.85rem; color:var(--gray);">عكس الإجابات:</span>
+                    </div>
+                    <div style="flex:1; min-width:150px;">
+                        <div class="progress-bar" style="height:8px; background:var(--glass);">
+                            <div class="fill" id="fixProgressFill" style="width:0%; height:100%; background:linear-gradient(90deg, var(--primary), var(--accent)); border-radius:10px; transition:width 0.3s ease;"></div>
+                        </div>
+                    </div>
+                    <span id="fixProgressText" style="font-size:0.85rem; color:var(--gray); min-width:120px; text-align:center;">0%</span>
+                    <button class="btn btn-sm btn-danger" id="cancelFixBtn" style="display:none;">
+                        <i class="fas fa-times"></i> إلغاء
+                    </button>
                 </div>
-                <div class="stat-card" style="border-left:4px solid var(--success);">
-                    <div class="stat-number" id="qStatEasy">0</div>
-                    <div class="stat-label">🟢 سهل</div>
-                </div>
-                <div class="stat-card" style="border-left:4px solid var(--accent);">
-                    <div class="stat-number" id="qStatMedium">0</div>
-                    <div class="stat-label">🟡 متوسط</div>
-                </div>
-                <div class="stat-card" style="border-left:4px solid var(--secondary);">
-                    <div class="stat-number" id="qStatHard">0</div>
-                    <div class="stat-label">🔴 صعب</div>
-                </div>
-                <div class="stat-card" style="border-left:4px solid var(--info);">
-                    <div class="stat-number" id="qStatCategories">0</div>
-                    <div class="stat-label">📂 التصنيفات</div>
-                </div>
-                <div class="stat-card" style="border-left:4px solid var(--accent);">
-                    <div class="stat-number" id="qStatTypes">0</div>
-                    <div class="stat-label">📝 أنواع الأسئلة</div>
-                </div>
-                <div class="stat-card" style="border-left:4px solid #FF6B6B;">
-                    <div class="stat-number" id="qStatUsed">0</div>
-                    <div class="stat-label">🎯 مستخدمة في الاختبارات</div>
-                </div>
-                <div class="stat-card" style="border-left:4px solid #4ECDC4;">
-                    <div class="stat-number" id="qStatAvgDifficulty">0</div>
-                    <div class="stat-label">📈 متوسط الصعوبة</div>
+                <div style="display:flex; gap:0.8rem; font-size:0.7rem; color:var(--gray); margin-top:0.3rem; flex-wrap:wrap;">
+                    <span>✅ تم العكس: <span id="fixCompletedCount">0</span></span>
+                    <span>⏳ المتبقي: <span id="fixRemainingCount">0</span></span>
+                    <span>❌ الأخطاء: <span id="fixErrorCount">0</span></span>
+                    <span>📊 الإجمالي: <span id="fixTotalCount">0</span></span>
                 </div>
             </div>
 
-            <!-- شريط الأدوات -->
-            <div class="questions-toolbar mb-2">
-                <div class="search-wrapper">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="searchQuestion" placeholder="ابحث عن سؤال..." class="search-input">
-                </div>
-                <div class="filters-wrapper">
-                    <select id="filterQuestionType" class="filter-select">
-                        <option value="">كل الأنواع</option>
-                        <option value="multiple_choice">📝 اختيار من متعدد</option>
-                        <option value="true_false">✅ صح/خطأ</option>
-                        <option value="fill_blank">✏️ ملء الفراغ</option>
-                        <option value="matching">🔗 مطابقة</option>
-                        <option value="ordering">🔢 ترتيب</option>
-                    </select>
-<select id="filterQuestionCategory" class="filter-select">
-    <option value="">كل التصنيفات</option>
-    ${GENERAL_CATEGORIES.map(cat => 
-        `<option value="${cat.id}">${cat.icon} ${cat.label}</option>`
-    ).join('')}
-</select>
-                    <select id="filterQuestionDifficulty" class="filter-select">
-                        <option value="">كل المستويات</option>
-                        <option value="سهل">🟢 سهل</option>
-                        <option value="متوسط">🟡 متوسط</option>
-                        <option value="صعب">🔴 صعب</option>
-                    </select>
-                    <select id="filterQuestionSort" class="filter-select">
-                        <option value="newest">الأحدث</option>
-                        <option value="oldest">الأقدم</option>
-                        <option value="alphabetical">أبجدياً</option>
-                        <option value="difficulty">الصعوبة</option>
-                        <option value="popular">الأكثر استخداماً</option>
-                    </select>
-                </div>
-                <div class="actions-wrapper">
-                    <button class="btn btn-sm btn-outline" id="clearQuestionFilters">
-                        <i class="fas fa-times"></i> مسح
-                    </button>
-                    <button class="btn btn-sm btn-outline" id="selectAllQuestionsBtn">
-                        <i class="fas fa-check-double"></i> تحديد الكل
-                    </button>
-                    <button class="btn btn-sm btn-danger" id="deleteSelectedQuestionsBtn" style="display:none;">
-                        <i class="fas fa-trash"></i> حذف المحدد (<span id="selectedCount">0</span>)
-                    </button>
-                </div>
+            <!-- ===== تبويبات الأسئلة ===== -->
+            <div class="questions-tabs" style="display:flex; gap:0.5rem; margin-bottom:1rem; border-bottom:2px solid var(--glass-border); padding-bottom:0.3rem;">
+                <button class="questions-tab-btn active" data-tab="normal" style="
+                    padding:0.4rem 1.2rem;
+                    border-radius:8px;
+                    border:none;
+                    background:var(--primary);
+                    color:#fff;
+                    font-weight:700;
+                    font-size:0.85rem;
+                    cursor:pointer;
+                    transition:all 0.3s ease;
+                ">
+                    <i class="fas fa-list"></i> الأسئلة العادية
+                </button>
+                <button class="questions-tab-btn" data-tab="crossword" style="
+                    padding:0.4rem 1.2rem;
+                    border-radius:8px;
+                    border:none;
+                    background:transparent;
+                    color:var(--gray);
+                    font-weight:700;
+                    font-size:0.85rem;
+                    cursor:pointer;
+                    transition:all 0.3s ease;
+                ">
+                    <i class="fas fa-th"></i> الكلمات المتقاطعة
+                </button>
             </div>
 
-            <!-- عرض الأسئلة -->
-            <div id="questionsContainer">
-                <div class="questions-grid" id="questionsGrid">
-                    <div class="text-gray text-center" style="padding:3rem;">
-                        <i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i>
-                        <p>جاري تحميل الأسئلة...</p>
+            <!-- ===== محتوى تبويب الأسئلة العادية ===== -->
+            <div id="questionsNormalTab" class="questions-tab-content" style="display:block;">
+                <!-- الإحصائيات -->
+                <div class="questions-stats-grid mb-2" id="questionsStats">
+                    <div class="stat-card" style="border-left:4px solid var(--primary);">
+                        <div class="stat-number" id="qStatTotal">0</div>
+                        <div class="stat-label">📊 إجمالي الأسئلة</div>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid var(--success);">
+                        <div class="stat-number" id="qStatEasy">0</div>
+                        <div class="stat-label">🟢 سهل</div>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid var(--accent);">
+                        <div class="stat-number" id="qStatMedium">0</div>
+                        <div class="stat-label">🟡 متوسط</div>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid var(--secondary);">
+                        <div class="stat-number" id="qStatHard">0</div>
+                        <div class="stat-label">🔴 صعب</div>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid var(--info);">
+                        <div class="stat-number" id="qStatCategories">0</div>
+                        <div class="stat-label">📂 التصنيفات</div>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid var(--accent);">
+                        <div class="stat-number" id="qStatTypes">0</div>
+                        <div class="stat-label">📝 أنواع الأسئلة</div>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid #FF6B6B;">
+                        <div class="stat-number" id="qStatUsed">0</div>
+                        <div class="stat-label">🎯 مستخدمة في الاختبارات</div>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid #4ECDC4;">
+                        <div class="stat-number" id="qStatAvgDifficulty">0</div>
+                        <div class="stat-label">📈 متوسط الصعوبة</div>
                     </div>
                 </div>
-                <div class="pagination" id="questionPagination"></div>
-            </div>
 
-            <!-- عرض فارغ -->
-            <div id="questionsEmpty" style="display:none;">
-                <div class="empty-state">
-                    <i class="fas fa-question-circle"></i>
-                    <h3>لا توجد أسئلة</h3>
-                    <p class="text-gray">ابدأ بإضافة أسئلتك الأولى!</p>
-                    <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;">
-                        <button class="btn btn-primary mt-1" id="emptyAddQuestion">
-                            <i class="fas fa-plus"></i> إضافة سؤال
+                <!-- شريط الأدوات -->
+                <div class="questions-toolbar mb-2">
+                    <div class="search-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="searchQuestion" placeholder="ابحث عن سؤال..." class="search-input">
+                    </div>
+                    <div class="filters-wrapper">
+                        <select id="filterQuestionType" class="filter-select">
+                            <option value="">كل الأنواع</option>
+                            <option value="multiple_choice">📝 اختيار من متعدد</option>
+                            <option value="true_false">✅ صح/خطأ</option>
+                            <option value="fill_blank">✏️ ملء الفراغ</option>
+                            <option value="matching">🔗 مطابقة</option>
+                            <option value="ordering">🔢 ترتيب</option>
+                        </select>
+                        <select id="filterQuestionCategory" class="filter-select">
+                            <option value="">كل التصنيفات</option>
+                            ${GENERAL_CATEGORIES.map(cat => 
+                                `<option value="${cat.id}">${cat.icon} ${cat.label}</option>`
+                            ).join('')}
+                        </select>
+                        <select id="filterQuestionDifficulty" class="filter-select">
+                            <option value="">كل المستويات</option>
+                            <option value="سهل">🟢 سهل</option>
+                            <option value="متوسط">🟡 متوسط</option>
+                            <option value="صعب">🔴 صعب</option>
+                        </select>
+                        <select id="filterQuestionSort" class="filter-select">
+                            <option value="newest">الأحدث</option>
+                            <option value="oldest">الأقدم</option>
+                            <option value="alphabetical">أبجدياً</option>
+                            <option value="difficulty">الصعوبة</option>
+                            <option value="popular">الأكثر استخداماً</option>
+                        </select>
+                    </div>
+                    <div class="actions-wrapper">
+                        <button class="btn btn-sm btn-outline" id="clearQuestionFilters">
+                            <i class="fas fa-times"></i> مسح
                         </button>
-                        <button class="btn btn-outline mt-1" id="emptyImportQuestions">
-                            <i class="fas fa-file-import"></i> استيراد أسئلة
+                        <button class="btn btn-sm btn-outline" id="selectAllQuestionsBtn">
+                            <i class="fas fa-check-double"></i> تحديد الكل
+                        </button>
+                        <button class="btn btn-sm btn-danger" id="deleteSelectedQuestionsBtn" style="display:none;">
+                            <i class="fas fa-trash"></i> حذف المحدد (<span id="selectedCount">0</span>)
                         </button>
                     </div>
+                </div>
+
+                <!-- عرض الأسئلة -->
+                <div id="questionsContainer">
+                    <div class="questions-grid" id="questionsGrid">
+                        <div class="text-gray text-center" style="padding:3rem;">
+                            <i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i>
+                            <p>جاري تحميل الأسئلة...</p>
+                        </div>
+                    </div>
+                    <div class="pagination" id="questionPagination"></div>
+                </div>
+
+                <!-- عرض فارغ -->
+                <div id="questionsEmpty" style="display:none;">
+                    <div class="empty-state">
+                        <i class="fas fa-question-circle"></i>
+                        <h3>لا توجد أسئلة</h3>
+                        <p class="text-gray">ابدأ بإضافة أسئلتك الأولى!</p>
+                        <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;">
+                            <button class="btn btn-primary mt-1" id="emptyAddQuestion">
+                                <i class="fas fa-plus"></i> إضافة سؤال
+                            </button>
+                            <button class="btn btn-outline mt-1" id="emptyImportQuestions">
+                                <i class="fas fa-file-import"></i> استيراد أسئلة
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== محتوى تبويب الكلمات المتقاطعة ===== -->
+            <div id="questionsCrosswordTab" class="questions-tab-content" style="display:none;">
+                <!-- الإحصائيات الخاصة بالكلمات المتقاطعة -->
+                <div class="questions-stats-grid mb-2" id="crosswordStats">
+                    <div class="stat-card" style="border-left:4px solid var(--primary);">
+                        <div class="stat-number" id="cwStatTotal">0</div>
+                        <div class="stat-label">📊 إجمالي الشبكات</div>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid var(--success);">
+                        <div class="stat-number" id="cwStatEasy">0</div>
+                        <div class="stat-label">🟢 سهل</div>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid var(--accent);">
+                        <div class="stat-number" id="cwStatMedium">0</div>
+                        <div class="stat-label">🟡 متوسط</div>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid var(--secondary);">
+                        <div class="stat-number" id="cwStatHard">0</div>
+                        <div class="stat-label">🔴 صعب</div>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid var(--info);">
+                        <div class="stat-number" id="cwStatCategories">0</div>
+                        <div class="stat-label">📂 التصنيفات</div>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid var(--accent);">
+                        <div class="stat-number" id="cwStatWords">0</div>
+                        <div class="stat-label">📝 إجمالي الكلمات</div>
+                    </div>
+                </div>
+
+                <!-- شريط أدوات الكلمات المتقاطعة -->
+                <div class="questions-toolbar mb-2">
+                    <div class="search-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="searchCrossword" placeholder="ابحث عن شبكة..." class="search-input">
+                    </div>
+                    <div class="filters-wrapper">
+                        <select id="filterCwCategory" class="filter-select">
+                            <option value="">كل التصنيفات</option>
+                            ${GENERAL_CATEGORIES.map(cat => 
+                                `<option value="${cat.id}">${cat.icon} ${cat.label}</option>`
+                            ).join('')}
+                        </select>
+                        <select id="filterCwDifficulty" class="filter-select">
+                            <option value="">كل المستويات</option>
+                            <option value="easy">🟢 سهل</option>
+                            <option value="medium">🟡 متوسط</option>
+                            <option value="hard">🔴 صعب</option>
+                            <option value="expert">💀 خبير</option>
+                        </select>
+                    </div>
+                    <div class="actions-wrapper">
+                        <button class="btn btn-primary" id="openAddCrossword">
+                            <i class="fas fa-plus"></i> شبكة جديدة
+                        </button>
+                        <button class="btn btn-outline" id="refreshCrosswordsBtn">
+                            <i class="fas fa-sync"></i> تحديث
+                        </button>
+                    </div>
+                </div>
+
+                <!-- شبكة الكلمات المتقاطعة -->
+                <div id="crosswordsContainer">
+                    <div class="crosswords-grid" id="crosswordsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1rem;">
+                        <div class="text-gray text-center" style="padding:3rem;grid-column:1/-1;">
+                            <i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i>
+                            <p>جاري تحميل الشبكات...</p>
+                        </div>
+                    </div>
+                    <div class="pagination" id="crosswordPagination"></div>
                 </div>
             </div>
 
@@ -12450,7 +15681,27 @@ _renderGameSection() {
                     
                     <!-- ✅ حاوية التفاصيل الجديدة (ستُعبأ بواسطة JavaScript) -->
                     <div id="resultDetailsContainer" class="result-details-container"></div>
+       <!-- ✅ ===== زر عرض الإحصائيات العامة ===== -->
+        <div style="margin: 0.5rem 0 1rem 0;">
+            <button class="btn btn-outline" id="showGameStatsBtn" style="justify-content:center; min-width:160px;">
+                <i class="fas fa-chart-bar"></i> عرض الإحصائيات العامة
+            </button>
+        </div>
 
+        <!-- ✅ ===== حاوية الإحصائيات العامة (مخفية) ===== -->
+        <div id="gameStatsContainer" style="display:none; margin-top:0.5rem; padding:0.8rem; background:var(--glass); border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; flex-wrap:wrap; gap:0.3rem;">
+                <span style="font-weight:700; font-size:0.9rem;">
+                    <i class="fas fa-chart-line" style="color:var(--accent);"></i> إحصائيات المباراة
+                </span>
+                <button class="btn btn-xs btn-outline" onclick="document.getElementById('gameStatsContainer').style.display='none'; document.getElementById('showGameStatsBtn').style.display='inline-flex';">
+                    <i class="fas fa-times"></i> إخفاء
+                </button>
+            </div>
+            <div id="gameStatsContent" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:0.3rem;">
+                <!-- سيتم تعبئتها بواسطة JavaScript -->
+            </div>
+        </div>
                     <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
                         <button class="btn btn-primary" id="gameReplayBtn"><i class="fas fa-redo"></i> لعب مجدداً</button>
                         <button class="btn btn-outline" id="gameHomeBtn"><i class="fas fa-home"></i> الرئيسية</button>
@@ -13313,6 +16564,1629 @@ _updateProfileChart(user) {
             }
         }
     });
+},
+
+// ============================================================
+// دوال إدارة الكلمات المتقاطعة
+// ============================================================
+
+/**
+ * تهيئة واجهة الكلمات المتقاطعة
+ */
+_initCrosswordUI() {
+    // ربط التبويبات
+    document.querySelectorAll('.questions-tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tab = this.dataset.tab;
+            document.querySelectorAll('.questions-tab-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.background = 'transparent';
+                b.style.color = 'var(--gray)';
+            });
+            this.classList.add('active');
+            this.style.background = 'var(--primary)';
+            this.style.color = '#fff';
+
+            document.querySelectorAll('.questions-tab-content').forEach(el => {
+                el.style.display = 'none';
+            });
+            if (tab === 'normal') {
+                document.getElementById('questionsNormalTab').style.display = 'block';
+                App._renderQuestionsAdvanced();
+            } else {
+                document.getElementById('questionsCrosswordTab').style.display = 'block';
+                App._renderCrosswords();
+            }
+        });
+    });
+
+    // زر إضافة شبكة جديدة
+    document.getElementById('openAddCrossword')?.addEventListener('click', () => {
+        App._openCrosswordEditor();
+    });
+
+    // زر تحديث الشبكات
+    document.getElementById('refreshCrosswordsBtn')?.addEventListener('click', () => {
+        App._renderCrosswords();
+    });
+
+    // البحث والفلترة
+    document.getElementById('searchCrossword')?.addEventListener('input', debounce(() => {
+        App._renderCrosswords();
+    }, 300));
+    document.getElementById('filterCwCategory')?.addEventListener('change', () => {
+        App._renderCrosswords();
+    });
+    document.getElementById('filterCwDifficulty')?.addEventListener('change', () => {
+        App._renderCrosswords();
+    });
+
+    // ربط نموذج الشبكة
+    this._setupCrosswordForm();
+},
+
+/**
+ * فتح محرر شبكة جديدة أو تعديل موجودة
+ */
+_openCrosswordEditor(data = null) {
+    if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'question') {
+        showToast('ليس لديك صلاحية', 'error');
+        return;
+    }
+
+    const modal = document.getElementById('crosswordModal');
+    const form = document.getElementById('crosswordForm');
+    const titleEl = document.getElementById('crosswordModalTitle');
+    const idInput = document.getElementById('cwFormId');
+
+    form.reset();
+    idInput.value = '';
+    
+    this._cwGridSize = parseInt(document.getElementById('cwGridSize').value) || 6;
+    this._cwCells = [];
+    this._cwWords = [];
+    this._cwSelectedRow = -1;
+    this._cwSelectedCol = -1;
+
+    if (data) {
+        titleEl.textContent = '✏️ تعديل شبكة كلمات متقاطعة';
+        idInput.value = data.id;
+        document.getElementById('cwTitle').value = data.question || '';
+        document.getElementById('cwCategory').value = data.category || 'general';
+        // ✅ استخدام الرتبة بدلاً من الصعوبة
+        document.getElementById('cwRankRequired').value = data.rankRequired || 0;
+        document.getElementById('cwGridSize').value = data.crosswordData?.gridSize || 6;
+        document.getElementById('cwTimeLimit').value = data.timeLimit || 120;
+        document.getElementById('cwPoints').value = data.points || 50;
+
+        this._cwGridSize = data.crosswordData?.gridSize || 6;
+        
+        let grid = data.crosswordData?.grid || [];
+        let words = data.crosswordData?.words || [];
+        
+        try {
+            if (typeof grid === 'string') {
+                grid = JSON.parse(grid);
+            }
+            if (typeof words === 'string') {
+                words = JSON.parse(words);
+            }
+        } catch (e) {
+            grid = data.crosswordData?.grid || [];
+            words = data.crosswordData?.words || [];
+        }
+        
+        this._cwCells = grid;
+        this._cwWords = words;
+        
+        if (this._cwCells.length === 0) {
+            this._cwCells = Array.from({ length: this._cwGridSize }, () => Array(this._cwGridSize).fill(''));
+        }
+        if (this._cwCells.length !== this._cwGridSize) {
+            this._cwCells = Array.from({ length: this._cwGridSize }, () => Array(this._cwGridSize).fill(''));
+        }
+    } else {
+        titleEl.textContent = '🆕 شبكة كلمات متقاطعة جديدة';
+        this._cwGridSize = parseInt(document.getElementById('cwGridSize').value) || 6;
+        this._cwCells = Array.from({ length: this._cwGridSize }, () => Array(this._cwGridSize).fill(''));
+        this._cwWords = [];
+        // ✅ تعيين الرتبة الافتراضية إلى برونزي 1 (0)
+        document.getElementById('cwRankRequired').value = 0;
+    }
+
+    this._renderCrosswordGridEditor();
+    this._renderCrosswordPreview();
+    this._updateWordsList();
+
+    App._openModal('crosswordModal');
+},
+
+_renderCrosswordGridEditor() {
+    const container = document.getElementById('crosswordGridEditor');
+    if (!container) return;
+
+    const size = this._cwGridSize;
+    container.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+
+    // ✅ حساب الخلايا التي تنتمي لكل كلمة (لتمييزها)
+    const cellWordCount = {};
+    const cellWords = {};
+    for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+            const key = `${r},${c}`;
+            cellWordCount[key] = 0;
+            cellWords[key] = [];
+        }
+    }
+    for (const w of this._cwWords) {
+        for (let i = 0; i < w.word.length; i++) {
+            let r, c;
+            if (w.direction === 'across') {
+                r = w.row;
+                c = w.col - i; // من اليمين إلى اليسار
+            } else {
+                r = w.row + i;
+                c = w.col;
+            }
+            if (r >= 0 && r < size && c >= 0 && c < size) {
+                const key = `${r},${c}`;
+                cellWordCount[key] = (cellWordCount[key] || 0) + 1;
+                if (!cellWords[key].includes(w.word)) {
+                    cellWords[key].push(w.word);
+                }
+            }
+        }
+    }
+
+    // ✅ تحديد الخلايا المتقاطعة (تنتمي لأكثر من كلمة)
+    const crossCells = {};
+    for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+            const key = `${r},${c}`;
+            if (cellWordCount[key] >= 2) {
+                crossCells[key] = true;
+            }
+        }
+    }
+
+    // ✅ تحديد بداية كل كلمة (أول حرف)
+const directionIndicators = {};
+this._cwWords.forEach(w => {
+    if (w.direction === 'across') {
+        // بداية الكلمة الأفقية = أقصى اليمين (col - word.length + 1)
+        const startCol = w.col - w.word.length + 1;
+        directionIndicators[`${w.row},${startCol}`] = '←';
+    } else {
+        // بداية الكلمة العمودية = أعلى (row)
+        directionIndicators[`${w.row},${w.col}`] = '↓';
+    }
+});
+
+    let html = '';
+    for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+            const isSelected = (r === this._cwSelectedRow && c === this._cwSelectedCol);
+            const value = this._cwCells[r]?.[c] || '';
+            const key = `${r},${c}`;
+            const wordCount = cellWordCount[key] || 0;
+            const wordsHere = cellWords[key] || [];
+            const isCross = crossCells[key] || false;
+            const isStart = !!directionIndicators[key];
+            
+            // تمييز الخلايا المتقاطعة بلون مختلف
+            let bgColor;
+            if (isSelected) {
+                bgColor = 'var(--accent)';
+            } else if (isCross) {
+                bgColor = 'rgba(108, 99, 255, 0.2)';
+            } else if (value) {
+                bgColor = 'var(--card-bg)';
+            } else {
+                bgColor = 'var(--glass)';
+            }
+            
+            const borderColor = isSelected ? 'var(--accent)' : 
+                               (isCross ? 'var(--primary)' : 'var(--border-color)');
+
+            // تلميح مفصل
+            let titleText = value ? `حرف: ${value}` : 'فارغة';
+            if (wordsHere.length > 0) {
+                titleText += ` | كلمات: ${wordsHere.join(', ')}`;
+            }
+            if (isCross) {
+                titleText += ' | ✚ متقاطعة';
+            }
+            if (isStart) {
+                titleText += ` | بداية كلمة ${directionIndicators[key]}`;
+            }
+
+            html += `
+                <div class="cw-editor-cell" 
+                     data-row="${r}" data-col="${c}"
+                     style="
+                        aspect-ratio:1;
+                        background:${bgColor};
+                        border:2px solid ${borderColor};
+                        border-radius:6px;
+                        display:flex;
+                        flex-direction:column;
+                        align-items:center;
+                        justify-content:center;
+                        font-size:1.2rem;
+                        font-weight:700;
+                        color:${value ? 'var(--light)' : 'var(--gray)'};
+                        cursor:pointer;
+                        transition:all 0.2s ease;
+                        user-select:none;
+                        min-height:44px;
+                        position:relative;
+                        ${!value ? 'opacity:0.6;' : ''}
+                     "
+                     onclick="App._selectCWCell(${r},${c})"
+                     onkeydown="App._handleCWKey(event, ${r},${c})"
+                     oncontextmenu="App._showCellWords(${r},${c}); return false;"
+                     contenteditable="false"
+                     tabindex="0"
+                     title="${titleText}"
+                >
+                    ${value}
+                    ${isCross ? `<span style="position:absolute;top:-4px;right:-4px;font-size:0.5rem;color:var(--primary);font-weight:900;">✚</span>` : ''}
+                    ${isStart ? `<span style="position:absolute;bottom:-4px;left:-4px;font-size:0.7rem;color:var(--accent);font-weight:900;">${directionIndicators[key]}</span>` : ''}
+                    ${!value && !isStart ? `<span style="font-size:0.4rem;color:var(--gray-dark);">${r+1},${c+1}</span>` : ''}
+                </div>
+            `;
+        }
+    }
+    container.innerHTML = html;
+},
+
+/**
+ * التحقق من صحة الشبكة قبل الحفظ (تأكد من عدم وجود تعارضات)
+ */
+_validateCrossword() {
+    const size = this._cwGridSize;
+    const errors = [];
+
+    // 1. التحقق من أن كل الخلايا المملوءة تنتمي لكلمة واحدة على الأقل
+    for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+            const value = this._cwCells[r][c];
+            if (!value) continue;
+            // التحقق من أن الخلية تنتمي لكلمة واحدة على الأقل
+            let belongs = false;
+            for (const w of this._cwWords) {
+                for (let i = 0; i < w.word.length; i++) {
+                    const wr = w.direction === 'across' ? w.row : w.row + i;
+                    const wc = w.direction === 'across' ? w.col + i : w.col;
+                    if (wr === r && wc === c) {
+                        belongs = true;
+                        break;
+                    }
+                }
+                if (belongs) break;
+            }
+            if (!belongs) {
+                errors.push(`الخلية (${r+1}, ${c+1}) مملوءة ولكنها لا تنتمي لأي كلمة`);
+            }
+        }
+    }
+
+    // 2. التحقق من أن كل كلمة مكتوبة بشكل صحيح في الشبكة
+    for (const w of this._cwWords) {
+        for (let i = 0; i < w.word.length; i++) {
+            const r = w.direction === 'across' ? w.row : w.row + i;
+            const c = w.direction === 'across' ? w.col + i : w.col;
+            const cellValue = this._cwCells[r]?.[c] || '';
+            if (cellValue !== w.word[i]) {
+                errors.push(`كلمة "${w.word}" غير مطابقة للشبكة في الخلية (${r+1}, ${c+1})`);
+                break;
+            }
+        }
+    }
+
+    return errors;
+},
+
+_autoDetectWords() {
+    const size = this._cwGridSize;
+    const grid = this._cwCells;
+    const detectedWords = [];
+
+    // التحقق من وجود حروف
+    let hasLetters = false;
+    for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+            if (grid[r] && grid[r][c] && grid[r][c].trim() !== '') {
+                hasLetters = true;
+                break;
+            }
+        }
+        if (hasLetters) break;
+    }
+
+    if (!hasLetters) {
+        showToast('⚠️ الشبكة فارغة! املأ بعض الحروف أولاً', 'error', 3000);
+        return;
+    }
+
+    // ===== 1. البحث أفقياً (من اليمين إلى اليسار) =====
+    for (let r = 0; r < size; r++) {
+        let c = size - 1;
+        while (c >= 0) {
+            if (!grid[r][c] || grid[r][c].trim() === '') {
+                c--;
+                continue;
+            }
+            
+            let word = '';
+            let startCol = c;
+            let endCol = c;
+            let tempC = c;
+            
+            while (tempC >= 0 && grid[r][tempC] && grid[r][tempC].trim() !== '') {
+                word = word + grid[r][tempC];
+                endCol = tempC;
+                tempC--;
+            }
+            
+            if (word.length >= 2) {
+                const isDuplicate = detectedWords.some(w => 
+                    w.word === word && 
+                    w.row === r && 
+                    w.col === startCol && // ✅ تم التصحيح: استخدام startCol (أقصى يمين)
+                    w.direction === 'across'
+                );
+                
+                if (!isDuplicate) {
+                    detectedWords.push({
+                        word: word,
+                        row: r,
+                        col: startCol, // ✅ col = أقصى يمين الكلمة
+                        direction: 'across',
+                        clue: '',
+                        detected: true
+                    });
+                }
+            }
+            
+            c = tempC;
+        }
+    }
+
+    // ===== 2. البحث عمودياً (من الأعلى إلى الأسفل) =====
+    for (let c = 0; c < size; c++) {
+        let r = 0;
+        while (r < size) {
+            if (!grid[r][c] || grid[r][c].trim() === '') {
+                r++;
+                continue;
+            }
+            
+            let word = '';
+            let startRow = r;
+            let endRow = r;
+            
+            while (r < size && grid[r][c] && grid[r][c].trim() !== '') {
+                word += grid[r][c];
+                endRow = r;
+                r++;
+            }
+            
+            if (word.length >= 2) {
+                const isDuplicate = detectedWords.some(w => 
+                    w.word === word && 
+                    w.row === startRow &&
+                    w.col === c &&
+                    w.direction === 'down'
+                );
+                
+                if (!isDuplicate) {
+                    detectedWords.push({
+                        word: word,
+                        row: startRow,
+                        col: c,
+                        direction: 'down',
+                        clue: '',
+                        detected: true
+                    });
+                }
+            }
+        }
+    }
+
+    if (detectedWords.length === 0) {
+        showToast('⚠️ لم يتم العثور على كلمات متصلة (تحتاج إلى حروف متجاورة بطول 2 حروف على الأقل)', 'error', 4000);
+        return;
+    }
+
+    this._detectedWords = detectedWords;
+    this._showDetectedWordsModal(detectedWords);
+},
+
+_showDetectedWordsModal(detectedWords) {
+    // ✅ التحقق من وجود مودال مفتوح بالفعل وإزالته (لتجنب التراكم)
+    const existingModal = document.querySelector('.detected-words-modal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay open detected-words-modal';
+    // ✅ جعل المودال يظهر فوق مودال الشبكة
+    modal.style.zIndex = '1000001';
+    
+    let wordsHtml = detectedWords.map((w, idx) => {
+        const dirText = w.direction === 'across' ? '← أفقياً (يمين→يسار)' : '↓ عمودياً (أعلى→أسفل)';
+        const posText = w.direction === 'across' 
+            ? `@(${w.row+1}, ${w.col+1})` 
+            : `@(${w.row+1}, ${w.col+1})`;
+        
+        return `
+            <div style="display:flex; align-items:center; gap:0.5rem; padding:0.3rem 0; border-bottom:1px solid var(--glass-border);">
+                <span style="font-weight:700; color:var(--accent); min-width:60px;">${w.word}</span>
+                <span style="font-size:0.6rem; color:var(--gray); min-width:80px;">${dirText}</span>
+                <span style="font-size:0.6rem; color:var(--gray-dark);">${posText}</span>
+                <input type="text" id="cwDetectedClue_${idx}" placeholder="أدخل الدليل..." style="flex:1; min-width:100px; padding:4px 8px; border-radius:6px; background:var(--glass); border:1px solid var(--glass-border); color:var(--light); font-size:0.8rem;">
+                <button class="btn btn-xs btn-success" onclick="App._addDetectedWord(${idx})" style="padding:2px 10px; white-space:nowrap;">
+                    <i class="fas fa-check"></i> إضافة
+                </button>
+            </div>
+        `;
+    }).join('');
+
+    modal.innerHTML = `
+        <div class="modal-card" style="max-width:650px; max-height:80vh; position:relative;">
+            <div class="modal-header">
+                <h3><i class="fas fa-magic" style="color:var(--accent);"></i> الكلمات المكتشفة (${detectedWords.length})</h3>
+                <button class="modal-close-btn" onclick="App._closeDetectedWordsModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div style="max-height:50vh; overflow-y:auto; padding:0.5rem 0;">
+                <p style="font-size:0.85rem; color:var(--gray); margin-bottom:0.5rem;">
+                    <i class="fas fa-info-circle"></i> أدخل دليلاً لكل كلمة ثم اضغط "إضافة" أو "إضافة الكل"
+                </p>
+                ${wordsHtml}
+            </div>
+            <div style="display:flex; gap:0.5rem; justify-content:center; margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--glass-border);">
+                <button class="btn btn-primary" onclick="App._addAllDetectedWords()" style="min-width:120px; justify-content:center;">
+                    <i class="fas fa-check-double"></i> إضافة الكل
+                </button>
+                <button class="btn btn-outline" onclick="App._closeDetectedWordsModal()">
+                    <i class="fas fa-times"></i> إلغاء
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // ✅ منع إغلاق المودال عند النقر على الخلفية (لتجنب إغلاق المودال الرئيسي)
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            // لا نفعل شيئاً - نمنع الإغلاق بالضغط على الخلفية
+        }
+    });
+},
+
+/**
+ * إغلاق مودال الكلمات المكتشفة فقط (دون التأثير على مودال الشبكة)
+ */
+_closeDetectedWordsModal() {
+    const modal = document.querySelector('.detected-words-modal');
+    if (modal) {
+        modal.remove();
+    }
+},
+
+_addDetectedWord(index) {
+    const clueInput = document.getElementById(`cwDetectedClue_${index}`);
+    if (!clueInput) return;
+    
+    const clue = clueInput.value.trim();
+    if (!clue) {
+        showToast('يرجى إدخال دليل للكلمة', 'error');
+        return;
+    }
+
+    const wordObj = this._detectedWords[index];
+    if (!wordObj) return;
+
+    const exists = this._cwWords.some(w => 
+        w.word === wordObj.word && 
+        w.row === wordObj.row && 
+        w.col === wordObj.col && 
+        w.direction === wordObj.direction
+    );
+
+    if (exists) {
+        showToast(`⚠️ كلمة "${wordObj.word}" موجودة بالفعل`, 'error');
+        return;
+    }
+
+    this._cwWords.push({
+        word: wordObj.word,
+        row: wordObj.row,
+        col: wordObj.col,
+        direction: wordObj.direction,
+        clue: clue
+    });
+
+    this._renderCrosswordGridEditor();
+    this._renderCrosswordPreview();
+    this._updateWordsList();
+
+    const btn = clueInput.parentElement.querySelector('.btn-success');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '✅ تم';
+        btn.style.opacity = '0.5';
+    }
+    clueInput.disabled = true;
+
+    showToast(`✅ تم إضافة "${wordObj.word}"`, 'success', 1500);
+
+    // ✅ بعد إضافة جميع الكلمات (اختياري: إغلاق المودال بعد إضافة الكل)
+    // نتحقق إذا كانت جميع الكلمات قد أضيفت
+    const allInputs = document.querySelectorAll('[id^="cwDetectedClue_"]');
+    let allAdded = true;
+    allInputs.forEach(input => {
+        if (!input.disabled) allAdded = false;
+    });
+    
+    if (allAdded) {
+        // جميع الكلمات أضيفت، نغلق المودال بعد 1 ثانية
+        setTimeout(() => {
+            this._closeDetectedWordsModal();
+        }, 1000);
+    }
+},
+
+_addAllDetectedWords() {
+    const clues = document.querySelectorAll('[id^="cwDetectedClue_"]');
+    let added = 0;
+    let missing = 0;
+
+    clues.forEach((input, idx) => {
+        const clue = input.value.trim();
+        if (!clue) {
+            missing++;
+            return;
+        }
+
+        const wordObj = this._detectedWords[idx];
+        if (!wordObj) return;
+
+        const exists = this._cwWords.some(w => 
+            w.word === wordObj.word && 
+            w.row === wordObj.row && 
+            w.col === wordObj.col && 
+            w.direction === wordObj.direction
+        );
+
+        if (exists) return;
+
+        this._cwWords.push({
+            word: wordObj.word,
+            row: wordObj.row,
+            col: wordObj.col,
+            direction: wordObj.direction,
+            clue: clue
+        });
+        added++;
+    });
+
+    if (added === 0) {
+        showToast(missing > 0 ? '⚠️ يرجى إدخال أدلة للكلمات أولاً' : '⚠️ لا توجد كلمات جديدة للإضافة', 'error');
+        return;
+    }
+
+    // تحديث الواجهة
+    this._renderCrosswordGridEditor();
+    this._renderCrosswordPreview();
+    this._updateWordsList();
+
+    // ✅ إغلاق مودال الكلمات المكتشفة فقط (بدون إغلاق مودال الشبكة)
+    this._closeDetectedWordsModal();
+
+    showToast(`✅ تم إضافة ${added} كلمة جديدة ${missing > 0 ? `(${missing} كلمة بدون دليل تم تخطيها)` : ''}`, 'success', 3000);
+},
+
+// استبدال دالة _renderCrosswordPreview بأكملها
+_renderCrosswordPreview() {
+    const container = document.getElementById('crosswordPreview');
+    if (!container) return;
+
+    const size = this._cwGridSize;
+    
+    // ✅ حساب الخلايا التي تحتوي على حروف
+    const cellsWithLetters = new Set();
+    for (const w of this._cwWords) {
+        for (let i = 0; i < w.word.length; i++) {
+            let r, c;
+            if (w.direction === 'across') {
+                r = w.row;
+                c = w.col - i;
+            } else {
+                r = w.row + i;
+                c = w.col;
+            }
+            if (r >= 0 && r < size && c >= 0 && c < size) {
+                cellsWithLetters.add(`${r},${c}`);
+            }
+        }
+    }
+
+    // ✅ حساب الحدود الفعلية للخلايا المملوءة
+    let minRow = Infinity, maxRow = -Infinity;
+    let minCol = Infinity, maxCol = -Infinity;
+    
+    for (const key of cellsWithLetters) {
+        const [r, c] = key.split(',').map(Number);
+        if (r < minRow) minRow = r;
+        if (r > maxRow) maxRow = r;
+        if (c < minCol) minCol = c;
+        if (c > maxCol) maxCol = c;
+    }
+    
+    if (cellsWithLetters.size === 0) {
+        container.innerHTML = '<div class="text-gray" style="text-align:center;padding:1rem;">لا توجد حروف في الشبكة</div>';
+        document.getElementById('cwPreviewStats').textContent = '0 كلمة';
+        return;
+    }
+
+    const actualWidth = maxCol - minCol + 1;
+    const actualHeight = maxRow - minRow + 1;
+    
+    container.style.gridTemplateColumns = `repeat(${actualWidth}, 1fr)`;
+    container.style.maxWidth = `${Math.min(actualWidth * 40, 300)}px`;
+    container.style.margin = '0 auto';
+
+    let html = '';
+    
+    // ✅ عرض الخلايا المملوءة فقط
+    for (let r = minRow; r <= maxRow; r++) {
+        for (let c = minCol; c <= maxCol; c++) {
+            const cellKey = `${r},${c}`;
+            const value = this._cwCells[r]?.[c] || '';
+            const isInWord = cellsWithLetters.has(cellKey);
+
+            if (!isInWord) {
+                // ✅ خلية فارغة - غير مرئية للحفاظ على التباعد
+                html += `
+                    <div style="
+                        aspect-ratio:1;
+                        visibility:hidden;
+                        min-height:32px;
+                    "></div>
+                `;
+                continue;
+            }
+
+            // ✅ خلية تحتوي على حرف
+            html += `
+                <div style="
+                    aspect-ratio:1;
+                    background:${value ? 'var(--card-bg)' : 'var(--glass)'};
+                    border:1px solid ${value ? 'var(--primary-light)' : 'var(--border-color)'};
+                    border-radius:4px;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:0.9rem;
+                    font-weight:600;
+                    color:${value ? 'var(--light)' : 'var(--gray-dark)'};
+                    min-height:32px;
+                    background:${value ? 'rgba(108,99,255,0.15)' : 'var(--glass)'};
+                ">
+                    ${value || ' '}
+                </div>
+            `;
+        }
+    }
+    
+    container.innerHTML = html;
+
+    // تحديث الإحصائيات
+    document.getElementById('cwPreviewStats').textContent = `${this._cwWords.length} كلمة (${cellsWithLetters.size} حرف)`;
+},
+
+_updateWordsList() {
+    const container = document.getElementById('cwWordsList');
+    if (!container) return;
+
+    if (this._cwWords.length === 0) {
+        container.innerHTML = '<div class="text-gray" style="font-size:0.8rem; text-align:center; padding:0.5rem;">لا توجد كلمات مضافة</div>';
+        return;
+    }
+
+    let html = '';
+    this._cwWords.forEach((w, idx) => {
+        // ✅ عرض الاتجاه بشكل صحيح للعربية
+        const dirText = w.direction === 'across' ? '← أفقياً (يمين→يسار)' : '↓ عمودياً (أعلى→أسفل)';
+        // عرض الإحداثيات بشكل صحيح
+        const posText = w.direction === 'across' 
+            ? `@(${w.row+1}, ${w.col+1})` 
+            : `@(${w.row+1}, ${w.col+1})`;
+        
+        html += `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:0.2rem 0; border-bottom:1px solid var(--glass-border); font-size:0.8rem;">
+                <div style="display:flex; gap:0.3rem; align-items:center; flex-wrap:wrap;">
+                    <span style="font-weight:700; color:var(--accent);">${w.word}</span>
+                    <span style="font-size:0.6rem; color:var(--gray);">[${dirText}]</span>
+                    <span style="font-size:0.7rem; color:var(--gray-dark);">(${w.clue})</span>
+                    <span style="font-size:0.6rem; color:var(--gray-dark);">${posText}</span>
+                </div>
+                <button class="btn btn-xs btn-danger" onclick="App._removeCWWord(${idx})" style="padding:0 6px;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+},
+
+_handleCWKey(e, row, col) {
+    const key = e.key;
+    const size = this._cwGridSize;
+    
+    if (key.length === 1 && key.match(/[a-zA-Z\u0600-\u06FF]/)) {
+        // حرف أو رقم
+        this._cwCells[row][col] = key;
+        this._renderCrosswordGridEditor();
+        this._renderCrosswordPreview();
+        // الانتقال حسب الاتجاه المحدد حالياً
+        const directionInput = document.getElementById('cwDirectionInput');
+        const currentDirection = directionInput ? directionInput.value : 'across';
+        
+        if (currentDirection === 'across') {
+            // أفقي: من اليمين إلى اليسار
+            if (col > 0) {
+                this._selectCWCell(row, col - 1);
+            }
+        } else {
+            // عمودي: من الأعلى إلى الأسفل
+            if (row < size - 1) {
+                this._selectCWCell(row + 1, col);
+            }
+        }
+        e.preventDefault();
+    } else if (key === 'Backspace' || key === 'Delete') {
+        this._cwCells[row][col] = '';
+        this._renderCrosswordGridEditor();
+        this._renderCrosswordPreview();
+        // الرجوع حسب الاتجاه المحدد
+        const directionInput = document.getElementById('cwDirectionInput');
+        const currentDirection = directionInput ? directionInput.value : 'across';
+        
+        if (currentDirection === 'across') {
+            if (col < size - 1) {
+                this._selectCWCell(row, col + 1);
+            }
+        } else {
+            if (row > 0) {
+                this._selectCWCell(row - 1, col);
+            }
+        }
+        e.preventDefault();
+    } else if (key === 'ArrowRight') {
+        // السهم الأيمن: ينتقل إلى اليسار (لأن الكتابة من اليمين لليسار)
+        if (col > 0) {
+            this._selectCWCell(row, col - 1);
+        }
+        e.preventDefault();
+    } else if (key === 'ArrowLeft') {
+        // السهم الأيسر: ينتقل إلى اليمين
+        if (col < size - 1) {
+            this._selectCWCell(row, col + 1);
+        }
+        e.preventDefault();
+    } else if (key === 'ArrowDown') {
+        if (row < size - 1) this._selectCWCell(row + 1, col);
+        e.preventDefault();
+    } else if (key === 'ArrowUp') {
+        if (row > 0) this._selectCWCell(row - 1, col);
+        e.preventDefault();
+    }
+},
+
+_addCWWord() {
+    const wordInput = document.getElementById('cwWordInput');
+    const clueInput = document.getElementById('cwClueInput');
+    const dirInput = document.getElementById('cwDirectionInput');
+
+    const word = wordInput.value.trim();
+    const clue = clueInput.value.trim();
+    const direction = dirInput.value;
+
+    if (!word || !clue) {
+        showToast('يرجى إدخال الكلمة والدليل', 'error');
+        return;
+    }
+
+    if (this._cwSelectedRow < 0 || this._cwSelectedCol < 0) {
+        showToast('يرجى تحديد خلية البداية في الشبكة أولاً', 'error');
+        return;
+    }
+
+    const row = this._cwSelectedRow;
+    const col = this._cwSelectedCol;
+    const size = this._cwGridSize;
+
+    // ✅ التحقق من الحدود حسب الاتجاه
+    if (direction === 'across') {
+        // الكلمة الأفقية: تبدأ من أقصى اليمين (col) وتتجه يساراً
+        // col - word.length + 1 يجب أن يكون >= 0
+        if (col - word.length + 1 < 0) {
+            showToast('الكلمة تتجاوز حدود الشبكة (تحتاج إلى مسافة كافية لليسار)', 'error');
+            return;
+        }
+    } else {
+        // الكلمة العمودية: تبدأ من row وتتجه لأسفل
+        if (row + word.length > size) {
+            showToast('الكلمة تتجاوز حدود الشبكة', 'error');
+            return;
+        }
+    }
+
+    // التحقق من التعارضات
+    const conflicts = [];
+    const newCells = {};
+    let hasConflict = false;
+
+    for (let i = 0; i < word.length; i++) {
+        let r, c;
+        if (direction === 'across') {
+            r = row;
+            c = col - i; // من اليمين إلى اليسار
+        } else {
+            r = row + i;
+            c = col;
+        }
+
+        const existing = this._cwCells[r]?.[c] || '';
+        const newChar = word[i];
+
+        if (existing && existing !== newChar) {
+            conflicts.push({ row: r, col: c, existing: existing, new: newChar });
+            hasConflict = true;
+        } else if (!existing) {
+            newCells[`${r},${c}`] = newChar;
+        }
+    }
+
+    // إذا كان هناك تعارض، نطلب التأكيد
+    if (hasConflict) {
+        let conflictMsg = '⚠️ تعارض في الخلايا التالية:\n';
+        conflicts.forEach(c => {
+            conflictMsg += `- (${c.row+1}, ${c.col+1}): "${c.existing}" ≠ "${c.new}"\n`;
+        });
+        conflictMsg += '\nهل تريد استبدال الحروف المتعارضة؟';
+        if (!confirm(conflictMsg)) {
+            return;
+        }
+        conflicts.forEach(c => {
+            this._cwCells[c.row][c.col] = c.new;
+        });
+    }
+
+    // تعبئة الخلايا الجديدة
+    Object.entries(newCells).forEach(([key, char]) => {
+        const [r, c] = key.split(',').map(Number);
+        this._cwCells[r][c] = char;
+    });
+
+    // ✅ التأكد من عدم وجود كلمة مكررة
+    const isDuplicate = this._cwWords.some(w => 
+        w.word === word && 
+        w.row === row && 
+        w.col === col && 
+        w.direction === direction
+    );
+
+    if (isDuplicate) {
+        showToast(`⚠️ الكلمة "${word}" موجودة بالفعل في هذا الموقع`, 'error');
+        return;
+    }
+
+    // إضافة الكلمة
+    this._cwWords.push({ word, clue, row, col, direction });
+
+    // تحديث الواجهة
+    this._renderCrosswordGridEditor();
+    this._renderCrosswordPreview();
+    this._updateWordsList();
+
+    wordInput.value = '';
+    clueInput.value = '';
+    wordInput.focus();
+
+    showToast(`✅ تم إضافة كلمة "${word}"`, 'success', 2000);
+},
+
+_showCellWords(row, col) {
+    const cellKey = `${row},${col}`;
+    
+    // ✅ البحث عن جميع الكلمات التي تمر بهذه الخلية (أفقية وعمودية)
+    const words = this._cwWords.filter(w => {
+        for (let i = 0; i < w.word.length; i++) {
+            let r, c;
+            if (w.direction === 'across') {
+                r = w.row;
+                c = w.col - i; // من اليمين إلى اليسار
+            } else {
+                r = w.row + i;
+                c = w.col;
+            }
+            if (r === row && c === col) return true;
+        }
+        return false;
+    });
+
+    if (words.length === 0) {
+        showToast(`الخلية (${row+1}, ${col+1}) لا تنتمي لأي كلمة`, 'info', 1500);
+        return;
+    }
+
+    let msg = `📌 الخلية (${row+1}, ${col+1}) تحتوي على:\n\n`;
+    words.forEach(w => {
+        const dirText = w.direction === 'across' ? '← أفقياً (يمين→يسار)' : '↓ عمودياً (أعلى→أسفل)';
+        // تحديد موقع الحرف في الكلمة
+        let position = -1;
+        for (let i = 0; i < w.word.length; i++) {
+            let r, c;
+            if (w.direction === 'across') {
+                r = w.row;
+                c = w.col - i;
+            } else {
+                r = w.row + i;
+                c = w.col;
+            }
+            if (r === row && c === col) {
+                position = i + 1;
+                break;
+            }
+        }
+        const posText = position > 0 ? ` (الحرف ${position} من ${w.word.length})` : '';
+        msg += `- "${w.word}" ${dirText}${posText}\n`;
+        msg += `  دليل: ${w.clue || 'لا يوجد'}\n`;
+    });
+    
+    showToast(msg, 'info', 5000);
+},
+
+_selectCWCell(row, col) {
+    this._cwSelectedRow = row;
+    this._cwSelectedCol = col;
+    this._renderCrosswordGridEditor();
+    
+    // التركيز على الخلية وإضافة مستمع للنقر المزدوج
+    const cellEl = document.querySelector(`.cw-editor-cell[data-row="${row}"][data-col="${col}"]`);
+    if (cellEl) {
+        cellEl.focus();
+        // إضافة مستمع للنقر المزدوج لعرض الكلمات
+        cellEl.ondblclick = () => {
+            this._showCellWords(row, col);
+        };
+    }
+},
+
+/**
+ * حذف كلمة من القائمة
+ */
+_removeCWWord(index) {
+    const wordObj = this._cwWords[index];
+    if (!wordObj) return;
+    if (!confirm(`حذف كلمة "${wordObj.word}"؟`)) return;
+
+    // إزالة الكلمة من المصفوفة
+    this._cwWords.splice(index, 1);
+
+    // إعادة بناء الشبكة من الكلمات المتبقية
+    this._cwCells = Array.from({ length: this._cwGridSize }, () => Array(this._cwGridSize).fill(''));
+    for (const w of this._cwWords) {
+        for (let i = 0; i < w.word.length; i++) {
+            const r = w.direction === 'across' ? w.row : w.row + i;
+            const c = w.direction === 'across' ? w.col + i : w.col;
+            this._cwCells[r][c] = w.word[i];
+        }
+    }
+
+    // تحديث الواجهة
+    this._renderCrosswordGridEditor();
+    this._renderCrosswordPreview();
+    this._updateWordsList();
+
+    showToast(`🗑️ تم حذف "${wordObj.word}"`, 'info', 1500);
+},
+
+/**
+ * إعادة ضبط الشبكة (مسح كل شيء)
+ */
+_clearCWGrid() {
+    if (!confirm('هل أنت متأكد من مسح الشبكة وجميع الكلمات؟')) return;
+    this._cwCells = Array.from({ length: this._cwGridSize }, () => Array(this._cwGridSize).fill(''));
+    this._cwWords = [];
+    this._renderCrosswordGridEditor();
+    this._renderCrosswordPreview();
+    this._updateWordsList();
+    showToast('🔄 تم إعادة ضبط الشبكة', 'info');
+},
+
+/**
+ * تعبئة تلقائية تجريبية (للمساعدة في بدء الشبكة)
+ */
+_autoFillCW() {
+    // يمكنك إضافة كلمات افتراضية أو خوارزمية بسيطة هنا
+    // هذا مجرد مثال
+    const sampleWords = [
+        { word: 'مرحبا', clue: 'تحية', row: 0, col: 0, direction: 'across' },
+        { word: 'كرة', clue: 'رياضة', row: 1, col: 2, direction: 'down' },
+        { word: 'علم', clue: 'معرفة', row: 2, col: 0, direction: 'across' },
+        { word: 'نور', clue: 'ضوء', row: 3, col: 1, direction: 'down' },
+        { word: 'بحر', clue: 'ماء', row: 4, col: 0, direction: 'across' }
+    ];
+
+    // تصفية الكلمات التي تتناسب مع حجم الشبكة
+    const size = this._cwGridSize;
+    const valid = sampleWords.filter(w => {
+        if (w.direction === 'across' && w.col + w.word.length <= size) return true;
+        if (w.direction === 'down' && w.row + w.word.length <= size) return true;
+        return false;
+    });
+
+    if (valid.length === 0) {
+        showToast('لا توجد كلمات تتناسب مع حجم الشبكة', 'error');
+        return;
+    }
+
+    // إضافة الكلمات
+    for (const w of valid) {
+        // التحقق من عدم التعارض
+        let conflict = false;
+        for (let i = 0; i < w.word.length; i++) {
+            const r = w.direction === 'across' ? w.row : w.row + i;
+            const c = w.direction === 'across' ? w.col + i : w.col;
+            const existing = this._cwCells[r]?.[c] || '';
+            if (existing && existing !== w.word[i]) {
+                conflict = true;
+                break;
+            }
+        }
+        if (!conflict) {
+            this._cwWords.push({ ...w });
+            for (let i = 0; i < w.word.length; i++) {
+                const r = w.direction === 'across' ? w.row : w.row + i;
+                const c = w.direction === 'across' ? w.col + i : w.col;
+                this._cwCells[r][c] = w.word[i];
+            }
+        }
+    }
+
+    this._renderCrosswordGridEditor();
+    this._renderCrosswordPreview();
+    this._updateWordsList();
+    showToast(`✅ تمت إضافة ${this._cwWords.length} كلمة تلقائياً`, 'success', 2000);
+},
+
+/**
+ * ربط نموذج الشبكة
+ */
+_setupCrosswordForm() {
+    const form = document.getElementById('crosswordForm');
+    if (!form) return;
+
+    // تغيير حجم الشبكة يعيد تهيئة الشبكة
+    document.getElementById('cwGridSize')?.addEventListener('change', function() {
+        const newSize = parseInt(this.value);
+        App._cwGridSize = newSize;
+        // إعادة تهيئة الشبكة مع الاحتفاظ بالكلمات التي تتناسب مع الحجم الجديد
+        const oldCells = App._cwCells;
+        App._cwCells = Array.from({ length: newSize }, () => Array(newSize).fill(''));
+        // إعادة تعبئة الكلمات القديمة التي تتناسب
+        const oldWords = [...App._cwWords];
+        App._cwWords = [];
+        for (const w of oldWords) {
+            if (w.direction === 'across' && w.col + w.word.length <= newSize) {
+                App._cwWords.push(w);
+            } else if (w.direction === 'down' && w.row + w.word.length <= newSize) {
+                App._cwWords.push(w);
+            }
+        }
+        // إعادة بناء الخلايا
+        for (const w of App._cwWords) {
+            for (let i = 0; i < w.word.length; i++) {
+                const r = w.direction === 'across' ? w.row : w.row + i;
+                const c = w.direction === 'across' ? w.col + i : w.col;
+                App._cwCells[r][c] = w.word[i];
+            }
+        }
+        App._renderCrosswordGridEditor();
+        App._renderCrosswordPreview();
+        App._updateWordsList();
+        showToast(`🔄 تم تغيير حجم الشبكة إلى ${newSize}×${newSize}`, 'info', 1500);
+    });
+
+    // زر إضافة كلمة
+    document.getElementById('cwAddWordBtn')?.addEventListener('click', () => {
+        this._addCWWord();
+    });
+
+    // الضغط على Enter في حقول الكلمة والدليل
+    document.getElementById('cwWordInput')?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('cwClueInput').focus();
+        }
+    });
+    document.getElementById('cwClueInput')?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            this._addCWWord();
+        }
+    });
+
+    // زر إعادة ضبط
+    document.getElementById('cwClearGridBtn')?.addEventListener('click', () => {
+        this._clearCWGrid();
+    });
+
+    // زر تعبئة تلقائية
+    document.getElementById('cwAutoFillBtn')?.addEventListener('click', () => {
+        this._autoFillCW();
+    });
+
+    // إرسال النموذج (حفظ الشبكة)
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await this._saveCrossword();
+    });
+},
+
+/**
+ * حذف حرف من خلية محددة (مع إزالة الكلمات التي تعتمد عليها)
+ */
+_removeCellChar(row, col) {
+    const value = this._cwCells[row]?.[col];
+    if (!value) {
+        showToast('الخلية فارغة', 'info');
+        return;
+    }
+
+    // العثور على الكلمات التي تمر بهذه الخلية
+    const affectedWords = this._cwWords.filter(w => {
+        for (let i = 0; i < w.word.length; i++) {
+            const r = w.direction === 'across' ? w.row : w.row + i;
+            const c = w.direction === 'across' ? w.col + i : w.col;
+            if (r === row && c === col) return true;
+        }
+        return false;
+    });
+
+    if (affectedWords.length === 0) {
+        // إذا لم تنتمي لأي كلمة، فقط امسح الحرف
+        this._cwCells[row][col] = '';
+        this._renderCrosswordGridEditor();
+        this._renderCrosswordPreview();
+        showToast('🗑️ تم حذف الحرف', 'info');
+        return;
+    }
+
+    // عرض الكلمات المتأثرة وطلب التأكيد
+    let msg = `⚠️ حذف الحرف "${value}" من الخلية (${row+1}, ${col+1}) سيؤثر على:\n`;
+    affectedWords.forEach(w => {
+        msg += `- "${w.word}" (${w.direction === 'across' ? 'أفقي' : 'عمودي'})\n`;
+    });
+    msg += '\nهل تريد حذف الحرف وإزالة هذه الكلمات؟';
+    if (!confirm(msg)) {
+        return;
+    }
+
+    // حذف الحرف من الخلية
+    this._cwCells[row][col] = '';
+
+    // إزالة الكلمات المتأثرة
+    const affectedWordIds = affectedWords.map(w => `${w.word}_${w.row}_${w.col}_${w.direction}`);
+    this._cwWords = this._cwWords.filter(w => {
+        const id = `${w.word}_${w.row}_${w.col}_${w.direction}`;
+        return !affectedWordIds.includes(id);
+    });
+
+    // إعادة بناء الخلايا من الكلمات المتبقية
+    // (هذا سيبقي الخلايا الأخرى كما هي، لكن قد تبقى خلايا من كلمات محذوفة)
+    // نقوم بمسح الخلايا التي أصبحت لا تنتمي لأي كلمة
+    const newCells = Array.from({ length: this._cwGridSize }, () => Array(this._cwGridSize).fill(''));
+    for (const w of this._cwWords) {
+        for (let i = 0; i < w.word.length; i++) {
+            const r = w.direction === 'across' ? w.row : w.row + i;
+            const c = w.direction === 'across' ? w.col + i : w.col;
+            newCells[r][c] = w.word[i];
+        }
+    }
+    this._cwCells = newCells;
+
+    this._renderCrosswordGridEditor();
+    this._renderCrosswordPreview();
+    this._updateWordsList();
+    showToast(`🗑️ تم حذف الحرف والكلمات المرتبطة (${affectedWords.length})`, 'info', 2000);
+},
+
+/**
+ * حفظ الشبكة في قاعدة البيانات
+ */
+async _saveCrossword() {
+    const id = document.getElementById('cwFormId').value;
+    const title = document.getElementById('cwTitle').value.trim();
+    const category = document.getElementById('cwCategory').value;
+    const rankRequired = parseInt(document.getElementById('cwRankRequired').value) || 0;
+    const gridSize = parseInt(document.getElementById('cwGridSize').value);
+    const timeLimit = parseInt(document.getElementById('cwTimeLimit').value);
+    const points = parseInt(document.getElementById('cwPoints').value);
+
+    if (!title) {
+        showToast('يرجى إدخال عنوان الشبكة', 'error');
+        return;
+    }
+    if (this._cwWords.length < 2) {
+        showToast('تحتاج إلى كلمتين على الأقل لإنشاء شبكة', 'error');
+        return;
+    }
+
+    // ✅ تحديد الصعوبة تلقائياً حسب الرتبة (للتوافق مع النظام القديم)
+    let difficulty = 'متوسط';
+    if (rankRequired < 600) difficulty = 'سهل';
+    else if (rankRequired < 1700) difficulty = 'متوسط';
+    else if (rankRequired < 3200) difficulty = 'صعب';
+    else difficulty = 'خبير';
+
+    const crosswordData = {
+        gridSize: gridSize,
+        grid: JSON.stringify(this._cwCells),
+        words: JSON.stringify(this._cwWords)
+    };
+
+    const data = {
+        type: 'crossword',
+        question: title,
+        category: category,
+        difficulty: difficulty,        // ✅ محسوبة تلقائياً من الرتبة
+        rankRequired: rankRequired,    // ✅ الرتبة المطلوبة
+        points: points,
+        timeLimit: timeLimit,
+        crosswordData: crosswordData,
+        isPublic: true,
+        createdAt: new Date().toISOString()
+    };
+
+    try {
+        if (id) {
+            await DataManager.update('questions', id, data);
+            showToast('✅ تم تحديث الشبكة', 'success');
+        } else {
+            await DataManager.add('questions', data);
+            showToast('✅ تم حفظ الشبكة', 'success');
+        }
+        App._closeModal('crosswordModal');
+        App._renderCrosswords();
+        App._refreshAllData();
+    } catch (err) {
+        console.error('Error saving crossword:', err);
+        showToast('❌ خطأ: ' + err.message, 'error');
+    }
+},
+
+/**
+ * عرض جميع الشبكات في التبويب
+ */
+_renderCrosswords() {
+    const container = document.getElementById('crosswordsGrid');
+    if (!container) {
+        console.warn('⚠️ crosswordsGrid not found');
+        return;
+    }
+
+    const allQuestions = DataManager.data.questions || [];
+    const crosswords = allQuestions.filter(q => q.type === 'crossword');
+
+    // تحديث الإحصائيات
+    const statElements = {
+        total: document.getElementById('cwStatTotal'),
+        easy: document.getElementById('cwStatEasy'),
+        medium: document.getElementById('cwStatMedium'),
+        hard: document.getElementById('cwStatHard'),
+        categories: document.getElementById('cwStatCategories'),
+        words: document.getElementById('cwStatWords')
+    };
+
+    // إذا كانت أي من العناصر غير موجودة، نخرج مع تحذير
+    for (const [key, el] of Object.entries(statElements)) {
+        if (!el) {
+            console.warn(`⚠️ Element cwStat${key.charAt(0).toUpperCase() + key.slice(1)} not found`);
+        }
+    }
+
+    // تطبيق البحث والفلترة
+    const search = document.getElementById('searchCrossword')?.value?.toLowerCase() || '';
+    const category = document.getElementById('filterCwCategory')?.value || '';
+    const difficulty = document.getElementById('filterCwDifficulty')?.value || '';
+
+    let filtered = crosswords.filter(cw => {
+        const matchSearch = cw.question?.toLowerCase().includes(search) || false;
+        const matchCategory = category ? cw.category === category : true;
+        const matchDifficulty = difficulty ? cw.difficulty === difficulty : true;
+        return matchSearch && matchCategory && matchDifficulty;
+    });
+
+    // تحديث الإحصائيات فقط إذا كانت العناصر موجودة
+    if (statElements.total) {
+        statElements.total.textContent = filtered.length;
+    }
+    if (statElements.easy) {
+        statElements.easy.textContent = filtered.filter(c => c.difficulty === 'سهل').length;
+    }
+    if (statElements.medium) {
+        statElements.medium.textContent = filtered.filter(c => c.difficulty === 'متوسط').length;
+    }
+    if (statElements.hard) {
+        statElements.hard.textContent = filtered.filter(c => c.difficulty === 'صعب').length;
+    }
+    if (statElements.categories) {
+        statElements.categories.textContent = new Set(filtered.map(c => c.category)).size;
+    }
+    if (statElements.words) {
+        statElements.words.textContent = filtered.reduce((sum, c) => sum + (c.crosswordData?.words?.length || 0), 0);
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state" style="grid-column:1/-1;text-align:center;padding:2rem;">
+                <i class="fas fa-th" style="font-size:2.5rem;color:var(--gray-dark);"></i>
+                <h3>لا توجد شبكات كلمات متقاطعة</h3>
+                <p class="text-gray">أضف شبكتك الأولى باستخدام زر "شبكة جديدة"</p>
+            </div>
+        `;
+        return;
+    }
+
+    // عرض البطاقات مع الرتبة
+    let html = '';
+    filtered.forEach(cw => {
+        let wordCount = 0;
+        let gridSize = cw.crosswordData?.gridSize || 0;
+        
+        try {
+            const words = cw.crosswordData?.words ? JSON.parse(cw.crosswordData.words) : [];
+            wordCount = words.length;
+        } catch (e) {
+            wordCount = cw.crosswordData?.words?.length || 0;
+        }
+        
+        // ✅ الحصول على اسم الرتبة من النقاط
+        const rankName = getRankNameByPoints(cw.rankRequired || 0);
+        const rank = getRank(cw.rankRequired || 0);
+        const rankIcon = rank.icon || '🏅';
+        
+        const diffIcon = cw.difficulty === 'سهل' ? '🟢' : cw.difficulty === 'متوسط' ? '🟡' : cw.difficulty === 'صعب' ? '🔴' : '💀';
+        const diffColor = cw.difficulty === 'سهل' ? 'var(--success)' : cw.difficulty === 'متوسط' ? 'var(--accent)' : 'var(--secondary)';
+        const canEdit = AuthService.checkPermission('editor') || AuthService.currentUser?.adminRole === 'question';
+
+        html += `
+            <div class="card crossword-card" style="padding:1rem;display:flex;flex-direction:column;gap:0.5rem;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                    <div style="font-weight:700;font-size:1rem;">${cw.question}</div>
+                    <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
+                        <span class="badge" style="background:${diffColor};color:#fff;">${diffIcon} ${cw.difficulty}</span>
+                        <span class="badge" style="background:${rank.color || 'var(--primary)'};color:#fff;">${rankIcon} ${rankName}</span>
+                    </div>
+                </div>
+                <div style="display:flex;gap:0.5rem;font-size:0.8rem;color:var(--gray);flex-wrap:wrap;">
+                    <span>📚 ${cw.category || 'عام'}</span>
+                    <span>📊 ${gridSize}×${gridSize}</span>
+                    <span>📝 ${wordCount} كلمة</span>
+                    <span>⭐ ${cw.points || 50} نقطة</span>
+                    <span>⏱ ${cw.timeLimit || 120}s</span>
+                    <span>🏅 ${rankName} (${cw.rankRequired || 0}+)</span>
+                </div>
+                <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.3rem;">
+                    <button class="btn btn-xs btn-outline" onclick="App._previewCrossword('${cw.id}')">
+                        <i class="fas fa-eye"></i> معاينة
+                    </button>
+                    ${canEdit ? `
+                        <button class="btn btn-xs btn-primary" onclick="App._editCrossword('${cw.id}')">
+                            <i class="fas fa-edit"></i> تعديل
+                        </button>
+                        <button class="btn btn-xs btn-danger" onclick="App._deleteCrossword('${cw.id}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+},
+
+/**
+ * معاينة شبكة في مودال منفصل
+ */
+_previewCrossword(id) {
+    const question = DataManager.data.questions.find(q => q.id === id);
+    if (!question || question.type !== 'crossword') {
+        showToast('الشبكة غير موجودة', 'error');
+        return;
+    }
+
+    // ✅ تحويل البيانات من JSON string إلى مصفوفات
+    const crosswordData = question.crosswordData || {};
+    let grid = [];
+    let words = [];
+    let size = crosswordData.gridSize || 5;
+    
+    try {
+        // إذا كانت البيانات مخزنة كـ JSON string
+        if (typeof crosswordData.grid === 'string') {
+            grid = JSON.parse(crosswordData.grid);
+        } else {
+            grid = crosswordData.grid || [];
+        }
+        
+        if (typeof crosswordData.words === 'string') {
+            words = JSON.parse(crosswordData.words);
+        } else {
+            words = crosswordData.words || [];
+        }
+    } catch (e) {
+        // إذا كان التنسيق قديماً
+        grid = crosswordData.grid || [];
+        words = crosswordData.words || [];
+    }
+    
+    // ✅ التأكد من حجم الشبكة
+    if (grid.length === 0) {
+        grid = Array.from({ length: size }, () => Array(size).fill(''));
+    }
+    
+    // ✅ عرض المودال
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay open';
+    modal.style.zIndex = '1000001';
+    
+    let gridHtml = '';
+    for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+            const value = grid[r]?.[c] || '';
+            gridHtml += `
+                <div style="
+                    aspect-ratio:1;
+                    background:${value ? 'var(--card-bg)' : 'var(--glass)'};
+                    border:1px solid var(--border-color);
+                    border-radius:4px;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:1.1rem;
+                    font-weight:700;
+                    color:${value ? 'var(--light)' : 'var(--gray-dark)'};
+                    min-height:36px;
+                ">
+                    ${value || ''}
+                </div>
+            `;
+        }
+    }
+    
+    // ✅ عرض الكلمات مع تفاصيلها
+    let wordsHtml = words.map(w => {
+        const dirText = w.direction === 'across' ? '← أفقياً (يمين→يسار)' : '↓ عمودياً (أعلى→أسفل)';
+        return `
+            <div style="display:flex; justify-content:space-between; padding:0.2rem 0; border-bottom:1px solid var(--glass-border); font-size:0.85rem;">
+                <span style="font-weight:700; color:var(--accent);">${w.word}</span>
+                <span style="color:var(--gray);">${dirText}</span>
+                <span style="color:var(--gray-dark); font-size:0.75rem;">@(${w.row+1}, ${w.col+1})</span>
+                <span style="color:var(--gray);">${w.clue || 'لا يوجد دليل'}</span>
+            </div>
+        `;
+    }).join('');
+
+    modal.innerHTML = `
+        <div class="modal-card" style="max-width:550px; max-height:80vh; overflow-y:auto;">
+            <div class="modal-header">
+                <h3><i class="fas fa-th" style="color:var(--accent);"></i> ${question.question || 'شبكة كلمات متقاطعة'}</h3>
+                <button class="modal-close-btn" onclick="this.closest('.modal-overlay').remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div style="padding:0.5rem 0;">
+                <div style="display:grid;grid-template-columns:repeat(${size},1fr);gap:4px;max-width:350px;margin:0 auto;direction:ltr;">
+                    ${gridHtml}
+                </div>
+                
+                <div style="margin-top:1rem;">
+                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap; font-size:0.8rem; color:var(--gray); justify-content:center;">
+                        <span>📚 ${question.category || 'عام'}</span>
+                        <span>•</span>
+                        <span>⭐ ${question.points || 50} نقطة</span>
+                        <span>•</span>
+                        <span>⏱ ${question.timeLimit || 120}s</span>
+                        <span>•</span>
+                        <span>📝 ${words.length} كلمة</span>
+                    </div>
+                </div>
+                
+                <div style="margin-top:1rem; text-align:right;">
+                    <div style="font-weight:700; color:var(--accent); margin-bottom:0.3rem;">📖 الأدلة (${words.length})</div>
+                    ${wordsHtml}
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">إغلاق</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+},
+
+/**
+ * تعديل شبكة موجودة
+ */
+_editCrossword(id) {
+    const question = DataManager.data.questions.find(q => q.id === id);
+    if (!question) {
+        showToast('الشبكة غير موجودة', 'error');
+        return;
+    }
+    
+    // ✅ تحويل البيانات من JSON string إلى مصفوفات
+    const crosswordData = question.crosswordData || {};
+    let grid = [];
+    let words = [];
+    
+    try {
+        grid = crosswordData.grid ? JSON.parse(crosswordData.grid) : [];
+        words = crosswordData.words ? JSON.parse(crosswordData.words) : [];
+    } catch (e) {
+        // إذا كان التنسيق قديماً (مصفوفة مباشرة)
+        grid = crosswordData.grid || [];
+        words = crosswordData.words || [];
+    }
+    
+    // ✅ التأكد من حجم الشبكة
+    const gridSize = crosswordData.gridSize || 6;
+    if (grid.length === 0) {
+        grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(''));
+    }
+    
+    // ✅ تمرير البيانات المحولة إلى المحرر
+    const data = {
+        ...question,
+        crosswordData: {
+            ...crosswordData,
+            grid: grid,
+            words: words
+        }
+    };
+    
+    this._openCrosswordEditor(data);
+},
+
+/**
+ * حذف شبكة
+ */
+async _deleteCrossword(id) {
+    if (!confirm('هل أنت متأكد من حذف هذه الشبكة؟')) return;
+    try {
+        await DataManager.delete('questions', id);
+        showToast('✅ تم حذف الشبكة', 'success');
+        this._renderCrosswords();
+        this._refreshAllData();
+    } catch (e) {
+        showToast('❌ خطأ: ' + e.message, 'error');
+    }
 },
 
 // ============================================================
@@ -17279,6 +22153,7 @@ document.getElementById('loginToPostBtn')?.addEventListener('click', () => {
         }
     });
 
+        this._initCrosswordUI();
         this._setupGameSettingsEvents();
         this._setupModalHandlers();
         this._setupFormHandlers();
@@ -20928,6 +25803,7 @@ _selectGameModeFromSettings() {
         'training_classic': '📚 تدريب كلاسيكي',
         'training_survival': '❤️ تحدي الصمود',
         'training_speed': '⚡ تحدي السرعة',
+        'training_crossword': 'الكلمات المتقاطعة',
         'ranked_classic': '⚔️ كلاسيكي مصنف',
         'ranked_individual': '🎯 تحدي فردي مصنف',
         'unranked_classic': '⚔️ كلاسيكي ودي',
@@ -21344,7 +26220,7 @@ async _importQuestions(file) {
 /**
  * بناء بيانات السؤال للاستيراد
  */
-_buildQuestionData(q) {
+_buildQuestionData: function(q) {
     const rankRequired = parseInt(q.rankRequired) || 0;
     
     // ✅ تحديد الصعوبة تلقائياً حسب الرتبة
@@ -21355,22 +26231,83 @@ _buildQuestionData(q) {
     else autoDifficulty = 'خبير';
     
     const base = {
-        question: q.question.trim(),
+        question: q.question ? q.question.trim() : '',
         options: q.options || [],
         correct: q.correct !== undefined ? q.correct : 0,
-        difficulty: autoDifficulty,  // ✅ تجاهل ما اختاره المستخدم
+        difficulty: autoDifficulty,
         category: q.category || 'عام',
         type: q.type || 'multiple_choice',
-        points: q.points || 10,
-        timeLimit: q.timeLimit || 30,
+        points: parseInt(q.points) || 10,
+        timeLimit: parseInt(q.timeLimit) || 30,
         isPublic: q.isPublic !== false,
         tags: q.tags || [],
         usedCount: q.usedCount || 0,
-        createdAt: new Date().toISOString(),
-        rankRequired: rankRequired  // ✅ هذا هو المهم الآن
+        createdAt: q.createdAt || new Date().toISOString(),
+        rankRequired: rankRequired
     };
 
-    // إضافة حقول خاصة حسب النوع
+    // ✅ ============================================================
+    // ✅ دعم الكلمات المتقاطعة - مع تحويل المصفوفات إلى JSON strings
+    // ✅ ============================================================
+    if (q.type === 'crossword') {
+        let crosswordData = {};
+        
+        // ✅ إذا كان هناك crosswordData مباشرة
+        if (q.crosswordData) {
+            crosswordData = q.crosswordData;
+        } 
+        // ✅ إذا كانت البيانات في حقول منفصلة
+        else if (q.grid && q.words) {
+            crosswordData = {
+                gridSize: q.gridSize || 5,
+                grid: q.grid,
+                words: q.words
+            };
+        } else {
+            // ✅ إذا لم تكن هناك بيانات، ننشئ شبكة افتراضية
+            const size = 5;
+            crosswordData = {
+                gridSize: size,
+                grid: Array.from({ length: size }, () => Array(size).fill('')),
+                words: []
+            };
+        }
+        
+        // ✅ التأكد من وجود الحقول الأساسية
+        if (!crosswordData.gridSize) {
+            crosswordData.gridSize = 5;
+        }
+        if (!crosswordData.grid || !Array.isArray(crosswordData.grid)) {
+            const size = crosswordData.gridSize || 5;
+            crosswordData.grid = Array.from({ length: size }, () => Array(size).fill(''));
+        }
+        if (!crosswordData.words || !Array.isArray(crosswordData.words)) {
+            crosswordData.words = [];
+        }
+        
+        // ✅ ============================================================
+        // ✅ ✅ ✅ التحويل إلى JSON strings (الحل الرئيسي)
+        // ✅ ============================================================
+        // تحويل grid إلى JSON string
+        if (Array.isArray(crosswordData.grid)) {
+            crosswordData.grid = JSON.stringify(crosswordData.grid);
+        }
+        
+        // تحويل words إلى JSON string
+        if (Array.isArray(crosswordData.words)) {
+            crosswordData.words = JSON.stringify(crosswordData.words);
+        }
+        
+        // ✅ تخزين crosswordData في base
+        base.crosswordData = crosswordData;
+        
+        console.log(`✅ بناء شبكة كلمات متقاطعة: "${base.question}" (تم تحويلها إلى JSON strings)`);
+        return base;
+    }
+
+    // ✅ ============================================================
+    // ✅ أنواع الأسئلة الأخرى
+    // ✅ ============================================================
     if (q.type === 'fill_blank' && q.correctAnswer) {
         base.correctAnswer = q.correctAnswer;
     }
@@ -21385,23 +26322,124 @@ _buildQuestionData(q) {
         base.oddIndex = q.oddIndex;
     }
     
-    return base;  // ✅ إرجاع base وليس data
+    return base;
 },
 
 /**
  * التحقق من صحة بيانات السؤال
  */
-_validateQuestionData(data) {
-    if (!data.question) return false;
-    if (data.rankRequired === undefined || data.rankRequired < 0) return false;
+_validateQuestionData: function(data) {
+    if (!data.question) {
+        console.warn('⚠️ سؤال بدون نص، تم تخطيه');
+        return false;
+    }
+    
+    if (data.rankRequired === undefined || data.rankRequired < 0) {
+        console.warn('⚠️ سؤال بدون رتبة مطلوبة، تم تخطيه');
+        return false;
+    }
+    
+    // ✅ ============================================================
+    // ✅ التحقق من صحة الكلمات المتقاطعة (مع دعم JSON strings)
+    // ✅ ============================================================
+    if (data.type === 'crossword') {
+        if (!data.crosswordData) {
+            console.warn('⚠️ سؤال كلمات متقاطعة بدون crosswordData، تم تخطيه');
+            return false;
+        }
+        
+        let words = data.crosswordData.words || [];
+        let grid = data.crosswordData.grid || [];
+        
+        // ✅ إذا كانت JSON string، نحولها إلى مصفوفة للتحقق
+        if (typeof words === 'string') {
+            try {
+                words = JSON.parse(words);
+            } catch (e) {
+                words = [];
+            }
+        }
+        if (typeof grid === 'string') {
+            try {
+                grid = JSON.parse(grid);
+            } catch (e) {
+                grid = [];
+            }
+        }
+        
+        if (!Array.isArray(words) || words.length === 0) {
+            console.warn('⚠️ سؤال كلمات متقاطعة بدون كلمات، تم تخطيه');
+            return false;
+        }
+        
+        if (!Array.isArray(grid) || grid.length === 0) {
+            console.warn('⚠️ سؤال كلمات متقاطعة بدون شبكة، تم تخطيه');
+            return false;
+        }
+        
+        // ✅ التحقق من وجود حروف في الشبكة
+        let hasLetters = false;
+        for (let r = 0; r < grid.length; r++) {
+            if (Array.isArray(grid[r])) {
+                for (let c = 0; c < grid[r].length; c++) {
+                    if (grid[r][c] && grid[r][c].trim() !== '') {
+                        hasLetters = true;
+                        break;
+                    }
+                }
+            }
+            if (hasLetters) break;
+        }
+        
+        if (!hasLetters) {
+            console.warn('⚠️ شبكة الكلمات المتقاطعة فارغة بالكامل، تم تخطيه');
+            return false;
+        }
+        
+        // ✅ التحقق من صحة كل كلمة
+        for (const w of words) {
+            if (!w.word || w.word.trim() === '') {
+                console.warn('⚠️ كلمة بدون نص، تم تخطي السؤال');
+                return false;
+            }
+            if (w.row === undefined || w.col === undefined) {
+                console.warn('⚠️ كلمة بدون موقع (row/col)، تم تخطي السؤال');
+                return false;
+            }
+            if (!w.direction || (w.direction !== 'across' && w.direction !== 'down')) {
+                console.warn('⚠️ كلمة بدون اتجاه صحيح، تم تخطي السؤال');
+                return false;
+            }
+        }
+        
+        console.log(`✅ شبكة كلمات متقاطعة صالحة: "${data.question}" (${words.length} كلمات)`);
+        return true;
+    }
+    
+    // ✅ ============================================================
+    // ✅ التحقق من أنواع الأسئلة الأخرى
+    // ✅ ============================================================
     switch(data.type) {
-        case 'multiple_choice': return data.options && data.options.length >= 2;
-        case 'true_false': return data.options && data.options.length >= 2;
-        case 'fill_blank': return data.correctAnswer && data.correctAnswer.trim().length > 0;
-        case 'matching': return data.matchingPairs && data.matchingPairs.length >= 2;
-        case 'ordering': return data.orderedItems && data.orderedItems.length >= 3;
-        case 'odd_one_out': return data.items && data.items.length >= 3 && data.oddIndex !== undefined; // ✅
-        default: return false;
+        case 'multiple_choice': 
+            if (!data.options || data.options.length < 2) return false;
+            return true;
+        case 'true_false': 
+            if (!data.options || data.options.length < 2) return false;
+            return true;
+        case 'fill_blank': 
+            if (!data.correctAnswer || data.correctAnswer.trim().length === 0) return false;
+            return true;
+        case 'matching': 
+            if (!data.matchingPairs || data.matchingPairs.length < 2) return false;
+            return true;
+        case 'ordering': 
+            if (!data.orderedItems || data.orderedItems.length < 3) return false;
+            return true;
+        case 'odd_one_out': 
+            if (!data.items || data.items.length < 3 || data.oddIndex === undefined) return false;
+            return true;
+        default: 
+            return false;
     }
 },
 
@@ -22307,7 +27345,7 @@ _renderQuestionsAdvanced() {
     
     if (!container) return;
     
-    const questions = DataManager.data.questions || [];
+    const questions = (DataManager.data.questions || []).filter(q => q.type !== 'crossword');
     
     // تحديث الإحصائيات
     this._renderQuestionStats(questions);
@@ -22434,10 +27472,37 @@ _renderQuestionsAdvanced() {
     this._updateSelectedCount();
 },
 
+// داخل App
+_showCrosswordMatchUI() {
+    // إنشاء حاوية إذا لم تكن موجودة
+    let container = document.getElementById('crosswordMatchContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'crosswordMatchContainer';
+        container.style.cssText = `
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 1050;
+            background: var(--dark);
+            padding: 1rem;
+            overflow-y: auto;
+        `;
+        document.body.appendChild(container);
+    }
+    container.style.display = 'block';
+    container.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--gray);"><i class="fas fa-spinner fa-spin"></i> جاري تحميل المباراة...</div>`;
+},
+
 _executeGameMode(mode) {
     const modeInfo = MODE_DESCRIPTIONS[mode];
     if (!modeInfo) {
         showToast('⚠️ طور غير معروف', 'error');
+        return;
+    }
+
+    // ✅ التحقق من أن الطور مفعل
+    if (!modeInfo.active) {
+        showToast(`⚠️ هذا الطور غير مفعل حالياً، سيتم إطلاقه قريباً!`, 'info', 3000);
         return;
     }
 
@@ -22451,61 +27516,96 @@ _executeGameMode(mode) {
         showToast(`🎮 بدء ${modeInfo.title}...`, 'success', 2000);
         App._activateSection('game');
         
-// تحميل الإعدادات الخاصة بالطور من Firebase/الكاش
-const savedSettings = this._getModeSettings(mode);
-// دمج الإعدادات الافتراضية مع المحفوظة
-const settings = { ...modeInfo.settings, ...savedSettings };
+        // تحميل الإعدادات الخاصة بالطور من Firebase/الكاش
+        const savedSettings = this._getModeSettings(mode);
+        const settings = { ...modeInfo.settings, ...savedSettings };
 
-// تنظيف المفاتيح وتحويلها إلى التنسيق المطلوب
-const cleanSettings = {};
-for (const [key, value] of Object.entries(settings)) {
-    // استخراج اسم الحقل الأساسي (بدون البادئة modeSpecific)
-    let baseKey = key;
-    if (key.startsWith('modeSpecific')) {
-        baseKey = key.replace('modeSpecific', '').toLowerCase();
-    }
-    // تعيين القيم حسب المفاتيح المعروفة
-    switch (baseKey) {
-        case 'difficulty':
-            cleanSettings.difficulty = value;
-            break;
-        case 'category':
-            cleanSettings.category = value;
-            break;
-        case 'questiontype':
-            cleanSettings.questionType = value;
-            break;
-        case 'count':
-            cleanSettings.questionCount = parseInt(value) || 10;
-            break;
-        case 'timelimit':
-            cleanSettings.timeLimit = parseInt(value) || 15;
-            break;
-        case 'gamemode':
-            cleanSettings.gameMode = value;
-            break;
-        default:
-            // إذا كان المفتاح غير معروف، نحتفظ به كما هو (للتوسع المستقبلي)
-            if (!cleanSettings[baseKey]) {
-                cleanSettings[baseKey] = value;
+        // تنظيف المفاتيح وتحويلها إلى التنسيق المطلوب
+        const cleanSettings = {};
+        for (const [key, value] of Object.entries(settings)) {
+            let baseKey = key;
+            if (key.startsWith('modeSpecific')) {
+                baseKey = key.replace('modeSpecific', '').toLowerCase();
             }
-            break;
+            switch (baseKey) {
+                case 'difficulty':
+                    cleanSettings.difficulty = value;
+                    break;
+                case 'category':
+                    cleanSettings.category = value;
+                    break;
+                case 'questiontype':
+                    cleanSettings.questionType = value;
+                    break;
+                case 'count':
+                    cleanSettings.questionCount = parseInt(value) || 10;
+                    break;
+                case 'timelimit':
+                    cleanSettings.timeLimit = parseInt(value) || 15;
+                    break;
+                case 'gamemode':
+                    cleanSettings.gameMode = value;
+                    break;
+                default:
+                    if (!cleanSettings[baseKey]) {
+                        cleanSettings[baseKey] = value;
+                    }
+                    break;
+            }
+        }
+
+if (mode === 'training_crossword') {
+    const savedSettings = this._getModeSettings(mode);
+    const settings = { ...modeInfo.settings, ...savedSettings };
+    
+    // ✅ جمع الإعدادات من جميع المصادر
+    const cleanSettings = {
+        category: settings.category || settings.modeSpecificCrosswordCategory || 'all',
+        crosswordLevel: settings.crosswordLevel || settings.modeSpecificCrosswordLevel || 'gradual',
+        crosswordTime: parseInt(settings.crosswordTime || settings.modeSpecificCrosswordTime || 5) || 5,
+        crosswordRounds: parseInt(settings.crosswordRounds || settings.modeSpecificCrosswordRounds || 5) || 5,
+    };
+
+    console.log('🔤 Starting crossword match with settings:', cleanSettings);
+
+    showToast(`🔤 بدء مباراة كلمات متقاطعة (${cleanSettings.crosswordRounds} جولات)`, 'success', 3000);
+    
+    // ✅ التأكد من وجود الحاوية
+    let container = document.getElementById('crosswordMatchContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'crosswordMatchContainer';
+        container.style.cssText = `
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 1050;
+            background: var(--dark);
+            padding: 1rem;
+            overflow-y: auto;
+        `;
+        document.body.appendChild(container);
     }
+    container.style.display = 'block';
+    container.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--gray);"><i class="fas fa-spinner fa-spin"></i> جاري تحميل المباراة...</div>`;
+    
+    // ✅ بدء المباراة
+    CrosswordMatchEngine.start(cleanSettings, () => {
+        console.log('✅ مباراة الكلمات المتقاطعة انتهت');
+    });
+    return;
 }
 
-// الإعدادات النهائية للعبة
-const finalSettings = {
-    difficulty: cleanSettings.difficulty || settings.difficulty || 'medium',
-    category: cleanSettings.category || settings.category || 'all',
-    questionType: cleanSettings.questionType || settings.questionType || 'all',
-    questionCount: parseInt(cleanSettings.questionCount || settings.questionCount || 10),
-    timeLimit: parseInt(cleanSettings.timeLimit || settings.timeLimit || 15),
-    gameMode: cleanSettings.gameMode || settings.gameMode || 'normal'
-};
+        const finalSettings = {
+            difficulty: cleanSettings.difficulty || settings.difficulty || 'medium',
+            category: cleanSettings.category || settings.category || 'all',
+            questionType: cleanSettings.questionType || settings.questionType || 'all',
+            questionCount: parseInt(cleanSettings.questionCount || settings.questionCount || 10),
+            timeLimit: parseInt(cleanSettings.timeLimit || settings.timeLimit || 15),
+            gameMode: cleanSettings.gameMode || settings.gameMode || 'normal'
+        };
         
         console.log('📊 Final training settings:', finalSettings);
         
-        // ✅ بدء اللعبة مع تمرير الإعدادات
         setTimeout(() => {
             GameEngine.start(finalSettings);
         }, 300);
@@ -23578,6 +28678,101 @@ App._modeDescriptions = {
     }
 };
 
+// ============================================================
+// دوال اللمس للهواتف
+// ============================================================
+
+CrosswordEngine._touchStartRow = null;
+CrosswordEngine._touchStartCol = null;
+CrosswordEngine._touchEndRow = null;
+CrosswordEngine._touchEndCol = null;
+
+/**
+ * بدء السحب باللمس
+ */
+CrosswordEngine._startDragTouch = function(event, row, col) {
+    if (this._isAnswered) return;
+    
+    event.preventDefault();
+    
+    // ✅ حفظ نقطة البداية
+    this._touchStartRow = row;
+    this._touchStartCol = col;
+    this._touchEndRow = row;
+    this._touchEndCol = col;
+    
+    // ✅ بدء السحب
+    this._startDrag(row, col, event);
+    
+    // ✅ اهتزاز خفيف للإشارة
+    if (navigator.vibrate) {
+        navigator.vibrate(10);
+    }
+},
+
+/**
+ * تحديث السحب باللمس
+ */
+CrosswordEngine._updateDragTouch = function(event) {
+    if (!this._isDragging || this._isAnswered) return;
+    
+    event.preventDefault();
+    
+    // ✅ الحصول على موقع اللمس
+    const touch = event.touches[0];
+    if (!touch) return;
+    
+    // ✅ العثور على الخلية تحت اللمس
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!element) return;
+    
+    const cellEl = element.closest('.crossword-cell');
+    if (!cellEl) return;
+    
+    const row = parseInt(cellEl.dataset.row);
+    const col = parseInt(cellEl.dataset.col);
+    
+    if (isNaN(row) || isNaN(col)) return;
+    
+    // ✅ تحديث السحب
+    this._touchEndRow = row;
+    this._touchEndCol = col;
+    this._updateDrag(row, col, event);
+},
+
+/**
+ * إنهاء السحب باللمس
+ */
+CrosswordEngine._endDragTouch = function(event) {
+    if (!this._isDragging) return;
+    
+    event.preventDefault();
+    
+    // ✅ إذا كان هناك تغيير في الموضع
+    if (this._touchStartRow !== this._touchEndRow || this._touchStartCol !== this._touchEndCol) {
+        // ✅ نستخدم الخلايا المحددة أثناء السحب
+        this._endDrag(event);
+    } else {
+        // ✅ إذا كان مجرد نقرة (بدون سحب)، نحدد الكلمة كاملة
+        const cell = { row: this._touchStartRow, col: this._touchStartCol };
+        const wordCells = this._getWordCells(cell.row, cell.col);
+        if (wordCells.length > 0) {
+            this._selectedCells = wordCells;
+            this._updateDragSelection();
+            setTimeout(() => {
+                this._openSolveModalFromSelection(this._selectedCells);
+                this._clearDragSelection();
+            }, 300);
+        }
+    }
+    
+    // ✅ تنظيف
+    this._touchStartRow = null;
+    this._touchStartCol = null;
+    this._touchEndRow = null;
+    this._touchEndCol = null;
+},
+
 App._updateModalWithCurrentMode = function() {
     const mode = selectedGameMode;
     const modeInfo = MODE_DESCRIPTIONS[mode];
@@ -23802,6 +28997,554 @@ App._selectPlayerCount = function(count) {
     }
     console.log(`👥 Player count: ${count}`);
 };
+
+// ============================================================
+// نظام السحب والتحديد للكلمات المتقاطعة
+// ============================================================
+
+CrosswordEngine._isDragging = false;
+CrosswordEngine._dragStartCell = null;
+CrosswordEngine._dragEndCell = null;
+CrosswordEngine._selectedCells = [];
+CrosswordEngine._dragTimeout = null;
+
+/**
+ * بدء عملية السحب عند الضغط على خلية
+ */
+CrosswordEngine._startDrag = function(row, col, event) {
+    if (this._isAnswered) return;
+    
+    // ✅ منع التحديد إذا كان الضغط على خلية فارغة خارج الكلمات
+    const isInWord = this._isCellInWord(row, col);
+    if (!isInWord) return;
+    
+    this._isDragging = true;
+    this._dragStartCell = { row, col };
+    this._dragEndCell = { row, col };
+    this._selectedCells = [{ row, col }];
+    
+    // ✅ تحديد الخلية الأولى
+    this._updateDragSelection();
+    
+    // ✅ منع الحدث الافتراضي (لتجنب التمرير أو التحديد النصي)
+    if (event) {
+        event.preventDefault();
+    }
+    
+    // ✅ اهتزاز خفيف للإشارة لبدء التحديد
+    if (navigator.vibrate) {
+        navigator.vibrate(10);
+    }
+},
+
+/**
+ * تحديث التحديد أثناء السحب
+ */
+CrosswordEngine._updateDrag = function(row, col, event) {
+    if (!this._isDragging || this._isAnswered) return;
+    
+    // ✅ التحقق من أن الخلية ضمن كلمة
+    if (!this._isCellInWord(row, col)) return;
+    
+    this._dragEndCell = { row, col };
+    
+    // ✅ حساب الخلايا بين نقطة البداية والنهاية (على طول الكلمة)
+    this._selectedCells = this._getCellsBetween(this._dragStartCell, this._dragEndCell);
+    
+    // ✅ تحديث التحديد في الواجهة
+    this._updateDragSelection();
+    
+    if (event) {
+        event.preventDefault();
+    }
+},
+
+/**
+ * إنهاء عملية السحب وفتح المودال
+ */
+CrosswordEngine._endDrag = function(event) {
+    if (!this._isDragging || this._isAnswered) {
+        this._isDragging = false;
+        return;
+    }
+    
+    this._isDragging = false;
+    
+    // ✅ إذا تم تحديد خلية واحدة فقط، نحاول تحديد الكلمة كاملة
+    if (this._selectedCells.length <= 1) {
+        // ✅ محاولة تحديد الكلمة الكاملة من الخلية الواحدة
+        const cell = this._dragStartCell || this._dragEndCell;
+        if (cell) {
+            const wordCells = this._getWordCells(cell.row, cell.col);
+            if (wordCells.length > 0) {
+                this._selectedCells = wordCells;
+                this._updateDragSelection();
+            }
+        }
+    }
+    
+    // ✅ إذا تم تحديد خلايا، نفتح المودال
+    if (this._selectedCells.length > 0) {
+        // ✅ ننتظر قليلاً لرؤية التحديد قبل فتح المودال
+        setTimeout(() => {
+            this._openSolveModalFromSelection(this._selectedCells);
+        }, 300);
+    }
+    
+    // ✅ تنظيف
+    this._dragStartCell = null;
+    this._dragEndCell = null;
+},
+
+// استبدال دالة _handleRoundComplete بأكملها في CrosswordMatchEngine
+CrosswordMatchEngine._handleRoundComplete = function(success, totalWords) {
+    if (!this._isRunning || this._isWaitingForNext) return;
+    this._isWaitingForNext = true;
+
+    try {
+        // ✅ الحصول على النتيجة من CrosswordEngine بشكل دقيق
+        const userGrid = CrosswordEngine._userGrid || [];
+        const fullGrid = CrosswordEngine._fullGrid || [];
+        const words = CrosswordEngine._words || [];
+        
+        // ✅ حساب عدد الكلمات المكتملة بشكل دقيق
+        let verifiedCount = 0;
+        for (const w of words) {
+            let isComplete = true;
+            for (let i = 0; i < w.word.length; i++) {
+                let r, c;
+                if (w.direction === 'across') {
+                    r = w.row;
+                    c = w.col - i;
+                } else {
+                    r = w.row + i;
+                    c = w.col;
+                }
+                const userChar = userGrid[r]?.[c] || '';
+                const solutionChar = fullGrid[r]?.[c] || '';
+                if (userChar.toUpperCase() !== solutionChar.toUpperCase()) {
+                    isComplete = false;
+                    break;
+                }
+            }
+            if (isComplete) {
+                verifiedCount++;
+            }
+        }
+        
+        const total = words.length;
+        const isAllComplete = (verifiedCount === total && total > 0);
+        
+        console.log(`🔍 Round ${this._currentRoundIndex + 1}: ${verifiedCount}/${total} words completed`);
+        console.log(`📊 isAllComplete: ${isAllComplete}, success param: ${success}`);
+
+        // ✅ تحديث واجهة التقدم دائماً
+        this._updateProgressUI(verifiedCount, total);
+
+        // ✅ إذا لم تكتمل جميع الكلمات، ننتظر فقط ولا ننهي الجولة
+        if (!isAllComplete) {
+            // ✅ تحديث واجهة المستخدم لإظهار التقدم
+            const resultContainer = document.getElementById('verifyResultContainer');
+            if (resultContainer) {
+                const remaining = total - verifiedCount;
+                resultContainer.innerHTML = `
+                    <div style="background:rgba(255,217,61,0.1);border:1px solid var(--accent);border-radius:8px;padding:0.5rem;text-align:center;margin-top:0.5rem;">
+                        <span style="font-weight:700;color:var(--accent);">
+                            ⏳ تقدم: ${verifiedCount}/${total} كلمة
+                        </span>
+                        <span style="color:var(--gray);font-size:0.8rem;margin-right:0.5rem;">
+                            تبقى ${remaining} كلمة
+                        </span>
+                        <div style="font-size:0.65rem;color:var(--gray);margin-top:0.2rem;">
+                            💡 استمر في حل الكلمات المتبقية
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // ✅ لا ننهي الجولة، ننتظر حتى تكتمل جميع الكلمات
+            this._isWaitingForNext = false;
+            return; // ✅ مهم: الخروج دون الانتقال للجولة التالية
+        }
+
+        // ✅ ============================================================
+        // ✅ هنا نصل فقط إذا اكتملت جميع الكلمات (isAllComplete === true)
+        // ✅ ============================================================
+        
+        // ✅ حساب النقاط والعملات
+        let points = 0;
+        let coins = 0;
+        
+        // النقاط الأساسية: كل كلمة = 15 نقطة
+        points = verifiedCount * 15;
+        
+        // مكافأة الإكمال الكامل
+        points += 50;
+        
+        // مكافأة الوقت المتبقي
+        const remainingTime = this._timeLeft;
+        if (remainingTime > 0) {
+            const bonus = Math.round(remainingTime / 10) * 2;
+            points += bonus;
+        }
+        
+        // النقود = 20% من النقاط
+        coins = Math.round(points * 0.2);
+        if (coins === 0 && points > 0) coins = 2;
+        
+        // ✅ حساب الحروف الصحيحة
+        let correctLetters = 0;
+        let totalLetters = 0;
+        for (let r = 0; r < fullGrid.length; r++) {
+            const row = fullGrid[r] || [];
+            for (let c = 0; c < row.length; c++) {
+                if (row[c] && row[c].trim() !== '') {
+                    totalLetters++;
+                    if (userGrid[r] && userGrid[r][c] && userGrid[r][c].toUpperCase() === row[c].toUpperCase()) {
+                        correctLetters++;
+                    }
+                }
+            }
+        }
+        
+        // ✅ تسجيل النتيجة الكاملة
+        const roundResult = {
+            round: this._currentRoundIndex + 1,
+            correct: verifiedCount,
+            wrong: 0,
+            total: total,
+            accuracy: 100,
+            points: Math.max(points, 0),
+            coins: Math.max(coins, 0),
+            timeTaken: this._totalTime - this._timeLeft,
+            correctLetters: correctLetters,
+            totalLetters: totalLetters,
+            success: true,
+            verifiedCount: verifiedCount,
+            remainingTime: remainingTime
+        };
+        
+        this._results.push(roundResult);
+        console.log(`✅ Round ${roundResult.round} COMPLETED successfully!`, roundResult);
+
+        // ✅ عرض رسالة النجاح
+        const resultContainer = document.getElementById('verifyResultContainer');
+        if (resultContainer) {
+            resultContainer.innerHTML = `
+                <div style="background:rgba(46,204,113,0.15);border:1px solid var(--success);border-radius:8px;padding:0.5rem;text-align:center;margin-top:0.5rem;animation: fadeUp 0.3s ease;">
+                    <span style="font-weight:700;color:var(--success);font-size:1.1rem;">
+                        🎉 جولة ${this._currentRoundIndex + 1} مكتملة!
+                    </span>
+                    <span style="color:var(--gray);font-size:0.9rem;margin-right:0.5rem;">
+                        +${roundResult.points} نقطة • +${roundResult.coins} عملة
+                    </span>
+                    <div style="font-size:0.7rem;color:var(--gray);margin-top:0.2rem;">
+                        ⏱ الوقت المتبقي: ${remainingTime}s • 📝 ${verifiedCount} كلمة صحيحة
+                    </div>
+                </div>
+            `;
+        }
+
+        // ✅ تحديث النقاط في العنوان
+        const scoreEl = document.getElementById('cwMatchScore');
+        if (scoreEl) {
+            const totalPoints = this._results.reduce((s, r) => s + (r.points || 0), 0);
+            scoreEl.textContent = `⭐ ${totalPoints}`;
+        }
+
+        // ✅ تحديث شريط التقدم إلى 100%
+        this._updateProgressUI(verifiedCount, total);
+
+        // ✅ الانتقال للجولة التالية بعد تأخير
+        this._currentRoundIndex++;
+        this._isWaitingForNext = false;
+        
+        if (this._currentRoundIndex < this._rounds.length) {
+            setTimeout(() => {
+                if (this._isRunning) {
+                    this._startRound();
+                }
+            }, 2000);
+        } else {
+            setTimeout(() => {
+                this._endMatch();
+            }, 1500);
+        }
+        
+    } catch (e) {
+        console.error('❌ Error handling round complete:', e);
+        this._isWaitingForNext = false;
+        this._currentRoundIndex++;
+        if (this._currentRoundIndex < this._rounds.length) {
+            setTimeout(() => this._startRound(), 500);
+        } else {
+            setTimeout(() => this._endMatch(), 500);
+        }
+    }
+};
+
+/**
+ * الحصول على الخلايا بين نقطتين (على طول الكلمة)
+ */
+CrosswordEngine._getCellsBetween = function(start, end) {
+    if (!start || !end) return [];
+    
+    const cells = [];
+    const gridSize = this._gridSize;
+    
+    // ✅ تحديد الاتجاه (أفقي أو عمودي)
+    const isHorizontal = start.row === end.row;
+    const isVertical = start.col === end.col;
+    
+    if (!isHorizontal && !isVertical) {
+        // ✅ إذا كان السحب قطرياً، نأخذ الخلايا التي تمر بها
+        // نستخدم أقرب خلايا على طول المسار
+        return this._getCellsAlongPath(start, end);
+    }
+    
+    if (isHorizontal) {
+        // ✅ سحب أفقي (من اليمين إلى اليسار أو العكس)
+        const row = start.row;
+        const minCol = Math.min(start.col, end.col);
+        const maxCol = Math.max(start.col, end.col);
+        
+        for (let c = minCol; c <= maxCol; c++) {
+            if (this._isCellInWord(row, c)) {
+                cells.push({ row, col: c });
+            }
+        }
+    } else if (isVertical) {
+        // ✅ سحب عمودي (من الأعلى إلى الأسفل أو العكس)
+        const col = start.col;
+        const minRow = Math.min(start.row, end.row);
+        const maxRow = Math.max(start.row, end.row);
+        
+        for (let r = minRow; r <= maxRow; r++) {
+            if (this._isCellInWord(r, col)) {
+                cells.push({ row: r, col });
+            }
+        }
+    }
+    
+    return cells;
+},
+
+/**
+ * الحصول على الخلايا على طول مسار قطري
+ */
+CrosswordEngine._getCellsAlongPath = function(start, end) {
+    const cells = [];
+    const gridSize = this._gridSize;
+    
+    const dRow = end.row - start.row;
+    const dCol = end.col - start.col;
+    const steps = Math.max(Math.abs(dRow), Math.abs(dCol));
+    
+    if (steps === 0) return [{ row: start.row, col: start.col }];
+    
+    for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const row = Math.round(start.row + dRow * t);
+        const col = Math.round(start.col + dCol * t);
+        
+        if (row >= 0 && row < gridSize && col >= 0 && col < gridSize) {
+            if (this._isCellInWord(row, col)) {
+                cells.push({ row, col });
+            }
+        }
+    }
+    
+    return cells;
+},
+
+/**
+ * الحصول على جميع خلايا الكلمة التي تحتوي على خلية معينة
+ */
+CrosswordEngine._getWordCells = function(row, col) {
+    // ✅ البحث عن الكلمة التي تحتوي على هذه الخلية
+    for (const w of this._words) {
+        const cells = [];
+        let isInWord = false;
+        
+        for (let i = 0; i < w.word.length; i++) {
+            let r, c;
+            if (w.direction === 'across') {
+                r = w.row;
+                c = w.col - i;
+            } else {
+                r = w.row + i;
+                c = w.col;
+            }
+            if (r >= 0 && r < this._gridSize && c >= 0 && c < this._gridSize) {
+                cells.push({ row: r, col: c, char: w.word[i], index: i });
+                if (r === row && c === col) {
+                    isInWord = true;
+                }
+            }
+        }
+        
+        if (isInWord) {
+            return cells;
+        }
+    }
+    
+    return [];
+},
+
+/**
+ * تحديث التحديد في الواجهة
+ */
+CrosswordEngine._updateDragSelection = function() {
+    // ✅ إزالة التحديد السابق
+    document.querySelectorAll('.crossword-cell.drag-selected').forEach(el => {
+        el.classList.remove('drag-selected');
+        el.style.background = '';
+        el.style.borderColor = '';
+        el.style.boxShadow = '';
+        el.style.transform = '';
+    });
+    
+    // ✅ تحديد الخلايا الجديدة
+    this._selectedCells.forEach(cell => {
+        const cellEl = document.querySelector(`.crossword-cell[data-row="${cell.row}"][data-col="${cell.col}"]`);
+        if (cellEl) {
+            cellEl.classList.add('drag-selected');
+            const isFilled = this._userGrid[cell.row]?.[cell.col] || '';
+            if (isFilled) {
+                cellEl.style.background = 'rgba(255, 217, 61, 0.3)';
+                cellEl.style.borderColor = 'var(--accent)';
+            } else {
+                cellEl.style.background = 'rgba(108, 99, 255, 0.25)';
+                cellEl.style.borderColor = 'var(--primary)';
+            }
+            cellEl.style.boxShadow = '0 0 25px rgba(108, 99, 255, 0.25)';
+            cellEl.style.transform = 'scale(1.05)';
+            cellEl.style.transition = 'all 0.15s ease';
+        }
+    });
+    
+    // ✅ تحديث عدد الخلايا المحددة
+    const countEl = document.getElementById('dragSelectionCount');
+    if (countEl) {
+        countEl.textContent = this._selectedCells.length;
+    }
+},
+
+/**
+ * فتح المودال من التحديد الحالي
+ */
+CrosswordEngine._openSolveModalFromSelection = function(selectedCells) {
+    if (!selectedCells || selectedCells.length === 0) {
+        showToast('⚠️ لم يتم تحديد أي خلايا', 'info');
+        return;
+    }
+    
+    // ✅ استخدام أول خلية محددة للعثور على الكلمة
+    const firstCell = selectedCells[0];
+    
+    // ✅ البحث عن الكلمة التي تحتوي على هذه الخلايا
+    let foundWord = null;
+    let foundCells = [];
+    
+    for (const w of this._words) {
+        const cells = [];
+        let allSelected = true;
+        
+        for (let i = 0; i < w.word.length; i++) {
+            let r, c;
+            if (w.direction === 'across') {
+                r = w.row;
+                c = w.col - i;
+            } else {
+                r = w.row + i;
+                c = w.col;
+            }
+            if (r >= 0 && r < this._gridSize && c >= 0 && c < this._gridSize) {
+                const isSelected = selectedCells.some(s => s.row === r && s.col === c);
+                cells.push({ row: r, col: c, char: w.word[i], index: i, isSelected });
+                if (!isSelected && selectedCells.length > 1) {
+                    allSelected = false;
+                }
+            }
+        }
+        
+        // ✅ إذا كانت جميع الخلايا المحددة ضمن هذه الكلمة
+        if (selectedCells.every(s => cells.some(c => c.row === s.row && c.col === s.col))) {
+            foundWord = w;
+            foundCells = cells;
+            break;
+        }
+    }
+    
+    if (!foundWord || foundCells.length === 0) {
+        showToast('⚠️ الخلايا المحددة لا تشكل كلمة كاملة', 'info');
+        this._clearDragSelection();
+        return;
+    }
+    
+    this._selectedWord = foundWord;
+    this._selectedWordCells = foundCells;
+    
+    // ✅ تعبئة المودال
+    this._fillSolveModal(foundWord, foundCells);
+    
+    // ✅ إزالة التحديد المؤقت
+    this._clearDragSelection();
+},
+
+/**
+ * تعبئة المودال بالبيانات
+ */
+CrosswordEngine._fillSolveModal = function(word, cells) {
+    const modal = document.getElementById('crosswordSolveModal');
+    if (!modal) {
+        console.error('❌ crosswordSolveModal not found');
+        return;
+    }
+    
+    // عرض الدليل
+    document.getElementById('crosswordClueDisplay').textContent = word.clue || 'لا يوجد دليل';
+    
+    // عرض عدد الحروف
+    document.getElementById('crosswordWordLength').textContent = word.word.length;
+    
+    // عرض الاتجاه
+    const dirText = word.direction === 'across' ? '← أفقي (يمين→يسار)' : '↓ عمودي (أعلى→أسفل)';
+    document.getElementById('crosswordDirectionText').textContent = dirText;
+    
+    // عرض الحروف الحالية
+    this._updateSolveModalLetters();
+    
+    // تعيين الخلية النشطة (أول خلية فارغة)
+    this._setSolveInputFocus();
+    
+    // فتح المودال
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    
+    // تركيز صندوق الإدخال
+    setTimeout(() => {
+        const input = document.getElementById('crosswordSolveInput');
+        if (input) {
+            input.focus();
+            input.select();
+        }
+    }, 300);
+},
+
+/**
+ * إزالة التحديد المؤقت
+ */
+CrosswordEngine._clearDragSelection = function() {
+    document.querySelectorAll('.crossword-cell.drag-selected').forEach(el => {
+        el.classList.remove('drag-selected');
+        el.style.background = '';
+        el.style.borderColor = '';
+        el.style.boxShadow = '';
+        el.style.transform = '';
+    });
+    this._selectedCells = [];
+},
 
 // ============================================================
 // 11. دالة عرض شرح الطور (نفسها لكن مع استخدام MODE_DESCRIPTIONS)
@@ -27965,6 +33708,1150 @@ App._renderQuestionSection = function(question, userAnswered, answers, user, cur
         </div>
     `;
 };
+
+// ============================================================
+// دوال حل الكلمات المتقاطعة عبر المودال
+// ============================================================
+
+// متغيرات لحفظ حالة الكلمة المحددة
+CrosswordEngine._selectedWord = null;
+CrosswordEngine._selectedWordCells = [];
+
+/**
+ * تحديد (تظليل) جميع خلايا الكلمة في الشبكة
+ */
+CrosswordEngine._highlightWordCells = function(cells) {
+    // ✅ إزالة أي تحديد سابق
+    document.querySelectorAll('.crossword-cell.highlighted').forEach(el => {
+        el.classList.remove('highlighted');
+        el.style.background = '';
+        el.style.borderColor = '';
+    });
+
+    // ✅ تحديد الخلايا الجديدة
+    cells.forEach(cell => {
+        const cellEl = document.querySelector(`.crossword-cell[data-row="${cell.row}"][data-col="${cell.col}"]`);
+        if (cellEl) {
+            cellEl.classList.add('highlighted');
+            // تغيير اللون لتحديد الكلمة
+            const isFilled = this._userGrid[cell.row]?.[cell.col] || '';
+            if (isFilled) {
+                cellEl.style.background = 'rgba(255, 217, 61, 0.25)';
+                cellEl.style.borderColor = 'var(--accent)';
+            } else {
+                cellEl.style.background = 'rgba(108, 99, 255, 0.2)';
+                cellEl.style.borderColor = 'var(--primary)';
+            }
+            cellEl.style.boxShadow = '0 0 20px rgba(108, 99, 255, 0.2)';
+            cellEl.style.transform = 'scale(1.02)';
+        }
+    });
+},
+
+/**
+ * إزالة التحديد عن جميع الخلايا
+ */
+CrosswordEngine._clearHighlights = function() {
+    document.querySelectorAll('.crossword-cell.highlighted').forEach(el => {
+        el.classList.remove('highlighted');
+        el.style.background = '';
+        el.style.borderColor = '';
+        el.style.boxShadow = '';
+        el.style.transform = '';
+    });
+},
+
+// ============================================================
+// CrosswordEngine – دوال المودال المطورة (مع إصلاح جميع الأخطاء)
+// ============================================================
+
+/**
+ * معالج فقدان التركيز من الخلية
+ */
+CrosswordEngine._handleCellBlur = function(input) {
+    // لا نقوم بأي شيء، فقط نمنع الأخطاء
+    // سيتم التعامل مع التركيز عند النقر على خلية أخرى
+};
+
+CrosswordEngine._updateSolveModalLetters = function() {
+    const container = document.getElementById('crosswordCurrentLetters');
+    if (!container) return;
+
+    const cells = this._selectedWordCells || [];
+    const userGrid = this._userGrid || [];
+    const selectedRow = this._selectedRow;
+    const selectedCol = this._selectedCol;
+
+    if (cells.length === 0) {
+        container.innerHTML = '<div class="text-gray" style="font-size:0.8rem;padding:0.5rem;">لا توجد خلايا</div>';
+        return;
+    }
+
+    // إعادة تعيين زر التحقق إلى حالته الطبيعية إذا لم تكن الإجابة مكتملة
+    if (!this._isAnswered) {
+        const verifyBtn = document.getElementById('crosswordVerifyBtn');
+        if (verifyBtn) {
+            verifyBtn.disabled = false;
+            verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> تحقق من الكلمة';
+            verifyBtn.style.opacity = '1';
+        }
+    }
+
+    let html = '';
+    let filledCount = 0;
+
+    cells.forEach((cell, index) => {
+        const userChar = userGrid[cell.row]?.[cell.col] || '';
+        const isSelected = (cell.row === selectedRow && cell.col === selectedCol);
+        const isFilled = userChar !== '';
+        if (isFilled) filledCount++;
+
+        // ✅ التحقق مما إذا كانت الخلية جزءاً من كلمة تم التحقق منها رسمياً (ثابتة)
+        const isInVerifiedWord = this._isCellInVerifiedWord(cell.row, cell.col);
+        const isVerifiedChar = isInVerifiedWord && isFilled;
+
+        let bgColor, borderColor, textColor, extraClass = '';
+        let isDisabled = false;
+
+        if (isVerifiedChar) {
+            // ✅ حرف متقاطع مكتمل رسمياً – أخضر ثابت
+            bgColor = 'rgba(46, 204, 113, 0.25)';
+            borderColor = 'var(--success)';
+            textColor = 'var(--success)';
+            extraClass = 'crossed-filled';
+            isDisabled = true;
+        } else if (isSelected) {
+            bgColor = 'var(--accent)';
+            borderColor = 'var(--accent)';
+            textColor = 'var(--dark)';
+            extraClass = 'selected';
+        } else if (isFilled) {
+            bgColor = 'var(--primary)';
+            borderColor = 'var(--primary-light)';
+            textColor = 'var(--light)';
+            extraClass = 'filled';
+        } else {
+            bgColor = 'var(--glass)';
+            borderColor = 'var(--border-color)';
+            textColor = 'var(--gray)';
+            extraClass = 'empty';
+        }
+
+        const displayChar = isFilled ? userChar : '';
+
+        html += `
+            <div class="crossword-solve-cell ${extraClass}"
+                 data-row="${cell.row}"
+                 data-col="${cell.col}"
+                 style="
+                    background: ${bgColor};
+                    border-color: ${borderColor};
+                    color: ${textColor};
+                    ${isVerifiedChar ? 'cursor: default;' : ''}
+                 "
+                 onclick="${isVerifiedChar ? '' : `CrosswordEngine._handleCellClick(${cell.row},${cell.col})`}"
+                 title="${isVerifiedChar ? '✓ حرف متقاطع مكتمل (ثابت)' : 'انقر لكتابة حرف'}"
+            >
+                <input type="text"
+                       class="crossword-cell-input"
+                       data-row="${cell.row}"
+                       data-col="${cell.col}"
+                       maxlength="1"
+                       value="${isFilled ? userChar : ''}"
+                       style="
+                           position: absolute;
+                           top: 0;
+                           left: 0;
+                           width: 100%;
+                           height: 100%;
+                           background: transparent;
+                           border: none;
+                           outline: none;
+                           text-align: center;
+                           font-size: inherit;
+                           font-weight: inherit;
+                           font-family: inherit;
+                           color: inherit;
+                           text-transform: uppercase;
+                           cursor: ${isVerifiedChar ? 'default' : 'pointer'};
+                           padding: 0;
+                           margin: 0;
+                           border-radius: inherit;
+                           caret-color: transparent;
+                           -webkit-user-select: none;
+                           user-select: none;
+                           pointer-events: ${isVerifiedChar ? 'none' : 'auto'};
+                       "
+                       onfocus="this.select()"
+                       oninput="CrosswordEngine._handleCellInput(this)"
+                       onkeydown="CrosswordEngine._handleCellKeydown(event, this)"
+                       onblur="CrosswordEngine._handleCellBlur(this)"
+                       autocomplete="off"
+                       spellcheck="false"
+                       ${isVerifiedChar ? 'disabled' : ''}
+                >
+                <span class="cell-number">${index + 1}</span>
+                ${isVerifiedChar ? '<span style="position:absolute;top:-4px;right:-4px;font-size:0.5rem;color:var(--success);font-weight:700;">✓</span>' : ''}
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+
+    // تحديث عدد الحروف المملوءة
+    const filledEl = document.getElementById('crosswordFilledCount');
+    if (filledEl) {
+        filledEl.textContent = `${filledCount}/${cells.length} مملوءة`;
+        filledEl.style.color = filledCount === cells.length ? 'var(--success)' : 'var(--gray)';
+    }
+
+    // تحديث طول الكلمة
+    const lenEl = document.getElementById('crosswordWordLength');
+    if (lenEl) lenEl.textContent = cells.length;
+
+    // إزالة التلميح القديم
+    const oldHint = container.parentNode?.querySelector('.fill-hint');
+    if (oldHint) oldHint.remove();
+
+    // إذا كانت جميع الخلايا مملوءة، نضيف تلميحاً
+    if (filledCount === cells.length && cells.length > 0 && !this._isAnswered) {
+        const hint = document.createElement('div');
+        hint.className = 'fill-hint';
+        hint.style.cssText = 'font-size:0.7rem;color:var(--gray);text-align:center;margin-top:0.2rem;';
+        hint.textContent = '💡 جميع الحروف مملوءة، اضغط "تحقق من الكلمة" للتأكد من صحتها';
+        container.parentNode?.appendChild(hint);
+    }
+
+    // تركيز الخلية المحددة (فقط إذا لم تكن ثابتة)
+    if (selectedRow >= 0 && selectedCol >= 0 && !this._isAnswered) {
+        const isSelectedVerified = this._isCellInVerifiedWord(selectedRow, selectedCol);
+        if (!isSelectedVerified) {
+            setTimeout(() => {
+                const cellEl = container.querySelector(`.crossword-solve-cell[data-row="${selectedRow}"][data-col="${selectedCol}"]`);
+                if (cellEl) {
+                    const input = cellEl.querySelector('.crossword-cell-input');
+                    if (input) {
+                        input.focus();
+                        input.select();
+                    }
+                }
+            }, 50);
+        } else {
+            // إذا كانت الخلية المحددة ثابتة، نبحث عن أول خلية غير ثابتة
+            for (const cell of cells) {
+                if (!this._isCellInVerifiedWord(cell.row, cell.col)) {
+                    this._selectedRow = cell.row;
+                    this._selectedCol = cell.col;
+                    this._updateSolveModalLetters();
+                    break;
+                }
+            }
+        }
+    }
+};
+
+/**
+ * معالج النقر على خلية – تحديد الخلية وتركيز الإدخال
+ */
+CrosswordEngine._handleCellClick = function(row, col) {
+    if (this._isAnswered) return;
+
+    // التحقق من أن الخلية ضمن الكلمة المحددة
+    const isInWord = this._selectedWordCells.some(cell =>
+        cell.row === row && cell.col === col
+    );
+
+    if (!isInWord) {
+        showToast('⚠️ هذه الخلية ليست ضمن الكلمة المحددة', 'info', 1500);
+        return;
+    }
+
+    // تحديث الخلية المحددة
+    this._selectedRow = row;
+    this._selectedCol = col;
+
+    // مسح رسالة التحقق السابقة عند النقر على خلية جديدة
+    const resultContainer = document.getElementById('verifyResultContainer');
+    if (resultContainer) {
+        resultContainer.innerHTML = '';
+    }
+
+    // تحديث عرض الخلايا
+    this._updateSolveModalLetters();
+};
+
+// استبدال دالة _handleCellInput بأكملها
+CrosswordEngine._handleCellInput = function(input) {
+    if (this._isAnswered) return;
+
+    const row = parseInt(input.dataset.row);
+    const col = parseInt(input.dataset.col);
+    const value = input.value.trim();
+
+    if (!value) {
+        // ✅ مسح الحرف
+        if (this._userGrid && this._userGrid[row]) {
+            this._userGrid[row][col] = '';
+        }
+        // ✅ إعادة عرض الشبكة وتحديث الإحصائيات
+        this.renderWithEmptyHidden('crosswordGameOptions');
+        this._updateStats();
+        this._updateSolveModalLetters();
+        return;
+    }
+
+    // أخذ الحرف الأول (مع تحويله إلى أحرف كبيرة)
+    const char = value.charAt(0).toUpperCase();
+
+    // ✅ التحقق من أن الخلية ضمن الكلمة المحددة
+    const isInWord = this._selectedWordCells.some(cell =>
+        cell.row === row && cell.col === col
+    );
+
+    if (!isInWord) {
+        showToast('⚠️ الخلية المحددة ليست ضمن هذه الكلمة', 'error', 1500);
+        input.value = '';
+        return;
+    }
+
+    // ✅ ============================================================
+    // ✅ تحديث userGrid بشكل صحيح
+    // ✅ ============================================================
+    if (!this._userGrid) {
+        this._userGrid = [];
+    }
+    if (!this._userGrid[row]) {
+        this._userGrid[row] = [];
+    }
+    this._userGrid[row][col] = char;
+
+    // ✅ تشغيل صوت
+    if (typeof SoundSystem !== 'undefined') {
+        SoundSystem.playClick();
+    }
+
+    // ✅ ============================================================
+    // ✅ إعادة عرض الشبكة وتحديث الإحصائيات فوراً
+    // ✅ ============================================================
+    this.renderWithEmptyHidden('crosswordGameOptions');
+    
+    // ✅ تحديث الإحصائيات (هذه الدالة تحسب الكلمات المكتملة)
+    const completedCount = this._updateStats();
+    
+    // ✅ تحديث عرض المودال
+    this._updateSolveModalLetters();
+
+    // ✅ مسح رسالة التحقق السابقة
+    const resultContainer = document.getElementById('verifyResultContainer');
+    if (resultContainer) {
+        resultContainer.innerHTML = '';
+    }
+
+    // ✅ ============================================================
+    // ✅ تحديث التقدم في CrosswordMatchEngine (المهم جداً!)
+    // ✅ ============================================================
+    if (typeof CrosswordMatchEngine !== 'undefined' && CrosswordMatchEngine._updateProgressUI) {
+        const totalWords = this._words ? this._words.length : 0;
+        CrosswordMatchEngine._updateProgressUI(completedCount || 0, totalWords);
+    }
+
+    // ✅ الانتقال إلى الخلية التالية الفارغة
+    setTimeout(() => {
+        this._moveToNextEmptyCell();
+        this._updateSolveModalLetters();
+    }, 50);
+};
+
+CrosswordEngine._handleCellKeydown = function(event, input) {
+    const row = parseInt(input.dataset.row);
+    const col = parseInt(input.dataset.col);
+    const cells = this._selectedWordCells || [];
+
+    // العثور على مؤشر الخلية الحالية
+    let currentIndex = -1;
+    for (let i = 0; i < cells.length; i++) {
+        if (cells[i].row === row && cells[i].col === col) {
+            currentIndex = i;
+            break;
+        }
+    }
+
+    if (currentIndex === -1) return;
+
+    const key = event.key;
+
+    // مفاتيح التنقل بين الخلايا
+    if (key === 'ArrowRight' || key === 'ArrowLeft' || key === 'ArrowUp' || key === 'ArrowDown') {
+        event.preventDefault();
+        
+        let nextIndex = -1;
+        const dir = this._selectedWord?.direction || 'across';
+        
+        if (dir === 'across') {
+            if (key === 'ArrowLeft') {
+                nextIndex = (currentIndex + 1) % cells.length;
+            } else if (key === 'ArrowRight') {
+                nextIndex = (currentIndex - 1 + cells.length) % cells.length;
+            } else {
+                nextIndex = key === 'ArrowUp' ? 0 : cells.length - 1;
+            }
+        } else {
+            if (key === 'ArrowUp') {
+                nextIndex = (currentIndex - 1 + cells.length) % cells.length;
+            } else if (key === 'ArrowDown') {
+                nextIndex = (currentIndex + 1) % cells.length;
+            } else {
+                nextIndex = key === 'ArrowLeft' ? 0 : cells.length - 1;
+            }
+        }
+
+        if (nextIndex >= 0 && nextIndex < cells.length) {
+            const nextCell = cells[nextIndex];
+            this._selectedRow = nextCell.row;
+            this._selectedCol = nextCell.col;
+            
+            // مسح رسالة التحقق عند التنقل
+            const resultContainer = document.getElementById('verifyResultContainer');
+            if (resultContainer) {
+                resultContainer.innerHTML = '';
+            }
+            
+            this._updateSolveModalLetters();
+        }
+        return;
+    }
+
+    // مفتاح المسح
+    if (key === 'Backspace' || key === 'Delete') {
+        event.preventDefault();
+        // مسح الحرف من الخلية الحالية
+        this._userGrid[row][col] = '';
+        this.renderWithEmptyHidden('gameOptions');
+        this._updateStats();
+        
+        // مسح رسالة التحقق
+        const resultContainer = document.getElementById('verifyResultContainer');
+        if (resultContainer) {
+            resultContainer.innerHTML = '';
+        }
+        
+        // تحديث العرض
+        this._updateSolveModalLetters();
+        
+        // الانتقال إلى الخلية السابقة بعد المسح
+        setTimeout(() => {
+            const prevIndex = (currentIndex - 1 + cells.length) % cells.length;
+            const prevCell = cells[prevIndex];
+            this._selectedRow = prevCell.row;
+            this._selectedCol = prevCell.col;
+            this._updateSolveModalLetters();
+        }, 50);
+        return;
+    }
+
+    // ✅ إصلاح: السماح بكتابة أكثر من حرف واحد (باستبدال الحرف السابق)
+    if (key.length === 1 && !event.ctrlKey && !event.metaKey) {
+        // نسمح بالكتابة، سيتم التعامل معها في oninput
+        // لا نمنع أي شيء
+    }
+};
+
+CrosswordEngine._moveToNextEmptyCell = function() {
+    const cells = this._selectedWordCells || [];
+    const userGrid = this._userGrid || [];
+
+    if (cells.length === 0) return;
+
+    // البحث عن أول خلية فارغة بعد الخلية الحالية (دورياً)
+    let currentIndex = -1;
+    for (let i = 0; i < cells.length; i++) {
+        if (cells[i].row === this._selectedRow && cells[i].col === this._selectedCol) {
+            currentIndex = i;
+            break;
+        }
+    }
+
+    // البحث عن أول خلية فارغة
+    let foundEmpty = false;
+    for (let i = 0; i < cells.length; i++) {
+        const idx = (currentIndex + 1 + i) % cells.length;
+        const cell = cells[idx];
+        const userChar = userGrid[cell.row]?.[cell.col] || '';
+        if (userChar === '') {
+            this._selectedRow = cell.row;
+            this._selectedCol = cell.col;
+            foundEmpty = true;
+            break;
+        }
+    }
+
+    if (!foundEmpty) {
+        // جميع الخلايا مملوءة – نبقى على الخلية الحالية
+        const filledCount = cells.filter(c => userGrid[c.row]?.[c.col]).length;
+        if (filledCount === cells.length) {
+            const resultContainer = document.getElementById('verifyResultContainer');
+            if (resultContainer && !this._isAnswered) {
+                resultContainer.innerHTML = `
+                    <div class="verify-result success" style="font-size:0.8rem;padding:0.3rem 0.8rem;">
+                        ✅ جميع الحروف مملوءة! اضغط "تحقق من الكلمة" للتأكيد.
+                    </div>
+                `;
+            }
+        }
+    }
+};
+
+/**
+ * التحقق مما إذا كانت الخلية جزءاً من كلمة تم حلها بالفعل
+ */
+CrosswordEngine._isCellInCompletedWord = function(row, col) {
+    // التحقق من جميع الكلمات التي مرت بها هذه الخلية
+    for (const w of this._words) {
+        // إذا كانت الكلمة مكتملة بالفعل
+        if (this._isWordComplete(w)) {
+            // التحقق مما إذا كانت الخلية ضمن هذه الكلمة
+            for (let i = 0; i < w.word.length; i++) {
+                let r, c;
+                if (w.direction === 'across') {
+                    r = w.row;
+                    c = w.col - i;
+                } else {
+                    r = w.row + i;
+                    c = w.col;
+                }
+                if (r === row && c === col) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+};
+
+/**
+ * ✅ إضافة متغير لتتبع الكلمات المكتملة رسمياً (بعد التحقق الناجح)
+ */
+CrosswordEngine._verifiedWords = []; // قائمة الكلمات التي تم التحقق منها بنجاح
+
+/**
+ * ✅ التحقق مما إذا كانت الكلمة مكتملة رسمياً (تم التحقق منها)
+ */
+CrosswordEngine._isWordVerified = function(wordObj) {
+    if (!wordObj) return false;
+    // التحقق من وجود الكلمة في قائمة الكلمات المكتملة رسمياً
+    return this._verifiedWords.some(w => 
+        w.word === wordObj.word && 
+        w.row === wordObj.row && 
+        w.col === wordObj.col && 
+        w.direction === wordObj.direction
+    );
+};
+
+/**
+ * ✅ التحقق مما إذا كانت الخلية جزءاً من كلمة تم التحقق منها رسمياً
+ */
+CrosswordEngine._isCellInVerifiedWord = function(row, col) {
+    for (const w of this._verifiedWords) {
+        for (let i = 0; i < w.word.length; i++) {
+            let r, c;
+            if (w.direction === 'across') {
+                r = w.row;
+                c = w.col - i;
+            } else {
+                r = w.row + i;
+                c = w.col;
+            }
+            if (r === row && c === col) {
+                return true;
+            }
+        }
+    }
+    return false;
+};
+
+// استبدال دالة _isWordComplete بأكملها
+CrosswordEngine._isWordComplete = function(wordObj) {
+    if (!wordObj || !wordObj.word) {
+        console.warn('⚠️ Invalid word object:', wordObj);
+        return false;
+    }
+    
+    if (wordObj.row === undefined || wordObj.col === undefined || wordObj.direction === undefined) {
+        console.warn('⚠️ Word missing position:', wordObj);
+        return false;
+    }
+
+    const userGrid = this._userGrid || [];
+    const fullGrid = this._fullGrid || [];
+    
+    console.log(`🔍 Checking word: "${wordObj.word}"`);
+
+    for (let i = 0; i < wordObj.word.length; i++) {
+        let r, c;
+        if (wordObj.direction === 'across') {
+            r = wordObj.row;
+            c = wordObj.col - i;
+        } else {
+            r = wordObj.row + i;
+            c = wordObj.col;
+        }
+        
+        // ✅ التحقق من وجود الخلية
+        if (r < 0 || r >= this._gridSize || c < 0 || c >= this._gridSize) {
+            console.warn(`⚠️ Cell out of bounds: (${r},${c})`);
+            return false;
+        }
+        
+        // ✅ الحصول على الحروف
+        const userChar = (userGrid[r] && userGrid[r][c]) ? userGrid[r][c] : '';
+        const solutionChar = (fullGrid[r] && fullGrid[r][c]) ? fullGrid[r][c] : '';
+        
+        console.log(`  Cell (${r},${c}): user="${userChar}", solution="${solutionChar}"`);
+        
+        // ✅ مقارنة الحروف (تجاهل حالة الأحرف)
+        if (userChar.toUpperCase() !== solutionChar.toUpperCase()) {
+            console.log(`  ❌ Mismatch at (${r},${c}): "${userChar}" !== "${solutionChar}"`);
+            return false;
+        }
+    }
+    
+    console.log(`  ✅ Word "${wordObj.word}" is complete!`);
+    return true;
+};
+
+/**
+ * فتح مودال الحل
+ */
+CrosswordEngine._openSolveModal = function(row, col) {
+    if (this._isAnswered) return;
+
+    // ✅ البحث عن الكلمة التي تحتوي على هذه الخلية
+    let foundWord = null;
+    let foundCells = [];
+
+    for (const w of this._words) {
+        if (!w || !w.word) continue;
+        const cells = [];
+        let isInWord = false;
+
+        for (let i = 0; i < w.word.length; i++) {
+            let r, c;
+            if (w.direction === 'across') {
+                r = w.row;
+                c = w.col - i;
+            } else {
+                r = w.row + i;
+                c = w.col;
+            }
+            if (r >= 0 && r < this._gridSize && c >= 0 && c < this._gridSize) {
+                cells.push({ row: r, col: c, char: w.word[i], index: i });
+                if (r === row && c === col) {
+                    isInWord = true;
+                }
+            }
+        }
+
+        if (isInWord) {
+            foundWord = w;
+            foundCells = cells;
+            break;
+        }
+    }
+
+    if (!foundWord) {
+        showToast('⚠️ هذه الخلية لا تنتمي لأي كلمة', 'info');
+        return;
+    }
+
+    // ✅ التحقق مما إذا كانت الكلمة مكتملة بالفعل
+    const wordCompleted = foundCells.every(cell => {
+        const userChar = this._userGrid?.[cell.row]?.[cell.col] || '';
+        return userChar === cell.char;
+    });
+
+    if (wordCompleted) {
+        showToast('✅ هذه الكلمة تم حلها بالفعل!', 'success', 2000);
+        return;
+    }
+
+    this._selectedWord = foundWord;
+    this._selectedWordCells = foundCells;
+
+    // ✅ تحديد الخلية النشطة (أول خلية فارغة)
+    let selectedRow = row;
+    let selectedCol = col;
+    const firstEmpty = foundCells.find(cell => !this._userGrid?.[cell.row]?.[cell.col]);
+    if (firstEmpty) {
+        selectedRow = firstEmpty.row;
+        selectedCol = firstEmpty.col;
+    }
+    this._selectedRow = selectedRow;
+    this._selectedCol = selectedCol;
+
+    // ✅ إعادة تعيين زر التحقق
+    const verifyBtn = document.getElementById('crosswordVerifyBtn');
+    if (verifyBtn) {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> تحقق من الكلمة';
+        verifyBtn.style.opacity = '1';
+    }
+
+    // ✅ مسح رسالة النتيجة
+    const resultContainer = document.getElementById('verifyResultContainer');
+    if (resultContainer) {
+        resultContainer.innerHTML = '';
+    }
+
+    // ✅ إعادة تعيين حالة الإجابة
+    this._isAnswered = false;
+
+    // ✅ تعبئة المودال
+    this._fillSolveModal(foundWord, foundCells);
+
+    // ✅ فتح المودال
+    const modal = document.getElementById('crosswordSolveModal');
+    if (modal) {
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        
+        // ✅ تحديث عرض الخلايا
+        setTimeout(() => {
+            this._updateSolveModalLetters();
+            // ✅ تركيز أول خلية فارغة
+            const inputs = document.querySelectorAll('.crossword-cell-input:not([disabled])');
+            if (inputs.length > 0) {
+                inputs[0].focus();
+                inputs[0].select();
+            }
+        }, 100);
+    }
+};
+
+/**
+ * إغلاق مودال الحل
+ */
+CrosswordEngine._closeSolveModal = function() {
+    const modal = document.getElementById('crosswordSolveModal');
+    if (modal) {
+        modal.classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    // إزالة التحديد عن الخلايا
+    this._clearHighlights();
+
+    this._selectedWord = null;
+    this._selectedWordCells = [];
+
+    // إعادة تعيين زر التحقق
+    const verifyBtn = document.getElementById('crosswordVerifyBtn');
+    if (verifyBtn) {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> تحقق من الكلمة';
+        verifyBtn.style.opacity = '1';
+    }
+
+    // مسح رسالة النتيجة
+    const resultContainer = document.getElementById('verifyResultContainer');
+    if (resultContainer) {
+        resultContainer.innerHTML = '';
+    }
+
+    this._isAnswered = false;
+    
+    // ✅ إعادة رسم الشبكة الرئيسية بعد إغلاق المودال
+    const container = document.getElementById('crosswordGameOptions');
+    if (container) {
+        this.renderWithEmptyHidden('crosswordGameOptions');
+    } else {
+        // محاولة البحث عن أي حاوية شبكة
+        const gameOptions = document.getElementById('gameOptions');
+        if (gameOptions) {
+            this.renderWithEmptyHidden('gameOptions');
+        }
+    }
+    
+    // ✅ تحديث الإحصائيات
+    this._updateStats();
+};
+
+/**
+ * تعليم الكلمة كمكتملة في الشبكة الرئيسية
+ */
+CrosswordEngine._markWordCompleted = function(wordObj) {
+    if (!wordObj) return;
+
+    // تحديث حالة الكلمة في قائمة الكلمات (واجهة الأدلة)
+    const wordIndex = this._words.indexOf(wordObj);
+    if (wordIndex !== -1) {
+        const clueItems = document.querySelectorAll('.clue-item');
+        if (clueItems[wordIndex]) {
+            const statusEl = clueItems[wordIndex].querySelector('.clue-status');
+            if (statusEl) {
+                statusEl.textContent = '✅';
+                statusEl.style.color = 'var(--success)';
+            }
+        }
+    }
+
+    // تحديث عدد الكلمات المكتملة
+    this._updateStats();
+
+    // ✅ تحديث خلايا الكلمة في الشبكة الرئيسية لتكون خضراء وثابتة
+    const cells = this._selectedWordCells || [];
+    cells.forEach(cell => {
+        const cellEl = document.querySelector(`.crossword-cell[data-row="${cell.row}"][data-col="${cell.col}"]`);
+        if (cellEl) {
+            cellEl.style.background = 'rgba(46, 204, 113, 0.25)';
+            cellEl.style.borderColor = 'var(--success)';
+            cellEl.dataset.completed = 'true';
+            // ✅ إضافة علامة ✓
+            if (!cellEl.querySelector('.completed-check')) {
+                const check = document.createElement('span');
+                check.className = 'completed-check';
+                check.textContent = '✓';
+                check.style.cssText = 'position:absolute;top:-4px;right:-4px;font-size:0.5rem;color:var(--success);font-weight:700;background:var(--dark);border-radius:50%;padding:0 2px;';
+                cellEl.style.position = 'relative';
+                cellEl.appendChild(check);
+            }
+        }
+    });
+};
+
+/**
+ * مسح الحرف من الخلية المحددة
+ */
+CrosswordEngine._clearSelectedCell = function() {
+    if (this._selectedRow < 0 || this._selectedCol < 0) {
+        showToast('⚠️ يرجى تحديد خلية أولاً', 'info', 1500);
+        return;
+    }
+
+    const userChar = this._userGrid[this._selectedRow]?.[this._selectedCol] || '';
+    if (!userChar) {
+        showToast('الخلية فارغة', 'info', 1000);
+        return;
+    }
+
+    this._userGrid[this._selectedRow][this._selectedCol] = '';
+
+    // تحديث العرض
+    this._updateSolveModalLetters();
+    this.renderWithEmptyHidden('gameOptions');
+    this._updateStats();
+
+    // تشغيل صوت
+    if (typeof SoundSystem !== 'undefined') {
+        SoundSystem.playClick();
+    }
+
+    // تركيز صندوق الإدخال
+    const input = document.getElementById('crosswordSolveInput');
+    if (input) {
+        input.focus();
+        input.select();
+    }
+
+    // إلغاء أي رسالة تحقق سابقة
+    const resultContainer = document.getElementById('verifyResultContainer');
+    if (resultContainer) resultContainer.innerHTML = '';
+};
+
+
+/**
+ * الحصول على الحروف المتقاطعة من كلمات أخرى
+ */
+CrosswordEngine._getCrossLetters = function(cells) {
+    const crossLetters = [];
+    const userGrid = this._userGrid || [];
+    
+    cells.forEach(cell => {
+        // ✅ البحث عن كلمات أخرى تمر بهذه الخلية
+        for (const w of this._words) {
+            // تخطي الكلمة الحالية
+            if (w === this._selectedWord) continue;
+            
+            for (let i = 0; i < w.word.length; i++) {
+                let r, c;
+                if (w.direction === 'across') {
+                    r = w.row;
+                    c = w.col - i;
+                } else {
+                    r = w.row + i;
+                    c = w.col;
+                }
+                if (r === cell.row && c === cell.col) {
+                    const userChar = userGrid[r]?.[c] || '';
+                    if (userChar) {
+                        crossLetters.push({ char: userChar, word: w.word });
+                    }
+                    break;
+                }
+            }
+        }
+    });
+    
+    // ✅ إزالة المكررات
+    const unique = [];
+    const seen = new Set();
+    for (const item of crossLetters) {
+        const key = `${item.char}_${item.word}`;
+        if (!seen.has(key)) {
+            seen.add(key);
+            unique.push(item);
+        }
+    }
+    
+    return unique;
+},
+
+/**
+ * تحديث حالة اكتمال الكلمة في الشبكة
+ */
+CrosswordEngine._updateWordCompletionStatus = function(cells) {
+    // ✅ تحديث عرض الكلمة في قائمة الأدلة
+    const wordIndex = this._words.indexOf(this._selectedWord);
+    if (wordIndex !== -1) {
+        const clueItems = document.querySelectorAll('.clue-item');
+        if (clueItems[wordIndex]) {
+            const statusEl = clueItems[wordIndex].querySelector('.clue-status');
+            if (statusEl) {
+                statusEl.textContent = '✅';
+                statusEl.style.color = 'var(--success)';
+            }
+        }
+    }
+    
+    // ✅ تحديث عدد الكلمات المكتملة
+    this._updateStats();
+},
+
+/**
+ * تعيين الخلية التي سيتم التركيز عليها في المودال
+ */
+CrosswordEngine._setSolveInputFocus = function() {
+    const cells = this._selectedWordCells || [];
+    const userGrid = this._userGrid || [];
+    
+    // ✅ البحث عن أول خلية فارغة
+    for (const cell of cells) {
+        const userChar = userGrid[cell.row]?.[cell.col] || '';
+        if (userChar === '') {
+            // تعيين الخلية الحالية
+            this._selectedRow = cell.row;
+            this._selectedCol = cell.col;
+            return;
+        }
+    }
+    
+    // ✅ إذا كانت جميع الخلايا مملوءة، نختار آخر خلية
+    if (cells.length > 0) {
+        const last = cells[cells.length - 1];
+        this._selectedRow = last.row;
+        this._selectedCol = last.col;
+    }
+},
+
+/**
+ * إرسال حرف من المودال
+ */
+CrosswordEngine._submitSolveLetter = function() {
+    const input = document.getElementById('crosswordSolveInput');
+    if (!input) return;
+
+    const value = input.value.trim();
+    if (!value) {
+        showToast('⚠️ يرجى إدخال حرف', 'info');
+        return;
+    }
+
+    // ✅ أخذ الحرف الأول فقط
+    const char = value.charAt(0).toUpperCase();
+
+    // ✅ التحقق من وجود خلية محددة
+    if (this._selectedRow < 0 || this._selectedCol < 0) {
+        showToast('⚠️ يرجى تحديد خلية أولاً', 'error');
+        return;
+    }
+
+    // ✅ التحقق من أن الخلية ضمن الكلمة المحددة
+    const isInWord = this._selectedWordCells.some(cell => 
+        cell.row === this._selectedRow && cell.col === this._selectedCol
+    );
+
+    if (!isInWord) {
+        showToast('⚠️ هذه الخلية ليست ضمن الكلمة المحددة', 'error');
+        return;
+    }
+
+    // ✅ إدخال الحرف
+    this._userGrid[this._selectedRow][this._selectedCol] = char;
+    
+    // ✅ تحديث عرض المودال
+    this._updateSolveModalLetters();
+    
+    // ✅ تحديث الشبكة
+    this.renderWithEmptyHidden('gameOptions');
+    this._updateStats();
+    
+    // ✅ الانتقال إلى الخلية التالية في الكلمة
+    this._moveToNextSolveCell();
+    
+    // ✅ تنظيف صندوق الإدخال
+    input.value = '';
+    input.focus();
+    
+    // ✅ تشغيل صوت
+    if (typeof SoundSystem !== 'undefined') {
+        SoundSystem.playClick();
+    }
+},
+
+/**
+ * الانتقال إلى الخلية التالية في الكلمة (للمودال)
+ */
+CrosswordEngine._moveToNextSolveCell = function() {
+    const cells = this._selectedWordCells || [];
+    const userGrid = this._userGrid || [];
+    
+    // ✅ البحث عن أول خلية فارغة بعد الخلية الحالية
+    let foundNext = false;
+    let currentIndex = -1;
+    
+    // العثور على index الخلية الحالية
+    for (let i = 0; i < cells.length; i++) {
+        if (cells[i].row === this._selectedRow && cells[i].col === this._selectedCol) {
+            currentIndex = i;
+            break;
+        }
+    }
+    
+    if (currentIndex === -1) {
+        // إذا لم يتم العثور، نذهب لأول خلية فارغة
+        for (const cell of cells) {
+            const userChar = userGrid[cell.row]?.[cell.col] || '';
+            if (userChar === '') {
+                this._selectedRow = cell.row;
+                this._selectedCol = cell.col;
+                foundNext = true;
+                break;
+            }
+        }
+        if (!foundNext) {
+            // جميع الخلايا مملوءة
+            showToast('✅ جميع الحروف مملوءة!', 'success', 1500);
+            // نختار آخر خلية
+            const last = cells[cells.length - 1];
+            this._selectedRow = last.row;
+            this._selectedCol = last.col;
+        }
+        return;
+    }
+    
+    // ✅ البحث عن الخلية التالية الفارغة
+    for (let i = currentIndex + 1; i < cells.length; i++) {
+        const userChar = userGrid[cells[i].row]?.[cells[i].col] || '';
+        if (userChar === '') {
+            this._selectedRow = cells[i].row;
+            this._selectedCol = cells[i].col;
+            foundNext = true;
+            break;
+        }
+    }
+    
+    if (!foundNext) {
+        // ✅ البحث عن أول خلية فارغة من البداية
+        for (let i = 0; i < cells.length; i++) {
+            const userChar = userGrid[cells[i].row]?.[cells[i].col] || '';
+            if (userChar === '') {
+                this._selectedRow = cells[i].row;
+                this._selectedCol = cells[i].col;
+                foundNext = true;
+                break;
+            }
+        }
+        
+        if (!foundNext) {
+            // جميع الخلايا مملوءة
+            showToast('✅ جميع الحروف مملوءة!', 'success', 1500);
+            const last = cells[cells.length - 1];
+            this._selectedRow = last.row;
+            this._selectedCol = last.col;
+        }
+    }
+},
+
+/**
+ * ملء الكلمة تلقائياً بالحروف الصحيحة
+ */
+CrosswordEngine._autoFillWord = function() {
+    if (!this._selectedWord || !this._selectedWordCells) {
+        showToast('⚠️ لم يتم تحديد كلمة', 'error');
+        return;
+    }
+
+    const cells = this._selectedWordCells || [];
+    let filled = 0;
+
+    cells.forEach(cell => {
+        this._userGrid[cell.row][cell.col] = cell.char;
+        filled++;
+    });
+
+    // ✅ تحديث الواجهة
+    this._updateSolveModalLetters();
+    this.renderWithEmptyHidden('gameOptions');
+    this._updateStats();
+
+    showToast(`✅ تم ملء ${filled} حرف تلقائياً`, 'success', 2000);
+    
+    if (typeof SoundSystem !== 'undefined') {
+        SoundSystem.playCorrect();
+    }
+},
+
+/**
+ * مسح جميع حروف الكلمة
+ */
+CrosswordEngine._clearWordCells = function() {
+    if (!this._selectedWord || !this._selectedWordCells) {
+        showToast('⚠️ لم يتم تحديد كلمة', 'error');
+        return;
+    }
+
+    if (!confirm('هل تريد مسح جميع حروف هذه الكلمة؟')) return;
+
+    const cells = this._selectedWordCells || [];
+    let cleared = 0;
+
+    cells.forEach(cell => {
+        this._userGrid[cell.row][cell.col] = '';
+        cleared++;
+    });
+
+    // ✅ تحديث الواجهة
+    this._updateSolveModalLetters();
+    this.renderWithEmptyHidden('gameOptions');
+    this._updateStats();
+
+    showToast(`🗑️ تم مسح ${cleared} حرف`, 'info', 2000);
+    
+    if (typeof SoundSystem !== 'undefined') {
+        SoundSystem.playClick();
+    }
+},
+
+/**
+ * معالجة ضغط Enter في صندوق الإدخال
+ */
+CrosswordEngine._handleSolveInputKey = function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        this._submitSolveLetter();
+    } else if (e.key === 'Escape') {
+        this._closeSolveModal();
+    }
+},
 
 // ===== خيارات الاختيار من متعدد =====
 App._renderMultipleChoiceOptions = function(question, userAnswered, userAnswer) {

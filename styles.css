@@ -13585,8 +13585,8 @@ body.light-theme .selected-mode-label {
         margin-bottom: 4rem !important;
     }
     #dashboardMatchSettingsBtn img {
-        width: 30px !important;
-        height: 30px !important;
+        width: 200px !important;
+        height: 120px !important;
     }
     #dashboardMatchSettingsBtn .fallback-icon {
         font-size: 1.3rem !important;
@@ -13594,7 +13594,7 @@ body.light-theme .selected-mode-label {
     .selected-mode-label {
         font-size: 0.7rem !important;
         padding: 3px 10px !important;
-        margin-bottom: 0.3rem !important;
+        margin-bottom: 4rem !important;
     }
 }
 
@@ -13692,4 +13692,349 @@ body.light-theme .selected-mode-label {
         font-size: 0.5rem !important;
         padding: 0px 6px !important;
     }
+}
+
+/* ============================================================
+   أنماط الكلمات المتقاطعة
+   ============================================================ */
+
+.crossword-cell {
+    aspect-ratio: 1 / 1;
+    background: var(--glass);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--light);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    min-height: 50px;
+    font-family: var(--font);
+    text-transform: uppercase;
+}
+
+.crossword-cell:focus {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+    transform: scale(1.02);
+}
+
+.crossword-cell.active {
+    background: var(--accent);
+    color: var(--dark);
+    border-color: var(--accent);
+}
+
+.crossword-cell.in-word {
+    background: var(--primary);
+    border-color: var(--primary-light);
+}
+
+.crossword-cell.filled {
+    background: var(--card-bg);
+    color: var(--light);
+    border-color: var(--accent);
+}
+
+@media (max-width: 480px) {
+    .crossword-cell {
+        font-size: 1rem;
+        min-height: 36px;
+        border-radius: 4px;
+    }
+}
+
+/* في styles.css */
+.detected-words-modal {
+    z-index: 1000001 !important;
+}
+
+.detected-words-modal .modal-card {
+    z-index: 1000002 !important;
+}
+
+/* ===== تحديد خلايا الكلمات المتقاطعة ===== */
+.crossword-cell.highlighted {
+    animation: highlightPulse 1.5s ease-in-out infinite;
+    z-index: 10;
+}
+
+@keyframes highlightPulse {
+    0%, 100% { 
+        box-shadow: 0 0 20px rgba(108, 99, 255, 0.15);
+        transform: scale(1.02);
+    }
+    50% { 
+        box-shadow: 0 0 40px rgba(108, 99, 255, 0.3);
+        transform: scale(1.05);
+    }
+}
+
+.crossword-cell.highlighted.filled {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 30px rgba(255, 217, 61, 0.2) !important;
+}
+
+.crossword-cell.highlighted .cell-number {
+    color: var(--accent) !important;
+}
+
+/* ===== تأثير السحب والتحديد للكلمات المتقاطعة ===== */
+.crossword-cell.drag-selected {
+    animation: dragPulse 0.3s ease;
+    z-index: 10;
+    position: relative;
+}
+
+@keyframes dragPulse {
+    0% { 
+        transform: scale(1);
+        box-shadow: 0 0 0px rgba(108, 99, 255, 0);
+    }
+    50% { 
+        transform: scale(1.08);
+        box-shadow: 0 0 30px rgba(108, 99, 255, 0.3);
+    }
+    100% { 
+        transform: scale(1.05);
+        box-shadow: 0 0 25px rgba(108, 99, 255, 0.2);
+    }
+}
+
+.crossword-cell.drag-selected.filled {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 35px rgba(255, 217, 61, 0.3) !important;
+}
+
+/* ===== مؤشر التحديد ===== */
+.crossword-cell {
+    touch-action: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+}
+
+/* ===== تحسين تجربة السحب ===== */
+.crossword-cell {
+    touch-action: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+}
+
+.crossword-cell.drag-selected {
+    animation: dragPulse 0.3s ease;
+    z-index: 10;
+    position: relative;
+}
+
+@keyframes dragPulse {
+    0% { 
+        transform: scale(1);
+        box-shadow: 0 0 0px rgba(108, 99, 255, 0);
+    }
+    50% { 
+        transform: scale(1.08);
+        box-shadow: 0 0 30px rgba(108, 99, 255, 0.3);
+    }
+    100% { 
+        transform: scale(1.05);
+        box-shadow: 0 0 25px rgba(108, 99, 255, 0.2);
+    }
+}
+
+.crossword-cell.drag-selected.filled {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 35px rgba(255, 217, 61, 0.3) !important;
+}
+
+/* ===== مؤشر السحب ===== */
+.crossword-cell.dragging {
+    cursor: grabbing !important;
+}
+
+/* ============================================================
+   أنماط خلايا الكلمات المتقاطعة في المودال
+   ============================================================ */
+
+.crossword-solve-cell {
+    aspect-ratio: 1 / 1;
+    width: 52px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--glass);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--light);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    font-family: var(--font);
+    text-transform: uppercase;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.crossword-solve-cell:hover {
+    transform: translateY(-3px) scale(1.04);
+    border-color: var(--primary);
+    box-shadow: 0 6px 20px rgba(108, 99, 255, 0.2);
+}
+
+.crossword-solve-cell:active {
+    transform: scale(0.94);
+}
+
+/* الخلية المحددة (النشطة) */
+.crossword-solve-cell.selected {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--dark);
+    box-shadow: 0 0 30px rgba(255, 217, 61, 0.4), inset 0 0 20px rgba(255, 217, 61, 0.1);
+    transform: scale(1.06);
+    animation: selectedPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes selectedPulse {
+    0%, 100% { box-shadow: 0 0 30px rgba(255, 217, 61, 0.4); }
+    50% { box-shadow: 0 0 50px rgba(255, 217, 61, 0.6), 0 0 80px rgba(255, 217, 61, 0.2); }
+}
+
+/* الخلية المملوءة (تحتوي على حرف) */
+.crossword-solve-cell.filled {
+    background: var(--primary);
+    border-color: var(--primary-light);
+    color: var(--light);
+    box-shadow: 0 2px 12px rgba(108, 99, 255, 0.2);
+}
+
+/* الخلية الفارغة */
+.crossword-solve-cell.empty {
+    background: var(--glass);
+    border-color: var(--border-color);
+    color: var(--gray);
+    opacity: 0.7;
+}
+
+.crossword-solve-cell.empty:hover {
+    opacity: 1;
+    border-color: var(--primary);
+}
+
+/* الخلية الصحيحة (بعد التحقق) */
+.crossword-solve-cell.filled-correct {
+    background: var(--success);
+    border-color: var(--success);
+    color: #fff;
+    box-shadow: 0 0 30px rgba(46, 204, 113, 0.4);
+    animation: correctPop 0.5s ease;
+}
+
+@keyframes correctPop {
+    0% { transform: scale(0.8); opacity: 0.5; }
+    40% { transform: scale(1.15); }
+    70% { transform: scale(0.95); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* الخلية الخاطئة (بعد التحقق) */
+.crossword-solve-cell.filled-wrong {
+    background: var(--secondary);
+    border-color: var(--secondary);
+    color: #fff;
+    box-shadow: 0 0 30px rgba(255, 107, 107, 0.4);
+    animation: wrongShake 0.5s ease;
+}
+
+@keyframes wrongShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-5px); }
+    80% { transform: translateX(5px); }
+}
+
+/* رقم الخلية */
+.crossword-solve-cell .cell-number {
+    position: absolute;
+    bottom: 2px;
+    right: 6px;
+    font-size: 0.45rem;
+    color: var(--gray-dark);
+    font-weight: 600;
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+}
+
+.crossword-solve-cell.selected .cell-number {
+    color: rgba(0, 0, 0, 0.4);
+    opacity: 0.8;
+}
+
+.crossword-solve-cell.filled .cell-number {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* ===== استجابة للشاشات الصغيرة ===== */
+@media (max-width: 480px) {
+    .crossword-solve-cell {
+        width: 42px;
+        height: 42px;
+        font-size: 1.2rem;
+        border-radius: 10px;
+        border-width: 2px;
+    }
+    .crossword-solve-cell .cell-number {
+        font-size: 0.4rem;
+        bottom: 1px;
+        right: 4px;
+    }
+}
+
+@media (max-width: 380px) {
+    .crossword-solve-cell {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+        border-radius: 8px;
+    }
+    .crossword-solve-cell .cell-number {
+        font-size: 0.35rem;
+        bottom: 0px;
+        right: 3px;
+    }
+}
+
+/* ============================================================
+   زر عرض الإحصائيات العامة
+   ============================================================ */
+
+#showGameStatsBtn {
+    transition: all 0.3s ease;
+}
+
+#showGameStatsBtn:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    background: rgba(255, 217, 61, 0.05);
+}
+
+#gameStatsContainer {
+    animation: fadeUp 0.3s ease;
+}
+
+#gameStatsContent > div {
+    transition: all 0.2s ease;
+}
+
+#gameStatsContent > div:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary);
 }
