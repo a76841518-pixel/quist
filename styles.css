@@ -1862,58 +1862,6 @@ body.light-theme .login-modal .tab-login:hover:not(.active) {
     border: 1px solid var(--border-color);
 }
 
-/* استجابة */
-@media (max-width: 768px) {
-    .profile-cover {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        padding: 1.5rem 1rem;
-    }
-    .profile-info {
-        text-align: center;
-    }
-    .profile-actions {
-        justify-content: center;
-    }
-    .profile-avatar {
-        width: 90px;
-        height: 90px;
-        font-size: 2.5rem;
-    }
-    .profile-name {
-        font-size: 1.5rem;
-    }
-    .profile-quick-stats .stat-card .stat-number {
-        font-size: 1.4rem;
-    }
-    .profile-tabs {
-        justify-content: center;
-    }
-    .tab-btn {
-        font-size: 0.8rem;
-        padding: 6px 14px;
-    }
-}
-
-@media (max-width: 480px) {
-    .profile-avatar {
-        width: 70px;
-        height: 70px;
-        font-size: 2rem;
-    }
-    .profile-name {
-        font-size: 1.2rem;
-    }
-    .profile-actions .btn {
-        font-size: 0.7rem;
-        padding: 6px 12px;
-    }
-    .profile-quick-stats {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
 /* ===== صورة الملف الشخصي مع رفع الصورة ===== */
 .profile-avatar-wrapper {
     position: relative;
@@ -10028,7 +9976,10 @@ html, body {
     transition: width 0.5s ease;
 }
 
-/* ===== بطاقة اللاعب ===== */
+/* ============================================================
+   الصفحة الرئيسية - بطاقة اللاعب (تحسين الهواتف)
+   ============================================================ */
+
 .player-card-new {
     display: flex;
     align-items: center;
@@ -10042,19 +9993,15 @@ html, body {
     transition: all 0.2s ease;
 }
 
-.player-card-new:hover {
-    background: rgba(255, 255, 255, 0.07);
-    transform: translateY(-2px);
-}
-
+/* ===== الصورة ===== */
 .player-card-new .player-avatar {
     width: 64px;
     height: 64px;
-    border-radius: 50%;
+    border-radius: 8px;
     overflow: hidden;
-    border: 3px solid #FFD93D;
+    border: 3px solid var(--accent);
     flex-shrink: 0;
-    background: #6C63FF;
+    background: var(--primary);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -10062,20 +10009,16 @@ html, body {
     color: #fff;
 }
 
-.player-card-new .player-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-}
-
+/* ===== المعلومات ===== */
 .player-card-new .player-info {
     flex: 1;
     min-width: 0;
+    text-align: right;
 }
 
-.player-card-new .player-info .player-name {
-    font-size: 1.1rem;
+/* ✅ اسم اللاعب - حجم مرن */
+.player-card-new .player-name {
+    font-size: clamp(0.9rem, 2vw, 1.1rem);
     font-weight: 800;
     color: #fffffe;
     white-space: nowrap;
@@ -10083,24 +10026,34 @@ html, body {
     text-overflow: ellipsis;
 }
 
-.player-card-new .player-info .player-clan {
-    font-size: 0.8rem;
+/* ✅ القبيلة - حجم مرن */
+.player-card-new .player-clan {
+    font-size: clamp(0.6rem, 1.2vw, 0.8rem);
     color: #a7a9be;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.player-card-new .player-info .player-clan span {
+.player-card-new .player-clan span {
     color: #FFD93D;
     font-weight: 600;
 }
 
+/* ===== الرتبة (بدون إطار أو خلفية) ===== */
 .player-card-new .player-rank {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    overflow: hidden;
+    width: clamp(40px, 8vw, 56px);
+    height: clamp(40px, 8vw, 56px);
     flex-shrink: 0;
-    border: 2px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.05);
+    border: none !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: none !important;
+    padding: 0;
+    margin: 0;
 }
 
 .player-card-new .player-rank img {
@@ -10108,6 +10061,254 @@ html, body {
     height: 100%;
     object-fit: contain;
     display: block;
+}
+
+/* ============================================================
+   الملف الشخصي - البطاقة (تحسين الهواتف)
+   ============================================================ */
+
+.profile-cover {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 1.2rem 1.5rem;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: nowrap;
+    position: relative;
+    transition: background 0.3s ease;
+    min-height: 120px;
+    width: 100%;
+}
+
+/* ===== الصورة ===== */
+.profile-avatar-wrapper {
+    flex-shrink: 0;
+}
+
+.profile-avatar {
+    width: clamp(60px, 12vw, 110px);
+    height: clamp(60px, 12vw, 110px);
+    border-radius: 8px;
+    background: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(1.5rem, 4vw, 3rem);
+    color: #fff;
+    font-weight: 700;
+    border: 4px solid var(--accent);
+    background-size: cover;
+    background-position: center;
+    flex-shrink: 0;
+}
+
+/* ===== المعلومات ===== */
+.profile-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0 0.5rem;
+    text-align: right;
+}
+
+/* ✅ اسم اللاعب - حجم مرن */
+.profile-name {
+    font-size: clamp(0.85rem, 2.2vw, 1.4rem);
+    font-weight: 800;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ✅ اسم المستخدم - حجم مرن */
+.profile-username {
+    color: var(--gray);
+    font-size: clamp(0.6rem, 1.4vw, 0.9rem);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ✅ القبيلة - حجم مرن */
+.profile-clan {
+    font-size: clamp(0.55rem, 1.2vw, 0.85rem);
+    color: var(--gray);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.profile-clan span {
+    color: var(--accent);
+    font-weight: 700;
+}
+
+/* ✅ الدور - حجم مرن */
+.profile-role {
+    display: inline-block;
+    background: var(--glass);
+    padding: 0.1rem 0.8rem;
+    border-radius: 40px;
+    font-size: clamp(0.5rem, 1vw, 0.7rem);
+    font-weight: 600;
+    width: fit-content;
+    white-space: nowrap;
+}
+
+/* ===== الرتبة (بدون إطار أو خلفية) ===== */
+.profile-rank {
+    width: clamp(40px, 8vw, 70px);
+    height: clamp(40px, 8vw, 70px);
+    flex-shrink: 0;
+    border: none !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: none !important;
+    padding: 0;
+    margin: 0;
+}
+
+.profile-rank img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+/* ============================================================
+   استجابة للشاشات الصغيرة - تحسين إضافي
+   ============================================================ */
+
+@media (max-width: 480px) {
+    /* ===== الصفحة الرئيسية ===== */
+    .player-card-new {
+        padding: 0.6rem 0.8rem;
+        gap: 0.6rem;
+        margin: 0.3rem 0.5rem;
+    }
+    
+    .player-card-new .player-avatar {
+        width: 48px;
+        height: 48px;
+        font-size: 1.4rem;
+        border-width: 2px;
+    }
+    
+    .player-card-new .player-name {
+        font-size: 0.8rem;
+    }
+    
+    .player-card-new .player-clan {
+        font-size: 0.55rem;
+    }
+    
+    .player-card-new .player-rank {
+        width: 36px;
+        height: 36px;
+    }
+    
+    /* ===== الملف الشخصي ===== */
+    .profile-cover {
+        padding: 0.6rem 0.8rem;
+        gap: 0.6rem;
+        min-height: 70px;
+    }
+    
+    .profile-avatar {
+        width: 56px;
+        height: 56px;
+        font-size: 1.4rem;
+        border-width: 3px;
+    }
+    
+    .profile-name {
+        font-size: 0.85rem;
+    }
+    
+    .profile-username {
+        font-size: 0.6rem;
+    }
+    
+    .profile-clan {
+        font-size: 0.55rem;
+    }
+    
+    .profile-role {
+        font-size: 0.5rem;
+        padding: 0.05rem 0.6rem;
+    }
+    
+    .profile-rank {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+@media (max-width: 380px) {
+    /* ===== الصفحة الرئيسية ===== */
+    .player-card-new .player-avatar {
+        width: 40px;
+        height: 40px;
+        font-size: 1.2rem;
+    }
+    
+    .player-card-new .player-name {
+        font-size: 0.7rem;
+    }
+    
+    .player-card-new .player-clan {
+        font-size: 0.5rem;
+    }
+    
+    .player-card-new .player-rank {
+        width: 30px;
+        height: 30px;
+    }
+    
+    /* ===== الملف الشخصي ===== */
+    .profile-cover {
+        padding: 0.4rem 0.5rem;
+        gap: 0.4rem;
+        min-height: 60px;
+    }
+    
+    .profile-avatar {
+        width: 44px;
+        height: 44px;
+        font-size: 1.2rem;
+        border-width: 2px;
+    }
+    
+    .profile-name {
+        font-size: 0.7rem;
+    }
+    
+    .profile-username {
+        font-size: 0.5rem;
+    }
+    
+    .profile-clan {
+        font-size: 0.45rem;
+    }
+    
+    .profile-role {
+        font-size: 0.4rem;
+        padding: 0.05rem 0.4rem;
+    }
+    
+    .profile-rank {
+        width: 34px;
+        height: 34px;
+    }
 }
 
 /* ===== القائمة الجانبية (اليسرى) ===== */
@@ -14286,12 +14487,12 @@ body.light-theme .selected-mode-label {
 @media (max-width: 768px) {
     .profile-cover {
         flex-direction: column;
-        align-items: center;
-        text-align: center;
+        align-items: right;
+        text-align: right;
         padding: 1rem;
     }
     .profile-cover .profile-info {
-        text-align: center;
+        text-align: right;
     }
     .profile-cover .profile-rank {
         width: 50px;
@@ -14709,5 +14910,232 @@ body.light-theme .selected-mode-label {
     
     .profile-level-card .level-header .level-points {
         font-size: 0.55rem;
+    }
+}
+
+.player-card-new .player-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 0%;          /* ✅ تغيير من 50% إلى 8px (مربع) */
+    overflow: hidden;
+    border: 3px solid var(--accent); /* الاحتفاظ بالحدود فقط */
+    flex-shrink: 0;
+    background: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: #fff;
+}
+
+/* ===== إزالة إطار وصندوق الرتبة في الصفحة الرئيسية ===== */
+.player-card-new .player-rank {
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+    border: none;                /* ✅ إزالة الإطار */
+    background: transparent;     /* ✅ إزالة الخلفية */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0;           /* ✅ إزالة الاستدارة */
+}
+
+.player-card-new .player-rank img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+/* ============================================================
+   الملف الشخصي - البطاقة
+   ============================================================ */
+
+/* ===== الصورة مربعة ===== */
+.profile-avatar {
+    width: 110px;
+    height: 110px;
+    border-radius: 0px;          /* ✅ مربع */
+    background: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    color: #fff;
+    font-weight: 700;
+    border: 4px solid var(--accent);
+    background-size: cover;
+    background-position: center;
+    flex-shrink: 0;
+}
+
+/* ===== الرتبة (بدون إطار أو خلفية) ===== */
+.profile-rank {
+    width: clamp(50px, 10vw, 70px);    /* مرن بين 50px و 70px */
+    height: clamp(50px, 10vw, 70px);
+    flex-shrink: 0;
+    border: none !important;           /* ✅ إزالة الإطار نهائياً */
+    background: transparent !important; /* ✅ إزالة الخلفية نهائياً */
+    border-radius: 0 !important;       /* ✅ إزالة الاستدارة */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+    box-shadow: none !important;       /* ✅ إزالة أي ظل */
+}
+
+.profile-rank img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+/* ============================================================
+   استجابة للشاشات الصغيرة - الحفاظ على المربع
+   ============================================================ */
+
+@media (max-width: 768px) {
+    /* الصورة في الصفحة الرئيسية */
+    .player-card-new .player-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 0px;
+        font-size: 1.8rem;
+    }
+    
+    /* الرتبة في الصفحة الرئيسية */
+    .player-card-new .player-rank {
+        width: 48px;
+        height: 48px;
+    }
+    
+    /* الصورة في الملف الشخصي */
+    .profile-avatar {
+        width: 80px;
+        height: 80px;
+        border-radius: 0px;
+        font-size: 2.2rem;
+    }
+    
+    /* الرتبة في الملف الشخصي */
+    .profile-rank {
+        width: 56px;
+        height: 56px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* الصورة في الصفحة الرئيسية */
+    .player-card-new .player-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 6px;
+        font-size: 1.4rem;
+    }
+    
+    /* الرتبة في الصفحة الرئيسية */
+    .player-card-new .player-rank {
+        width: 40px;
+        height: 40px;
+    }
+    
+    /* الصورة في الملف الشخصي */
+    .profile-avatar {
+        width: 64px;
+        height: 64px;
+        border-radius: 6px;
+        font-size: 1.8rem;
+    }
+    
+    /* الرتبة في الملف الشخصي */
+    .profile-rank {
+        width: 48px;
+        height: 48px;
+    }
+}
+
+@media (max-width: 380px) {
+    /* الصورة في الصفحة الرئيسية */
+    .player-card-new .player-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 4px;
+        font-size: 1.2rem;
+    }
+    
+    /* الرتبة في الصفحة الرئيسية */
+    .player-card-new .player-rank {
+        width: 34px;
+        height: 34px;
+    }
+    
+    /* الصورة في الملف الشخصي */
+    .profile-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 4px;
+        font-size: 1.4rem;
+    }
+    
+    /* الرتبة في الملف الشخصي */
+    .profile-rank {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+/* ===== تقليل حجم النصوص في الهواتف ===== */
+@media (max-width: 480px) {
+    .profile-name {
+        font-size: 0.85rem !important;   /* قيمة ثابتة صغيرة */
+    }
+    .profile-username {
+        font-size: 0.65rem !important;
+    }
+    .profile-clan {
+        font-size: 0.6rem !important;
+    }
+    .profile-role {
+        font-size: 0.5rem !important;
+    }
+    .profile-rank {
+        width: 40px !important;
+        height: 40px !important;
+    }
+}
+
+@media (max-width: 380px) {
+    .profile-name {
+        font-size: 0.7rem !important;
+    }
+    .profile-username {
+        font-size: 0.55rem !important;
+    }
+    .profile-clan {
+        font-size: 0.5rem !important;
+    }
+    .profile-role {
+        font-size: 0.45rem !important;
+    }
+    .profile-rank {
+        width: 34px !important;
+        height: 34px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .profile-rank {
+        width: 32px !important;    /* حجم صغير جداً */
+        height: 32px !important;
+    }
+}
+
+@media (max-width: 380px) {
+    .profile-rank {
+        width: 26px !important;    /* أصغر للهواتف الصغيرة */
+        height: 26px !important;
     }
 }

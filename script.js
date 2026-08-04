@@ -17057,7 +17057,6 @@ _renderProfileSection() {
                     <div class="profile-name" id="profileName">زائر</div>
                     <div class="profile-username" id="profileUsername">@guest</div>
                     <div class="profile-clan">🏰 القبيلة: <span id="profileClan">غير منضم</span></div>
-                    <div class="profile-role" id="profileRole">👀 لاعب</div>
                 </div>
                 
                 <!-- الرتبة -->
