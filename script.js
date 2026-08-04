@@ -4421,6 +4421,7 @@ data: {
 async loadAll() {
     if (this._isLoading) return this.data;
     this._isLoading = true;
+    
     try {
         // التحقق من الاتصال أولاً
         const isOnline = await checkInternetConnection();
@@ -4435,10 +4436,13 @@ async loadAll() {
         
         const collections = ['questions', 'leaderboard', 'rooms', 'storeItems', 'transactions'];
         
+        // ✅ زيادة المهلة إلى 15 ثانية
+        const timeoutMs = 15000;
+        
         // محاولة جلب البيانات مع مهلة
         const results = await Promise.race([
             Promise.all(collections.map(col => FirestoreService.getAll(col))),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs))
         ]);
         
         collections.forEach((col, idx) => {
@@ -4447,17 +4451,40 @@ async loadAll() {
         this._lastUpdate = new Date();
         this._notifyListeners();
         return this.data;
+        
     } catch (e) {
         console.error('❌ Error loading data:', e);
-        // إذا كان الخطأ بسبب الاتصال، استخدم البيانات المخزنة
+        
+        // ✅ في حالة timeout أو أي خطأ، استخدم البيانات المخزنة مسبقاً
         if (e.message === 'timeout' || e.message.includes('unavailable')) {
             showToast('⚠️ بطء في الاتصال، استخدام البيانات المخزنة مؤقتاً', 'info', 4000);
         } else {
             showToast('⚠️ خطأ في تحميل البيانات، جاري استخدام البيانات المخزنة', 'error');
         }
+        
+        // ✅ محاولة تحميل من localStorage كنسخة احتياطية
+        try {
+            const cached = localStorage.getItem('appDataCache');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                Object.keys(parsed).forEach(key => {
+                    if (this.data[key] !== undefined) {
+                        this.data[key] = parsed[key];
+                    }
+                });
+                console.log('✅ تم استعادة البيانات من localStorage');
+                this._lastUpdate = new Date();
+                this._notifyListeners();
+                return this.data;
+            }
+        } catch (cacheError) {
+            console.warn('⚠️ فشل تحميل البيانات من localStorage', cacheError);
+        }
+        
         this._lastUpdate = new Date();
         this._notifyListeners();
         return this.data;
+        
     } finally {
         this._isLoading = false;
     }
@@ -9462,6 +9489,7 @@ const CrosswordEngine = {
     _timerInterval: null,
     _timeLeft: 0,
     _completedCount: 0,
+    _tempGrid: null,
 
     // ===== التهيئة =====
     init(crosswordData, onComplete) {
@@ -9606,20 +9634,16 @@ _verifyWord: function() {
     }
 
     const cells = this._selectedWordCells || [];
-    const userGrid = this._userGrid || [];
-    const correctWord = this._selectedWord?.word || '';
     const resultContainer = document.getElementById('verifyResultContainer');
-
     if (!resultContainer) return;
 
-    // بناء الكلمة من الخلايا بالترتيب الصحيح
+    // بناء الكلمة من _tempGrid
     let userWord = '';
     for (const cell of cells) {
-        const char = userGrid[cell.row]?.[cell.col] || '';
+        const char = this._tempGrid[cell.row]?.[cell.col] || '';
         userWord += char;
     }
 
-    // إذا كانت الكلمة فارغة أو ناقصة
     if (userWord.length < cells.length) {
         resultContainer.innerHTML = `
             <div style="font-size:0.85rem;padding:0.4rem 1rem;background:rgba(255,107,107,0.1);border-radius:8px;border:1px solid var(--secondary);">
@@ -9630,21 +9654,52 @@ _verifyWord: function() {
         return;
     }
 
-    // توحيد الحالة
+    const correctWord = this._selectedWord?.word || '';
     const userWordUpper = userWord.toUpperCase();
     const correctWordUpper = correctWord.toUpperCase();
 
-    // محاولة عكس الكلمة إذا لزم الأمر (للحالات التي يكون فيها الترتيب معكوساً)
     let isCorrect = userWordUpper === correctWordUpper;
     if (!isCorrect) {
         const reversed = userWordUpper.split('').reverse().join('');
         isCorrect = reversed === correctWordUpper;
     }
 
-    console.log(`🔍 Verifying word: "${userWord}" vs "${correctWord}" - ${isCorrect ? '✅ Correct' : '❌ Wrong'}`);
-
     if (isCorrect) {
-        // ... باقي الكود كما هو (عند النجاح)
+        // ✅ 1. نسخ الحروف من _tempGrid إلى _userGrid (الشبكة الأساسية)
+        for (const cell of cells) {
+            const char = this._tempGrid[cell.row]?.[cell.col] || '';
+            if (char) {
+                this._userGrid[cell.row][cell.col] = char;
+            }
+        }
+
+        // ✅ 2. إضافة الكلمة إلى قائمة المكتملة رسمياً (المفتاح لحل المشكلة)
+        if (!this._verifiedWords) this._verifiedWords = [];
+        
+        // التأكد من عدم إضافة الكلمة مكررة
+        const alreadyExists = this._verifiedWords.some(w => 
+            w.word === this._selectedWord.word && 
+            w.row === this._selectedWord.row && 
+            w.col === this._selectedWord.col && 
+            w.direction === this._selectedWord.direction
+        );
+        
+        if (!alreadyExists) {
+            this._verifiedWords.push({
+                word: this._selectedWord.word,
+                row: this._selectedWord.row,
+                col: this._selectedWord.col,
+                direction: this._selectedWord.direction
+            });
+        }
+
+        this._isAnswered = true;
+        
+        // ✅ 3. تحديث الشبكة الأساسية
+        this.renderWithEmptyHidden('crosswordGameOptions');
+        this._updateStats();
+        this._markWordCompleted(this._selectedWord);
+
         resultContainer.innerHTML = `
             <div style="font-size:1rem;padding:0.5rem 1rem;background:rgba(46,204,113,0.1);border-radius:8px;border:1px solid var(--success);">
                 🎉 تهانينا! الكلمة "${correctWord}" صحيحة تماماً!
@@ -9653,71 +9708,19 @@ _verifyWord: function() {
         showToast(`✅ الكلمة "${correctWord}" صحيحة!`, 'success', 3000);
         if (typeof SoundSystem !== 'undefined') SoundSystem.playCorrect();
 
-        // تثبيت الخلايا في الشبكة الرئيسية
-        for (const cell of cells) {
-            const char = userGrid[cell.row]?.[cell.col] || '';
-            if (char) {
-                const cellEl = document.querySelector(`.crossword-cell[data-row="${cell.row}"][data-col="${cell.col}"]`);
-                if (cellEl) {
-                    cellEl.style.background = 'rgba(46, 204, 113, 0.25)';
-                    cellEl.style.borderColor = 'var(--success)';
-                    cellEl.style.color = 'var(--success)';
-                    cellEl.dataset.completed = 'true';
-                    if (!cellEl.querySelector('.completed-check')) {
-                        const check = document.createElement('span');
-                        check.className = 'completed-check';
-                        check.textContent = '✓';
-                        check.style.cssText = 'position:absolute;top:-4px;right:-4px;font-size:0.5rem;color:var(--success);font-weight:700;background:var(--dark);border-radius:50%;padding:0 2px;';
-                        cellEl.style.position = 'relative';
-                        cellEl.appendChild(check);
-                    }
-                }
-            }
-        }
-
-        // تحديث الإحصائيات
-        const completedCount = this._updateStats();
+        // ✅ 4. تحديث التقدم في CrosswordMatchEngine
         if (typeof CrosswordMatchEngine !== 'undefined' && CrosswordMatchEngine._updateProgressUI) {
-            const totalWords = this._words ? this._words.length : 0;
-            CrosswordMatchEngine._updateProgressUI(completedCount, totalWords);
+            const completed = this._words.filter(w => this._isWordComplete(w)).length;
+            CrosswordMatchEngine._updateProgressUI(completed, this._words.length);
         }
 
-        const verifyBtn = document.getElementById('crosswordVerifyBtn');
-        if (verifyBtn) {
-            verifyBtn.disabled = true;
-            verifyBtn.innerHTML = '✅ تم الحل';
-            verifyBtn.style.opacity = '0.6';
-        }
-
-        this._isAnswered = true;
-        if (!this._verifiedWords) this._verifiedWords = [];
-        this._verifiedWords.push({
-            word: this._selectedWord.word,
-            row: this._selectedWord.row,
-            col: this._selectedWord.col,
-            direction: this._selectedWord.direction
-        });
-
+        // ✅ 5. إغلاق المودال بعد 1.5 ثانية
         setTimeout(() => {
             this._closeSolveModal();
-            this.renderWithEmptyHidden('crosswordGameOptions');
-            let allCompleted = true;
-            for (const w of this._words) {
-                if (!this._isWordComplete(w)) {
-                    allCompleted = false;
-                    break;
-                }
-            }
-            if (allCompleted && this._onComplete) {
-                this._onComplete(true, this._words.length);
-            } else if (this._onComplete) {
-                const currentCompleted = this._words.filter(w => this._isWordComplete(w)).length;
-                this._onComplete(false, currentCompleted);
-            }
         }, 1500);
 
     } else {
-        // ... الحالة الخاطئة
+        // ❌ فشل: لا ننقل أي حروف إلى _userGrid
         resultContainer.innerHTML = `
             <div style="font-size:0.9rem;padding:0.4rem 1rem;background:rgba(255,107,107,0.1);border-radius:8px;border:1px solid var(--secondary);">
                 ❌ الكلمة غير صحيحة. حاول مرة أخرى!
@@ -9725,32 +9728,8 @@ _verifyWord: function() {
         `;
         showToast('❌ الكلمة غير صحيحة، حاول مرة أخرى', 'error', 2500);
         if (typeof SoundSystem !== 'undefined') SoundSystem.playWrong();
-
-        // تمييز الخلايا الخاطئة مؤقتاً
-        for (const cell of cells) {
-            const userChar = userGrid[cell.row]?.[cell.col] || '';
-            if (userChar) {
-                const cellEl = document.querySelector(`.crossword-cell[data-row="${cell.row}"][data-col="${cell.col}"]`);
-                if (cellEl) {
-                    cellEl.style.background = 'rgba(255, 107, 107, 0.25)';
-                    cellEl.style.borderColor = 'var(--secondary)';
-                    cellEl.style.color = 'var(--secondary)';
-                    setTimeout(() => {
-                        const currentChar = userGrid[cell.row]?.[cell.col] || '';
-                        if (currentChar) {
-                            cellEl.style.background = 'var(--primary)';
-                            cellEl.style.borderColor = 'var(--primary-light)';
-                            cellEl.style.color = 'var(--light)';
-                        } else {
-                            cellEl.style.background = 'var(--glass)';
-                            cellEl.style.borderColor = 'var(--border-color)';
-                            cellEl.style.color = 'var(--gray)';
-                        }
-                    }, 1500);
-                }
-            }
-        }
-
+        
+        // إعادة تمكين زر التحقق
         const verifyBtn = document.getElementById('crosswordVerifyBtn');
         if (verifyBtn) {
             verifyBtn.disabled = false;
@@ -9827,41 +9806,37 @@ _isWordComplete: function(wordObj) {
     if (wordObj.row === undefined || wordObj.col === undefined || wordObj.direction === undefined) return false;
 
     const userGrid = this._userGrid || [];
-    const correctWord = wordObj.word;
 
-    // بناء الكلمة من الخلايا حسب الاتجاه
-    let userWord = '';
-    for (let i = 0; i < correctWord.length; i++) {
+    for (let i = 0; i < wordObj.word.length; i++) {
         let r, c;
         if (wordObj.direction === 'across') {
             r = wordObj.row;
-            c = wordObj.col - i; // من اليمين إلى اليسار
+            c = wordObj.col - i;
         } else {
             r = wordObj.row + i;
             c = wordObj.col;
         }
-        if (r < 0 || r >= this._gridSize || c < 0 || c >= this._gridSize) return false;
-        const char = userGrid[r]?.[c] || '';
-        userWord += char;
+        
+        if (r < 0 || r >= this._gridSize || c < 0 || c >= this._gridSize) {
+            return false;
+        }
+        
+        const userChar = (userGrid[r] && userGrid[r][c]) ? userGrid[r][c] : '';
+        const solutionChar = (this._fullGrid[r] && this._fullGrid[r][c]) ? this._fullGrid[r][c] : '';
+        
+        if (userChar.toUpperCase() !== solutionChar.toUpperCase()) {
+            return false;
+        }
     }
-
-    // مقارنة مع تجاهل الحالة، مع محاولة عكس الترتيب إذا لزم الأمر
-    const userWordUpper = userWord.toUpperCase();
-    const correctWordUpper = correctWord.toUpperCase();
-    if (userWordUpper === correctWordUpper) return true;
-    // محاولة معكوسة
-    const reversed = userWordUpper.split('').reverse().join('');
-    return reversed === correctWordUpper;
+    
+    return true;
 },
 
-// استبدال دالة _updateStats بأكملها
-_updateStats() {
+_updateStats: function() {
     if (!this._words || this._words.length === 0) {
-        console.warn('⚠️ No words found in _updateStats');
         return 0;
     }
 
-    // ✅ حساب الكلمات المكتملة باستخدام _isWordComplete
     let completed = 0;
     for (const w of this._words) {
         if (this._isWordComplete(w)) {
@@ -9869,11 +9844,7 @@ _updateStats() {
         }
     }
 
-    console.log(`📊 _updateStats: ${completed}/${this._words.length} words completed`);
-    console.log('📊 User grid:', JSON.stringify(this._userGrid));
-    console.log('📊 Full grid:', JSON.stringify(this._fullGrid));
-
-    // ✅ تحديث عداد الكلمات المكتملة في الشبكة
+    // تحديث عداد الكلمات المكتملة
     const el = document.getElementById('crosswordCompletedCount');
     if (el) {
         el.textContent = completed;
@@ -9886,7 +9857,7 @@ _updateStats() {
         }
     }
 
-    // ✅ تحديث شريط التقدم
+    // تحديث شريط التقدم
     const progressEl = document.getElementById('cwMatchProgress');
     if (progressEl) {
         const total = this._words.length;
@@ -9894,14 +9865,12 @@ _updateStats() {
         progressEl.style.width = `${Math.min(progress, 100)}%`;
         if (completed === total && total > 0) {
             progressEl.style.background = 'linear-gradient(90deg, var(--success), var(--accent))';
-            progressEl.style.boxShadow = '0 0 20px rgba(46, 204, 113, 0.3)';
         } else {
             progressEl.style.background = 'linear-gradient(90deg, var(--primary), var(--accent))';
-            progressEl.style.boxShadow = 'none';
         }
     }
 
-    // ✅ تحديث النص
+    // تحديث النص
     const progressText = document.getElementById('cwProgressText');
     if (progressText) {
         if (completed === this._words.length && this._words.length > 0) {
@@ -10257,124 +10226,314 @@ _updateStats() {
         }, 100);
     },
 
-    // ===== المودال =====
-    _openSolveModal(row, col) {
-        if (this._isAnswered) return;
+_isWordVerified: function(wordObj) {
+    if (!wordObj || !this._verifiedWords) return false;
+    
+    return this._verifiedWords.some(w => 
+        w.word === wordObj.word && 
+        w.row === wordObj.row && 
+        w.col === wordObj.col && 
+        w.direction === wordObj.direction
+    );
+},
 
-        let foundWord = null;
-        let foundCells = [];
+_openSolveModal: function(row, col) {
+    if (this._isAnswered) return;
 
-        for (const w of this._words) {
-            if (!w || !w.word) continue;
-            const cells = [];
-            let isInWord = false;
-
-            for (let i = 0; i < w.word.length; i++) {
-                let r, c;
-                if (w.direction === 'across') {
-                    r = w.row;
-                    c = w.col - i;
-                } else {
-                    r = w.row + i;
-                    c = w.col;
-                }
-                if (r >= 0 && r < this._gridSize && c >= 0 && c < this._gridSize) {
-                    cells.push({ row: r, col: c, char: w.word[i], index: i });
-                    if (r === row && c === col) {
-                        isInWord = true;
-                    }
+    // البحث عن الكلمة التي تحتوي على الخلية
+    let foundWord = null;
+    let foundCells = [];
+    for (const w of this._words) {
+        if (!w || !w.word) continue;
+        const cells = [];
+        let isInWord = false;
+        for (let i = 0; i < w.word.length; i++) {
+            let r, c;
+            if (w.direction === 'across') {
+                r = w.row;
+                c = w.col - i;
+            } else {
+                r = w.row + i;
+                c = w.col;
+            }
+            if (r >= 0 && r < this._gridSize && c >= 0 && c < this._gridSize) {
+                cells.push({ row: r, col: c, char: w.word[i], index: i });
+                if (r === row && c === col) {
+                    isInWord = true;
                 }
             }
+        }
+        if (isInWord) {
+            foundWord = w;
+            foundCells = cells;
+            break;
+        }
+    }
 
-            if (isInWord) {
-                foundWord = w;
-                foundCells = cells;
-                break;
+    if (!foundWord) {
+        showToast('⚠️ هذه الخلية لا تنتمي لأي كلمة', 'info');
+        return;
+    }
+
+    // ✅ التحقق مما إذا كانت الكلمة قد تم حلها سابقاً
+    const isWordAlreadySolved = this._isWordVerified(foundWord);
+    if (isWordAlreadySolved) {
+        showToast('✅ هذه الكلمة تم حلها بالفعل!', 'success', 2000);
+        // تمييز الكلمة في الشبكة
+        this._highlightWordCells(foundCells);
+        setTimeout(() => this._clearHighlights(), 2000);
+        return;
+    }
+
+    // ✅ التحقق من وجود خلايا غير مثبتة في الكلمة
+    const allCellsVerified = foundCells.every(cell => 
+        this._isCellInVerifiedWord(cell.row, cell.col)
+    );
+    
+    if (allCellsVerified) {
+        showToast('✅ جميع خلايا هذه الكلمة مثبتة من كلمات سابقة!', 'success', 2000);
+        return;
+    }
+
+    // نسخ الشبكة الحالية إلى المؤقتة
+    this._tempGrid = this._userGrid.map(row => [...row]);
+
+    this._selectedWord = foundWord;
+    this._selectedWordCells = foundCells;
+    this._isAnswered = false;
+
+    // تعيين الخلية النشطة (أول خلية فارغة غير مثبتة في _tempGrid)
+    let selectedRow = row;
+    let selectedCol = col;
+    
+    // البحث عن أول خلية فارغة غير مثبتة
+    const firstEmpty = foundCells.find(cell => {
+        const isVerified = this._isCellInVerifiedWord(cell.row, cell.col);
+        const isEmpty = !this._tempGrid[cell.row]?.[cell.col];
+        return !isVerified && isEmpty;
+    });
+    
+    if (firstEmpty) {
+        selectedRow = firstEmpty.row;
+        selectedCol = firstEmpty.col;
+    } else {
+        // إذا كانت جميع الخلايا غير المثبتة مملوءة، نختار أول خلية غير مثبتة
+        const firstUnverified = foundCells.find(cell => !this._isCellInVerifiedWord(cell.row, cell.col));
+        if (firstUnverified) {
+            selectedRow = firstUnverified.row;
+            selectedCol = firstUnverified.col;
+        }
+    }
+    this._selectedRow = selectedRow;
+    this._selectedCol = selectedCol;
+
+    // إعادة تعيين زر التحقق
+    const verifyBtn = document.getElementById('crosswordVerifyBtn');
+    if (verifyBtn) {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> تحقق من الكلمة';
+        verifyBtn.style.opacity = '1';
+    }
+
+    const resultContainer = document.getElementById('verifyResultContainer');
+    if (resultContainer) resultContainer.innerHTML = '';
+
+    // تعبئة المودال وفتحه
+    this._fillSolveModal(foundWord, foundCells);
+    const modal = document.getElementById('crosswordSolveModal');
+    if (modal) {
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        setTimeout(() => {
+            this._updateSolveModalLetters();
+            // تركيز أول خلية غير مثبتة وفارغة
+            const inputs = document.querySelectorAll('.crossword-cell-input:not([disabled])');
+            if (inputs.length > 0) {
+                inputs[0].focus();
+                inputs[0].select();
+            }
+        }, 100);
+    }
+},
+
+_openSolveModalFromSelection: function(selectedCells) {
+    if (!selectedCells || selectedCells.length === 0) {
+        showToast('⚠️ لم يتم تحديد أي خلايا', 'info');
+        return;
+    }
+    
+    // استخدام أول خلية محددة للعثور على الكلمة
+    const firstCell = selectedCells[0];
+    
+    // البحث عن الكلمة التي تحتوي على هذه الخلايا
+    let foundWord = null;
+    let foundCells = [];
+    
+    for (const w of this._words) {
+        const cells = [];
+        let allSelected = true;
+        
+        for (let i = 0; i < w.word.length; i++) {
+            let r, c;
+            if (w.direction === 'across') {
+                r = w.row;
+                c = w.col - i;
+            } else {
+                r = w.row + i;
+                c = w.col;
+            }
+            if (r >= 0 && r < this._gridSize && c >= 0 && c < this._gridSize) {
+                const isSelected = selectedCells.some(s => s.row === r && s.col === c);
+                cells.push({ row: r, col: c, char: w.word[i], index: i, isSelected });
+                if (!isSelected && selectedCells.length > 1) {
+                    allSelected = false;
+                }
             }
         }
-
-        if (!foundWord) {
-            showToast('⚠️ هذه الخلية لا تنتمي لأي كلمة', 'info');
-            return;
+        
+        // إذا كانت جميع الخلايا المحددة ضمن هذه الكلمة
+        if (selectedCells.every(s => cells.some(c => c.row === s.row && c.col === s.col))) {
+            foundWord = w;
+            foundCells = cells;
+            break;
         }
+    }
+    
+    if (!foundWord || foundCells.length === 0) {
+        showToast('⚠️ الخلايا المحددة لا تشكل كلمة كاملة', 'info');
+        this._clearDragSelection();
+        return;
+    }
+    
+    // ✅ التحقق مما إذا كانت الكلمة قد تم حلها سابقاً
+    const isWordAlreadySolved = this._isWordVerified(foundWord);
+    if (isWordAlreadySolved) {
+        showToast('✅ هذه الكلمة تم حلها بالفعل!', 'success', 2000);
+        this._highlightWordCells(foundCells);
+        setTimeout(() => this._clearHighlights(), 2000);
+        this._clearDragSelection();
+        return;
+    }
 
-        const wordCompleted = foundCells.every(cell => {
-            const userChar = this._userGrid?.[cell.row]?.[cell.col] || '';
-            return userChar === cell.char;
-        });
+    // ✅ التحقق من وجود خلايا غير مثبتة في الكلمة
+    const allCellsVerified = foundCells.every(cell => 
+        this._isCellInVerifiedWord(cell.row, cell.col)
+    );
+    
+    if (allCellsVerified) {
+        showToast('✅ جميع خلايا هذه الكلمة مثبتة من كلمات سابقة!', 'success', 2000);
+        this._clearDragSelection();
+        return;
+    }
+    
+    // نسخ الشبكة الحالية إلى المؤقتة
+    this._tempGrid = this._userGrid.map(row => [...row]);
+    
+    this._selectedWord = foundWord;
+    this._selectedWordCells = foundCells;
+    this._isAnswered = false;
 
-        if (wordCompleted) {
-            showToast('✅ هذه الكلمة تم حلها بالفعل!', 'success', 2000);
-            return;
+    // تعيين الخلية النشطة (أول خلية فارغة غير مثبتة في _tempGrid)
+    let selectedRow = foundCells[0].row;
+    let selectedCol = foundCells[0].col;
+    
+    const firstEmpty = foundCells.find(cell => {
+        const isVerified = this._isCellInVerifiedWord(cell.row, cell.col);
+        const isEmpty = !this._tempGrid[cell.row]?.[cell.col];
+        return !isVerified && isEmpty;
+    });
+    
+    if (firstEmpty) {
+        selectedRow = firstEmpty.row;
+        selectedCol = firstEmpty.col;
+    } else {
+        const firstUnverified = foundCells.find(cell => !this._isCellInVerifiedWord(cell.row, cell.col));
+        if (firstUnverified) {
+            selectedRow = firstUnverified.row;
+            selectedCol = firstUnverified.col;
         }
+    }
+    this._selectedRow = selectedRow;
+    this._selectedCol = selectedCol;
 
-        this._selectedWord = foundWord;
-        this._selectedWordCells = foundCells;
+    // إعادة تعيين زر التحقق
+    const verifyBtn = document.getElementById('crosswordVerifyBtn');
+    if (verifyBtn) {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> تحقق من الكلمة';
+        verifyBtn.style.opacity = '1';
+    }
 
-        let selectedRow = row;
-        let selectedCol = col;
-        const firstEmpty = foundCells.find(cell => !this._userGrid?.[cell.row]?.[cell.col]);
-        if (firstEmpty) {
-            selectedRow = firstEmpty.row;
-            selectedCol = firstEmpty.col;
-        }
-        this._selectedRow = selectedRow;
-        this._selectedCol = selectedCol;
+    const resultContainer = document.getElementById('verifyResultContainer');
+    if (resultContainer) resultContainer.innerHTML = '';
 
-        const verifyBtn = document.getElementById('crosswordVerifyBtn');
-        if (verifyBtn) {
-            verifyBtn.disabled = false;
-            verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> تحقق من الكلمة';
-            verifyBtn.style.opacity = '1';
-        }
+    // تعبئة المودال وفتحه
+    this._fillSolveModal(foundWord, foundCells);
+    
+    // إزالة التحديد المؤقت
+    this._clearDragSelection();
+    
+    const modal = document.getElementById('crosswordSolveModal');
+    if (modal) {
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        setTimeout(() => {
+            this._updateSolveModalLetters();
+            // تركيز أول خلية غير مثبتة وفارغة
+            const inputs = document.querySelectorAll('.crossword-cell-input:not([disabled])');
+            if (inputs.length > 0) {
+                inputs[0].focus();
+                inputs[0].select();
+            }
+        }, 100);
+    }
+},
 
-        const resultContainer = document.getElementById('verifyResultContainer');
-        if (resultContainer) {
-            resultContainer.innerHTML = '';
-        }
-
-        this._isAnswered = false;
-
-        this._fillSolveModal(foundWord, foundCells);
-
-        const modal = document.getElementById('crosswordSolveModal');
-        if (modal) {
-            modal.classList.add('open');
-            document.body.style.overflow = 'hidden';
-
-            setTimeout(() => {
-                this._updateSolveModalLetters();
-                const inputs = document.querySelectorAll('.crossword-cell-input:not([disabled])');
-                if (inputs.length > 0) {
-                    inputs[0].focus();
-                    inputs[0].select();
-                }
-            }, 100);
-        }
-    },
-
-// استبدال دالة _fillSolveModal بأكملها
 _fillSolveModal: function(word, cells) {
     const modal = document.getElementById('crosswordSolveModal');
-    if (!modal) return;
+    if (!modal) {
+        console.error('❌ crosswordSolveModal not found');
+        return;
+    }
 
-    document.getElementById('crosswordClueDisplay').textContent = word.clue || 'لا يوجد دليل';
-    document.getElementById('crosswordWordLength').textContent = word.word.length;
+    // عرض الدليل
+    const clueEl = document.getElementById('crosswordClueDisplay');
+    if (clueEl) clueEl.textContent = word.clue || 'لا يوجد دليل';
     
+    // عرض عدد الحروف
+    const lengthEl = document.getElementById('crosswordWordLength');
+    if (lengthEl) lengthEl.textContent = word.word.length;
+    
+    // عرض الاتجاه
     const dirText = word.direction === 'across' ? '← أفقي (يمين→يسار)' : '↓ عمودي (أعلى→أسفل)';
-    document.getElementById('crosswordDirectionText').textContent = dirText;
+    const dirEl = document.getElementById('crosswordDirectionText');
+    if (dirEl) dirEl.textContent = dirText;
 
-    // بناء الخلايا لأول مرة فقط
+    // بناء خلايا المودال باستخدام _tempGrid
     this._renderSolveModalCells(cells);
-
-    // تحديث العرض
+    
+    // تحديث عرض الحروف من _tempGrid
     this._updateSolveModalLetters();
+    
+    // تعيين الخلية النشطة (أول خلية فارغة في _tempGrid)
+    this._setSolveInputFocus();
+    
+    // ✅ إضافة مستمع للضغط على Enter في جميع الخلايا
+    setTimeout(() => {
+        const allInputs = document.querySelectorAll('.crossword-cell-input:not([disabled])');
+        allInputs.forEach(input => {
+            // إزالة المستمع القديم لتجنب التكرار
+            input.removeEventListener('keydown', this._handleEnterKey);
+            // إضافة المستمع الجديد
+            input.addEventListener('keydown', this._handleEnterKey.bind(this));
+        });
+    }, 100);
     
     // فتح المودال
     modal.classList.add('open');
     document.body.style.overflow = 'hidden';
-
-    // التركيز على أول خلية فارغة
+    
+    // تركيز أول خلية فارغة بعد فتح المودال
     setTimeout(() => {
         const inputs = document.querySelectorAll('.crossword-cell-input:not([disabled])');
         if (inputs.length > 0) {
@@ -10384,39 +10543,84 @@ _fillSolveModal: function(word, cells) {
     }, 300);
 },
 
+_handleEnterKey: function(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        // ✅ التحقق من الكلمة الحالية
+        this._verifyWord();
+    }
+},
+
+_setSolveInputFocus: function() {
+    const cells = this._selectedWordCells || [];
+    const tempGrid = this._tempGrid || [];
+    
+    // البحث عن أول خلية فارغة في _tempGrid
+    for (const cell of cells) {
+        const userChar = tempGrid[cell.row]?.[cell.col] || '';
+        if (userChar === '') {
+            this._selectedRow = cell.row;
+            this._selectedCol = cell.col;
+            return;
+        }
+    }
+    
+    // إذا كانت جميع الخلايا مملوءة، نختار آخر خلية
+    if (cells.length > 0) {
+        const last = cells[cells.length - 1];
+        this._selectedRow = last.row;
+        this._selectedCol = last.col;
+    }
+},
+
 _renderSolveModalCells: function(cells) {
     const container = document.getElementById('crosswordCurrentLetters');
     if (!container) return;
 
     let html = '';
     cells.forEach((cell, index) => {
-        const userChar = this._userGrid?.[cell.row]?.[cell.col] || '';
+        // ✅ قراءة من _tempGrid (النسخة المؤقتة)
+        const userChar = this._tempGrid[cell.row]?.[cell.col] || '';
         const isFilled = userChar !== '';
         const isSelected = (cell.row === this._selectedRow && cell.col === this._selectedCol);
+        
+        // ✅ التحقق مما إذا كانت الخلية جزءاً من كلمة تم التحقق منها رسمياً (ثابتة/متقاطعة)
         const isVerified = this._isCellInVerifiedWord(cell.row, cell.col);
-        const isDisabled = isVerified && isFilled;
+        const isDisabled = isVerified; // الخلايا المتقاطعة المثبتة تكون معطلة
 
-        let bgColor, borderColor, textColor;
-        if (isDisabled) {
+        let bgColor, borderColor, textColor, extraClass = '';
+        let cursor = 'pointer';
+        let pointerEvents = 'auto';
+
+        if (isVerified) {
+            // ✅ خلية متقاطعة مثبتة – أخضر ثابت + معطلة
             bgColor = 'rgba(46, 204, 113, 0.25)';
             borderColor = 'var(--success)';
             textColor = 'var(--success)';
+            extraClass = 'verified-fixed';
+            cursor = 'default';
+            pointerEvents = 'none';
         } else if (isSelected) {
             bgColor = 'var(--accent)';
             borderColor = 'var(--accent)';
             textColor = 'var(--dark)';
+            extraClass = 'selected';
         } else if (isFilled) {
             bgColor = 'var(--primary)';
             borderColor = 'var(--primary-light)';
             textColor = 'var(--light)';
+            extraClass = 'filled';
         } else {
             bgColor = 'var(--glass)';
             borderColor = 'var(--border-color)';
             textColor = 'var(--gray)';
+            extraClass = 'empty';
         }
 
         html += `
-            <div class="crossword-solve-cell ${isDisabled ? 'filled-correct' : ''}"
+            <div class="crossword-solve-cell ${extraClass} ${isVerified ? 'verified-cell' : ''}"
                  data-row="${cell.row}"
                  data-col="${cell.col}"
                  style="
@@ -10434,13 +10638,16 @@ _renderSolveModalCells: function(cells) {
                     font-size: 1.6rem;
                     font-weight: 800;
                     transition: all 0.15s ease;
-                    cursor: ${isDisabled ? 'default' : 'pointer'};
+                    cursor: ${cursor};
                     user-select: none;
                     position: relative;
                     font-family: var(--font);
                     text-transform: uppercase;
+                    ${isVerified ? 'opacity: 0.9;' : ''}
+                    ${isVerified ? 'box-shadow: 0 0 15px rgba(46,204,113,0.2);' : ''}
                  "
-                 onclick="${isDisabled ? '' : `CrosswordEngine._handleCellClick(${cell.row},${cell.col})`}"
+                 onclick="${isVerified ? '' : `CrosswordEngine._handleCellClick(${cell.row},${cell.col})`}"
+                 title="${isVerified ? '✓ حرف متقاطع مكتمل (ثابت)' : 'انقر لكتابة حرف'}"
             >
                 <input type="text"
                        class="crossword-cell-input"
@@ -10463,32 +10670,35 @@ _renderSolveModalCells: function(cells) {
                            font-family: inherit;
                            color: inherit;
                            text-transform: uppercase;
-                           cursor: ${isDisabled ? 'default' : 'pointer'};
+                           cursor: ${cursor};
                            padding: 0;
                            margin: 0;
                            border-radius: inherit;
                            caret-color: transparent;
                            -webkit-user-select: none;
                            user-select: none;
-                           pointer-events: ${isDisabled ? 'none' : 'auto'};
+                           pointer-events: ${pointerEvents};
+                           ${isVerified ? 'pointer-events: none;' : ''}
                        "
-                       onfocus="this.select()"
-                       oninput="CrosswordEngine._handleCellInput(this)"
-                       onkeydown="CrosswordEngine._handleCellKeydown(event, this)"
+                       onfocus="${isVerified ? '' : 'this.select()'}"
+                       oninput="${isVerified ? '' : 'CrosswordEngine._handleCellInput(this)'}"
+                       onkeydown="${isVerified ? '' : 'CrosswordEngine._handleCellKeydown(event, this)'}"
                        autocomplete="off"
                        spellcheck="false"
-                       ${isDisabled ? 'disabled' : ''}
+                       ${isVerified ? 'disabled' : ''}
+                       ${isVerified ? 'readonly' : ''}
                 >
                 <span class="cell-number" style="
                     position: absolute;
                     bottom: 2px;
                     right: 6px;
                     font-size: 0.45rem;
-                    color: var(--gray-dark);
-                    font-weight: 600;
-                    opacity: 0.6;
+                    color: ${isVerified ? 'var(--success)' : 'var(--gray-dark)'};
+                    font-weight: ${isVerified ? '700' : '600'};
+                    opacity: ${isVerified ? '0.8' : '0.6'};
                 ">${index + 1}</span>
-                ${isDisabled ? '<span style="position:absolute;top:-4px;right:-4px;font-size:0.5rem;color:var(--success);font-weight:700;">✓</span>' : ''}
+                ${isVerified ? '<span style="position:absolute;top:-4px;right:-4px;font-size:0.5rem;color:var(--success);font-weight:700;background:var(--dark);border-radius:50%;padding:0 2px;">✓</span>' : ''}
+                ${isVerified ? '<span style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:0.35rem;color:var(--success);font-weight:700;white-space:nowrap;">مثبت</span>' : ''}
             </div>
         `;
     });
@@ -10506,97 +10716,7 @@ _updateSolveModalLetters: function() {
         return;
     }
 
-    // تحديث الخلايا الموجودة دون إعادة بناء DOM
-    const existingCells = container.querySelectorAll('.crossword-solve-cell');
-    
-    // إذا اختلف العدد، أعد بناء الكل (يحدث مرة واحدة فقط)
-    if (existingCells.length !== cells.length) {
-        this._renderSolveModalCells(cells);
-        return;
-    }
-
-    let filledCount = 0;
-    let firstEmptyCell = null;
-
-    cells.forEach((cell, index) => {
-        const userChar = this._userGrid?.[cell.row]?.[cell.col] || '';
-        const isFilled = userChar !== '';
-        const isSelected = (cell.row === this._selectedRow && cell.col === this._selectedCol);
-        const isVerified = this._isCellInVerifiedWord(cell.row, cell.col);
-        const isDisabled = isVerified && isFilled;
-        
-        if (isFilled) filledCount++;
-        if (!isFilled && !firstEmptyCell && !isVerified) {
-            firstEmptyCell = { row: cell.row, col: cell.col };
-        }
-
-        // العثور على العنصر المقابل
-        const cellEl = existingCells[index];
-        if (!cellEl) return;
-
-        // تحديث الأنماط
-        let bgColor, borderColor, textColor;
-        if (isDisabled) {
-            bgColor = 'rgba(46, 204, 113, 0.25)';
-            borderColor = 'var(--success)';
-            textColor = 'var(--success)';
-        } else if (isSelected) {
-            bgColor = 'var(--accent)';
-            borderColor = 'var(--accent)';
-            textColor = 'var(--dark)';
-        } else if (isFilled) {
-            bgColor = 'var(--primary)';
-            borderColor = 'var(--primary-light)';
-            textColor = 'var(--light)';
-        } else {
-            bgColor = 'var(--glass)';
-            borderColor = 'var(--border-color)';
-            textColor = 'var(--gray)';
-        }
-
-        cellEl.style.background = bgColor;
-        cellEl.style.borderColor = borderColor;
-        cellEl.style.color = textColor;
-
-        // تحديث الإدخال
-        const input = cellEl.querySelector('.crossword-cell-input');
-        if (input) {
-            input.value = isFilled ? userChar : '';
-            input.disabled = isDisabled;
-            input.style.pointerEvents = isDisabled ? 'none' : 'auto';
-            input.style.cursor = isDisabled ? 'default' : 'pointer';
-        }
-
-        // تحديث علامة التحقق
-        const checkMark = cellEl.querySelector('span:last-child');
-        if (isDisabled) {
-            if (!checkMark || !checkMark.textContent.includes('✓')) {
-                const newCheck = document.createElement('span');
-                newCheck.style.cssText = 'position:absolute;top:-4px;right:-4px;font-size:0.5rem;color:var(--success);font-weight:700;';
-                newCheck.textContent = '✓';
-                cellEl.appendChild(newCheck);
-            }
-        } else if (checkMark && checkMark.textContent.includes('✓')) {
-            checkMark.remove();
-        }
-
-        // إزالة أو إضافة class
-        cellEl.classList.toggle('filled-correct', isDisabled);
-        
-        // تحديث onclick
-        cellEl.onclick = isDisabled ? null : function() {
-            CrosswordEngine._handleCellClick(cell.row, cell.col);
-        };
-    });
-
-    // تحديث العداد
-    const filledEl = document.getElementById('crosswordFilledCount');
-    if (filledEl) {
-        filledEl.textContent = `${filledCount}/${cells.length} مملوءة`;
-        filledEl.style.color = filledCount === cells.length ? 'var(--success)' : 'var(--gray)';
-    }
-
-    // تحديث زر التحقق
+    // إعادة تعيين زر التحقق إلى حالته الطبيعية إذا لم تكن الإجابة مكتملة
     if (!this._isAnswered) {
         const verifyBtn = document.getElementById('crosswordVerifyBtn');
         if (verifyBtn) {
@@ -10606,49 +10726,221 @@ _updateSolveModalLetters: function() {
         }
     }
 
-    // إذا كانت جميع الخلايا مملوءة، أضف تلميحاً
-    const oldHint = container.parentNode?.querySelector('.fill-hint');
+    // التحقق من وجود خلايا موجودة مسبقاً لتحديثها دون إعادة بناء DOM
+    const existingCells = container.querySelectorAll('.crossword-solve-cell');
+    
+    if (existingCells.length !== cells.length) {
+        this._renderSolveModalCells(cells);
+        // ✅ إعادة ربط مستمع Enter بعد إعادة البناء
+        setTimeout(() => {
+            this._bindEnterKeyListeners();
+        }, 50);
+        return;
+    }
+
+    let filledCount = 0;
+    let firstEmptyCell = null;
+    let hasVerifiedCells = false;
+
+    cells.forEach((cell, index) => {
+        const userChar = this._tempGrid[cell.row]?.[cell.col] || '';
+        const isFilled = userChar !== '';
+        const isSelected = (cell.row === this._selectedRow && cell.col === this._selectedCol);
+        
+        const isVerified = this._isCellInVerifiedWord(cell.row, cell.col);
+        const isDisabled = isVerified;
+        
+        if (isVerified) hasVerifiedCells = true;
+        if (isFilled) filledCount++;
+        if (!isFilled && !firstEmptyCell && !isVerified) {
+            firstEmptyCell = { row: cell.row, col: cell.col };
+        }
+
+        const cellEl = existingCells[index];
+        if (!cellEl) return;
+
+        // تحديث الأنماط...
+        let bgColor, borderColor, textColor, extraClass = '';
+        let cursor = 'pointer';
+        let pointerEvents = 'auto';
+
+        if (isVerified) {
+            bgColor = 'rgba(46, 204, 113, 0.25)';
+            borderColor = 'var(--success)';
+            textColor = 'var(--success)';
+            extraClass = 'verified-fixed';
+            cursor = 'default';
+            pointerEvents = 'none';
+        } else if (isSelected) {
+            bgColor = 'var(--accent)';
+            borderColor = 'var(--accent)';
+            textColor = 'var(--dark)';
+            extraClass = 'selected';
+        } else if (isFilled) {
+            bgColor = 'var(--primary)';
+            borderColor = 'var(--primary-light)';
+            textColor = 'var(--light)';
+            extraClass = 'filled';
+        } else {
+            bgColor = 'var(--glass)';
+            borderColor = 'var(--border-color)';
+            textColor = 'var(--gray)';
+            extraClass = 'empty';
+        }
+
+        cellEl.style.background = bgColor;
+        cellEl.style.borderColor = borderColor;
+        cellEl.style.color = textColor;
+        cellEl.className = `crossword-solve-cell ${extraClass} ${isVerified ? 'verified-cell' : ''}`;
+        cellEl.style.cursor = cursor;
+        if (isVerified) {
+            cellEl.style.opacity = '0.9';
+            cellEl.style.boxShadow = '0 0 15px rgba(46,204,113,0.2)';
+        } else {
+            cellEl.style.opacity = '1';
+            cellEl.style.boxShadow = 'none';
+        }
+        
+        cellEl.onclick = isVerified ? null : function() {
+            CrosswordEngine._handleCellClick(cell.row, cell.col);
+        };
+        cellEl.title = isVerified ? '✓ حرف متقاطع مكتمل (ثابت)' : 'انقر لكتابة حرف';
+
+        const input = cellEl.querySelector('.crossword-cell-input');
+        if (input) {
+            input.value = isFilled ? userChar : '';
+            input.disabled = isVerified;
+            input.readOnly = isVerified;
+            input.style.pointerEvents = isVerified ? 'none' : 'auto';
+            input.style.cursor = isVerified ? 'default' : 'pointer';
+            
+            if (isVerified) {
+                input.removeAttribute('oninput');
+                input.removeAttribute('onkeydown');
+                input.removeAttribute('onfocus');
+            } else {
+                input.setAttribute('oninput', 'CrosswordEngine._handleCellInput(this)');
+                input.setAttribute('onkeydown', 'CrosswordEngine._handleCellKeydown(event, this)');
+                input.setAttribute('onfocus', 'this.select()');
+                // ✅ إضافة مستمع Enter مباشرة للعنصر
+                input.removeEventListener('keydown', this._handleEnterKey);
+                input.addEventListener('keydown', this._handleEnterKey.bind(this));
+            }
+        }
+
+        // تحديث علامة التحقق
+        let checkMark = cellEl.querySelector('span:last-child');
+        if (isVerified) {
+            if (!checkMark || !checkMark.textContent.includes('✓')) {
+                if (checkMark) checkMark.remove();
+                const newCheck = document.createElement('span');
+                newCheck.style.cssText = 'position:absolute;top:-4px;right:-4px;font-size:0.5rem;color:var(--success);font-weight:700;background:var(--dark);border-radius:50%;padding:0 2px;';
+                newCheck.textContent = '✓';
+                cellEl.appendChild(newCheck);
+                
+                const label = document.createElement('span');
+                label.style.cssText = 'position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:0.35rem;color:var(--success);font-weight:700;white-space:nowrap;';
+                label.textContent = 'مثبت';
+                cellEl.appendChild(label);
+            }
+        } else if (checkMark && checkMark.textContent.includes('✓')) {
+            checkMark.remove();
+            const label = cellEl.querySelector('span:last-child');
+            if (label && label.textContent === 'مثبت') {
+                label.remove();
+            }
+        }
+        
+        const numberEl = cellEl.querySelector('.cell-number');
+        if (numberEl) {
+            numberEl.style.color = isVerified ? 'var(--success)' : 'var(--gray-dark)';
+            numberEl.style.fontWeight = isVerified ? '700' : '600';
+            numberEl.style.opacity = isVerified ? '0.8' : '0.6';
+        }
+    });
+
+    // تحديث عدد الحروف المملوءة
+    const filledEl = document.getElementById('crosswordFilledCount');
+    if (filledEl) {
+        filledEl.textContent = `${filledCount}/${cells.length} مملوءة`;
+        filledEl.style.color = filledCount === cells.length ? 'var(--success)' : 'var(--gray)';
+    }
+
+    // تحديث عدد الخلايا المثبتة
+    const verifiedCount = cells.filter(c => this._isCellInVerifiedWord(c.row, c.col)).length;
+    const verifiedEl = document.getElementById('verifiedCellCount');
+    if (verifiedEl) verifiedEl.textContent = verifiedCount;
+    
+    const editableEl = document.getElementById('editableCellCount');
+    if (editableEl) editableEl.textContent = cells.length - verifiedCount;
+
+    // تحديث التلميحات
+    const oldHint = container.parentNode?.querySelector('.fixed-hint');
     if (oldHint) oldHint.remove();
 
-    if (filledCount === cells.length && cells.length > 0 && !this._isAnswered) {
+    if (hasVerifiedCells) {
         const hint = document.createElement('div');
-        hint.className = 'fill-hint';
-        hint.style.cssText = 'font-size:0.7rem;color:var(--gray);text-align:center;margin-top:0.2rem;';
-        hint.textContent = '💡 جميع الحروف مملوءة، اضغط "تحقق من الكلمة" للتأكد من صحتها';
+        hint.className = 'fixed-hint';
+        hint.style.cssText = 'font-size:0.6rem;color:var(--success);text-align:center;margin-top:0.2rem;background:rgba(46,204,113,0.05);padding:0.2rem 0.5rem;border-radius:6px;border:1px solid rgba(46,204,113,0.1);';
+        hint.textContent = '🔒 الخلايا الخضراء مثبتة من كلمات متقاطعة سابقة (غير قابلة للتعديل)';
         container.parentNode?.appendChild(hint);
     }
 
-    // التركيز على الخلية المناسبة (مع منع فقدان التركيز)
-    if (!this._isAnswered) {
-        // إذا كانت الخلية الحالية ثابتة، انتقل لأول خلية فارغة
-        if (this._selectedRow >= 0 && this._selectedCol >= 0) {
-            const isSelectedVerified = this._isCellInVerifiedWord(this._selectedRow, this._selectedCol);
-            if (isSelectedVerified && firstEmptyCell) {
-                this._selectedRow = firstEmptyCell.row;
-                this._selectedCol = firstEmptyCell.col;
-                // تحديث الخلايا مرة أخرى
-                setTimeout(() => this._updateSolveModalLetters(), 50);
-                return;
+    // إذا كانت جميع الخلايا غير المثبتة مملوءة
+    const unverifiedCells = cells.filter(c => !this._isCellInVerifiedWord(c.row, c.col));
+    const unverifiedFilled = unverifiedCells.filter(c => this._tempGrid[c.row]?.[c.col]).length;
+    
+    if (unverifiedCells.length > 0 && unverifiedFilled === unverifiedCells.length && !this._isAnswered) {
+        const oldFillHint = container.parentNode?.querySelector('.fill-hint');
+        if (oldFillHint) oldFillHint.remove();
+        
+        const fillHint = document.createElement('div');
+        fillHint.className = 'fill-hint';
+        fillHint.style.cssText = 'font-size:0.7rem;color:var(--gray);text-align:center;margin-top:0.2rem;';
+        fillHint.textContent = '💡 جميع الحروف غير المثبتة مملوءة! اضغط "تحقق من الكلمة" أو Enter للتأكيد.';
+        container.parentNode?.appendChild(fillHint);
+    }
+
+    // تركيز الخلية المحددة
+    if (this._selectedRow >= 0 && this._selectedCol >= 0 && !this._isAnswered) {
+        const isSelectedVerified = this._isCellInVerifiedWord(this._selectedRow, this._selectedCol);
+        if (!isSelectedVerified) {
+            setTimeout(() => {
+                const cellEl = container.querySelector(`.crossword-solve-cell[data-row="${this._selectedRow}"][data-col="${this._selectedCol}"]`);
+                if (cellEl) {
+                    const input = cellEl.querySelector('.crossword-cell-input');
+                    if (input && !input.disabled) {
+                        input.focus();
+                        input.select();
+                    }
+                }
+            }, 50);
+        } else {
+            for (const cell of cells) {
+                if (!this._isCellInVerifiedWord(cell.row, cell.col)) {
+                    this._selectedRow = cell.row;
+                    this._selectedCol = cell.col;
+                    setTimeout(() => this._updateSolveModalLetters(), 50);
+                    break;
+                }
             }
-        } else if (firstEmptyCell) {
-            this._selectedRow = firstEmptyCell.row;
-            this._selectedCol = firstEmptyCell.col;
-            setTimeout(() => this._updateSolveModalLetters(), 50);
-            return;
         }
     }
 
-    // الحفاظ على التركيز (مهم جداً للهواتف)
+    // ✅ إعادة ربط مستمع Enter لجميع الخلايا غير المثبتة
     setTimeout(() => {
-        const activeInput = container.querySelector('.crossword-cell-input:not([disabled]):focus');
-        if (!activeInput && !this._isAnswered) {
-            const firstInput = container.querySelector('.crossword-cell-input:not([disabled])');
-            if (firstInput) {
-                firstInput.focus();
-                firstInput.select();
-            }
-        }
-    }, 10);
+        this._bindEnterKeyListeners();
+    }, 50);
+},
+
+_bindEnterKeyListeners: function() {
+    const inputs = document.querySelectorAll('.crossword-cell-input:not([disabled])');
+    inputs.forEach(input => {
+        // إزالة المستمع القديم لتجنب التكرار
+        input.removeEventListener('keydown', this._handleEnterKey);
+        // إضافة المستمع الجديد
+        input.addEventListener('keydown', this._handleEnterKey.bind(this));
+    });
 },
 
     _isCellInVerifiedWord(row, col) {
@@ -10671,66 +10963,90 @@ _updateSolveModalLetters: function() {
         return false;
     },
 
-    _handleCellClick(row, col) {
-        if (this._isAnswered) return;
+_handleCellClick: function(row, col) {
+    if (this._isAnswered) return;
 
-        const isInWord = this._selectedWordCells.some(cell =>
-            cell.row === row && cell.col === col
-        );
+    // ✅ التحقق مما إذا كانت الخلية مثبتة (متقاطعة)
+    if (this._isCellInVerifiedWord(row, col)) {
+        showToast('🔒 هذه الخلية مثبتة من كلمة متقاطعة سابقة، لا يمكن تعديلها', 'info', 2000);
+        return;
+    }
 
-        if (!isInWord) {
-            showToast('⚠️ هذه الخلية ليست ضمن الكلمة المحددة', 'info', 1500);
-            return;
-        }
+    // التحقق من أن الخلية ضمن الكلمة المحددة
+    const isInWord = this._selectedWordCells.some(cell =>
+        cell.row === row && cell.col === col
+    );
 
-        this._selectedRow = row;
-        this._selectedCol = col;
+    if (!isInWord) {
+        showToast('⚠️ هذه الخلية ليست ضمن الكلمة المحددة', 'info', 1500);
+        return;
+    }
 
-        const resultContainer = document.getElementById('verifyResultContainer');
-        if (resultContainer) {
-            resultContainer.innerHTML = '';
-        }
+    // تحديث الخلية المحددة
+    this._selectedRow = row;
+    this._selectedCol = col;
 
-        this._updateSolveModalLetters();
-    },
+    // مسح رسالة التحقق السابقة
+    const resultContainer = document.getElementById('verifyResultContainer');
+    if (resultContainer) {
+        resultContainer.innerHTML = '';
+    }
+
+    // تحديث عرض الخلايا
+    this._updateSolveModalLetters();
+},
 
 _handleCellInput: function(input) {
     if (this._isAnswered) return;
 
     const row = parseInt(input.dataset.row);
     const col = parseInt(input.dataset.col);
+    
+    // ✅ التحقق مما إذا كانت الخلية مثبتة (متقاطعة)
+    if (this._isCellInVerifiedWord(row, col)) {
+        showToast('🔒 هذه الخلية مثبتة من كلمة متقاطعة سابقة، لا يمكن تعديلها', 'info', 2000);
+        input.value = '';
+        return;
+    }
+
     const value = input.value.trim();
 
     if (!value) {
-        this._userGrid[row][col] = '';
-        this.renderWithEmptyHidden('crosswordGameOptions');
-        this._updateStats();
+        // مسح الحرف من _tempGrid فقط
+        if (this._tempGrid && this._tempGrid[row]) {
+            this._tempGrid[row][col] = '';
+        }
         this._updateSolveModalLetters();
         return;
     }
 
     const char = value.charAt(0).toUpperCase();
 
+    // التحقق من أن الخلية ضمن الكلمة المحددة
     const isInWord = this._selectedWordCells.some(cell =>
         cell.row === row && cell.col === col
     );
 
     if (!isInWord) {
-        input.value = '';
         showToast('⚠️ الخلية المحددة ليست ضمن هذه الكلمة', 'error', 1500);
+        input.value = '';
         return;
     }
 
-    this._userGrid[row][col] = char;
+    // التعديل على _tempGrid فقط
+    if (!this._tempGrid) {
+        this._tempGrid = this._userGrid.map(row => [...row]);
+    }
+    if (!this._tempGrid[row]) {
+        this._tempGrid[row] = [];
+    }
+    this._tempGrid[row][col] = char;
 
     if (typeof SoundSystem !== 'undefined') {
         SoundSystem.playClick();
     }
 
-    this.renderWithEmptyHidden('crosswordGameOptions');
-    this._updateStats();
-    
-    // ✅ تحديث المودال دون إعادة بناء DOM
+    // تحديث المودال فقط
     this._updateSolveModalLetters();
 
     const resultContainer = document.getElementById('verifyResultContainer');
@@ -10738,98 +11054,132 @@ _handleCellInput: function(input) {
         resultContainer.innerHTML = '';
     }
 
-    // الانتقال إلى الخلية التالية
+    // الانتقال إلى الخلية التالية الفارغة
     setTimeout(() => {
         this._moveToNextEmptyCell();
     }, 50);
 },
 
-    _handleCellKeydown(event, input) {
-        const row = parseInt(input.dataset.row);
-        const col = parseInt(input.dataset.col);
-        const cells = this._selectedWordCells || [];
+_handleCellKeydown: function(event, input) {
+    const row = parseInt(input.dataset.row);
+    const col = parseInt(input.dataset.col);
+    const cells = this._selectedWordCells || [];
 
-        let currentIndex = -1;
-        for (let i = 0; i < cells.length; i++) {
-            if (cells[i].row === row && cells[i].col === col) {
-                currentIndex = i;
-                break;
-            }
+    // العثور على مؤشر الخلية الحالية
+    let currentIndex = -1;
+    for (let i = 0; i < cells.length; i++) {
+        if (cells[i].row === row && cells[i].col === col) {
+            currentIndex = i;
+            break;
         }
+    }
 
-        if (currentIndex === -1) return;
+    if (currentIndex === -1) return;
 
-        const key = event.key;
+    const key = event.key;
 
-        if (key === 'ArrowRight' || key === 'ArrowLeft' || key === 'ArrowUp' || key === 'ArrowDown') {
+    // ✅ التحقق مما إذا كانت الخلية مثبتة (متقاطعة) - نمنع جميع التفاعلات
+    if (this._isCellInVerifiedWord(row, col)) {
+        if (key === 'Backspace' || key === 'Delete' || key === 'ArrowRight' || key === 'ArrowLeft' || key === 'ArrowUp' || key === 'ArrowDown') {
             event.preventDefault();
+            showToast('🔒 هذه الخلية مثبتة من كلمة متقاطعة سابقة، لا يمكن تعديلها', 'info', 1500);
+        }
+        return;
+    }
 
-            let nextIndex = -1;
-            const dir = this._selectedWord?.direction || 'across';
-
+    // مفاتيح التنقل بين الخلايا (فقط للخلايا غير المثبتة)
+    if (key === 'ArrowRight' || key === 'ArrowLeft' || key === 'ArrowUp' || key === 'ArrowDown') {
+        event.preventDefault();
+        
+        let nextIndex = -1;
+        const dir = this._selectedWord?.direction || 'across';
+        
+        // نبحث عن الخلية التالية غير المثبتة
+        let foundNext = false;
+        let startIdx = currentIndex;
+        
+        for (let i = 0; i < cells.length; i++) {
+            let idx;
             if (dir === 'across') {
                 if (key === 'ArrowLeft') {
-                    nextIndex = (currentIndex + 1) % cells.length;
+                    idx = (startIdx + 1 + i) % cells.length;
                 } else if (key === 'ArrowRight') {
-                    nextIndex = (currentIndex - 1 + cells.length) % cells.length;
+                    idx = (startIdx - 1 - i + cells.length) % cells.length;
                 } else {
-                    nextIndex = key === 'ArrowUp' ? 0 : cells.length - 1;
+                    idx = (startIdx + 1 + i) % cells.length;
                 }
             } else {
                 if (key === 'ArrowUp') {
-                    nextIndex = (currentIndex - 1 + cells.length) % cells.length;
+                    idx = (startIdx - 1 - i + cells.length) % cells.length;
                 } else if (key === 'ArrowDown') {
-                    nextIndex = (currentIndex + 1) % cells.length;
+                    idx = (startIdx + 1 + i) % cells.length;
                 } else {
-                    nextIndex = key === 'ArrowLeft' ? 0 : cells.length - 1;
+                    idx = (startIdx + 1 + i) % cells.length;
                 }
             }
-
-            if (nextIndex >= 0 && nextIndex < cells.length) {
-                const nextCell = cells[nextIndex];
+            
+            const nextCell = cells[idx];
+            if (!this._isCellInVerifiedWord(nextCell.row, nextCell.col)) {
                 this._selectedRow = nextCell.row;
                 this._selectedCol = nextCell.col;
-
-                const resultContainer = document.getElementById('verifyResultContainer');
-                if (resultContainer) {
-                    resultContainer.innerHTML = '';
-                }
-
-                this._updateSolveModalLetters();
+                foundNext = true;
+                break;
             }
-            return;
         }
-
-        if (key === 'Backspace' || key === 'Delete') {
-            event.preventDefault();
-            this._userGrid[row][col] = '';
-            this.renderWithEmptyHidden('crosswordGameOptions');
-            this._updateStats();
-
+        
+        if (foundNext) {
             const resultContainer = document.getElementById('verifyResultContainer');
             if (resultContainer) {
                 resultContainer.innerHTML = '';
             }
-
             this._updateSolveModalLetters();
+        } else {
+            // جميع الخلايا المتبقية مثبتة
+            showToast('🔒 جميع الخلايا المتبقية مثبتة', 'info', 1500);
+        }
+        return;
+    }
 
-            setTimeout(() => {
-                const prevIndex = (currentIndex - 1 + cells.length) % cells.length;
-                const prevCell = cells[prevIndex];
+    // مفتاح المسح - فقط للخلايا غير المثبتة
+    if (key === 'Backspace' || key === 'Delete') {
+        event.preventDefault();
+        // مسح الحرف من _tempGrid
+        if (this._tempGrid && this._tempGrid[row]) {
+            this._tempGrid[row][col] = '';
+        }
+        this._updateSolveModalLetters();
+        
+        // الانتقال إلى الخلية السابقة غير المثبتة
+        let foundPrev = false;
+        for (let i = 1; i < cells.length; i++) {
+            const idx = (currentIndex - i + cells.length) % cells.length;
+            const prevCell = cells[idx];
+            if (!this._isCellInVerifiedWord(prevCell.row, prevCell.col)) {
                 this._selectedRow = prevCell.row;
                 this._selectedCol = prevCell.col;
-                this._updateSolveModalLetters();
-            }, 50);
-            return;
+                foundPrev = true;
+                break;
+            }
         }
-    },
+        
+        if (!foundPrev) {
+            // إذا كانت جميع الخلايا السابقة مثبتة، نبقى على الخلية الحالية
+            this._selectedRow = row;
+            this._selectedCol = col;
+        }
+        
+        this._updateSolveModalLetters();
+        return;
+    }
+},
 
 _moveToNextEmptyCell: function() {
     const cells = this._selectedWordCells || [];
-    const userGrid = this._userGrid || [];
+    const tempGrid = this._tempGrid || [];
 
     if (cells.length === 0) return;
 
+    // البحث عن مؤشر الخلية الحالية
     let currentIndex = -1;
     for (let i = 0; i < cells.length; i++) {
         if (cells[i].row === this._selectedRow && cells[i].col === this._selectedCol) {
@@ -10838,11 +11188,23 @@ _moveToNextEmptyCell: function() {
         }
     }
 
+    // إذا لم يتم العثور على الخلية الحالية، نبدأ من البداية
+    if (currentIndex === -1) {
+        currentIndex = 0;
+    }
+
+    // البحث عن أول خلية فارغة غير مثبتة (دورياً)
     let foundEmpty = false;
     for (let i = 0; i < cells.length; i++) {
         const idx = (currentIndex + 1 + i) % cells.length;
         const cell = cells[idx];
-        const userChar = userGrid[cell.row]?.[cell.col] || '';
+        
+        // ✅ تخطي الخلايا المثبتة
+        if (this._isCellInVerifiedWord(cell.row, cell.col)) {
+            continue;
+        }
+        
+        const userChar = tempGrid[cell.row]?.[cell.col] || '';
         if (userChar === '') {
             this._selectedRow = cell.row;
             this._selectedCol = cell.col;
@@ -10852,48 +11214,87 @@ _moveToNextEmptyCell: function() {
     }
 
     if (!foundEmpty) {
-        // جميع الخلايا مملوءة
-        const filledCount = cells.filter(c => userGrid[c.row]?.[c.col]).length;
-        if (filledCount === cells.length) {
+        // ✅ التحقق من الخلايا غير المثبتة فقط
+        const unverifiedCells = cells.filter(c => !this._isCellInVerifiedWord(c.row, c.col));
+        const filledCount = unverifiedCells.filter(c => tempGrid[c.row]?.[c.col]).length;
+        
+        if (unverifiedCells.length > 0 && filledCount === unverifiedCells.length) {
             const resultContainer = document.getElementById('verifyResultContainer');
             if (resultContainer && !this._isAnswered) {
                 resultContainer.innerHTML = `
                     <div style="font-size:0.8rem;padding:0.3rem 0.8rem;background:rgba(46,204,113,0.1);border-radius:8px;border:1px solid var(--success);">
-                        ✅ جميع الحروف مملوءة! اضغط "تحقق من الكلمة" للتأكيد.
+                        ✅ جميع الحروف غير المثبتة مملوءة! اضغط "تحقق من الكلمة" للتأكيد.
                     </div>
                 `;
             }
         }
+        // نبقى على الخلية الحالية
     }
 
-    // ✅ تحديث المودال بعد تغيير الخلية (بدون إعادة بناء)
+    // تحديث عرض المودال
     this._updateSolveModalLetters();
 },
 
-    _closeSolveModal() {
-        const modal = document.getElementById('crosswordSolveModal');
-        if (modal) {
-            modal.classList.remove('open');
-            document.body.style.overflow = '';
+_closeSolveModal: function() {
+    const modal = document.getElementById('crosswordSolveModal');
+    if (modal) {
+        modal.classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    // ✅ إزالة مستمعات Enter
+    const inputs = document.querySelectorAll('.crossword-cell-input');
+    inputs.forEach(input => {
+        input.removeEventListener('keydown', this._handleEnterKey);
+    });
+
+    // إزالة التحديد عن الخلايا
+    this._clearHighlights();
+
+    // تجاهل التغييرات المؤقتة
+    this._tempGrid = null;
+    this._selectedWord = null;
+    this._selectedWordCells = [];
+    this._isAnswered = false;
+
+    // إعادة تعيين زر التحقق
+    const verifyBtn = document.getElementById('crosswordVerifyBtn');
+    if (verifyBtn) {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> تحقق من الكلمة';
+        verifyBtn.style.opacity = '1';
+    }
+
+    // مسح رسالة النتيجة
+    const resultContainer = document.getElementById('verifyResultContainer');
+    if (resultContainer) {
+        resultContainer.innerHTML = '';
+    }
+
+    // إعادة رسم الشبكة الرئيسية
+    const container = document.getElementById('crosswordGameOptions');
+    if (container) {
+        this.renderWithEmptyHidden('crosswordGameOptions');
+    } else {
+        const gameOptions = document.getElementById('gameOptions');
+        if (gameOptions) {
+            this.renderWithEmptyHidden('gameOptions');
         }
+    }
+    
+    // تحديث الإحصائيات
+    this._updateStats();
+},
 
-        this._selectedWord = null;
-        this._selectedWordCells = [];
-
-        const verifyBtn = document.getElementById('crosswordVerifyBtn');
-        if (verifyBtn) {
-            verifyBtn.disabled = false;
-            verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> تحقق من الكلمة';
-            verifyBtn.style.opacity = '1';
-        }
-
-        const resultContainer = document.getElementById('verifyResultContainer');
-        if (resultContainer) {
-            resultContainer.innerHTML = '';
-        }
-
-        this._isAnswered = false;
-    },
+_clearHighlights: function() {
+    document.querySelectorAll('.crossword-cell.highlighted').forEach(el => {
+        el.classList.remove('highlighted');
+        el.style.background = '';
+        el.style.borderColor = '';
+        el.style.boxShadow = '';
+        el.style.transform = '';
+    });
+},
 
 _startTimer: function() {
     if (this._timerInterval) {
@@ -29565,108 +29966,6 @@ CrosswordEngine._updateDragSelection = function() {
 },
 
 /**
- * فتح المودال من التحديد الحالي
- */
-CrosswordEngine._openSolveModalFromSelection = function(selectedCells) {
-    if (!selectedCells || selectedCells.length === 0) {
-        showToast('⚠️ لم يتم تحديد أي خلايا', 'info');
-        return;
-    }
-    
-    // ✅ استخدام أول خلية محددة للعثور على الكلمة
-    const firstCell = selectedCells[0];
-    
-    // ✅ البحث عن الكلمة التي تحتوي على هذه الخلايا
-    let foundWord = null;
-    let foundCells = [];
-    
-    for (const w of this._words) {
-        const cells = [];
-        let allSelected = true;
-        
-        for (let i = 0; i < w.word.length; i++) {
-            let r, c;
-            if (w.direction === 'across') {
-                r = w.row;
-                c = w.col - i;
-            } else {
-                r = w.row + i;
-                c = w.col;
-            }
-            if (r >= 0 && r < this._gridSize && c >= 0 && c < this._gridSize) {
-                const isSelected = selectedCells.some(s => s.row === r && s.col === c);
-                cells.push({ row: r, col: c, char: w.word[i], index: i, isSelected });
-                if (!isSelected && selectedCells.length > 1) {
-                    allSelected = false;
-                }
-            }
-        }
-        
-        // ✅ إذا كانت جميع الخلايا المحددة ضمن هذه الكلمة
-        if (selectedCells.every(s => cells.some(c => c.row === s.row && c.col === s.col))) {
-            foundWord = w;
-            foundCells = cells;
-            break;
-        }
-    }
-    
-    if (!foundWord || foundCells.length === 0) {
-        showToast('⚠️ الخلايا المحددة لا تشكل كلمة كاملة', 'info');
-        this._clearDragSelection();
-        return;
-    }
-    
-    this._selectedWord = foundWord;
-    this._selectedWordCells = foundCells;
-    
-    // ✅ تعبئة المودال
-    this._fillSolveModal(foundWord, foundCells);
-    
-    // ✅ إزالة التحديد المؤقت
-    this._clearDragSelection();
-},
-
-/**
- * تعبئة المودال بالبيانات
- */
-CrosswordEngine._fillSolveModal = function(word, cells) {
-    const modal = document.getElementById('crosswordSolveModal');
-    if (!modal) {
-        console.error('❌ crosswordSolveModal not found');
-        return;
-    }
-    
-    // عرض الدليل
-    document.getElementById('crosswordClueDisplay').textContent = word.clue || 'لا يوجد دليل';
-    
-    // عرض عدد الحروف
-    document.getElementById('crosswordWordLength').textContent = word.word.length;
-    
-    // عرض الاتجاه
-    const dirText = word.direction === 'across' ? '← أفقي (يمين→يسار)' : '↓ عمودي (أعلى→أسفل)';
-    document.getElementById('crosswordDirectionText').textContent = dirText;
-    
-    // عرض الحروف الحالية
-    this._updateSolveModalLetters();
-    
-    // تعيين الخلية النشطة (أول خلية فارغة)
-    this._setSolveInputFocus();
-    
-    // فتح المودال
-    modal.classList.add('open');
-    document.body.style.overflow = 'hidden';
-    
-    // تركيز صندوق الإدخال
-    setTimeout(() => {
-        const input = document.getElementById('crosswordSolveInput');
-        if (input) {
-            input.focus();
-            input.select();
-        }
-    }, 300);
-},
-
-/**
  * إزالة التحديد المؤقت
  */
 CrosswordEngine._clearDragSelection = function() {
@@ -33882,19 +34181,6 @@ CrosswordEngine._highlightWordCells = function(cells) {
     });
 },
 
-/**
- * إزالة التحديد عن جميع الخلايا
- */
-CrosswordEngine._clearHighlights = function() {
-    document.querySelectorAll('.crossword-cell.highlighted').forEach(el => {
-        el.classList.remove('highlighted');
-        el.style.background = '';
-        el.style.borderColor = '';
-        el.style.boxShadow = '';
-        el.style.transform = '';
-    });
-},
-
 // ============================================================
 // CrosswordEngine – دوال المودال المطورة (مع إصلاح جميع الأخطاء)
 // ============================================================
@@ -33905,434 +34191,6 @@ CrosswordEngine._clearHighlights = function() {
 CrosswordEngine._handleCellBlur = function(input) {
     // لا نقوم بأي شيء، فقط نمنع الأخطاء
     // سيتم التعامل مع التركيز عند النقر على خلية أخرى
-};
-
-CrosswordEngine._updateSolveModalLetters = function() {
-    const container = document.getElementById('crosswordCurrentLetters');
-    if (!container) return;
-
-    const cells = this._selectedWordCells || [];
-    const userGrid = this._userGrid || [];
-    const selectedRow = this._selectedRow;
-    const selectedCol = this._selectedCol;
-
-    if (cells.length === 0) {
-        container.innerHTML = '<div class="text-gray" style="font-size:0.8rem;padding:0.5rem;">لا توجد خلايا</div>';
-        return;
-    }
-
-    // إعادة تعيين زر التحقق إلى حالته الطبيعية إذا لم تكن الإجابة مكتملة
-    if (!this._isAnswered) {
-        const verifyBtn = document.getElementById('crosswordVerifyBtn');
-        if (verifyBtn) {
-            verifyBtn.disabled = false;
-            verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> تحقق من الكلمة';
-            verifyBtn.style.opacity = '1';
-        }
-    }
-
-    let html = '';
-    let filledCount = 0;
-
-    cells.forEach((cell, index) => {
-        const userChar = userGrid[cell.row]?.[cell.col] || '';
-        const isSelected = (cell.row === selectedRow && cell.col === selectedCol);
-        const isFilled = userChar !== '';
-        if (isFilled) filledCount++;
-
-        // ✅ التحقق مما إذا كانت الخلية جزءاً من كلمة تم التحقق منها رسمياً (ثابتة)
-        const isInVerifiedWord = this._isCellInVerifiedWord(cell.row, cell.col);
-        const isVerifiedChar = isInVerifiedWord && isFilled;
-
-        let bgColor, borderColor, textColor, extraClass = '';
-        let isDisabled = false;
-
-        if (isVerifiedChar) {
-            // ✅ حرف متقاطع مكتمل رسمياً – أخضر ثابت
-            bgColor = 'rgba(46, 204, 113, 0.25)';
-            borderColor = 'var(--success)';
-            textColor = 'var(--success)';
-            extraClass = 'crossed-filled';
-            isDisabled = true;
-        } else if (isSelected) {
-            bgColor = 'var(--accent)';
-            borderColor = 'var(--accent)';
-            textColor = 'var(--dark)';
-            extraClass = 'selected';
-        } else if (isFilled) {
-            bgColor = 'var(--primary)';
-            borderColor = 'var(--primary-light)';
-            textColor = 'var(--light)';
-            extraClass = 'filled';
-        } else {
-            bgColor = 'var(--glass)';
-            borderColor = 'var(--border-color)';
-            textColor = 'var(--gray)';
-            extraClass = 'empty';
-        }
-
-        const displayChar = isFilled ? userChar : '';
-
-        html += `
-            <div class="crossword-solve-cell ${extraClass}"
-                 data-row="${cell.row}"
-                 data-col="${cell.col}"
-                 style="
-                    background: ${bgColor};
-                    border-color: ${borderColor};
-                    color: ${textColor};
-                    ${isVerifiedChar ? 'cursor: default;' : ''}
-                 "
-                 onclick="${isVerifiedChar ? '' : `CrosswordEngine._handleCellClick(${cell.row},${cell.col})`}"
-                 title="${isVerifiedChar ? '✓ حرف متقاطع مكتمل (ثابت)' : 'انقر لكتابة حرف'}"
-            >
-                <input type="text"
-                       class="crossword-cell-input"
-                       data-row="${cell.row}"
-                       data-col="${cell.col}"
-                       maxlength="1"
-                       value="${isFilled ? userChar : ''}"
-                       style="
-                           position: absolute;
-                           top: 0;
-                           left: 0;
-                           width: 100%;
-                           height: 100%;
-                           background: transparent;
-                           border: none;
-                           outline: none;
-                           text-align: center;
-                           font-size: inherit;
-                           font-weight: inherit;
-                           font-family: inherit;
-                           color: inherit;
-                           text-transform: uppercase;
-                           cursor: ${isVerifiedChar ? 'default' : 'pointer'};
-                           padding: 0;
-                           margin: 0;
-                           border-radius: inherit;
-                           caret-color: transparent;
-                           -webkit-user-select: none;
-                           user-select: none;
-                           pointer-events: ${isVerifiedChar ? 'none' : 'auto'};
-                       "
-                       onfocus="this.select()"
-                       oninput="CrosswordEngine._handleCellInput(this)"
-                       onkeydown="CrosswordEngine._handleCellKeydown(event, this)"
-                       onblur="CrosswordEngine._handleCellBlur(this)"
-                       autocomplete="off"
-                       spellcheck="false"
-                       ${isVerifiedChar ? 'disabled' : ''}
-                >
-                <span class="cell-number">${index + 1}</span>
-                ${isVerifiedChar ? '<span style="position:absolute;top:-4px;right:-4px;font-size:0.5rem;color:var(--success);font-weight:700;">✓</span>' : ''}
-            </div>
-        `;
-    });
-
-    container.innerHTML = html;
-
-    // تحديث عدد الحروف المملوءة
-    const filledEl = document.getElementById('crosswordFilledCount');
-    if (filledEl) {
-        filledEl.textContent = `${filledCount}/${cells.length} مملوءة`;
-        filledEl.style.color = filledCount === cells.length ? 'var(--success)' : 'var(--gray)';
-    }
-
-    // تحديث طول الكلمة
-    const lenEl = document.getElementById('crosswordWordLength');
-    if (lenEl) lenEl.textContent = cells.length;
-
-    // إزالة التلميح القديم
-    const oldHint = container.parentNode?.querySelector('.fill-hint');
-    if (oldHint) oldHint.remove();
-
-    // إذا كانت جميع الخلايا مملوءة، نضيف تلميحاً
-    if (filledCount === cells.length && cells.length > 0 && !this._isAnswered) {
-        const hint = document.createElement('div');
-        hint.className = 'fill-hint';
-        hint.style.cssText = 'font-size:0.7rem;color:var(--gray);text-align:center;margin-top:0.2rem;';
-        hint.textContent = '💡 جميع الحروف مملوءة، اضغط "تحقق من الكلمة" للتأكد من صحتها';
-        container.parentNode?.appendChild(hint);
-    }
-
-    // تركيز الخلية المحددة (فقط إذا لم تكن ثابتة)
-    if (selectedRow >= 0 && selectedCol >= 0 && !this._isAnswered) {
-        const isSelectedVerified = this._isCellInVerifiedWord(selectedRow, selectedCol);
-        if (!isSelectedVerified) {
-            setTimeout(() => {
-                const cellEl = container.querySelector(`.crossword-solve-cell[data-row="${selectedRow}"][data-col="${selectedCol}"]`);
-                if (cellEl) {
-                    const input = cellEl.querySelector('.crossword-cell-input');
-                    if (input) {
-                        input.focus();
-                        input.select();
-                    }
-                }
-            }, 50);
-        } else {
-            // إذا كانت الخلية المحددة ثابتة، نبحث عن أول خلية غير ثابتة
-            for (const cell of cells) {
-                if (!this._isCellInVerifiedWord(cell.row, cell.col)) {
-                    this._selectedRow = cell.row;
-                    this._selectedCol = cell.col;
-                    this._updateSolveModalLetters();
-                    break;
-                }
-            }
-        }
-    }
-};
-
-/**
- * معالج النقر على خلية – تحديد الخلية وتركيز الإدخال
- */
-CrosswordEngine._handleCellClick = function(row, col) {
-    if (this._isAnswered) return;
-
-    // التحقق من أن الخلية ضمن الكلمة المحددة
-    const isInWord = this._selectedWordCells.some(cell =>
-        cell.row === row && cell.col === col
-    );
-
-    if (!isInWord) {
-        showToast('⚠️ هذه الخلية ليست ضمن الكلمة المحددة', 'info', 1500);
-        return;
-    }
-
-    // تحديث الخلية المحددة
-    this._selectedRow = row;
-    this._selectedCol = col;
-
-    // مسح رسالة التحقق السابقة عند النقر على خلية جديدة
-    const resultContainer = document.getElementById('verifyResultContainer');
-    if (resultContainer) {
-        resultContainer.innerHTML = '';
-    }
-
-    // تحديث عرض الخلايا
-    this._updateSolveModalLetters();
-};
-
-// استبدال دالة _handleCellInput بأكملها
-CrosswordEngine._handleCellInput = function(input) {
-    if (this._isAnswered) return;
-
-    const row = parseInt(input.dataset.row);
-    const col = parseInt(input.dataset.col);
-    const value = input.value.trim();
-
-    if (!value) {
-        // ✅ مسح الحرف
-        if (this._userGrid && this._userGrid[row]) {
-            this._userGrid[row][col] = '';
-        }
-        // ✅ إعادة عرض الشبكة وتحديث الإحصائيات
-        this.renderWithEmptyHidden('crosswordGameOptions');
-        this._updateStats();
-        this._updateSolveModalLetters();
-        return;
-    }
-
-    // أخذ الحرف الأول (مع تحويله إلى أحرف كبيرة)
-    const char = value.charAt(0).toUpperCase();
-
-    // ✅ التحقق من أن الخلية ضمن الكلمة المحددة
-    const isInWord = this._selectedWordCells.some(cell =>
-        cell.row === row && cell.col === col
-    );
-
-    if (!isInWord) {
-        showToast('⚠️ الخلية المحددة ليست ضمن هذه الكلمة', 'error', 1500);
-        input.value = '';
-        return;
-    }
-
-    // ✅ ============================================================
-    // ✅ تحديث userGrid بشكل صحيح
-    // ✅ ============================================================
-    if (!this._userGrid) {
-        this._userGrid = [];
-    }
-    if (!this._userGrid[row]) {
-        this._userGrid[row] = [];
-    }
-    this._userGrid[row][col] = char;
-
-    // ✅ تشغيل صوت
-    if (typeof SoundSystem !== 'undefined') {
-        SoundSystem.playClick();
-    }
-
-    // ✅ ============================================================
-    // ✅ إعادة عرض الشبكة وتحديث الإحصائيات فوراً
-    // ✅ ============================================================
-    this.renderWithEmptyHidden('crosswordGameOptions');
-    
-    // ✅ تحديث الإحصائيات (هذه الدالة تحسب الكلمات المكتملة)
-    const completedCount = this._updateStats();
-    
-    // ✅ تحديث عرض المودال
-    this._updateSolveModalLetters();
-
-    // ✅ مسح رسالة التحقق السابقة
-    const resultContainer = document.getElementById('verifyResultContainer');
-    if (resultContainer) {
-        resultContainer.innerHTML = '';
-    }
-
-    // ✅ ============================================================
-    // ✅ تحديث التقدم في CrosswordMatchEngine (المهم جداً!)
-    // ✅ ============================================================
-    if (typeof CrosswordMatchEngine !== 'undefined' && CrosswordMatchEngine._updateProgressUI) {
-        const totalWords = this._words ? this._words.length : 0;
-        CrosswordMatchEngine._updateProgressUI(completedCount || 0, totalWords);
-    }
-
-    // ✅ الانتقال إلى الخلية التالية الفارغة
-    setTimeout(() => {
-        this._moveToNextEmptyCell();
-        this._updateSolveModalLetters();
-    }, 50);
-};
-
-CrosswordEngine._handleCellKeydown = function(event, input) {
-    const row = parseInt(input.dataset.row);
-    const col = parseInt(input.dataset.col);
-    const cells = this._selectedWordCells || [];
-
-    // العثور على مؤشر الخلية الحالية
-    let currentIndex = -1;
-    for (let i = 0; i < cells.length; i++) {
-        if (cells[i].row === row && cells[i].col === col) {
-            currentIndex = i;
-            break;
-        }
-    }
-
-    if (currentIndex === -1) return;
-
-    const key = event.key;
-
-    // مفاتيح التنقل بين الخلايا
-    if (key === 'ArrowRight' || key === 'ArrowLeft' || key === 'ArrowUp' || key === 'ArrowDown') {
-        event.preventDefault();
-        
-        let nextIndex = -1;
-        const dir = this._selectedWord?.direction || 'across';
-        
-        if (dir === 'across') {
-            if (key === 'ArrowLeft') {
-                nextIndex = (currentIndex + 1) % cells.length;
-            } else if (key === 'ArrowRight') {
-                nextIndex = (currentIndex - 1 + cells.length) % cells.length;
-            } else {
-                nextIndex = key === 'ArrowUp' ? 0 : cells.length - 1;
-            }
-        } else {
-            if (key === 'ArrowUp') {
-                nextIndex = (currentIndex - 1 + cells.length) % cells.length;
-            } else if (key === 'ArrowDown') {
-                nextIndex = (currentIndex + 1) % cells.length;
-            } else {
-                nextIndex = key === 'ArrowLeft' ? 0 : cells.length - 1;
-            }
-        }
-
-        if (nextIndex >= 0 && nextIndex < cells.length) {
-            const nextCell = cells[nextIndex];
-            this._selectedRow = nextCell.row;
-            this._selectedCol = nextCell.col;
-            
-            // مسح رسالة التحقق عند التنقل
-            const resultContainer = document.getElementById('verifyResultContainer');
-            if (resultContainer) {
-                resultContainer.innerHTML = '';
-            }
-            
-            this._updateSolveModalLetters();
-        }
-        return;
-    }
-
-    // مفتاح المسح
-    if (key === 'Backspace' || key === 'Delete') {
-        event.preventDefault();
-        // مسح الحرف من الخلية الحالية
-        this._userGrid[row][col] = '';
-        this.renderWithEmptyHidden('gameOptions');
-        this._updateStats();
-        
-        // مسح رسالة التحقق
-        const resultContainer = document.getElementById('verifyResultContainer');
-        if (resultContainer) {
-            resultContainer.innerHTML = '';
-        }
-        
-        // تحديث العرض
-        this._updateSolveModalLetters();
-        
-        // الانتقال إلى الخلية السابقة بعد المسح
-        setTimeout(() => {
-            const prevIndex = (currentIndex - 1 + cells.length) % cells.length;
-            const prevCell = cells[prevIndex];
-            this._selectedRow = prevCell.row;
-            this._selectedCol = prevCell.col;
-            this._updateSolveModalLetters();
-        }, 50);
-        return;
-    }
-
-    // ✅ إصلاح: السماح بكتابة أكثر من حرف واحد (باستبدال الحرف السابق)
-    if (key.length === 1 && !event.ctrlKey && !event.metaKey) {
-        // نسمح بالكتابة، سيتم التعامل معها في oninput
-        // لا نمنع أي شيء
-    }
-};
-
-CrosswordEngine._moveToNextEmptyCell = function() {
-    const cells = this._selectedWordCells || [];
-    const userGrid = this._userGrid || [];
-
-    if (cells.length === 0) return;
-
-    // البحث عن أول خلية فارغة بعد الخلية الحالية (دورياً)
-    let currentIndex = -1;
-    for (let i = 0; i < cells.length; i++) {
-        if (cells[i].row === this._selectedRow && cells[i].col === this._selectedCol) {
-            currentIndex = i;
-            break;
-        }
-    }
-
-    // البحث عن أول خلية فارغة
-    let foundEmpty = false;
-    for (let i = 0; i < cells.length; i++) {
-        const idx = (currentIndex + 1 + i) % cells.length;
-        const cell = cells[idx];
-        const userChar = userGrid[cell.row]?.[cell.col] || '';
-        if (userChar === '') {
-            this._selectedRow = cell.row;
-            this._selectedCol = cell.col;
-            foundEmpty = true;
-            break;
-        }
-    }
-
-    if (!foundEmpty) {
-        // جميع الخلايا مملوءة – نبقى على الخلية الحالية
-        const filledCount = cells.filter(c => userGrid[c.row]?.[c.col]).length;
-        if (filledCount === cells.length) {
-            const resultContainer = document.getElementById('verifyResultContainer');
-            if (resultContainer && !this._isAnswered) {
-                resultContainer.innerHTML = `
-                    <div class="verify-result success" style="font-size:0.8rem;padding:0.3rem 0.8rem;">
-                        ✅ جميع الحروف مملوءة! اضغط "تحقق من الكلمة" للتأكيد.
-                    </div>
-                `;
-            }
-        }
-    }
 };
 
 /**
@@ -34360,25 +34218,6 @@ CrosswordEngine._isCellInCompletedWord = function(row, col) {
         }
     }
     return false;
-};
-
-/**
- * ✅ إضافة متغير لتتبع الكلمات المكتملة رسمياً (بعد التحقق الناجح)
- */
-CrosswordEngine._verifiedWords = []; // قائمة الكلمات التي تم التحقق منها بنجاح
-
-/**
- * ✅ التحقق مما إذا كانت الكلمة مكتملة رسمياً (تم التحقق منها)
- */
-CrosswordEngine._isWordVerified = function(wordObj) {
-    if (!wordObj) return false;
-    // التحقق من وجود الكلمة في قائمة الكلمات المكتملة رسمياً
-    return this._verifiedWords.some(w => 
-        w.word === wordObj.word && 
-        w.row === wordObj.row && 
-        w.col === wordObj.col && 
-        w.direction === wordObj.direction
-    );
 };
 
 /**
@@ -34451,162 +34290,6 @@ CrosswordEngine._isWordComplete = function(wordObj) {
     
     console.log(`  ✅ Word "${wordObj.word}" is complete!`);
     return true;
-};
-
-/**
- * فتح مودال الحل
- */
-CrosswordEngine._openSolveModal = function(row, col) {
-    if (this._isAnswered) return;
-
-    // ✅ البحث عن الكلمة التي تحتوي على هذه الخلية
-    let foundWord = null;
-    let foundCells = [];
-
-    for (const w of this._words) {
-        if (!w || !w.word) continue;
-        const cells = [];
-        let isInWord = false;
-
-        for (let i = 0; i < w.word.length; i++) {
-            let r, c;
-            if (w.direction === 'across') {
-                r = w.row;
-                c = w.col - i;
-            } else {
-                r = w.row + i;
-                c = w.col;
-            }
-            if (r >= 0 && r < this._gridSize && c >= 0 && c < this._gridSize) {
-                cells.push({ row: r, col: c, char: w.word[i], index: i });
-                if (r === row && c === col) {
-                    isInWord = true;
-                }
-            }
-        }
-
-        if (isInWord) {
-            foundWord = w;
-            foundCells = cells;
-            break;
-        }
-    }
-
-    if (!foundWord) {
-        showToast('⚠️ هذه الخلية لا تنتمي لأي كلمة', 'info');
-        return;
-    }
-
-    // ✅ التحقق مما إذا كانت الكلمة مكتملة بالفعل
-    const wordCompleted = foundCells.every(cell => {
-        const userChar = this._userGrid?.[cell.row]?.[cell.col] || '';
-        return userChar === cell.char;
-    });
-
-    if (wordCompleted) {
-        showToast('✅ هذه الكلمة تم حلها بالفعل!', 'success', 2000);
-        return;
-    }
-
-    this._selectedWord = foundWord;
-    this._selectedWordCells = foundCells;
-
-    // ✅ تحديد الخلية النشطة (أول خلية فارغة)
-    let selectedRow = row;
-    let selectedCol = col;
-    const firstEmpty = foundCells.find(cell => !this._userGrid?.[cell.row]?.[cell.col]);
-    if (firstEmpty) {
-        selectedRow = firstEmpty.row;
-        selectedCol = firstEmpty.col;
-    }
-    this._selectedRow = selectedRow;
-    this._selectedCol = selectedCol;
-
-    // ✅ إعادة تعيين زر التحقق
-    const verifyBtn = document.getElementById('crosswordVerifyBtn');
-    if (verifyBtn) {
-        verifyBtn.disabled = false;
-        verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> تحقق من الكلمة';
-        verifyBtn.style.opacity = '1';
-    }
-
-    // ✅ مسح رسالة النتيجة
-    const resultContainer = document.getElementById('verifyResultContainer');
-    if (resultContainer) {
-        resultContainer.innerHTML = '';
-    }
-
-    // ✅ إعادة تعيين حالة الإجابة
-    this._isAnswered = false;
-
-    // ✅ تعبئة المودال
-    this._fillSolveModal(foundWord, foundCells);
-
-    // ✅ فتح المودال
-    const modal = document.getElementById('crosswordSolveModal');
-    if (modal) {
-        modal.classList.add('open');
-        document.body.style.overflow = 'hidden';
-        
-        // ✅ تحديث عرض الخلايا
-        setTimeout(() => {
-            this._updateSolveModalLetters();
-            // ✅ تركيز أول خلية فارغة
-            const inputs = document.querySelectorAll('.crossword-cell-input:not([disabled])');
-            if (inputs.length > 0) {
-                inputs[0].focus();
-                inputs[0].select();
-            }
-        }, 100);
-    }
-};
-
-/**
- * إغلاق مودال الحل
- */
-CrosswordEngine._closeSolveModal = function() {
-    const modal = document.getElementById('crosswordSolveModal');
-    if (modal) {
-        modal.classList.remove('open');
-        document.body.style.overflow = '';
-    }
-
-    // إزالة التحديد عن الخلايا
-    this._clearHighlights();
-
-    this._selectedWord = null;
-    this._selectedWordCells = [];
-
-    // إعادة تعيين زر التحقق
-    const verifyBtn = document.getElementById('crosswordVerifyBtn');
-    if (verifyBtn) {
-        verifyBtn.disabled = false;
-        verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> تحقق من الكلمة';
-        verifyBtn.style.opacity = '1';
-    }
-
-    // مسح رسالة النتيجة
-    const resultContainer = document.getElementById('verifyResultContainer');
-    if (resultContainer) {
-        resultContainer.innerHTML = '';
-    }
-
-    this._isAnswered = false;
-    
-    // ✅ إعادة رسم الشبكة الرئيسية بعد إغلاق المودال
-    const container = document.getElementById('crosswordGameOptions');
-    if (container) {
-        this.renderWithEmptyHidden('crosswordGameOptions');
-    } else {
-        // محاولة البحث عن أي حاوية شبكة
-        const gameOptions = document.getElementById('gameOptions');
-        if (gameOptions) {
-            this.renderWithEmptyHidden('gameOptions');
-        }
-    }
-    
-    // ✅ تحديث الإحصائيات
-    this._updateStats();
 };
 
 /**
@@ -34758,32 +34441,6 @@ CrosswordEngine._updateWordCompletionStatus = function(cells) {
     
     // ✅ تحديث عدد الكلمات المكتملة
     this._updateStats();
-},
-
-/**
- * تعيين الخلية التي سيتم التركيز عليها في المودال
- */
-CrosswordEngine._setSolveInputFocus = function() {
-    const cells = this._selectedWordCells || [];
-    const userGrid = this._userGrid || [];
-    
-    // ✅ البحث عن أول خلية فارغة
-    for (const cell of cells) {
-        const userChar = userGrid[cell.row]?.[cell.col] || '';
-        if (userChar === '') {
-            // تعيين الخلية الحالية
-            this._selectedRow = cell.row;
-            this._selectedCol = cell.col;
-            return;
-        }
-    }
-    
-    // ✅ إذا كانت جميع الخلايا مملوءة، نختار آخر خلية
-    if (cells.length > 0) {
-        const last = cells[cells.length - 1];
-        this._selectedRow = last.row;
-        this._selectedCol = last.col;
-    }
 },
 
 /**
