@@ -6585,23 +6585,15 @@ _finishGame() {
     });
 },
 
-_showLevelScreen(data) {
-    console.log('📊 _showLevelScreen called with:', data);
-    
-    const { pointsEarned, oldTotal, newTotal, oldLevel, newLevel, levelsGained, onComplete } = data;
-    
-    // إزالة أي شاشة سابقة
+_showLevelScreen: function(data) {
     const oldScreen = document.getElementById('levelScreen');
     if (oldScreen) oldScreen.remove();
-    
+
     const screen = document.createElement('div');
     screen.id = 'levelScreen';
     screen.style.cssText = `
         position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        top: 0; left: 0; right: 0; bottom: 0;
         z-index: 10000;
         background: #0f0e17;
         display: flex;
@@ -6611,9 +6603,17 @@ _showLevelScreen(data) {
         padding: 2rem;
         animation: fadeUp 0.5s ease;
     `;
-    
-    const levelProgress = getLevelProgress(newTotal);
-    
+
+    const { pointsEarned, oldTotal, newTotal, oldLevel, newLevel, levelsGained, onComplete } = data;
+    const oldProgress = getLevelProgress(oldTotal);
+    const newProgress = getLevelProgress(newTotal);
+
+    // ✅ حساب النسبة المئوية للتقدم القديم والجديد
+    const oldPercent = Math.min(oldProgress.progress, 100);
+    const newPercent = Math.min(newProgress.progress, 100);
+
+    console.log(`📊 Level progress: old=${oldPercent}%, new=${newPercent}%`);
+
     screen.innerHTML = `
         <div style="text-align:center; max-width:500px; width:100%;">
             <div style="font-size:4rem; margin-bottom:0.5rem;">${levelsGained > 0 ? '🚀' : '⭐'}</div>
@@ -6630,76 +6630,127 @@ _showLevelScreen(data) {
                     <span>المستوى ${newLevel.level}</span>
                 </div>
                 <div style="height:12px; background:rgba(255,255,255,0.06); border-radius:10px; overflow:hidden; position:relative;">
-                    <div id="levelProgressFillResult" style="height:100%; width:0%; background:linear-gradient(90deg, #6C63FF, #FFD93D); border-radius:10px; transition:width 0.8s ease;"></div>
+                    <div id="levelProgressFillResult" style="
+                        height:100%; 
+                        width:${oldPercent}%; 
+                        background:linear-gradient(90deg, #6C63FF, #FFD93D); 
+                        border-radius:10px; 
+                        transition:width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+                    "></div>
+                    <!-- ✅ علامات المستويات المتجاوزة -->
+                    ${levelsGained > 1 ? Array.from({ length: Math.min(levelsGained, 5) }, (_, i) => `
+                        <div style="
+                            position:absolute;
+                            top:0;
+                            left:${((i + 1) / levelsGained) * 100}%;
+                            width:3px;
+                            height:100%;
+                            background:rgba(255,255,255,0.3);
+                            border-radius:2px;
+                            animation: fadeUp 0.3s ease ${i * 0.15}s both;
+                        "></div>
+                    `).join('') : ''}
                 </div>
-                <div style="text-align:center; font-size:0.8rem; color:#a7a9be; margin-top:0.3rem;">
-                    +${pointsEarned} نقطة
+                <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#a7a9be; margin-top:0.2rem;">
+                    <span>+${pointsEarned} نقطة</span>
+                    <span>${newPercent}%</span>
                 </div>
             </div>
-            <button id="levelContinueBtn" style="display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:10px 24px; border-radius:40px; font-weight:600; font-size:0.9rem; background:#6C63FF; color:#fff; border:none; cursor:pointer; min-width:150px; box-shadow:0 4px 20px rgba(108,99,255,0.3);">
-                <i class="fas fa-arrow-right"></i> متابعة
-            </button>
+            
+            <!-- ✅ أزرار التحكم -->
+            <div style="display:flex; gap:0.5rem; justify-content:center; flex-wrap:wrap;">
+                <button id="levelContinueBtn" style="
+                    display:inline-flex; 
+                    align-items:center; 
+                    justify-content:center; 
+                    gap:8px; 
+                    padding:10px 24px; 
+                    border-radius:40px; 
+                    font-weight:600; 
+                    font-size:0.9rem; 
+                    background:#6C63FF; 
+                    color:#fff; 
+                    border:none; 
+                    cursor:pointer; 
+                    min-width:150px; 
+                    box-shadow:0 4px 20px rgba(108,99,255,0.3);
+                    transition: all 0.3s ease;
+                ">
+                    <i class="fas fa-arrow-right"></i> متابعة
+                </button>
+                ${levelsGained > 0 ? `
+                    <button id="levelReplayBtn" style="
+                        display:inline-flex; 
+                        align-items:center; 
+                        justify-content:center; 
+                        gap:8px; 
+                        padding:10px 24px; 
+                        border-radius:40px; 
+                        font-weight:600; 
+                        font-size:0.9rem; 
+                        background:#2ecc71; 
+                        color:#fff; 
+                        border:none; 
+                        cursor:pointer; 
+                        min-width:150px; 
+                        box-shadow:0 4px 20px rgba(46,204,113,0.3);
+                        transition: all 0.3s ease;
+                    ">
+                        <i class="fas fa-redo"></i> إعادة اللعب
+                    </button>
+                ` : ''}
+            </div>
         </div>
     `;
-    
+
     document.body.appendChild(screen);
-    console.log('✅ Level screen added to DOM');
-    
-    // تشغيل حركة شريط التقدم
+
+    // ✅ تحريك شريط التقدم من النسبة القديمة إلى الجديدة
     setTimeout(() => {
         const fill = document.getElementById('levelProgressFillResult');
         if (fill) {
-            fill.style.width = `${Math.min(levelProgress.progress, 100)}%`;
-        }
-    }, 300);
-    
-    // ربط زر المتابعة
-    const attachButtonHandler = () => {
-        const btn = document.getElementById('levelContinueBtn');
-        if (btn) {
-            // إزالة المستمعات القديمة
-            const newBtn = btn.cloneNode(true);
-            btn.parentNode.replaceChild(newBtn, btn);
+            // ابدأ من النسبة القديمة ثم تحرك إلى الجديدة
+            fill.style.width = `${oldPercent}%`;
             
-            newBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('🔄 Level continue clicked');
+            // بعد 300ms، ابدأ التحرك إلى النسبة الجديدة
+            setTimeout(() => {
+                fill.style.width = `${newPercent}%`;
                 
-                // إزالة شاشة المستوى
-                const screenToRemove = document.getElementById('levelScreen');
-                if (screenToRemove) {
-                    screenToRemove.remove();
-                    console.log('🗑️ Removed level screen');
+                // ✅ إذا تم تخطي مستويات، أضف تأثير خاص
+                if (levelsGained > 0) {
+                    fill.style.background = 'linear-gradient(90deg, #FFD93D, #2ecc71, #FFD93D)';
+                    fill.style.backgroundSize = '200% 100%';
+                    fill.style.animation = 'shimmer 1.5s infinite';
                 }
-                
-                // استدعاء onComplete
-                if (typeof onComplete === 'function') {
-                    onComplete();
-                } else {
-                    // Fallback: عرض الإحصائيات مباشرة
-                    console.log('📊 No onComplete, showing stats');
-                    if (typeof GameEngine._showStatsScreen === 'function') {
-                        GameEngine._showStatsScreen(GameEngine._resultValues);
-                    } else {
-                        document.getElementById('gameResultScreen').style.display = 'block';
-                    }
-                }
-            });
-            
-            console.log('✅ Level continue button attached');
-        } else {
-            console.error('❌ levelContinueBtn not found!');
-            setTimeout(attachButtonHandler, 100);
+            }, 300);
         }
-    };
-    
-    setTimeout(attachButtonHandler, 50);
-    
-    // تشغيل صوت المستوى
-    if (levelsGained > 0 && typeof SoundSystem !== 'undefined') {
-        SoundSystem.playLevelUp();
-    }
+    }, 100);
+
+    // ✅ ربط زر المتابعة
+    document.getElementById('levelContinueBtn')?.addEventListener('click', function() {
+        screen.remove();
+        if (typeof onComplete === 'function') {
+            onComplete();
+        }
+    });
+
+    // ✅ ربط زر إعادة اللعب
+    document.getElementById('levelReplayBtn')?.addEventListener('click', function() {
+        screen.remove();
+        // إعادة تشغيل المباراة
+        const matchContainer = document.getElementById('crosswordMatchContainer');
+        if (matchContainer) matchContainer.style.display = 'none';
+        
+        const settings = CrosswordMatchEngine._settings || {};
+        showToast('🔄 جاري إعادة تشغيل المباراة...', 'info', 1500);
+        setTimeout(() => {
+            if (typeof CrosswordMatchEngine !== 'undefined' && CrosswordMatchEngine.start) {
+                CrosswordMatchEngine.start(settings, CrosswordMatchEngine._onComplete);
+            } else if (typeof GameEngine !== 'undefined' && GameEngine.start) {
+                GameEngine.start(settings);
+            }
+        }, 500);
+    });
 },
 
 _showAchievementsScreen(achievements) {
@@ -9045,24 +9096,22 @@ _updateProgressUI (completed, total) {
         }, 1000);
     },
 
+// ===== إنهاء المباراة وتجميع الإحصائيات =====
 _endMatch: function() {
-    // ✅ منع التكرار - إذا كانت المباراة منتهية بالفعل
     if (!this._isRunning) {
         console.log('⏹️ _endMatch: المباراة منتهية بالفعل');
         return;
     }
-    
+
     console.log('🏁 _endMatch: بدء إنهاء المباراة');
-    
-    // ✅ إيقاف جميع المؤقتات فوراً
+
+    // إيقاف جميع المؤقتات
     this._stopTimer();
-    
-    // ✅ منع أي عمليات أخرى
     this._isRunning = false;
     this._isWaitingForNext = false;
     this._endTime = Date.now();
 
-    // ✅ حساب الإحصائيات النهائية بدقة
+    // حساب الإحصائيات النهائية من النتائج المخزنة
     const totalCorrect = this._results.reduce((sum, r) => sum + (r.correct || 0), 0);
     const totalWrong = this._results.reduce((sum, r) => sum + (r.wrong || 0), 0);
     const totalQuestions = this._results.reduce((sum, r) => sum + (r.total || 0), 0);
@@ -9070,43 +9119,35 @@ _endMatch: function() {
     const totalPoints = this._results.reduce((sum, r) => sum + (r.points || 0), 0);
     const totalCoins = this._results.reduce((sum, r) => sum + (r.coins || 0), 0);
     const totalTime = Math.round((this._endTime - this._startTime) / 1000);
-    
-    // ✅ تفاصيل إضافية
+
     const totalRounds = this._results.length;
     const completedRounds = this._results.filter(r => r.success).length;
     const totalCorrectLetters = this._results.reduce((sum, r) => sum + (r.correctLetters || 0), 0);
     const totalLetters = this._results.reduce((sum, r) => sum + (r.totalLetters || 0), 0);
 
     console.log('📊 Match results:', {
-        totalCorrect,
-        totalWrong,
-        totalQuestions,
-        accuracy,
-        totalPoints,
-        totalCoins,
-        totalTime,
+        totalCorrect, totalWrong, totalQuestions, accuracy,
+        totalPoints, totalCoins, totalTime,
         rounds: this._results.length,
-        completedRounds,
-        totalCorrectLetters,
-        totalLetters
+        completedRounds, totalCorrectLetters, totalLetters
     });
 
-    // ✅ إزالة حاوية المباراة من الشاشة
+    // إزالة حاوية المباراة
     const container = document.getElementById('crosswordMatchContainer');
     if (container) {
         container.style.display = 'none';
         container.innerHTML = '';
     }
 
-    // ✅ عرض رسالة للمستخدم
+    // عرض رسالة للمستخدم
     if (totalPoints > 0 || totalCorrect > 0) {
         showToast(`🏁 انتهت المباراة! ${totalPoints} نقطة • ${totalCoins} عملة • ${accuracy}% دقة`, 'success', 5000);
     } else {
         showToast('⏹️ انتهت المباراة دون إجابات صحيحة', 'info', 4000);
     }
 
-    // ✅ حفظ الإحصائيات مع جميع التفاصيل
-    this._saveStats({
+    // تجميع البيانات لعرضها في الشاشات
+    const statsData = {
         totalCorrect,
         totalWrong,
         totalQuestions,
@@ -9119,29 +9160,19 @@ _endMatch: function() {
         totalCorrectLetters,
         totalLetters,
         rounds: this._results,
-    });
+    };
 
-    // ✅ عرض النتائج المتسلسلة
-    this._showResultsSequence({
-        totalCorrect,
-        totalWrong,
-        totalQuestions,
-        accuracy,
-        totalPoints,
-        totalCoins,
-        totalTime,
-        totalRounds,
-        completedRounds,
-        totalCorrectLetters,
-        totalLetters,
-        rounds: this._results,
-    });
+    // حفظ الإحصائيات في قاعدة البيانات
+    this._saveStats(statsData);
 
-    // ✅ استدعاء onComplete إن وجد
+    // عرض النتائج المتسلسلة
+    this._showResultsSequence(statsData);
+
+    // استدعاء onComplete إن وجد
     if (this._onComplete) {
         this._onComplete();
     }
-    
+
     console.log('✅ مباراة الكلمات المتقاطعة انتهت بنجاح');
 },
 
@@ -9158,192 +9189,637 @@ _stopTimer: function() {
     }
 },
 
-    // عرض النتائج المتسلسلة
-    _showResultsSequence(data) {
+_checkAndShowAchievements: function(data, onComplete) {
+    try {
         const user = AuthService.currentUser;
-        const oldTotal = user?.totalScore || 0;
-        const newTotal = oldTotal + data.totalPoints;
-        const oldLevel = getLevel(oldTotal);
-        const newLevel = getLevel(newTotal);
-        const levelsGained = newLevel.level - oldLevel.level;
+        if (!user) {
+            if (onComplete) onComplete();
+            return;
+        }
 
-        // عرض شاشة المستوى
-        if (typeof GameEngine._showLevelScreen === 'function') {
-            GameEngine._showLevelScreen({
-                pointsEarned: data.totalPoints,
-                oldTotal,
-                newTotal,
-                oldLevel,
-                newLevel,
-                levelsGained,
-                onComplete: () => {
-                    this._showQuickStats(data);
+        // بناء بيانات الإنجازات
+        const gameData = {
+            trainingCompleted: (user.stats?.training?.completed || 0) + (data.totalRounds || 0),
+            trainingBestScore: Math.max(user.stats?.training?.bestScore || 0, data.totalPoints || 0),
+            trainingSurvivalWins: user.stats?.training?.survivalWins || 0,
+            trainingSpeedWins: user.stats?.training?.speedWins || 0,
+            survivalStreak: user.stats?.training?.survivalStreak || 0,
+            speedCorrect: (user.stats?.training?.speedCorrect || 0) + (data.totalCorrect || 0),
+            totalAnswers: (user.stats?.correctAnswers || 0) + (data.totalCorrect || 0),
+            totalWins: (user.stats?.gamesWon || 0) + (data.totalPoints > 50 ? 1 : 0),
+            correctStreak: data.totalCorrect || 0,
+            gamesPlayed: (user.stats?.gamesPlayed || 0) + 1,
+            avgTime: data.totalTime / (data.totalRounds || 1),
+            currentScore: data.totalPoints,
+            currentCorrect: data.totalCorrect,
+            currentQuestions: data.totalQuestions,
+            crosswordCorrect: data.totalCorrect,
+            crosswordAccuracy: data.accuracy,
+            crosswordRounds: data.totalRounds,
+            crosswordPoints: data.totalPoints,
+        };
+
+        // استخدام AchievementManager
+        if (typeof AchievementManager !== 'undefined' && AchievementManager.checkAchievements) {
+            const newAchievements = AchievementManager.checkAchievements(gameData);
+            
+            if (newAchievements && newAchievements.length > 0) {
+                // تحديث إنجازات المستخدم
+                const currentAchievements = user.achievements || [];
+                const newIds = newAchievements.map(a => a.id);
+                const updatedAchievements = [...currentAchievements, ...newIds];
+                
+                AuthService.updateUser({ achievements: updatedAchievements }).catch(() => {});
+                if (AuthService.currentUser) {
+                    AuthService.currentUser.achievements = updatedAchievements;
                 }
-            });
-        } else {
-            // Fallback: عرض الإحصائيات مباشرة
-            this._showQuickStats(data);
+                
+                // عرض الإنجازات
+                this._showAchievementsScreen(newAchievements, onComplete);
+                return;
+            }
         }
-    },
-
-    // شاشة الإحصائيات السريعة
-    _showQuickStats(data) {
-        const oldScreen = document.getElementById('crosswordStatsScreen');
-        if (oldScreen) oldScreen.remove();
-
-        const container = document.createElement('div');
-        container.id = 'crosswordStatsScreen';
-        container.style.cssText = `
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            z-index: 10001;
-            background: #0f0e17;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-            animation: fadeUp 0.5s ease;
-            overflow-y: auto;
-        `;
-
-        container.innerHTML = `
-            <div style="max-width:550px;width:100%;text-align:center;">
-                <div style="font-size:3rem;margin-bottom:0.5rem;">📊</div>
-                <h2 style="font-size:1.8rem;font-weight:900;color:#FFD93D;">إحصائيات المباراة</h2>
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;margin:1rem 0;">
-                    <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:0.5rem;">
-                        <div style="font-size:1.5rem;font-weight:900;color:#2ecc71;">${data.totalCorrect}</div>
-                        <div style="font-size:0.7rem;color:#a7a9be;">✅ صحيح</div>
-                    </div>
-                    <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:0.5rem;">
-                        <div style="font-size:1.5rem;font-weight:900;color:#FF6B6B;">${data.totalWrong}</div>
-                        <div style="font-size:0.7rem;color:#a7a9be;">❌ خاطئ</div>
-                    </div>
-                    <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:0.5rem;">
-                        <div style="font-size:1.5rem;font-weight:900;color:#FFD93D;">${data.accuracy}%</div>
-                        <div style="font-size:0.7rem;color:#a7a9be;">🎯 الدقة</div>
-                    </div>
-                    <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:0.5rem;grid-column:1/2;">
-                        <div style="font-size:1.2rem;font-weight:900;color:#4fc3f7;">${data.totalTime}s</div>
-                        <div style="font-size:0.7rem;color:#a7a9be;">⏱ الوقت</div>
-                    </div>
-                    <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:0.5rem;grid-column:2/3;">
-                        <div style="font-size:1.2rem;font-weight:900;color:#FFD93D;">${data.totalPoints}</div>
-                        <div style="font-size:0.7rem;color:#a7a9be;">⭐ النقاط</div>
-                    </div>
-                    <div style="background:rgba(255,255,255,0.06);border-radius:12px;padding:0.5rem;grid-column:3/4;">
-                        <div style="font-size:1.2rem;font-weight:900;color:#FFD93D;">${data.totalCoins}</div>
-                        <div style="font-size:0.7rem;color:#a7a9be;">🪙 النقود</div>
-                    </div>
-                </div>
-                <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;margin-top:0.5rem;">
-                    <button class="btn btn-primary" id="cwShowDetailsBtn">📋 عرض التفاصيل</button>
-                    <button class="btn btn-outline" id="cwShowGeneralStatsBtn">📊 الإحصائيات العامة</button>
-                    <button class="btn btn-success" id="cwFinishBtn">🏠 إنهاء</button>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(container);
-
-        // ربط الأزرار
-        document.getElementById('cwShowDetailsBtn').addEventListener('click', () => {
-            container.remove();
-            this._showDetailedStats(data);
-        });
-
-        document.getElementById('cwShowGeneralStatsBtn').addEventListener('click', () => {
-            container.remove();
-            this._showGeneralStats();
-        });
-
-        document.getElementById('cwFinishBtn').addEventListener('click', () => {
-            container.remove();
-            const matchContainer = document.getElementById('crosswordMatchContainer');
-            if (matchContainer) matchContainer.style.display = 'none';
-            App._activateSection('dashboard');
-        });
-    },
-
-    // شاشة التفاصيل
-    _showDetailedStats(data) {
-        const oldScreen = document.getElementById('crosswordDetailedStats');
-        if (oldScreen) oldScreen.remove();
-
-        const container = document.createElement('div');
-        container.id = 'crosswordDetailedStats';
-        container.style.cssText = `
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            z-index: 10002;
-            background: #0f0e17;
-            display: flex;
-            flex-direction: column;
-            padding: 1.5rem;
-            overflow-y: auto;
-            animation: fadeUp 0.5s ease;
-        `;
-
-        let roundsHtml = '';
-        if (data.rounds && data.rounds.length > 0) {
-            roundsHtml = data.rounds.map((r, idx) => `
-                <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:0.5rem 1rem;margin-bottom:0.3rem;border-right:3px solid ${(r.success !== false && r.correct === r.total && r.total > 0) ? 'var(--success)' : 'var(--secondary)'};">
-                    <div style="display:flex;justify-content:space-between;font-size:0.85rem;flex-wrap:wrap;gap:0.3rem;">
-                        <span>الجولة ${idx+1}</span>
-                        <span>✅ ${r.correct || 0} / ${r.total || 0}</span>
-                        <span>⭐ ${r.points || 0}</span>
-                        <span>🪙 ${r.coins || 0}</span>
-                        <span style="color:${(r.accuracy || 0) >= 70 ? 'var(--success)' : 'var(--secondary)'};">${r.accuracy || 0}%</span>
-                    </div>
-                </div>
-            `).join('');
-        } else {
-            roundsHtml = '<div style="color:var(--gray);text-align:center;padding:1rem;">لا توجد تفاصيل للجولات</div>';
-        }
-
-        container.innerHTML = `
-            <div style="max-width:650px;margin:0 auto;width:100%;">
-                <h2 style="font-size:1.6rem;font-weight:900;color:#FFD93D;text-align:center;margin-bottom:0.5rem;">📋 تفاصيل المباراة</h2>
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;margin-bottom:1rem;">
-                    <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:0.5rem;text-align:center;">
-                        <div style="font-size:0.7rem;color:#a7a9be;">الجولات</div>
-                        <div style="font-weight:700;">${data.rounds ? data.rounds.length : 0}</div>
-                    </div>
-                    <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:0.5rem;text-align:center;">
-                        <div style="font-size:0.7rem;color:#a7a9be;">إجمالي الحروف الصحيحة</div>
-                        <div style="font-weight:700;">${data.rounds ? data.rounds.reduce((s,r) => s + (r.correctLetters || 0), 0) : 0}</div>
-                    </div>
-                    <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:0.5rem;text-align:center;">
-                        <div style="font-size:0.7rem;color:#a7a9be;">المتوسط</div>
-                        <div style="font-weight:700;">${data.rounds && data.rounds.length > 0 ? Math.round(data.rounds.reduce((s,r) => s + (r.points || 0), 0) / data.rounds.length) : 0} نقطة</div>
-                    </div>
-                </div>
-                <div style="margin-bottom:1rem;max-height:50vh;overflow-y:auto;">
-                    ${roundsHtml}
-                </div>
-                <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;">
-                    <button class="btn btn-outline" id="cwBackToStatsBtn">🔙 العودة</button>
-                    <button class="btn btn-success" id="cwFinishFromDetailsBtn">🏠 الرئيسية</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(container);
-
-        document.getElementById('cwBackToStatsBtn').addEventListener('click', () => {
-            container.remove();
-            this._showQuickStats(data);
-        });
-
-        document.getElementById('cwFinishFromDetailsBtn').addEventListener('click', () => {
-            container.remove();
-            const matchContainer = document.getElementById('crosswordMatchContainer');
-            if (matchContainer) matchContainer.style.display = 'none';
-            App._activateSection('dashboard');
-        });
         
-        this._lastData = data;
-    },
+        if (onComplete) onComplete();
+    } catch (e) {
+        console.warn('⚠️ Error checking achievements:', e);
+        if (onComplete) onComplete();
+    }
+},
+
+_showAchievementsScreen: function(achievements, onComplete) {
+    if (!achievements || achievements.length === 0) {
+        if (onComplete) onComplete();
+        return;
+    }
+
+    // إزالة أي شاشة سابقة
+    const oldScreen = document.getElementById('achievementsScreen');
+    if (oldScreen) oldScreen.remove();
+
+    const screen = document.createElement('div');
+    screen.id = 'achievementsScreen';
+    screen.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 10001;
+        background: #0f0e17;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        animation: fadeUp 0.5s ease;
+        overflow-y: auto;
+    `;
+
+    const totalPoints = achievements.reduce((sum, ach) => sum + (ach.points || 0), 0);
+    
+    let achievementsHtml = achievements.map((ach, index) => {
+        const imageUrl = ach.image || ach.icon || '🏆';
+        const isImage = imageUrl && (imageUrl.startsWith('http') || imageUrl.startsWith('/') || imageUrl.startsWith('images/'));
+        return `
+            <div style="display:flex; align-items:center; gap:0.8rem; background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem 1rem; margin-bottom:0.5rem; width:100%; max-width:400px; animation: fadeUp 0.3s ease ${index * 0.1}s both; border:1px solid #FFD93D;">
+                <div style="width:45px; height:45px; border-radius:50%; overflow:hidden; flex-shrink:0; background:#6C63FF; display:flex; align-items:center; justify-content:center; font-size:1.5rem; border:2px solid #FFD93D;">
+                    ${isImage ? `<img src="${imageUrl}" style="width:100%;height:100%;object-fit:cover;" alt="${ach.name || 'إنجاز'}" onerror="this.style.display='none';this.parentElement.textContent='🏆'">` : (imageUrl || '🏆')}
+                </div>
+                <div style="flex:1; text-align:right;">
+                    <div style="font-weight:700; font-size:0.95rem; color:#FFD93D;">${ach.name || 'إنجاز'}</div>
+                    <div style="font-size:0.7rem; color:#a7a9be;">${ach.description || ''}</div>
+                </div>
+                <span style="font-weight:700; color:#2ecc71; font-size:0.9rem; flex-shrink:0;">+${ach.points || 0}</span>
+            </div>
+        `;
+    }).join('');
+
+    screen.innerHTML = `
+        <div style="text-align:center; max-width:500px; width:100%;">
+            <div style="font-size:3.5rem; margin-bottom:0.5rem;">🏆</div>
+            <h2 style="font-size:1.8rem; font-weight:900; color:#FFD93D; margin-bottom:0.5rem;">
+                🎉 ${achievements.length} إنجاز جديد!
+            </h2>
+            <p style="color:#a7a9be; margin-bottom:1rem; font-size:0.95rem;">
+                حصلت على <strong style="color:#FFD93D;">${totalPoints}</strong> نقطة إضافية
+            </p>
+            <div style="margin-bottom:1.2rem; max-height:350px; overflow-y:auto; width:100%; padding:0 0.5rem;">
+                ${achievementsHtml}
+            </div>
+            <button id="achievementsContinueBtn" style="display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:12px 30px; border-radius:40px; font-weight:600; font-size:1rem; background:#6C63FF; color:#fff; border:none; cursor:pointer; min-width:180px; box-shadow:0 4px 20px rgba(108,99,255,0.4); transition:all 0.3s ease;">
+                <i class="fas fa-arrow-right"></i> متابعة
+            </button>
+        </div>
+    `;
+
+    document.body.appendChild(screen);
+
+    // تشغيل صوت الإنجاز
+    if (typeof SoundSystem !== 'undefined' && SoundSystem.playLevelUp) {
+        SoundSystem.playLevelUp();
+    }
+
+    // ربط زر المتابعة
+    document.getElementById('achievementsContinueBtn')?.addEventListener('click', function() {
+        screen.remove();
+        if (typeof onComplete === 'function') {
+            onComplete();
+        }
+    });
+},
+
+// ===== عرض النتائج المتسلسلة =====
+_showResultsSequence: function(data) {
+    const user = AuthService.currentUser;
+    const oldTotal = user?.totalScore || 0;
+    const newTotal = oldTotal + data.totalPoints;
+    const oldLevel = getLevel(oldTotal);
+    const newLevel = getLevel(newTotal);
+    const levelsGained = newLevel.level - oldLevel.level;
+
+    // دالة المتابعة بعد شاشة المستوى
+    const afterLevelScreen = () => {
+        // التحقق من الإنجازات ثم عرض الإحصائيات
+        this._checkAndShowAchievements(data, () => {
+            this._showQuickStats(data);
+        });
+    };
+
+    // عرض شاشة المستوى (استخدام App أو GameEngine)
+    if (typeof App !== 'undefined' && typeof App._showLevelScreen === 'function') {
+        App._showLevelScreen({
+            pointsEarned: data.totalPoints,
+            oldTotal: oldTotal,
+            newTotal: newTotal,
+            oldLevel: oldLevel,
+            newLevel: newLevel,
+            levelsGained: levelsGained,
+            onComplete: afterLevelScreen
+        });
+    } else if (typeof GameEngine !== 'undefined' && typeof GameEngine._showLevelScreen === 'function') {
+        GameEngine._showLevelScreen({
+            pointsEarned: data.totalPoints,
+            oldTotal: oldTotal,
+            newTotal: newTotal,
+            oldLevel: oldLevel,
+            newLevel: newLevel,
+            levelsGained: levelsGained,
+            onComplete: afterLevelScreen
+        });
+    } else {
+        // Fallback: تخطي شاشة المستوى
+        console.warn('⚠️ _showLevelScreen not found, skipping');
+        afterLevelScreen();
+    }
+},
+
+// ===== شاشة الإحصائيات السريعة (المطورة) =====
+_showQuickStats: function(data) {
+    const oldScreen = document.getElementById('crosswordStatsScreen');
+    if (oldScreen) oldScreen.remove();
+
+    const container = document.createElement('div');
+    container.id = 'crosswordStatsScreen';
+    container.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 10001;
+        background: #0f0e17;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 1.5rem;
+        animation: fadeUp 0.5s ease;
+        overflow-y: auto;
+    `;
+
+    // حفظ البيانات في نطاق الدالة لاستخدامها في الأزرار
+    const statsData = data;
+
+    // تجميع تفاصيل النقاط والعملات من جميع الجولات
+    const allPointDetails = [];
+    const allCoinDetails = [];
+    if (data.rounds) {
+        data.rounds.forEach(r => {
+            if (r.pointDetails) {
+                r.pointDetails.forEach(d => {
+                    const existing = allPointDetails.find(p => p.label === d.label);
+                    if (existing) existing.value += d.value;
+                    else allPointDetails.push({ ...d });
+                });
+            }
+            if (r.coinDetails) {
+                r.coinDetails.forEach(d => {
+                    const existing = allCoinDetails.find(c => c.label === d.label);
+                    if (existing) existing.value += d.value;
+                    else allCoinDetails.push({ ...d });
+                });
+            }
+        });
+    }
+
+    allPointDetails.sort((a, b) => b.value - a.value);
+    allCoinDetails.sort((a, b) => b.value - a.value);
+
+    let pointDetailsHtml = '';
+    if (allPointDetails.length > 0) {
+        pointDetailsHtml = allPointDetails.map(d => `
+            <div style="display:flex;justify-content:space-between;padding:0.2rem 0.5rem;border-bottom:1px solid var(--glass-border);font-size:0.75rem;">
+                <span style="color:var(--gray);">${d.label}</span>
+                <span style="font-weight:700;color:${d.value >= 0 ? 'var(--success)' : 'var(--secondary)'};">${d.value >= 0 ? '+' : ''}${d.value}</span>
+            </div>
+        `).join('');
+    }
+
+    let coinDetailsHtml = '';
+    if (allCoinDetails.length > 0) {
+        coinDetailsHtml = allCoinDetails.map(d => `
+            <div style="display:flex;justify-content:space-between;padding:0.2rem 0.5rem;border-bottom:1px solid var(--glass-border);font-size:0.75rem;">
+                <span style="color:var(--gray);">${d.label}</span>
+                <span style="font-weight:700;color:var(--accent);">+${d.value}</span>
+            </div>
+        `).join('');
+    }
+
+    const totalRounds = data.rounds ? data.rounds.length : 0;
+    const completedRounds = data.rounds ? data.rounds.filter(r => r.success).length : 0;
+
+    container.innerHTML = `
+        <div style="max-width:550px;width:100%;text-align:center;">
+            <div style="font-size:3rem;margin-bottom:0.3rem;">📊</div>
+            <h2 style="font-size:1.8rem;font-weight:900;color:#FFD93D;">إحصائيات المباراة</h2>
+            <p style="color:var(--gray);font-size:0.85rem;margin-bottom:0.5rem;">
+                ${totalRounds} جولة • ${completedRounds} مكتملة • ${data.totalQuestions || 0} كلمة
+            </p>
+
+            <!-- النقاط والعملات الكلية -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin:0.5rem 0;">
+                <div style="background:rgba(108,99,255,0.1);border-radius:12px;padding:0.5rem;border:1px solid var(--primary);">
+                    <div style="font-size:0.65rem;color:var(--gray);">⭐ النقاط الكلية</div>
+                    <div style="font-size:1.8rem;font-weight:900;color:var(--primary);">${data.totalPoints || 0}</div>
+                </div>
+                <div style="background:rgba(255,217,61,0.1);border-radius:12px;padding:0.5rem;border:1px solid var(--accent);">
+                    <div style="font-size:0.65rem;color:var(--gray);">🪙 العملات الكلية</div>
+                    <div style="font-size:1.8rem;font-weight:900;color:var(--accent);">${data.totalCoins || 0}</div>
+                </div>
+            </div>
+
+            <!-- الإحصائيات الأساسية -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.3rem;margin:0.5rem 0;">
+                <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:0.3rem;">
+                    <div style="font-size:1.2rem;font-weight:900;color:#2ecc71;">${data.totalCorrect || 0}</div>
+                    <div style="font-size:0.6rem;color:var(--gray);">✅ كلمات صحيحة</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:0.3rem;">
+                    <div style="font-size:1.2rem;font-weight:900;color:#FF6B6B;">${data.totalWrong || 0}</div>
+                    <div style="font-size:0.6rem;color:var(--gray);">❌ كلمات خاطئة</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:0.3rem;">
+                    <div style="font-size:1.2rem;font-weight:900;color:#FFD93D;">${data.accuracy || 0}%</div>
+                    <div style="font-size:0.6rem;color:var(--gray);">🎯 الدقة</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:0.3rem;">
+                    <div style="font-size:1rem;font-weight:900;color:#4fc3f7;">${data.totalTime || 0}s</div>
+                    <div style="font-size:0.6rem;color:var(--gray);">⏱ الوقت</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:0.3rem;">
+                    <div style="font-size:1rem;font-weight:900;color:#9b59b6;">${data.totalCorrectLetters || 0}</div>
+                    <div style="font-size:0.6rem;color:var(--gray);">🔤 حروف صحيحة</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:0.3rem;">
+                    <div style="font-size:1rem;font-weight:900;color:#f39c12;">${data.totalRounds || 0}</div>
+                    <div style="font-size:0.6rem;color:var(--gray);">📝 جولات</div>
+                </div>
+            </div>
+
+            <!-- تفاصيل النقاط -->
+            ${pointDetailsHtml ? `
+                <div style="margin:0.5rem 0;background:rgba(108,99,255,0.05);border-radius:8px;padding:0.3rem 0.5rem;border:1px solid rgba(108,99,255,0.1);text-align:right;">
+                    <div style="font-weight:700;font-size:0.8rem;color:var(--primary);margin-bottom:0.2rem;">⭐ تفاصيل النقاط</div>
+                    ${pointDetailsHtml}
+                    <div style="display:flex;justify-content:space-between;padding:0.2rem 0.5rem;border-top:2px solid var(--primary);margin-top:0.2rem;font-weight:700;font-size:0.85rem;color:var(--primary);">
+                        <span>المجموع</span>
+                        <span>+${data.totalPoints || 0}</span>
+                    </div>
+                </div>
+            ` : ''}
+
+            <!-- تفاصيل العملات -->
+            ${coinDetailsHtml ? `
+                <div style="margin:0.5rem 0;background:rgba(255,217,61,0.05);border-radius:8px;padding:0.3rem 0.5rem;border:1px solid rgba(255,217,61,0.1);text-align:right;">
+                    <div style="font-weight:700;font-size:0.8rem;color:var(--accent);margin-bottom:0.2rem;">🪙 تفاصيل العملات</div>
+                    ${coinDetailsHtml}
+                    <div style="display:flex;justify-content:space-between;padding:0.2rem 0.5rem;border-top:2px solid var(--accent);margin-top:0.2rem;font-weight:700;font-size:0.85rem;color:var(--accent);">
+                        <span>المجموع</span>
+                        <span>+${data.totalCoins || 0}</span>
+                    </div>
+                </div>
+            ` : ''}
+
+            <!-- الأزرار -->
+            <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;margin-top:0.5rem;">
+                <button class="btn btn-primary" id="cwShowDetailsBtn">
+                    <i class="fas fa-eye"></i> عرض التفاصيل الكاملة
+                </button>
+                <button class="btn btn-success" id="cwReplayBtn">
+                    <i class="fas fa-redo"></i> إعادة اللعب
+                </button>
+                <button class="btn btn-outline" id="cwFinishBtn">
+                    <i class="fas fa-home"></i> إنهاء
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(container);
+
+    // ربط الأزرار
+    document.getElementById('cwShowDetailsBtn')?.addEventListener('click', function() {
+        container.remove();
+        CrosswordMatchEngine._showDetailedStats(statsData);
+    });
+
+    // ✅ زر إعادة اللعب
+    document.getElementById('cwReplayBtn')?.addEventListener('click', function() {
+        container.remove();
+        const matchContainer = document.getElementById('crosswordMatchContainer');
+        if (matchContainer) matchContainer.style.display = 'none';
+        
+        // إعادة تشغيل المباراة بنفس الإعدادات
+        const settings = CrosswordMatchEngine._settings || {};
+        showToast('🔄 جاري إعادة تشغيل المباراة...', 'info', 1500);
+        setTimeout(() => {
+            CrosswordMatchEngine.start(settings, CrosswordMatchEngine._onComplete);
+        }, 500);
+    });
+
+    document.getElementById('cwFinishBtn')?.addEventListener('click', function() {
+        container.remove();
+        const matchContainer = document.getElementById('crosswordMatchContainer');
+        if (matchContainer) matchContainer.style.display = 'none';
+        if (typeof App !== 'undefined') {
+            App._activateSection('dashboard');
+        } else {
+            location.reload();
+        }
+    });
+},
+
+// ===== شاشة التفاصيل الكاملة (المطورة) =====
+_showDetailedStats: function(data) {
+    const oldScreen = document.getElementById('crosswordDetailedStats');
+    if (oldScreen) oldScreen.remove();
+
+    const container = document.createElement('div');
+    container.id = 'crosswordDetailedStats';
+    container.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 10002;
+        background: #0f0e17;
+        display: flex;
+        flex-direction: column;
+        padding: 1.5rem;
+        overflow-y: auto;
+        animation: fadeUp 0.5s ease;
+    `;
+
+    // حفظ البيانات في نطاق الدالة
+    const statsData = data;
+
+    // حساب الإحصائيات الإجمالية
+    const totalRounds = data.rounds ? data.rounds.length : 0;
+    const completedRounds = data.rounds ? data.rounds.filter(r => r.success).length : 0;
+    const totalCorrect = data.totalCorrect || 0;
+    const totalWrong = data.totalWrong || 0;
+    const totalQuestions = data.totalQuestions || 0;
+    const accuracy = data.accuracy || 0;
+    const totalPoints = data.totalPoints || 0;
+    const totalCoins = data.totalCoins || 0;
+    const totalTime = data.totalTime || 0;
+    const totalCorrectLetters = data.totalCorrectLetters || 0;
+    const totalLetters = data.totalLetters || 0;
+
+    // تجميع تفاصيل النقاط والعملات من جميع الجولات
+    const allPointDetails = [];
+    const allCoinDetails = [];
+    if (data.rounds) {
+        data.rounds.forEach(r => {
+            if (r.pointDetails) {
+                r.pointDetails.forEach(d => {
+                    const existing = allPointDetails.find(p => p.label === d.label);
+                    if (existing) existing.value += d.value;
+                    else allPointDetails.push({ ...d });
+                });
+            }
+            if (r.coinDetails) {
+                r.coinDetails.forEach(d => {
+                    const existing = allCoinDetails.find(c => c.label === d.label);
+                    if (existing) existing.value += d.value;
+                    else allCoinDetails.push({ ...d });
+                });
+            }
+        });
+    }
+
+    allPointDetails.sort((a, b) => b.value - a.value);
+    allCoinDetails.sort((a, b) => b.value - a.value);
+
+    // بناء HTML للجولات
+    let roundsHtml = '';
+    if (data.rounds && data.rounds.length > 0) {
+        roundsHtml = data.rounds.map((r, idx) => {
+            const isCompleted = r.success !== false;
+            const roundAccuracy = r.total > 0 ? Math.round((r.correct / r.total) * 100) : 0;
+
+            let roundPointDetailsHtml = '';
+            if (r.pointDetails && r.pointDetails.length > 0) {
+                roundPointDetailsHtml = r.pointDetails.map(d => `
+                    <span style="font-size:0.55rem;padding:0.05rem 0.4rem;border-radius:30px;background:rgba(108,99,255,0.1);border:1px solid rgba(108,99,255,0.2);color:var(--primary);">
+                        ${d.label} ${d.value >= 0 ? '+' : ''}${d.value}
+                    </span>
+                `).join('');
+            }
+
+            let roundCoinDetailsHtml = '';
+            if (r.coinDetails && r.coinDetails.length > 0) {
+                roundCoinDetailsHtml = r.coinDetails.map(d => `
+                    <span style="font-size:0.55rem;padding:0.05rem 0.4rem;border-radius:30px;background:rgba(255,217,61,0.1);border:1px solid rgba(255,217,61,0.2);color:var(--accent);">
+                        ${d.label} +${d.value}
+                    </span>
+                `).join('');
+            }
+
+            return `
+                <div style="background:${isCompleted ? 'rgba(46,204,113,0.05)' : 'rgba(255,107,107,0.05)'};border-radius:10px;padding:0.6rem 1rem;margin-bottom:0.5rem;border-right:4px solid ${isCompleted ? 'var(--success)' : 'var(--secondary)'};">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.3rem;">
+                        <span style="font-weight:700;font-size:0.9rem;">جولة ${idx + 1} ${isCompleted ? '✅' : '❌'}</span>
+                        <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
+                            <span style="font-size:0.7rem;color:var(--gray);">⏱ ${r.timeTaken || 0}s</span>
+                            <span style="font-size:0.7rem;color:var(--gray);">📝 ${r.correct || 0}/${r.total || 0}</span>
+                            <span style="font-size:0.7rem;color:${roundAccuracy >= 70 ? 'var(--success)' : 'var(--secondary)'};">🎯 ${roundAccuracy}%</span>
+                            <span style="font-size:0.7rem;color:var(--primary);">⭐ ${r.points || 0}</span>
+                            <span style="font-size:0.7rem;color:var(--accent);">🪙 ${r.coins || 0}</span>
+                        </div>
+                    </div>
+                    ${r.correctLetters !== undefined ? `
+                        <div style="font-size:0.65rem;color:var(--gray);margin-top:0.2rem;">🔤 حروف صحيحة: ${r.correctLetters}/${r.totalLetters || 0} ${r.correctLetters === r.totalLetters ? ' ✅' : ''}</div>
+                    ` : ''}
+                    <div style="display:flex;flex-wrap:wrap;gap:0.2rem;margin-top:0.3rem;padding-top:0.3rem;border-top:1px solid var(--glass-border);">
+                        ${roundPointDetailsHtml} ${roundCoinDetailsHtml}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // بناء تفاصيل النقاط والعملات الإجمالية
+    let totalPointDetailsHtml = '';
+    if (allPointDetails.length > 0) {
+        totalPointDetailsHtml = allPointDetails.map(d => `
+            <div style="display:flex;justify-content:space-between;padding:0.15rem 0.3rem;border-bottom:1px solid var(--glass-border);font-size:0.75rem;">
+                <span style="color:var(--gray);">${d.label}</span>
+                <span style="font-weight:700;color:${d.value >= 0 ? 'var(--success)' : 'var(--secondary)'};">${d.value >= 0 ? '+' : ''}${d.value}</span>
+            </div>
+        `).join('');
+    }
+
+    let totalCoinDetailsHtml = '';
+    if (allCoinDetails.length > 0) {
+        totalCoinDetailsHtml = allCoinDetails.map(d => `
+            <div style="display:flex;justify-content:space-between;padding:0.15rem 0.3rem;border-bottom:1px solid var(--glass-border);font-size:0.75rem;">
+                <span style="color:var(--gray);">${d.label}</span>
+                <span style="font-weight:700;color:var(--accent);">+${d.value}</span>
+            </div>
+        `).join('');
+    }
+
+    container.innerHTML = `
+        <div style="max-width:700px;margin:0 auto;width:100%;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
+                <h2 style="font-size:1.6rem;font-weight:900;color:#FFD93D;">
+                    <i class="fas fa-list" style="color:var(--accent);"></i> تفاصيل المباراة
+                </h2>
+                <button class="btn btn-sm btn-outline" onclick="document.getElementById('crosswordDetailedStats').remove(); App._activateSection('dashboard');">
+                    <i class="fas fa-times"></i> إغلاق
+                </button>
+            </div>
+
+            <!-- الملخص الإجمالي -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:0.5rem;margin-bottom:1rem;">
+                <div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;">
+                    <div style="font-size:0.6rem;color:var(--gray);">الجولات</div>
+                    <div style="font-weight:700;font-size:1.1rem;">${totalRounds}</div>
+                </div>
+                <div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;">
+                    <div style="font-size:0.6rem;color:var(--gray);">المكتملة</div>
+                    <div style="font-weight:700;font-size:1.1rem;color:var(--success);">${completedRounds}</div>
+                </div>
+                <div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;">
+                    <div style="font-size:0.6rem;color:var(--gray);">✅ صحيحة</div>
+                    <div style="font-weight:700;font-size:1.1rem;color:#2ecc71;">${totalCorrect}</div>
+                </div>
+                <div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;">
+                    <div style="font-size:0.6rem;color:var(--gray);">❌ خاطئة</div>
+                    <div style="font-weight:700;font-size:1.1rem;color:#FF6B6B;">${totalWrong}</div>
+                </div>
+                <div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;">
+                    <div style="font-size:0.6rem;color:var(--gray);">🎯 الدقة</div>
+                    <div style="font-weight:700;font-size:1.1rem;color:#FFD93D;">${accuracy}%</div>
+                </div>
+                <div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;">
+                    <div style="font-size:0.6rem;color:var(--gray);">⏱ الوقت</div>
+                    <div style="font-weight:700;font-size:1.1rem;color:#4fc3f7;">${totalTime}s</div>
+                </div>
+                <div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;">
+                    <div style="font-size:0.6rem;color:var(--gray);">⭐ النقاط</div>
+                    <div style="font-weight:700;font-size:1.1rem;color:var(--primary);">${totalPoints}</div>
+                </div>
+                <div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;">
+                    <div style="font-size:0.6rem;color:var(--gray);">🪙 العملات</div>
+                    <div style="font-weight:700;font-size:1.1rem;color:var(--accent);">${totalCoins}</div>
+                </div>
+                <div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;">
+                    <div style="font-size:0.6rem;color:var(--gray);">🔤 حروف صحيحة</div>
+                    <div style="font-weight:700;font-size:1.1rem;color:#9b59b6;">${totalCorrectLetters}</div>
+                </div>
+            </div>
+
+            ${totalPointDetailsHtml ? `
+                <div style="background:rgba(108,99,255,0.05);border-radius:8px;padding:0.3rem 0.5rem;margin-bottom:0.5rem;border:1px solid rgba(108,99,255,0.1);text-align:right;">
+                    <div style="font-weight:700;font-size:0.85rem;color:var(--primary);margin-bottom:0.2rem;">⭐ تفاصيل النقاط الإجمالية</div>
+                    ${totalPointDetailsHtml}
+                    <div style="display:flex;justify-content:space-between;padding:0.2rem 0.3rem;border-top:2px solid var(--primary);margin-top:0.2rem;font-weight:700;font-size:0.85rem;color:var(--primary);">
+                        <span>المجموع الكلي</span>
+                        <span>+${totalPoints}</span>
+                    </div>
+                </div>
+            ` : ''}
+
+            ${totalCoinDetailsHtml ? `
+                <div style="background:rgba(255,217,61,0.05);border-radius:8px;padding:0.3rem 0.5rem;margin-bottom:0.5rem;border:1px solid rgba(255,217,61,0.1);text-align:right;">
+                    <div style="font-weight:700;font-size:0.85rem;color:var(--accent);margin-bottom:0.2rem;">🪙 تفاصيل العملات الإجمالية</div>
+                    ${totalCoinDetailsHtml}
+                    <div style="display:flex;justify-content:space-between;padding:0.2rem 0.3rem;border-top:2px solid var(--accent);margin-top:0.2rem;font-weight:700;font-size:0.85rem;color:var(--accent);">
+                        <span>المجموع الكلي</span>
+                        <span>+${totalCoins}</span>
+                    </div>
+                </div>
+            ` : ''}
+
+            <div style="margin-top:0.5rem;">
+                <h4 style="font-size:1rem;font-weight:700;color:var(--gray);margin-bottom:0.5rem;">📋 الجولات (${totalRounds})</h4>
+                <div style="max-height:50vh;overflow-y:auto;padding:0.2rem 0.1rem;">
+                    ${roundsHtml || '<div style="color:var(--gray);text-align:center;padding:1rem;">لا توجد تفاصيل للجولات</div>'}
+                </div>
+            </div>
+
+            <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;margin-top:1rem;padding-top:0.5rem;border-top:1px solid var(--glass-border);">
+                <button class="btn btn-outline" id="cwBackToStatsBtn">
+                    <i class="fas fa-arrow-right"></i> العودة للإحصائيات
+                </button>
+                <button class="btn btn-success" id="cwReplayFromDetailsBtn">
+                    <i class="fas fa-redo"></i> إعادة اللعب
+                </button>
+                <button class="btn btn-primary" id="cwFinishFromDetailsBtn">
+                    <i class="fas fa-home"></i> الرئيسية
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(container);
+
+    // ربط الأزرار (استخدام closures لحل مشكلة data is not defined)
+    document.getElementById('cwBackToStatsBtn')?.addEventListener('click', function() {
+        container.remove();
+        CrosswordMatchEngine._showQuickStats(statsData);
+    });
+
+    document.getElementById('cwReplayFromDetailsBtn')?.addEventListener('click', function() {
+        container.remove();
+        const matchContainer = document.getElementById('crosswordMatchContainer');
+        if (matchContainer) matchContainer.style.display = 'none';
+        
+        const settings = CrosswordMatchEngine._settings || {};
+        showToast('🔄 جاري إعادة تشغيل المباراة...', 'info', 1500);
+        setTimeout(() => {
+            CrosswordMatchEngine.start(settings, CrosswordMatchEngine._onComplete);
+        }, 500);
+    });
+
+    document.getElementById('cwFinishFromDetailsBtn')?.addEventListener('click', function() {
+        container.remove();
+        const matchContainer = document.getElementById('crosswordMatchContainer');
+        if (matchContainer) matchContainer.style.display = 'none';
+        if (typeof App !== 'undefined') {
+            App._activateSection('dashboard');
+        } else {
+            location.reload();
+        }
+    });
+
+    // حفظ البيانات للرجوع إليها
+    this._lastData = statsData;
+},
 
     // الإحصائيات العامة
     _showGeneralStats() {
@@ -9490,6 +9966,7 @@ const CrosswordEngine = {
     _timeLeft: 0,
     _completedCount: 0,
     _tempGrid: null,
+    _wrongAttempts: 0,
 
     // ===== التهيئة =====
     init(crosswordData, onComplete) {
@@ -9660,6 +10137,7 @@ _verifyWord: function() {
 
     let isCorrect = userWordUpper === correctWordUpper;
     if (!isCorrect) {
+        this._wrongAttempts = (this._wrongAttempts || 0) + 1;
         const reversed = userWordUpper.split('').reverse().join('');
         isCorrect = reversed === correctWordUpper;
     }
@@ -10041,6 +10519,71 @@ _updateStats: function() {
 
         return { total, correct, percentage, isComplete };
     },
+
+// أضف هذه الدالة داخل CrosswordMatchEngine
+
+// ===== التحقق من الإنجازات =====
+_checkAchievements: function(data, onComplete) {
+    try {
+        const user = AuthService.currentUser;
+        if (!user) {
+            if (onComplete) onComplete();
+            return;
+        }
+
+        // بناء بيانات الإنجازات من نتائج المباراة
+        const gameData = {
+            trainingCompleted: (user.stats?.training?.completed || 0) + (data.totalRounds || 0),
+            trainingBestScore: Math.max(user.stats?.training?.bestScore || 0, data.totalPoints || 0),
+            trainingSurvivalWins: user.stats?.training?.survivalWins || 0,
+            trainingSpeedWins: user.stats?.training?.speedWins || 0,
+            survivalStreak: user.stats?.training?.survivalStreak || 0,
+            speedCorrect: (user.stats?.training?.speedCorrect || 0) + (data.totalCorrect || 0),
+            totalAnswers: (user.stats?.correctAnswers || 0) + (data.totalCorrect || 0),
+            totalWins: (user.stats?.gamesWon || 0) + (data.totalPoints > 50 ? 1 : 0),
+            correctStreak: data.totalCorrect || 0,
+            gamesPlayed: (user.stats?.gamesPlayed || 0) + 1,
+            avgTime: data.totalTime / (data.totalRounds || 1),
+            currentScore: data.totalPoints,
+            currentCorrect: data.totalCorrect,
+            currentQuestions: data.totalQuestions,
+            crosswordCorrect: data.totalCorrect,
+            crosswordAccuracy: data.accuracy,
+            crosswordRounds: data.totalRounds,
+            crosswordPoints: data.totalPoints,
+        };
+
+        // استخدام AchievementManager للتحقق
+        if (typeof AchievementManager !== 'undefined' && AchievementManager.checkAchievements) {
+            const newAchievements = AchievementManager.checkAchievements(gameData);
+            
+            if (newAchievements && newAchievements.length > 0) {
+                // تحديث إنجازات المستخدم
+                const currentAchievements = user.achievements || [];
+                const newIds = newAchievements.map(a => a.id);
+                const updatedAchievements = [...currentAchievements, ...newIds];
+                
+                // حفظ الإنجازات
+                AuthService.updateUser({ achievements: updatedAchievements }).catch(() => {});
+                if (AuthService.currentUser) {
+                    AuthService.currentUser.achievements = updatedAchievements;
+                }
+                
+                // عرض الإنجازات الجديدة
+                if (typeof App._showAchievementsScreen === 'function') {
+                    App._showAchievementsScreen(newAchievements);
+                    if (onComplete) onComplete();
+                    return;
+                }
+            }
+        }
+        
+        if (onComplete) onComplete();
+    } catch (e) {
+        console.warn('⚠️ Error checking achievements:', e);
+        if (onComplete) onComplete();
+    }
+},
 
     // ===== عرض الشبكة =====
     renderWithEmptyHidden(containerId) {
@@ -11523,13 +12066,23 @@ async start() {
 
 async _loadModeSettingsFromFirebase() {
     const user = AuthService.currentUser;
+    
+    // ✅ محاولة استعادة من localStorage أولاً (للمستخدم غير المسجل أو كنسخة احتياطية)
+    const savedMode = localStorage.getItem('selectedGameMode');
+    const savedIcon = localStorage.getItem('modeIconImage');
+    
     if (!user) {
-        // محاولة تحميل من localStorage للمستخدم غير المسجل
-        const savedMode = localStorage.getItem('selectedGameMode');
+        // للمستخدم غير المسجل، استخدم localStorage
         if (savedMode && ACTIVE_MODES.includes(savedMode)) {
             selectedGameMode = savedMode;
-            this._updatePlayButtonMode();
+            console.log('📌 Mode loaded from localStorage (guest):', selectedGameMode);
+        } else {
+            selectedGameMode = 'ranked_classic';
+            localStorage.setItem('selectedGameMode', selectedGameMode);
         }
+        
+        // ✅ تحديث الواجهة فوراً
+        this._updateModeUI();
         return;
     }
     
@@ -11537,59 +12090,148 @@ async _loadModeSettingsFromFirebase() {
         const doc = await db.collection('userSettings').doc(user.uid).get();
         if (doc.exists) {
             const data = doc.data();
+            
+            // تحميل إعدادات الأطوار
             if (data.modeSettings) {
                 this._modeSettingsCache = data.modeSettings;
                 localStorage.setItem('modeSettings_backup', JSON.stringify(data.modeSettings));
-                console.log('✅ Mode settings loaded from Firebase:', this._modeSettingsCache);
+                console.log('✅ Mode settings loaded from Firebase');
             }
+            
             // ✅ تحميل الطور المختار
             if (data.selectedGameMode && ACTIVE_MODES.includes(data.selectedGameMode)) {
                 selectedGameMode = data.selectedGameMode;
+                localStorage.setItem('selectedGameMode', selectedGameMode);
                 console.log('✅ Selected game mode loaded from Firebase:', selectedGameMode);
-                this._updatePlayButtonMode();
             } else {
-                // إذا لم يكن هناك طور مختار في Firebase، استخدم localStorage
-                const savedMode = localStorage.getItem('selectedGameMode');
+                // استخدام القيمة من localStorage أو الافتراضية
                 if (savedMode && ACTIVE_MODES.includes(savedMode)) {
                     selectedGameMode = savedMode;
-                    this._updatePlayButtonMode();
+                } else {
+                    selectedGameMode = 'ranked_classic';
+                    localStorage.setItem('selectedGameMode', selectedGameMode);
                 }
+                console.log('📌 Using default/fallback mode:', selectedGameMode);
             }
+            
+            // ✅ تحميل صورة الطور المحفوظة
+            if (data.modeIconImage) {
+                localStorage.setItem('modeIconImage', data.modeIconImage);
+                console.log('✅ Mode icon loaded from Firebase:', data.modeIconImage);
+            } else if (savedIcon) {
+                // استخدام الصورة المخزنة محلياً
+                console.log('📌 Using saved icon from localStorage:', savedIcon);
+            }
+            
         } else {
             // إنشاء مستند افتراضي
             await db.collection('userSettings').doc(user.uid).set({
                 modeSettings: {},
                 selectedGameMode: 'ranked_classic',
+                modeIconImage: 'images/modes/ranked_classic.png',
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             console.log('✅ Created empty mode settings document in Firebase');
-            // استخدام القيمة الافتراضية
+            
+            // استخدام القيم الافتراضية
             selectedGameMode = 'ranked_classic';
-            this._updatePlayButtonMode();
+            localStorage.setItem('selectedGameMode', selectedGameMode);
+            localStorage.setItem('modeIconImage', 'images/modes/ranked_classic.png');
         }
+        
         this._modeSettingsLoaded = true;
+        
+        // ✅ تحديث الواجهة بعد تحميل الإعدادات
+        this._updateModeUI();
+        
     } catch (e) {
         console.warn('⚠️ Could not load mode settings from Firebase, using localStorage backup', e);
-        // محاولة تحميل من localStorage كنسخة احتياطية
-        const backup = localStorage.getItem('modeSettings_backup');
-        if (backup) {
-            try {
-                this._modeSettingsCache = JSON.parse(backup);
-                console.log('✅ Mode settings loaded from localStorage backup');
-            } catch (e2) {
-                this._modeSettingsCache = {};
-            }
-        } else {
-            this._modeSettingsCache = {};
-        }
-        // تحميل الطور المختار من localStorage
-        const savedMode = localStorage.getItem('selectedGameMode');
+        
+        // استخدام localStorage كنسخة احتياطية
         if (savedMode && ACTIVE_MODES.includes(savedMode)) {
             selectedGameMode = savedMode;
-            this._updatePlayButtonMode();
+        } else {
+            selectedGameMode = 'ranked_classic';
+            localStorage.setItem('selectedGameMode', selectedGameMode);
         }
+        
+        // ✅ تحديث الواجهة حتى في حالة الخطأ
+        this._updateModeUI();
         this._modeSettingsLoaded = true;
     }
+},
+
+_updateModeIconImage: function(mode) {
+    const modeIconImg = document.getElementById('modeIconImg');
+    if (!modeIconImg) {
+        console.warn('⚠️ modeIconImg element not found');
+        return;
+    }
+    
+    // ✅ إذا كان mode غير معرف، استخدم القيمة الافتراضية
+    if (!mode) {
+        mode = 'ranked_classic';
+    }
+    
+    let imagePath;
+    
+    // ✅ إذا كان mode هو مسار صورة كامل
+    if (mode && (mode.startsWith('images/') || mode.startsWith('http') || mode.startsWith('data:'))) {
+        imagePath = mode;
+    } else {
+        // ✅ بناء مسار الصورة من اسم الطور
+        const modeInfo = MODE_DESCRIPTIONS[mode];
+        if (modeInfo && modeInfo.iconImage) {
+            imagePath = modeInfo.iconImage;
+        } else {
+            imagePath = `images/modes/${mode}.png`;
+        }
+    }
+    
+    console.log('🔄 Loading mode icon:', imagePath);
+    
+    // ✅ محاولة تحميل الصورة
+    const img = new Image();
+    img.onload = function() {
+        modeIconImg.src = imagePath;
+        modeIconImg.style.display = 'block';
+        modeIconImg.style.opacity = '1';
+        modeIconImg.style.width = '100%';
+        modeIconImg.style.height = '100%';
+        modeIconImg.style.objectFit = 'contain';
+        
+        // ✅ إزالة أي أيقونة احتياطية
+        const parent = modeIconImg.parentElement;
+        const oldFallback = parent.querySelector('.fallback-icon');
+        if (oldFallback) oldFallback.remove();
+        
+        // ✅ حفظ المسار في localStorage
+        localStorage.setItem('modeIconImage', imagePath);
+        
+        console.log('✅ Mode icon loaded successfully:', imagePath);
+    };
+    img.onerror = function() {
+        console.warn('⚠️ Mode icon not found:', imagePath);
+        modeIconImg.style.display = 'none';
+        
+        // ✅ عرض أيقونة احتياطية
+        const parent = modeIconImg.parentElement;
+        let fallback = parent.querySelector('.fallback-icon');
+        if (!fallback) {
+            fallback = document.createElement('span');
+            fallback.className = 'fallback-icon';
+            const modeInfo = MODE_DESCRIPTIONS[mode];
+            fallback.textContent = modeInfo ? modeInfo.icon || '⚙️' : '⚙️';
+            fallback.style.cssText = 'font-size: 2rem; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;';
+            parent.appendChild(fallback);
+        } else {
+            fallback.style.display = 'flex';
+        }
+        
+        // ✅ حفظ المسار الافتراضي في localStorage
+        localStorage.setItem('modeIconImage', '');
+    };
+    img.src = imagePath;
 },
 
 async _saveModeSettingsToFirebase(mode, settings) {
@@ -11908,8 +12550,67 @@ async _checkUsernameAvailability(username) {
     }
 },
 
+_updateModeUI: function() {
+    const mode = selectedGameMode || 'ranked_classic';
+    const modeInfo = MODE_DESCRIPTIONS[mode];
+    
+    if (!modeInfo) {
+        console.warn(`⚠️ Mode "${mode}" not found, using default`);
+        selectedGameMode = 'ranked_classic';
+        this._updateModeUI();
+        return;
+    }
+    
+    console.log('🔄 Updating mode UI for:', mode);
+    
+    // 1️⃣ تحديث تسمية الطور
+    const modeLabel = document.getElementById('selectedModeLabel');
+    if (modeLabel) {
+        modeLabel.textContent = `${modeInfo.icon || '⚔️'} ${modeInfo.title || 'كلاسيكي مصنف'}`;
+        modeLabel.style.display = 'inline-block';
+        console.log('✅ Mode label updated:', modeLabel.textContent);
+    }
+    
+    // 2️⃣ تحديث صورة الطور في زر الإعدادات
+    this._updateModeIconImage(mode);
+    
+    // 3️⃣ تحديث زر اللعب (إذا كان موجوداً)
+    const playBtn = document.getElementById('dashboardPlayBtn');
+    if (playBtn) {
+        // تحديث أي نص أو أيقونة في زر اللعب
+        const btnContent = playBtn.querySelector('.btn-content');
+        if (btnContent) {
+            // إزالة أي محتوى سابق مع الاحتفاظ بالهيكل
+            const existingSpan = btnContent.querySelector('span');
+            if (existingSpan) {
+                existingSpan.textContent = `🎮 ${modeInfo.title || 'العب'}`;
+            }
+        }
+    }
+    
+    // 4️⃣ تحديث زر الإعدادات (عنوان توضيحي)
+    const settingsBtn = document.getElementById('dashboardMatchSettingsBtn');
+    if (settingsBtn) {
+        const isCompetitive = modeInfo.competitive || false;
+        const modeType = isCompetitive ? '🏅 تصنيفي' : '🎮 ودي';
+        settingsBtn.title = `${modeInfo.icon || '⚔️'} ${modeInfo.title || 'كلاسيكي مصنف'} (${modeType})`;
+    }
+    
+    // 5️⃣ حفظ الطور المختار في localStorage
+    localStorage.setItem('selectedGameMode', mode);
+    
+    console.log('✅ Mode UI updated successfully');
+},
+
 // في App
 async _loadApp() {
+        // ✅ استعادة صورة الطور من localStorage إذا كانت موجودة
+    const savedIcon = localStorage.getItem('modeIconImage');
+    if (savedIcon) {
+        this._updateModeIconImage(savedIcon);
+    } else if (selectedGameMode) {
+        this._updateModeIconImage(selectedGameMode);
+    }
     // ============================================================
     // شاشة التحميل وتحديث التقدم - عبارات محفزة
     // ============================================================
@@ -12010,6 +12711,16 @@ async _loadApp() {
 
     await AuthService.init();
     
+    updateProgress(20, '📚 جاري التحميل...', 'تحميل إعدادات اللعبة');
+    updateTaskStatus('settings', '🔄 جاري...', '⚙️');
+    
+    await this._loadModeSettingsFromFirebase();
+    updateTaskStatus('settings', '✅ تم', '⚙️');
+    updateProgress(25, '✅ تم تحميل الإعدادات', `الطور: ${selectedGameMode || 'افتراضي'}`);
+    
+    // ✅ تحديث واجهة الطور بعد تحميل الإعدادات
+    this._updateModeUI();
+
     if (AuthService.currentUser) {
         await this._loadModeSettingsFromFirebase();
         updateTaskStatus('auth', '✅ تم', '✅');
@@ -13249,41 +13960,6 @@ _buildModals() {
     </div>
 </div>
 
-            <!-- Profile Edit Modal -->
-<div class="modal-overlay" id="profileEditModal">
-    <div class="modal-card fullscreen-modal">
-        <div class="modal-header">
-            <h3><i class="fas fa-user-edit"></i> تعديل الملف الشخصي</h3>
-            <button class="btn btn-sm" id="closeProfileEditModal" style="background:transparent;color:var(--gray);">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <form id="profileEditForm">
-            <div class="form-group">
-                <label>اسم المستخدم *</label>
-                <input type="text" id="editUsername" required placeholder="اسم المستخدم">
-            </div>
-            <div class="form-group">
-                <label>السيرة الذاتية</label>
-                <textarea id="editBio" rows="3" placeholder="اكتب عن نفسك..."></textarea>
-            </div>
-            <div class="form-group">
-                <label>الموقع</label>
-                <input type="text" id="editLocation" placeholder="المدينة، البلد">
-            </div>
-            <div class="form-group" style="background:var(--glass);padding:10px;border-radius:var(--radius-sm);border:1px solid var(--glass-border);">
-                <label style="color:var(--gray);">
-                    <i class="fas fa-info-circle"></i> 
-                    لتغيير الصورة الشخصية، استخدم زر الكاميرا 📷 في الملف الشخصي
-                </label>
-            </div>
-            <button type="submit" class="btn btn-primary w-100" style="justify-content:center;">
-                <i class="fas fa-save"></i> حفظ التغييرات
-            </button>
-        </form>
-    </div>
-</div>
-
             <!-- Admin User Edit Modal -->
             <div class="modal-overlay" id="adminUserModal"><div class="modal-card">
                 <div class="modal-header"><h3><i class="fas fa-user-cog"></i> تعديل المستخدم</h3><button class="btn btn-sm" id="closeAdminUserModal" style="background:transparent;color:var(--gray);"><i class="fas fa-times"></i></button></div>
@@ -13327,6 +14003,14 @@ _renderDashboard() {
     const avatarHtml = user?.avatar ? `<img src="${user.avatar}" alt="avatar">` : '👤';
     const isAdmin = this._isAdminUser();
 
+    // ✅ الحصول على الطور المختار (مع قيمة افتراضية)
+    const mode = selectedGameMode || 'ranked_classic';
+    const modeInfo = MODE_DESCRIPTIONS[mode] || MODE_DESCRIPTIONS['ranked_classic'];
+    const modeDisplayName = modeInfo.title || 'كلاسيكي مصنف';
+    const modeIcon = modeInfo.icon || '⚔️';
+    
+    const imgPath = 'images/dashboard/';
+
     return `
     <div class="dashboard-container" style="
         background-image: url('images/dashboard-bg.jpg');
@@ -13335,6 +14019,9 @@ _renderDashboard() {
         background-repeat: no-repeat;
         min-height: 100vh;
         position: relative;
+        display: flex;
+        flex-direction: column;
+        padding-bottom: 0;
     ">
         <!-- طبقة التعتيم -->
         <div style="
@@ -13347,84 +14034,143 @@ _renderDashboard() {
             z-index: 0;
         "></div>
         
-    <div class="dashboard-container">
-        <!-- خلفية -->
-        <div class="dashboard-bg"></div>
-
         <!-- المحتوى -->
-        <div class="dashboard-content">
+        <div style="position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh;">
 
-            <!-- الشريط العلوي: القائمة ☰ + النقود + المتجر -->
-            <div class="dashboard-top-bar">
-                <button class="menu-icon-btn" id="dashboardMenuBtn" title="القائمة">
-                    <i class="fas fa-bars"></i>
-                    <span class="notif-dot" id="menuNotificationBadge" style="display:none;"></span>
-                </button>
-                <div class="top-currencies">
-                    <span class="coin-display"><i class="fas fa-coins"></i> <span id="dashboardCoins">${user?.coins || 0}</span></span>
-                    <span class="gem-display"><i class="fas fa-gem"></i> <span id="dashboardGems">${user?.gems || 0}</span></span>
-                    <button class="store-btn" id="dashboardStoreBtnNew"><i class="fas fa-store"></i></button>
+            <!-- ===== الشريط العلوي ===== -->
+            <div class="dashboard-top-bar-new">
+                <div class="left-section">
+                    <button class="top-icon-btn" id="dashboardSettingsBtn" title="الإعدادات">
+                        <div class="btn-bg" style="background-image: url('${imgPath}settings-icon.png');"></div>
+                    </button>
+                    <button class="top-icon-btn" id="dashboardNotificationsBtn" title="الإشعارات">
+                        <div class="btn-bg" style="background-image: url('${imgPath}notifications-icon.png');"></div>
+                        <span class="badge-dot" id="notificationBadge" style="display:none;"></span>
+                    </button>
                 </div>
-            </div>
-
-            <!-- القائمة المنسدلة -->
-            <div class="dropdown-menu" id="dashboardDropdownMenu">
-                <div class="dropdown-item" data-action="notifications"><i class="fas fa-bell"></i> الإشعارات <span class="badge-dot" id="dropdownNotifBadge"></span></div>
-                <div class="dropdown-item" data-action="friends"><i class="fas fa-user-friends"></i> الأصدقاء</div>
-                <div class="dropdown-item" data-action="messages"><i class="fas fa-envelope"></i> الرسائل</div>
-                <div class="dropdown-divider"></div>
-                <div class="dropdown-item" data-action="questions"><i class="fas fa-question-circle"></i> الأسئلة</div>
-                    <!-- عنصر مخفي للمشرفين فقط -->
-                    <div class="dropdown-item" data-action="admin" style="display:none;">
-                        <i class="fas fa-shield-halved"></i>
-                        <span>لوحة المشرف</span>
+                
+                <div class="right-section">
+                    <!-- العملات الذهبية -->
+                    <div class="currency-item coins" id="coinsDisplay">
+                        <div class="currency-icon" style="background-image: url('${imgPath}coins-icon.png');"></div>
+                        <span class="currency-value" id="dashboardCoins">${user?.coins || 0}</span>
+                        <span class="currency-plus">+</span>
                     </div>
-                                    <div class="dropdown-divider"></div>
-                <div class="dropdown-item" data-action="settings"><i class="fas fa-cog"></i> الإعدادات</div>
-                <div class="dropdown-divider"></div>
-                <div class="dropdown-item logout" id="dashboardLogoutBtn"><i class="fas fa-sign-out-alt"></i> تسجيل الخروج</div>
-            </div>
-
-            <!-- بطاقة الملف الشخصي -->
-            <div class="profile-card" id="dashboardProfileClick">
-                <div class="profile-left">
-                    <!-- المستوى -->
-                    <div class="level-box">
-                        <div class="level-header">
-                            <span>المستوى <strong id="dashboardLevelNum">${progress.currentLevel || 1}</strong></span>
-                            <span id="dashboardLevelPoints">${user?.totalScore || 0}</span>
+                    
+                    <!-- الجواهر -->
+                    <div class="currency-item gems" id="gemsDisplay">
+                        <div class="currency-icon" style="background-image: url('${imgPath}gems-icon.png');"></div>
+                        <span class="currency-value" id="dashboardGems">${user?.gems || 0}</span>
+                        <span class="currency-plus">+</span>
+                    </div>
+                    
+                    <div class="level-display-new" id="dashboardLevelClick">
+                        <div class="level-icon-wrapper">
+                            <div class="level-icon-bg" style="background-image: url('${imgPath}level-icon.png');"></div>
+                            <span class="level-number-inside" id="dashboardLevelNumber">${progress.currentLevel || 1}</span>
                         </div>
-                        <div class="progress-track"><div class="progress-fill" id="dashboardLevelProgress" style="width:${progress.progress}%;"></div></div>
-                        <div class="level-next">إلى المستوى التالي: <span id="dashboardLevelMax">${progress.nextMin || 1000}</span></div>
+                        <div class="level-progress-wrapper">
+                            <div class="level-progress">
+                                <div class="fill" id="dashboardLevelProgress" style="width:${progress.progress}%;"></div>
+                            </div>
+                            <div class="level-progress-label" id="dashboardLevelLabel">${user?.totalScore || 0} pts</div>
+                        </div>
                     </div>
-                    <!-- الرتبة -->
-<div class="rank-box">
-    <div class="rank-header">
-        <span><span class="rank-icon">${rank.icon || '🏅'}</span> <strong id="dashboardRankName">${rank.name}</strong></span>
-        <span id="dashboardRankPoints">${user?.rankPoints || 0}</span>
-    </div>
-    <div class="rank-track"><div class="rank-fill" id="dashboardRankProgress" style="width:${rank.progress}%;"></div></div>
-    <div class="rank-next">إلى الرتبة التالية: <span id="dashboardRankNext">${rank.nextName || 'مكتمل 🏆'}</span></div>
-</div>
                 </div>
-<div class="profile-top">
-    <div class="avatar-large" id="dashboardAvatar">${avatarHtml}</div>
-    <div class="user-fullname" id="dashboardUserName">${user?.displayName || user?.username || 'زائر'}</div>
-</div>
             </div>
-
-            <!-- الباتل باس -->
-            <div class="battlepass-box">
-                <span>🎟️ الباتل باس قريباً...</span>
+            
+            <!-- ===== بطاقة اللاعب ===== -->
+            <div class="player-card-new" id="dashboardProfileClick">
+                <div class="player-avatar" id="dashboardAvatar">
+                    ${user?.avatar ? `<img src="${user.avatar}" alt="${user.username}">` : '👤'}
+                </div>
+                <div class="player-info">
+                    <div class="player-name" id="dashboardUserName">${user?.displayName || user?.username || 'زائر'}</div>
+                    <div class="player-clan">🏰 القبيلة: <span id="dashboardClanName">${clanName}</span></div>
+                </div>
+                <div class="player-rank">
+                    <img src="images/ranks/${rank.image || 'bronze1.png'}" alt="${rank.name}" onerror="this.style.display='none';this.parentElement.textContent='${rank.icon || '🏅'}'">
+                </div>
             </div>
-
-            <!-- أزرار الإجراءات -->
-            <div class="action-buttons">
-                <button class="btn-action primary" id="dashboardPlayBtn"><i class="fas fa-play"></i> العب الآن</button>
-                <button class="btn-action secondary" id="dashboardMultiplayerBtn"><i class="fas fa-users"></i> لعب جماعي</button>
-                <button class="btn-action" id="dashboardAchievementsBtn"><i class="fas fa-star"></i> الإنجازات</button>
+            
+            <!-- ===== مساحة فارغة تدفع الأزرار للأسفل ===== -->
+            <div style="flex: 1;"></div>
+            
+            <div class="play-section-wrapper">
+                <!-- ✅ اسم الطور المختار -->
+                <div class="selected-mode-label" id="selectedModeLabel">
+                    ${modeIcon} ${modeDisplayName}
+                </div>
+                
+                <!-- حاوية زر الإعدادات -->
+                <div style="display: flex; flex-direction: column; align-items: center; width: 100%; margin: 0.5rem 0 0.8rem 0;">
+                    <!-- زر الإعدادات -->
+                    <button id="dashboardMatchSettingsBtn" title="${modeIcon} ${modeDisplayName}">
+                        <img id="modeIconImg" src="images/modes/${mode}.png" alt="شعار الطور" 
+                             style="width: 100%; height: 100%; object-fit: contain; display: block;"
+                             onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\\'fallback-icon\\'>${modeIcon}</span>'">
+                    </button>
+                    
+                    <!-- زر اللعب -->
+                    <button id="dashboardPlayBtn" title="ابدأ اللعب">
+                        <div class="btn-content">
+                            <span>🎮 ${modeDisplayName}</span>
+                        </div>
+                    </button>
+                </div>
             </div>
-
+            
+            <!-- ===== القائمة السفلية ===== -->
+            <div class="bottom-nav">
+                <button class="nav-btn" id="navStore" title="المتجر">
+                    <div class="nav-bg" style="background-image: url('${imgPath}store-icon.png');"></div>
+                    <div class="nav-content">
+                        <span>المتجر</span>
+                    </div>
+                </button>
+                <button class="nav-btn" id="navFriends" title="الأصدقاء">
+                    <div class="nav-bg" style="background-image: url('${imgPath}friends-icon.png');"></div>
+                    <div class="nav-content">
+                        <span>الأصدقاء</span>
+                    </div>
+                    <span class="badge-count" id="friendsNavBadge" style="display:none;">0</span>
+                </button>
+                <button class="nav-btn active" id="navPlay" title="اللعب">
+                    <div class="nav-bg" style="background-image: url('${imgPath}play-nav-icon.png');"></div>
+                    <div class="nav-content">
+                        <span>اللعب</span>
+                    </div>
+                </button>
+                <button class="nav-btn" id="navClan" title="القبيلة">
+                    <div class="nav-bg" style="background-image: url('${imgPath}clan-icon.png');"></div>
+                    <div class="nav-content">
+                        <span>القبيلة</span>
+                    </div>
+                </button>
+                <button class="nav-btn" id="navTournament" title="البطولة">
+                    <div class="nav-bg" style="background-image: url('${imgPath}tournament-icon.png');"></div>
+                    <div class="nav-content">
+                        <span>البطولة</span>
+                    </div>
+                </button>
+            </div>
+            
+            <!-- ===== القائمة الجانبية ===== -->
+            <div class="side-menu">
+                <button class="side-btn" id="sidebarBattlePass" title="الباتل باس">
+                    <div class="btn-bg" style="background-image: url('${imgPath}battlepass-icon.png');"></div>
+                    <span class="tooltip">الباتل باس</span>
+                </button>
+                <button class="side-btn" id="sidebarRanks" title="الرتب">
+                    <div class="btn-bg" style="background-image: url('${imgPath}ranks-icon.png');"></div>
+                    <span class="tooltip">الرتب</span>
+                </button>
+                <button class="side-btn" id="sidebarTasks" title="المهام">
+                    <div class="btn-bg" style="background-image: url('${imgPath}tasks-icon.png');"></div>
+                    <span class="tooltip">المهام</span>
+                </button>
+            </div>
+            
         </div>
     </div>
     `;
@@ -16292,194 +17038,78 @@ async _addGems(amount) {
     showToast(`💎 تم إضافة ${amount} ماسة!`, 'success');
 },
 
+// ============================================================
+// عرض صفحة الملف الشخصي - نسخة معدلة (بطاقة مستطيلة)
+// ============================================================
+
 _renderProfileSection() {
     return `
         <div class="profile-page">
-            <!-- رأس الصفحة -->
-            <div class="profile-header">
-                <div class="profile-cover">
-                    <div class="profile-avatar-wrapper">
-                        <div class="profile-avatar" id="profileAvatar">👤</div>
-                        <button class="btn btn-sm btn-primary avatar-edit-btn" id="changeAvatarBtn" title="تغيير الصورة">
-                            <i class="fas fa-camera"></i>
-                        </button>
-                        <button class="btn btn-sm btn-danger avatar-remove-btn" id="removeAvatarBtn" title="حذف الصورة" style="display:none;">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                        <div class="avatar-progress-container" id="avatarProgressContainer" style="display:none;">
-                            <div class="progress-bar">
-                                <div class="fill" id="avatarProgressFill" style="width:0%;"></div>
-                            </div>
-                            <div class="progress-text" id="avatarProgressText">0%</div>
-                        </div>
-                        <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
-                    </div>
-                    <div class="profile-info">
-                        <h1 class="profile-name" id="profileName">زائر</h1>
-                        <div class="profile-username" id="profileUsername">@guest</div>
-                        <div class="profile-bio" id="profileBio">لا توجد سيرة ذاتية</div>
-                        <div class="profile-location" id="profileLocation">📍 غير محدد</div>
-                        <div class="profile-role" id="profileRole">👀 لاعب</div>
-                        <div class="profile-join-date">انضم في: <span id="profileJoinDate">—</span></div>
-                        <div class="profile-level-display" id="profileLevelDisplay">
-                            <span class="level-emoji">🌟</span>
-                            <span class="level-name">مبتدئ</span>
-                            <span class="level-points-badge" id="profileLevelPoints">0 نقطة</span>
-                        </div>
-                        <div class="profile-level-progress">
-                            <div class="progress-bar" style="height:6px;">
-                                <div class="fill" id="profileLevelProgress" style="width:0%;"></div>
-                            </div>
-                            <div class="progress-labels" style="display:flex;justify-content:space-between;font-size:0.65rem;color:var(--gray);">
-                                <span id="levelCurrentLabel"></span>
-                                <span id="levelNextLabel">مستوى 2 (100 نقطة)</span>
-                            </div>
-                        </div>
-                        <div class="profile-rank" style="margin:0.5rem 0;padding:0.5rem;background:var(--glass);border-radius:var(--radius-sm);cursor:pointer;" onclick="App._showRanksPage()">
-                            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-                                <span id="profileRankDisplay">🏅 برونزي 1</span>
-                                <span class="text-gray" style="font-size:0.8rem;">نقاط الرتبة: <span id="profileRankPoints">0</span></span>
-                            </div>
-                            <div class="progress-bar" style="height:6px;margin-top:0.3rem;">
-                                <div id="rankProgressFill" style="height:100%;width:0%;border-radius:6px;"></div>
-                            </div>
-                            <div id="rankLabels" style="display:flex;justify-content:space-between;font-size:0.6rem;color:var(--gray);margin-top:0.1rem;">
-                                <span>برونزي 1</span>
-                                <span>برونزي 2 (100)</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- ============================================================ -->
-                    <!-- ✅ أزرار الإجراءات مع تمرير أفقي للهواتف -->
-                    <!-- ============================================================ -->
-                    <div class="profile-actions" style="
-                        display: flex;
-                        gap: 0.5rem;
-                        flex-wrap: nowrap;
-                        overflow-x: auto;
-                        -webkit-overflow-scrolling: touch;
-                        scrollbar-width: none;
-                        padding: 0.3rem 0.2rem 0.5rem;
-                        width: 100%;
-                        max-width: 100%;
-                    ">
-                        <!-- زر تعديل الملف -->
-                        <button class="btn btn-primary" id="editProfileBtn" style="
-                            flex-shrink: 0;
-                            white-space: nowrap;
-                            font-size: 0.85rem;
-                            padding: 8px 16px;
-                            min-height: 40px;
-                        ">
-                            <i class="fas fa-edit"></i> تعديل الملف
-                        </button>
-                        
-                        <!-- زر الإحصائيات -->
-                        <button class="btn btn-outline" id="profileStatsBtn" style="
-                            flex-shrink: 0;
-                            white-space: nowrap;
-                            font-size: 0.85rem;
-                            padding: 8px 16px;
-                            min-height: 40px;
-                        ">
-                            <i class="fas fa-chart-line"></i> الإحصائيات
-                        </button>
-                        
-                        <!-- ✅ زر الإنجازات (جديد) -->
-                        <button class="btn btn-outline" id="profileAchievementsBtn" style="
-                            flex-shrink: 0;
-                            white-space: nowrap;
-                            font-size: 0.85rem;
-                            padding: 8px 16px;
-                            min-height: 40px;
-                            border-color: var(--accent);
-                            color: var(--accent);
-                        ">
-                            <i class="fas fa-star"></i> الإنجازات
-                            <span class="badge" id="profileAchievementsBadge" style="
-                                background: var(--accent);
-                                color: var(--dark);
-                                font-size: 0.6rem;
-                                padding: 1px 8px;
-                                border-radius: 30px;
-                                margin-right: 4px;
-                            ">0</span>
-                        </button>
-                        
-                        <!-- زر الأصدقاء -->
-                        <button class="btn btn-outline" id="profileFriendsBtn" style="
-                            flex-shrink: 0;
-                            white-space: nowrap;
-                            font-size: 0.85rem;
-                            padding: 8px 16px;
-                            min-height: 40px;
-                        ">
-                            <i class="fas fa-user-friends"></i> الأصدقاء
-                            <span class="badge" id="friendsCount" style="
-                                background: var(--primary);
-                                color: #fff;
-                                font-size: 0.6rem;
-                                padding: 1px 8px;
-                                border-radius: 30px;
-                                margin-right: 4px;
-                            ">0</span>
-                        </button>
-                        
-                        <!-- زر المتابعين -->
-                        <button class="btn btn-outline" id="showFollowersBtn" style="
-                            flex-shrink: 0;
-                            white-space: nowrap;
-                            font-size: 0.85rem;
-                            padding: 8px 16px;
-                            min-height: 40px;
-                        ">
-                            <i class="fas fa-user-plus"></i> المتابعين
-                            <span class="badge" id="followersCount" style="
-                                background: var(--info);
-                                color: #fff;
-                                font-size: 0.6rem;
-                                padding: 1px 8px;
-                                border-radius: 30px;
-                                margin-right: 4px;
-                            ">0</span>
-                        </button>
-                        
-                        <!-- زر المتابَعين -->
-                        <button class="btn btn-outline" id="showFollowingBtn" style="
-                            flex-shrink: 0;
-                            white-space: nowrap;
-                            font-size: 0.85rem;
-                            padding: 8px 16px;
-                            min-height: 40px;
-                        ">
-                            <i class="fas fa-user-check"></i> المتابَعين
-                            <span class="badge" id="followingCount" style="
-                                background: var(--success);
-                                color: #fff;
-                                font-size: 0.6rem;
-                                padding: 1px 8px;
-                                border-radius: 30px;
-                                margin-right: 4px;
-                            ">0</span>
-                        </button>
-                        
-                        <!-- زر مشاركة الملف -->
-                        <button class="btn btn-outline" id="shareProfileBtn" style="
-                            flex-shrink: 0;
-                            white-space: nowrap;
-                            font-size: 0.85rem;
-                            padding: 8px 16px;
-                            min-height: 40px;
-                        ">
-                            <i class="fas fa-share-alt"></i> مشاركة
-                        </button>
-                    </div>
+            <!-- ===== البطاقة الرئيسية (مستطيلة - أفقي) ===== -->
+            <div class="profile-cover">
+                <!-- الصورة -->
+                <div class="profile-avatar-wrapper">
+                    <div class="profile-avatar" id="profileAvatar">👤</div>
+                </div>
+                
+                <!-- المعلومات -->
+                <div class="profile-info">
+                    <div class="profile-name" id="profileName">زائر</div>
+                    <div class="profile-username" id="profileUsername">@guest</div>
+                    <div class="profile-clan">🏰 القبيلة: <span id="profileClan">غير منضم</span></div>
+                    <div class="profile-role" id="profileRole">👀 لاعب</div>
+                </div>
+                
+                <!-- الرتبة -->
+                <div class="profile-rank" id="profileRankDisplay">
+                    <img src="images/ranks/bronze1.png" alt="برونزي 1">
                 </div>
             </div>
+            
+            <!-- ===== شريط تقدم المستوى (مبسط - بدون تفاصيل إضافية) ===== -->
+            <div class="profile-level-card" style="margin-top: 1rem; padding: 0.8rem 1.2rem; background: var(--glass); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+                    <span style="font-weight: 700; font-size: 0.9rem; color: var(--light);">
+                        <i class="fas fa-star" style="color: var(--accent);"></i> المستوى <span id="profileLevelNumber">1</span>
+                    </span>
+                    <span style="font-size: 0.8rem; color: var(--gray);">
+                        <span id="profileCurrentPoints">0</span> نقطة
+                    </span>
+                </div>
+                <div class="progress-bar" style="height: 6px; background: var(--glass); border-radius: 10px; overflow: hidden;">
+                    <div class="fill" id="profileLevelProgress" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); border-radius: 10px; transition: width 0.5s ease;"></div>
+                </div>
+                <!-- ✅ تم حذف المستوى الحالي والمستوى التالي والنقاط التالية -->
+            </div>
+            
+            <!-- ===== الأزرار (أسفل البطاقة) ===== -->
+            <div class="profile-actions">
+                <button class="btn btn-outline" id="profileStatsBtn">
+                    <i class="fas fa-chart-line"></i> الإحصائيات
+                </button>
+                <button class="btn btn-outline" id="profileAchievementsBtn" style="border-color: var(--accent); color: var(--accent);">
+                    <i class="fas fa-star"></i> الإنجازات
+                    <span class="badge" id="profileAchievementsBadge" style="background: var(--accent); color: var(--dark); font-size: 0.6rem; padding: 1px 8px; border-radius: 30px; margin-right: 4px;">0</span>
+                </button>
+                <button class="btn btn-outline" id="profileFriendsBtn">
+                    <i class="fas fa-user-friends"></i> الأصدقاء
+                    <span class="badge" id="friendsCount" style="background: var(--primary); color: #fff; font-size: 0.6rem; padding: 1px 8px; border-radius: 30px; margin-right: 4px;">0</span>
+                </button>
+                <button class="btn btn-outline" id="showFollowersBtn">
+                    <i class="fas fa-user-plus"></i> المتابعين
+                    <span class="badge" id="followersCount" style="background: var(--info); color: #fff; font-size: 0.6rem; padding: 1px 8px; border-radius: 30px; margin-right: 4px;">0</span>
+                </button>
+                <button class="btn btn-outline" id="showFollowingBtn">
+                    <i class="fas fa-user-check"></i> المتابَعين
+                    <span class="badge" id="followingCount" style="background: var(--success); color: #fff; font-size: 0.6rem; padding: 1px 8px; border-radius: 30px; margin-right: 4px;">0</span>
+                </button>
+                <button class="btn btn-outline" id="shareProfileBtn">
+                    <i class="fas fa-share-alt"></i> مشاركة
+                </button>
+            </div>
 
-            <!-- إحصائيات سريعة -->
-            <div class="profile-quick-stats grid-5">
+            <!-- ===== الإحصائيات السريعة ===== -->
+            <div class="profile-quick-stats grid-5" style="margin-top: 1.5rem;">
                 <div class="stat-card">
                     <div class="stat-icon"><i class="fas fa-gamepad"></i></div>
                     <div class="stat-number" id="profileGamesPlayed">0</div>
@@ -16507,12 +17137,12 @@ _renderProfileSection() {
                 </div>
             </div>
 
-            <!-- شارات المستخدم -->
+            <!-- ===== شارات المستخدم ===== -->
             <div class="profile-badges-container" id="profileBadgesContainer">
                 <!-- سيتم تعبئتها بـ JS -->
             </div>
 
-            <!-- تبويبات المحتوى -->
+            <!-- ===== تبويبات المحتوى ===== -->
             <div class="profile-tabs">
                 <button class="tab-btn" data-tab="activity"><i class="fas fa-clock"></i> النشاطات</button>
                 <button class="tab-btn" data-tab="achievements"><i class="fas fa-medal"></i> الإنجازات</button>
@@ -16521,7 +17151,7 @@ _renderProfileSection() {
                 <button class="tab-btn" data-tab="friends"><i class="fas fa-user-friends"></i> الأصدقاء</button>
             </div>
 
-            <!-- محتوى التبويبات -->
+            <!-- ===== محتوى التبويبات ===== -->
             <div class="profile-tab-content">
                 <!-- النشاطات -->
                 <div class="tab-panel" id="tab-activity">
@@ -17612,6 +18242,240 @@ _closeDetectedWordsModal() {
     if (modal) {
         modal.remove();
     }
+},
+
+// داخل كائن App
+
+/**
+ * عرض شاشة المستوى
+ */
+_showLevelScreen: function(data) {
+    const oldScreen = document.getElementById('levelScreen');
+    if (oldScreen) oldScreen.remove();
+
+    const screen = document.createElement('div');
+    screen.id = 'levelScreen';
+    screen.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 10000;
+        background: #0f0e17;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        animation: fadeUp 0.5s ease;
+    `;
+
+    const { pointsEarned, oldTotal, newTotal, oldLevel, newLevel, levelsGained, onComplete } = data;
+    const oldProgress = getLevelProgress(oldTotal);
+    const newProgress = getLevelProgress(newTotal);
+    
+    const oldPercent = Math.min(oldProgress.progress, 100);
+    const newPercent = Math.min(newProgress.progress, 100);
+
+    screen.innerHTML = `
+        <div style="text-align:center; max-width:500px; width:100%;">
+            <div style="font-size:4rem; margin-bottom:0.5rem;">${levelsGained > 0 ? '🚀' : '⭐'}</div>
+            <h2 style="font-size:2rem; font-weight:900; color:#FFD93D; margin-bottom:0.3rem;">
+                ${levelsGained > 0 ? `المستوى ${newLevel.level}!` : `المستوى ${newLevel.level}`}
+            </h2>
+            <p style="color:#a7a9be; margin-bottom:1rem;">
+                ${levelsGained > 0 ? `🎉 تم تخطي ${levelsGained} مستوى!` : 'تقدم رائع!'}
+            </p>
+            <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:1rem; margin-bottom:1rem;">
+                <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#a7a9be;">
+                    <span>المستوى ${oldLevel.level}</span>
+                    <span>${newTotal} نقطة</span>
+                    <span>المستوى ${newLevel.level}</span>
+                </div>
+                <div style="height:12px; background:rgba(255,255,255,0.06); border-radius:10px; overflow:hidden; position:relative;">
+                    <div id="levelProgressFillResult" style="
+                        height:100%; 
+                        width:${oldPercent}%; 
+                        background:linear-gradient(90deg, #6C63FF, #FFD93D); 
+                        border-radius:10px; 
+                        transition:width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+                    "></div>
+                    ${levelsGained > 1 ? Array.from({ length: Math.min(levelsGained, 5) }, (_, i) => `
+                        <div style="
+                            position:absolute;
+                            top:0;
+                            left:${((i + 1) / levelsGained) * 100}%;
+                            width:3px;
+                            height:100%;
+                            background:rgba(255,255,255,0.3);
+                            border-radius:2px;
+                            animation: fadeUp 0.3s ease ${i * 0.15}s both;
+                        "></div>
+                    `).join('') : ''}
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#a7a9be; margin-top:0.2rem;">
+                    <span>+${pointsEarned} نقطة</span>
+                    <span>${newPercent}%</span>
+                </div>
+            </div>
+            
+            <div style="display:flex; gap:0.5rem; justify-content:center; flex-wrap:wrap;">
+                <button id="levelContinueBtn" style="
+                    display:inline-flex; 
+                    align-items:center; 
+                    justify-content:center; 
+                    gap:8px; 
+                    padding:10px 24px; 
+                    border-radius:40px; 
+                    font-weight:600; 
+                    font-size:0.9rem; 
+                    background:#6C63FF; 
+                    color:#fff; 
+                    border:none; 
+                    cursor:pointer; 
+                    min-width:150px; 
+                    box-shadow:0 4px 20px rgba(108,99,255,0.3);
+                ">
+                    <i class="fas fa-arrow-right"></i> متابعة
+                </button>
+                ${levelsGained > 0 ? `
+                    <button id="levelReplayBtn" style="
+                        display:inline-flex; 
+                        align-items:center; 
+                        justify-content:center; 
+                        gap:8px; 
+                        padding:10px 24px; 
+                        border-radius:40px; 
+                        font-weight:600; 
+                        font-size:0.9rem; 
+                        background:#2ecc71; 
+                        color:#fff; 
+                        border:none; 
+                        cursor:pointer; 
+                        min-width:150px; 
+                        box-shadow:0 4px 20px rgba(46,204,113,0.3);
+                    ">
+                        <i class="fas fa-redo"></i> إعادة اللعب
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(screen);
+
+    // تحريك شريط التقدم من النسبة القديمة إلى الجديدة
+    setTimeout(() => {
+        const fill = document.getElementById('levelProgressFillResult');
+        if (fill) {
+            fill.style.width = `${oldPercent}%`;
+            setTimeout(() => {
+                fill.style.width = `${newPercent}%`;
+                if (levelsGained > 0) {
+                    fill.style.background = 'linear-gradient(90deg, #FFD93D, #2ecc71, #FFD93D)';
+                    fill.style.backgroundSize = '200% 100%';
+                    fill.style.animation = 'shimmer 1.5s infinite';
+                }
+            }, 300);
+        }
+    }, 100);
+
+    document.getElementById('levelContinueBtn')?.addEventListener('click', function() {
+        screen.remove();
+        if (typeof onComplete === 'function') {
+            onComplete();
+        }
+    });
+
+    document.getElementById('levelReplayBtn')?.addEventListener('click', function() {
+        screen.remove();
+        const matchContainer = document.getElementById('crosswordMatchContainer');
+        if (matchContainer) matchContainer.style.display = 'none';
+        
+        const settings = CrosswordMatchEngine._settings || {};
+        showToast('🔄 جاري إعادة تشغيل المباراة...', 'info', 1500);
+        setTimeout(() => {
+            if (typeof CrosswordMatchEngine !== 'undefined' && CrosswordMatchEngine.start) {
+                CrosswordMatchEngine.start(settings, CrosswordMatchEngine._onComplete);
+            }
+        }, 500);
+    });
+},
+
+/**
+ * عرض شاشة الإنجازات
+ */
+_showAchievementsScreen: function(achievements, onComplete) {
+    if (!achievements || achievements.length === 0) {
+        if (onComplete) onComplete();
+        return;
+    }
+
+    const oldScreen = document.getElementById('achievementsScreen');
+    if (oldScreen) oldScreen.remove();
+
+    const screen = document.createElement('div');
+    screen.id = 'achievementsScreen';
+    screen.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 10001;
+        background: #0f0e17;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        animation: fadeUp 0.5s ease;
+        overflow-y: auto;
+    `;
+
+    const totalPoints = achievements.reduce((sum, ach) => sum + (ach.points || 0), 0);
+    let achievementsHtml = achievements.map((ach, index) => {
+        const imageUrl = ach.image || ach.icon || '🏆';
+        const isImage = imageUrl && (imageUrl.startsWith('http') || imageUrl.startsWith('/') || imageUrl.startsWith('images/'));
+        return `
+            <div style="display:flex; align-items:center; gap:0.8rem; background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem 1rem; margin-bottom:0.5rem; width:100%; max-width:400px; animation: fadeUp 0.3s ease ${index * 0.1}s both; border:1px solid #FFD93D;">
+                <div style="width:45px; height:45px; border-radius:50%; overflow:hidden; flex-shrink:0; background:#6C63FF; display:flex; align-items:center; justify-content:center; font-size:1.5rem; border:2px solid #FFD93D;">
+                    ${isImage ? `<img src="${imageUrl}" style="width:100%;height:100%;object-fit:cover;" alt="${ach.name || 'إنجاز'}" onerror="this.style.display='none';this.parentElement.textContent='🏆'">` : (imageUrl || '🏆')}
+                </div>
+                <div style="flex:1; text-align:right;">
+                    <div style="font-weight:700; font-size:0.95rem; color:#FFD93D;">${ach.name || 'إنجاز'}</div>
+                    <div style="font-size:0.7rem; color:#a7a9be;">${ach.description || ''}</div>
+                </div>
+                <span style="font-weight:700; color:#2ecc71; font-size:0.9rem; flex-shrink:0;">+${ach.points || 0}</span>
+            </div>
+        `;
+    }).join('');
+
+    screen.innerHTML = `
+        <div style="text-align:center; max-width:500px; width:100%;">
+            <div style="font-size:3.5rem; margin-bottom:0.5rem;">🏆</div>
+            <h2 style="font-size:1.8rem; font-weight:900; color:#FFD93D; margin-bottom:0.5rem;">
+                🎉 ${achievements.length} إنجاز جديد!
+            </h2>
+            <p style="color:#a7a9be; margin-bottom:1rem; font-size:0.95rem;">
+                حصلت على <strong style="color:#FFD93D;">${totalPoints}</strong> نقطة إضافية
+            </p>
+            <div style="margin-bottom:1.2rem; max-height:350px; overflow-y:auto; width:100%; padding:0 0.5rem;">
+                ${achievementsHtml}
+            </div>
+            <button id="achievementsContinueBtn" style="display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:12px 30px; border-radius:40px; font-weight:600; font-size:1rem; background:#6C63FF; color:#fff; border:none; cursor:pointer; min-width:180px; box-shadow:0 4px 20px rgba(108,99,255,0.4); transition:all 0.3s ease;">
+                <i class="fas fa-arrow-right"></i> متابعة
+            </button>
+        </div>
+    `;
+
+    document.body.appendChild(screen);
+
+    if (typeof SoundSystem !== 'undefined' && SoundSystem.playLevelUp) {
+        SoundSystem.playLevelUp();
+    }
+
+    document.getElementById('achievementsContinueBtn')?.addEventListener('click', function() {
+        screen.remove();
+        if (typeof onComplete === 'function') {
+            onComplete();
+        }
+    });
 },
 
 _addDetectedWord(index) {
@@ -21372,6 +22236,10 @@ _updateStats(stats) {
 // تحديث واجهة المستخدم بناءً على بيانات المستخدم
 // ============================================================
 
+// ============================================================
+// تحديث واجهة المستخدم بناءً على بيانات المستخدم
+// ============================================================
+
 _updateUserUI(user) {
     // ✅ عناصر رئيسية - التحقق من وجودها قبل التعديل
     const nameEl = document.getElementById('userNameDisplay');
@@ -21387,62 +22255,52 @@ _updateUserUI(user) {
     const achLevel = document.getElementById('achLevel');
     const achCount = document.getElementById('achCount');
     const achCoins = document.getElementById('achCoins');
-    const levelCurrent = document.getElementById('levelCurrent');
-    const levelNext = document.getElementById('levelNext');
-    const levelProgressFill = document.getElementById('levelProgressFill');
-    const levelPointsDisplay = document.getElementById('levelPointsDisplay');
     const storeCoins = document.getElementById('storeCoins');
+    const gemsEl = document.getElementById('userGemsDisplay');
+    const adminNavLink = document.getElementById('adminNavLink');
+    
+    // ✅ عناصر الملف الشخصي الجديدة
     const profileName = document.getElementById('profileName');
     const profileUsername = document.getElementById('profileUsername');
-    const profileBio = document.getElementById('profileBio');
-    const profileLocation = document.getElementById('profileLocation');
+    const profileClan = document.getElementById('profileClan');
     const profileRole = document.getElementById('profileRole');
     const profileAvatar = document.getElementById('profileAvatar');
-    const profileJoinDate = document.getElementById('profileJoinDate');
     const profileGamesPlayed = document.getElementById('profileGamesPlayed');
     const profileGamesWon = document.getElementById('profileGamesWon');
     const profileCorrectAnswers = document.getElementById('profileCorrectAnswers');
     const profileCoins = document.getElementById('profileCoins');
     const profileScore = document.getElementById('profileScore');
-    const adminNavLink = document.getElementById('adminNavLink');
+    
+    // ✅ عناصر المستوى المبسط (بدون تفاصيل إضافية)
+    const profileLevelNumber = document.getElementById('profileLevelNumber');
+    const profileCurrentPoints = document.getElementById('profileCurrentPoints');
+    const profileLevelProgress = document.getElementById('profileLevelProgress');
+    
+    // ✅ عناصر الرتبة
+    const rankDisplay = document.getElementById('profileRankDisplay');
+    const rankPointsEl = document.getElementById('profileRankPoints');
+    const rankProgress = document.getElementById('rankProgressFill');
+    const rankLabels = document.getElementById('rankLabels');
+    
+    // ✅ عناصر تم حذفها (للتوافق مع الكود القديم)
+    const profileBio = document.getElementById('profileBio');
+    const profileLocation = document.getElementById('profileLocation');
+    const profileJoinDate = document.getElementById('profileJoinDate');
+    const levelCurrentLabel = document.getElementById('levelCurrentLabel');
+    const levelNextLabel = document.getElementById('levelNextLabel');
+    const levelCurrent = document.getElementById('levelCurrent');
+    const levelNext = document.getElementById('levelNext');
+    const levelPointsDisplay = document.getElementById('levelPointsDisplay');
+    const levelProgressFill = document.getElementById('levelProgressFill');
     const changeAvatarBtn = document.getElementById('changeAvatarBtn');
     const removeAvatarBtn = document.getElementById('removeAvatarBtn');
-    const gemsEl = document.getElementById('userGemsDisplay');
 
     if (user) {
-            // الرتبة
-const rank = getRank(user.rankPoints || 0);
-const rankDisplay = document.getElementById('profileRankDisplay');
-if (rankDisplay) {
-    rankDisplay.innerHTML = `
-        <img src="images/ranks/${rank.image}" alt="${rank.name}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;margin-left:8px;">
-        <span style="font-weight:700;color:${rank.color};">${rank.name}</span>
-        <span style="font-size:0.7rem;color:var(--gray);">${user.rankPoints || 0} نقطة رتبة</span>
-    `;
-}
-    const rankPointsEl = document.getElementById('profileRankPoints');
-    if (rankPointsEl) rankPointsEl.textContent = user.rankPoints || 0;
-    
-    const rankProgress = document.getElementById('rankProgressFill');
-    if (rankProgress) {
-        rankProgress.style.width = `${Math.min(rank.progress, 100)}%`;
-        rankProgress.style.background = `linear-gradient(90deg, ${rank.color}, var(--accent))`;
-    }
-    const rankLabels = document.getElementById('rankLabels');
-    if (rankLabels) {
-        rankLabels.innerHTML = `
-            <span>${rank.name}</span>
-            <span>${rank.nextName}${rank.nextMin ? ` (${rank.nextMin})` : ''}</span>
-        `;
-    }
+        // ===== 1. معلومات المستخدم الأساسية =====
         const displayName = user.fullName || user.displayName || user.username || user.email || 'مستخدم';
         const username = user.username || 'guest';
         
-        if (changeAvatarBtn) changeAvatarBtn.style.display = 'flex';
-        if (removeAvatarBtn) {
-            removeAvatarBtn.style.display = user.avatar ? 'flex' : 'none';
-        }
-
+        // تحديث العناصر الأساسية
         if (nameEl) nameEl.textContent = displayName;
         if (roleEl) {
             roleEl.textContent = AuthService.getRoleLabel(user.role);
@@ -21459,13 +22317,21 @@ if (rankDisplay) {
         if (achCoins) achCoins.textContent = user.coins || 0;
         if (storeCoins) storeCoins.textContent = user.coins || 0;
         if (gemsEl) gemsEl.textContent = user.gems || 0;
-
+        
+        // ===== 2. الملف الشخصي (البطاقة) =====
+        // الاسم واسم المستخدم
         if (profileName) profileName.textContent = displayName;
         if (profileUsername) profileUsername.textContent = `@${username}`;
-        if (profileBio) profileBio.textContent = user.bio || 'لا توجد سيرة ذاتية';
-        if (profileLocation) profileLocation.textContent = user.location ? `📍 ${user.location}` : '📍 غير محدد';
+        
+        // ✅ القبيلة (تم إضافتها حديثاً)
+        if (profileClan) {
+            profileClan.textContent = user.clan || 'غير منضم';
+        }
+        
+        // الدور
         if (profileRole) profileRole.textContent = `دور: ${AuthService.getRoleLabel(user.role)}`;
         
+        // الصورة الشخصية (مربعة)
         if (profileAvatar) {
             if (user.avatar && user.avatar.startsWith('data:image')) {
                 profileAvatar.style.backgroundImage = `url(${user.avatar})`;
@@ -21478,76 +22344,86 @@ if (rankDisplay) {
             }
         }
         
-        if (profileJoinDate) profileJoinDate.textContent = formatDate(user.createdAt);
+        // ===== 3. المستوى المبسط (بدون تفاصيل إضافية) =====
+        const level = getLevel(user.totalScore || 0);
+        const progress = getLevelProgress(user.totalScore || 0);
+        
+        if (profileLevelNumber) {
+            profileLevelNumber.textContent = level.level;
+        }
+        if (profileCurrentPoints) {
+            profileCurrentPoints.textContent = user.totalScore || 0;
+        }
+        if (profileLevelProgress) {
+            profileLevelProgress.style.width = `${Math.min(progress.progress, 100)}%`;
+        }
+        
+        // ===== 4. الرتبة =====
+        const rank = getRank(user.rankPoints || 0);
+        
+        if (rankDisplay) {
+            rankDisplay.innerHTML = `
+                <img src="images/ranks/${rank.image}" alt="${rank.name}" style="width:100%;height:100%;object-fit:contain;">
+            `;
+        }
+        if (rankPointsEl) {
+            rankPointsEl.textContent = user.rankPoints || 0;
+        }
+        if (rankProgress) {
+            rankProgress.style.width = `${Math.min(rank.progress, 100)}%`;
+            rankProgress.style.background = `linear-gradient(90deg, ${rank.color}, var(--accent))`;
+        }
+        if (rankLabels) {
+            rankLabels.innerHTML = `
+                <span>${rank.name}</span>
+                <span>${rank.nextName}${rank.nextMin ? ` (${rank.nextMin})` : ''}</span>
+            `;
+        }
+        
+        // ===== 5. إحصائيات الملف الشخصي =====
         if (profileGamesPlayed) profileGamesPlayed.textContent = user.stats?.gamesPlayed || 0;
         if (profileGamesWon) profileGamesWon.textContent = user.stats?.gamesWon || 0;
         if (profileCorrectAnswers) profileCorrectAnswers.textContent = user.stats?.correctAnswers || 0;
         if (profileCoins) profileCoins.textContent = user.coins || 0;
         if (profileScore) profileScore.textContent = user.totalScore || 0;
-
+        
+        // ===== 6. إنجازات المستخدم =====
         if (achLevel) {
-            const level = getLevel(user.totalScore || 0);
             achLevel.style.color = level.color;
         }
         if (achCount) {
-    const unlocked = AchievementManager.getUnlockedAchievements();
-    const total = ACHIEVEMENTS_DATA.length;
+            const unlocked = AchievementManager.getUnlockedAchievements();
+            const total = ACHIEVEMENTS_DATA.length;
+            achCount.textContent = `${unlocked.length}/${total}`;
         }
-
-if (user) {
-    // عرض الرتبة
-const rank = getRank(user.rankPoints || 0);
-const rankDisplay = document.getElementById('profileRankDisplay');
-if (rankDisplay) {
-    rankDisplay.innerHTML = `
-        <img src="images/ranks/${rank.image}" alt="${rank.name}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;margin-left:8px;">
-        <span style="font-weight:700;color:${rank.color};">${rank.name}</span>
-        <span style="font-size:0.7rem;color:var(--gray);">${user.rankPoints || 0} نقطة رتبة</span>
-    `;
-}
-    
-    // شريط تقدم الرتبة
-    const rankProgress = document.getElementById('rankProgressFill');
-    if (rankProgress) {
-        rankProgress.style.width = `${Math.min(rank.progress, 100)}%`;
-        rankProgress.style.background = `linear-gradient(90deg, ${rank.color}, var(--accent))`;
-    }
-    const rankLabels = document.getElementById('rankLabels');
-    if (rankLabels) {
-        rankLabels.innerHTML = `
-            <span>${rank.name}</span>
-            <span>${rank.nextName}${rank.nextMin ? ` (${rank.nextMin})` : ''}</span>
-        `;
-    }
-}
-
-const progress = getLevelProgress(user.totalScore || 0);
-document.getElementById('levelCurrentLabel').textContent = `المستوى ${progress.currentLevel}`;
-if (progress.nextMin) {
-    document.getElementById('levelNextLabel').textContent = `المستوى ${progress.nextLevel} (${progress.nextMin} نقطة)`;
-} else {
-    document.getElementById('levelNextLabel').textContent = '🏆 مكتمل';
-}
-        if (levelCurrent) levelCurrent.textContent = progress.current;
-        if (levelNext) levelNext.textContent = progress.next;
-        if (levelProgressFill) levelProgressFill.style.width = `${Math.min(progress.progress, 100)}%`;
-        if (levelPointsDisplay) levelPointsDisplay.textContent = `${user.totalScore || 0} نقطة`;
-
+        
+        // ===== 7. شارة الإنجازات في زر الإنجازات =====
+        const badge = document.getElementById('profileAchievementsBadge');
+        if (badge) {
+            const unlocked = AchievementManager.getUnlockedAchievements();
+            badge.textContent = unlocked.length;
+        }
+        
+        // ===== 8. صلاحيات المشرف =====
         const isAdmin = user && (user.role === 'admin' || user.role === 'super_admin' || user.adminRole);
         if (adminNavLink) {
             adminNavLink.style.display = isAdmin ? 'flex' : 'none';
         }
-
-        // ✅ ============================================================
-        // ✅ تطبيق التخصيصات (الإطارات، الخلفيات، الشارات، السمات)
-        // ✅ يتم تطبيقها دائماً عند وجود مستخدم (من قاعدة البيانات)
-        // ✅ ============================================================
+        
+        // ===== 9. أزرار الصورة (معطلة) =====
+        if (changeAvatarBtn) changeAvatarBtn.style.display = 'none';
+        if (removeAvatarBtn) removeAvatarBtn.style.display = 'none';
+        
+        // ===== 10. تطبيق التخصيصات =====
         this._applyUserCustomizations(user);
 
     } else {
-        // ❌ حالة عدم وجود مستخدم (زائر) - نعرض الواجهة الافتراضية فقط
-        // ✅ لا نقوم بإزالة التخصيصات هنا لأن المستخدم غير موجود أصلاً
+        // ============================================================
+        // ❌ حالة عدم وجود مستخدم (زائر)
+        // ============================================================
         const defaultName = 'زائر';
+        
+        // العناصر الأساسية
         if (nameEl) nameEl.textContent = defaultName;
         if (roleEl) {
             roleEl.textContent = '👀 لاعب';
@@ -21560,26 +22436,55 @@ if (progress.nextMin) {
         if (welcomeUser) welcomeUser.textContent = 'مرحباً بك!';
         if (scoreDisplay) scoreDisplay.textContent = '⭐ 0';
         if (coinsDisplay) coinsDisplay.textContent = '0';
-        if (changeAvatarBtn) changeAvatarBtn.style.display = 'none';
-        if (removeAvatarBtn) removeAvatarBtn.style.display = 'none';
         
-        if (levelCurrent) levelCurrent.textContent = 'مبتدئ';
-        if (levelNext) levelNext.textContent = 'محترف (100 نقطة)';
-        if (levelProgressFill) levelProgressFill.style.width = '0%';
-        if (levelPointsDisplay) levelPointsDisplay.textContent = '0 نقطة';
-        
+        // الملف الشخصي
         if (profileName) profileName.textContent = defaultName;
         if (profileUsername) profileUsername.textContent = '@guest';
-        if (profileBio) profileBio.textContent = 'لا توجد سيرة ذاتية';
-        if (profileLocation) profileLocation.textContent = '📍 غير محدد';
+        if (profileClan) profileClan.textContent = 'غير منضم';
         if (profileRole) profileRole.textContent = 'دور: لاعب';
         if (profileAvatar) {
             profileAvatar.style.backgroundImage = '';
             profileAvatar.textContent = '👤';
         }
+        
+        // المستوى المبسط
+        if (profileLevelNumber) profileLevelNumber.textContent = '1';
+        if (profileCurrentPoints) profileCurrentPoints.textContent = '0';
+        if (profileLevelProgress) profileLevelProgress.style.width = '0%';
+        
+        // الرتبة
+        if (rankDisplay) {
+            rankDisplay.innerHTML = `<img src="images/ranks/bronze1.png" alt="برونزي 1" style="width:100%;height:100%;object-fit:contain;">`;
+        }
+        if (rankPointsEl) rankPointsEl.textContent = '0';
+        if (rankProgress) {
+            rankProgress.style.width = '0%';
+            rankProgress.style.background = 'var(--glass)';
+        }
+        if (rankLabels) {
+            rankLabels.innerHTML = `<span>برونزي 1</span><span>برونزي 2 (100)</span>`;
+        }
+        
+        // إحصائيات
+        if (profileGamesPlayed) profileGamesPlayed.textContent = '0';
+        if (profileGamesWon) profileGamesWon.textContent = '0';
+        if (profileCorrectAnswers) profileCorrectAnswers.textContent = '0';
+        if (profileCoins) profileCoins.textContent = '0';
+        if (profileScore) profileScore.textContent = '0';
+        
+        // إنجازات
+        if (achCount) achCount.textContent = '0/0';
+        const badge = document.getElementById('profileAchievementsBadge');
+        if (badge) badge.textContent = '0';
+        
+        // أزرار الصورة
+        if (changeAvatarBtn) changeAvatarBtn.style.display = 'none';
+        if (removeAvatarBtn) removeAvatarBtn.style.display = 'none';
+        
+        // المشرف
         if (adminNavLink) adminNavLink.style.display = 'none';
         
-        // ✅ استعادة الألوان الافتراضية للواجهة (لأن المستخدم غير موجود)
+        // ✅ استعادة الألوان الافتراضية للواجهة
         const root = document.documentElement;
         root.style.setProperty('--primary', '#6C63FF');
         root.style.setProperty('--accent', '#FFD93D');
@@ -21591,13 +22496,32 @@ if (progress.nextMin) {
             profileAvatar.style.boxShadow = 'none';
         }
         
-        // ✅ إزالة الشارة من الاسم (لأن المستخدم غير موجود)
+        // ✅ إزالة الشارة من الاسم
         const nameEl2 = document.querySelector('.profile-name');
         if (nameEl2) {
             const oldBadge = nameEl2.querySelector('.active-badge-icon');
             if (oldBadge) oldBadge.remove();
         }
     }
+    
+    // ============================================================
+    // ✅ تحديث العناصر القديمة (للتوافق مع الكود القديم)
+    // ============================================================
+    // هذه العناصر قد تكون موجودة في أجزاء أخرى من التطبيق
+    // نقوم بتحديثها إذا كانت موجودة
+    
+    // العناصر المحذوفة (نجعلها فارغة أو مخفية)
+    if (profileBio) profileBio.textContent = '';
+    if (profileLocation) profileLocation.textContent = '';
+    if (profileJoinDate) profileJoinDate.textContent = '';
+    
+    // عناصر المستوى القديمة (نجعلها فارغة أو مخفية)
+    if (levelCurrentLabel) levelCurrentLabel.textContent = '';
+    if (levelNextLabel) levelNextLabel.textContent = '';
+    if (levelCurrent) levelCurrent.textContent = '';
+    if (levelNext) levelNext.textContent = '';
+    if (levelPointsDisplay) levelPointsDisplay.textContent = '';
+    if (levelProgressFill) levelProgressFill.style.width = '0%';
 },
 
 /**
@@ -22701,6 +23625,9 @@ document.getElementById('loginToPostBtn')?.addEventListener('click', () => {
         this._initQuestionForm();
         this._setupMultiplayerHandlers();
         this._setupSoundButtons();
+            setTimeout(() => {
+        this._updateModeUI();
+    }, 100);
     },
 
 _setupModalHandlers() {
@@ -25524,28 +26451,22 @@ _onDataUpdate(data) {
 // إصلاح دالة _onUserUpdate في script.js
 // ============================================================
 
-_onUserUpdate(user) {
+_onUserUpdate: function(user) {
     // 1️⃣ تحديث واجهة المستخدم الأساسية
     this._updateUserUI(user);
     this._updateDashboardUI();
 
     if (user) {
-        // تحديث شارة الإنجازات في الملف الشخصي
-        const unlockedAchievements = AchievementManager.getUnlockedAchievements();
-        const badge = document.getElementById('profileAchievementsBadge');
-        if (badge) {
-            badge.textContent = unlockedAchievements.length;
-        }
-                // ✅ تحميل إعدادات الأطوار من Firebase (إذا لم تكن محملة)
+        // ✅ تحميل إعدادات الأطوار من Firebase (إذا لم تكن محملة)
         if (!this._modeSettingsLoaded) {
             this._loadModeSettingsFromFirebase().then(() => {
                 console.log('✅ Mode settings loaded from Firebase');
-                // تحديث عرض الإعدادات في صفحة اللعبة
                 this._updateGameSettingsDisplay();
+                this._updateModeIconImage(selectedGameMode);
             });
         } else {
-            // تحديث عرض الإعدادات في صفحة اللعبة
             this._updateGameSettingsDisplay();
+            this._updateModeIconImage(selectedGameMode);
         }
         
         // مزامنة الإنجازات مع المستخدم الحالي
@@ -25677,25 +26598,38 @@ _listenNotifications(userId) {
         });
 },
 
-/**
- * حفظ الطور المختار في Firebase و localStorage
- */
 _saveSelectedGameMode(mode) {
     if (!AuthService.currentUser) {
         // حفظ في localStorage مؤقتاً للمستخدم غير المسجل
         localStorage.setItem('selectedGameMode', mode);
+        this._updateModeIconImage(mode);
         return;
     }
+    
     try {
         const user = AuthService.currentUser;
+        const modeImagePath = `images/modes/${mode}.png`;
+        
+        // ✅ حفظ الطور وصورته في Firebase
         db.collection('userSettings').doc(user.uid).set({
             selectedGameMode: mode,
+            modeIconImage: modeImagePath,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true }).catch(e => console.warn('⚠️ Firebase save error:', e));
+        
+        // ✅ حفظ في localStorage
         localStorage.setItem('selectedGameMode', mode);
+        localStorage.setItem('modeIconImage', modeImagePath);
+        
+        // ✅ تحديث صورة زر الإعدادات
+        this._updateModeIconImage(mode);
+        
+        console.log('✅ Mode and icon saved:', mode, modeImagePath);
+        
     } catch (e) {
         console.warn('⚠️ Could not save selectedGameMode:', e);
-        localStorage.setItem('selectedGameMode', mode); // حفظ محلياً كنسخة احتياطية
+        localStorage.setItem('selectedGameMode', mode);
+        this._updateModeIconImage(mode);
     }
 },
 
@@ -26319,7 +27253,7 @@ _handleEscKey(e) {
     }
 },
 
-_selectGameModeFromSettings() {
+_selectGameModeFromSettings: function() {
     const mode = selectedGameMode;
     const modeInfo = MODE_DESCRIPTIONS[mode];
     if (!modeInfo) {
@@ -26327,10 +27261,10 @@ _selectGameModeFromSettings() {
         return;
     }
 
-    // ✅ حفظ الإعدادات الخاصة بالطور الحالي (مثل التدريب)
+    // حفظ الإعدادات الخاصة بالطور الحالي
     this._saveModeSpecificSettings(mode);
 
-    // حفظ الطور المختار
+    // ✅ حفظ الطور المختار وصورته
     this._saveSelectedGameMode(mode);
 
     // عرض رسالة تأكيد
@@ -28092,13 +29026,13 @@ _executeGameMode(mode) {
 if (mode === 'training_crossword') {
     const savedSettings = this._getModeSettings(mode);
     const settings = { ...modeInfo.settings, ...savedSettings };
-    
-    // ✅ جمع الإعدادات من جميع المصادر
+
+    // ✅ إعطاء الأولوية للمفاتيح المبدوءة بـ modeSpecific
     const cleanSettings = {
-        category: settings.category || settings.modeSpecificCrosswordCategory || 'all',
-        crosswordLevel: settings.crosswordLevel || settings.modeSpecificCrosswordLevel || 'gradual',
-        crosswordTime: parseInt(settings.crosswordTime || settings.modeSpecificCrosswordTime || 5) || 5,
-        crosswordRounds: parseInt(settings.crosswordRounds || settings.modeSpecificCrosswordRounds || 5) || 5,
+        category: settings.modeSpecificCrosswordCategory || settings.category || 'all',
+        crosswordLevel: settings.modeSpecificCrosswordLevel || settings.crosswordLevel || 'gradual',
+        crosswordTime: parseInt(settings.modeSpecificCrosswordTime || settings.crosswordTime || 5) || 5,
+        crosswordRounds: parseInt(settings.modeSpecificCrosswordRounds || settings.crosswordRounds || 5) || 5,
     };
 
     console.log('🔤 Starting crossword match with settings:', cleanSettings);
@@ -29416,18 +30350,16 @@ App._updateModalWithCurrentMode = function() {
         }
     }
 
-    // ✅ تحديث الإعدادات الخاصة - الأهم
+    // ✅ تحديث الإعدادات الخاصة
     const settingsContainer = document.getElementById('modeSpecificSettingsContainer');
     const contentDiv = document.getElementById('modeSpecificContent');
     const titleEl = document.getElementById('modeSpecificTitle');
     
     if (settingsContainer && contentDiv) {
-        // إظهار حاوية الإعدادات فقط للأطوار التي لها إعدادات قابلة للتعديل
         const hasSettings = isTraining || isRoom;
         settingsContainer.style.display = hasSettings ? 'block' : 'none';
         
         if (hasSettings) {
-            // تحديث المحتوى حسب الطور
             this._updateModeSpecificSettings(mode);
         }
     }
@@ -29471,16 +30403,18 @@ App._updateModalWithCurrentMode = function() {
             }
         }
     }
+
+    // ✅ تحديث صورة زر الإعدادات
+    this._updateModeIconImage(mode);
+    
     // ===== إضافة صور الخلفية لبطاقات الأطوار =====
     const modeCards = document.querySelectorAll('.mode-card-horizontal');
     modeCards.forEach(card => {
         const cardMode = card.dataset.mode;
         if (!cardMode) return;
         
-        // مسار الصورة
         const imgPath = `images/modes/${cardMode}.jpg`;
         
-        // محاولة تحميل الصورة
         const img = new Image();
         img.onload = function() {
             card.style.backgroundImage = `url('${imgPath}')`;
@@ -29489,7 +30423,6 @@ App._updateModalWithCurrentMode = function() {
             card.style.backgroundRepeat = 'no-repeat';
         };
         img.onerror = function() {
-            // إذا لم توجد الصورة، استخدم خلفية لونية بديلة حسب نوع الطور
             const fallbackColors = {
                 'ranked': 'linear-gradient(135deg, #6C63FF, #4a3fcf)',
                 'unranked': 'linear-gradient(135deg, #2ecc71, #1a8a4a)',
@@ -29503,7 +30436,7 @@ App._updateModalWithCurrentMode = function() {
         img.src = imgPath;
     });
 
-    // ===== تحديث البطاقات النشطة =====
+    // تحديث البطاقات النشطة
     modeCards.forEach(card => {
         card.classList.toggle('active', card.dataset.mode === mode);
     });
@@ -29637,12 +30570,12 @@ CrosswordMatchEngine._handleRoundComplete = function(success, totalWords) {
     this._isWaitingForNext = true;
 
     try {
-        // ✅ الحصول على النتيجة من CrosswordEngine بشكل دقيق
+        // ✅ الحصول على البيانات من CrosswordEngine
         const userGrid = CrosswordEngine._userGrid || [];
         const fullGrid = CrosswordEngine._fullGrid || [];
         const words = CrosswordEngine._words || [];
         
-        // ✅ حساب عدد الكلمات المكتملة بشكل دقيق
+        // ✅ حساب عدد الكلمات المكتملة
         let verifiedCount = 0;
         for (const w of words) {
             let isComplete = true;
@@ -29669,16 +30602,13 @@ CrosswordMatchEngine._handleRoundComplete = function(success, totalWords) {
         
         const total = words.length;
         const isAllComplete = (verifiedCount === total && total > 0);
-        
-        console.log(`🔍 Round ${this._currentRoundIndex + 1}: ${verifiedCount}/${total} words completed`);
-        console.log(`📊 isAllComplete: ${isAllComplete}, success param: ${success}`);
+        const completedWords = verifiedCount; // ✅ تعريف واضح
 
-        // ✅ تحديث واجهة التقدم دائماً
+        // تحديث واجهة التقدم
         this._updateProgressUI(verifiedCount, total);
 
-        // ✅ إذا لم تكتمل جميع الكلمات، ننتظر فقط ولا ننهي الجولة
+        // إذا لم تكتمل جميع الكلمات، ننتظر
         if (!isAllComplete) {
-            // ✅ تحديث واجهة المستخدم لإظهار التقدم
             const resultContainer = document.getElementById('verifyResultContainer');
             if (resultContainer) {
                 const remaining = total - verifiedCount;
@@ -29696,38 +30626,16 @@ CrosswordMatchEngine._handleRoundComplete = function(success, totalWords) {
                     </div>
                 `;
             }
-            
-            // ✅ لا ننهي الجولة، ننتظر حتى تكتمل جميع الكلمات
             this._isWaitingForNext = false;
-            return; // ✅ مهم: الخروج دون الانتقال للجولة التالية
+            return; // ✅ الخروج دون نهاية الجولة
         }
 
-        // ✅ ============================================================
-        // ✅ هنا نصل فقط إذا اكتملت جميع الكلمات (isAllComplete === true)
-        // ✅ ============================================================
-        
-        // ✅ حساب النقاط والعملات
-        let points = 0;
-        let coins = 0;
-        
-        // النقاط الأساسية: كل كلمة = 15 نقطة
-        points = verifiedCount * 15;
-        
-        // مكافأة الإكمال الكامل
-        points += 50;
-        
-        // مكافأة الوقت المتبقي
+        // ✅ ===== هنا نصل فقط إذا اكتملت جميع الكلمات =====
+        // حساب النقاط والعملات
         const remainingTime = this._timeLeft;
-        if (remainingTime > 0) {
-            const bonus = Math.round(remainingTime / 10) * 2;
-            points += bonus;
-        }
+        const accuracy = total > 0 ? Math.round((verifiedCount / total) * 100) : 0;
         
-        // النقود = 20% من النقاط
-        coins = Math.round(points * 0.2);
-        if (coins === 0 && points > 0) coins = 2;
-        
-        // ✅ حساب الحروف الصحيحة
+        // حساب الحروف الصحيحة
         let correctLetters = 0;
         let totalLetters = 0;
         for (let r = 0; r < fullGrid.length; r++) {
@@ -29741,14 +30649,103 @@ CrosswordMatchEngine._handleRoundComplete = function(success, totalWords) {
                 }
             }
         }
-        
-        // ✅ تسجيل النتيجة الكاملة
+        const letterAccuracy = totalLetters > 0 ? Math.round((correctLetters / totalLetters) * 100) : 0;
+
+        // ===== حساب النقاط المتقدمة =====
+        let points = 0;
+        let coins = 0;
+        const pointDetails = [];
+        const coinDetails = [];
+
+        // 1. نقاط أساسية لكل كلمة مكتملة (15 نقطة لكل كلمة)
+        const baseWordPoints = completedWords * 15;
+        points += baseWordPoints;
+        pointDetails.push({ label: `📝 ${completedWords} كلمة × 15`, value: baseWordPoints });
+
+        // 2. مكافأة الإكمال الكامل
+        const completionBonus = 50;
+        points += completionBonus;
+        pointDetails.push({ label: '🎯 إكمال كامل', value: completionBonus });
+
+        // 3. مكافأة الدقة (نسبة الكلمات المكتملة)
+        let accuracyBonus = 0;
+        if (accuracy >= 90) accuracyBonus = 30;
+        else if (accuracy >= 70) accuracyBonus = 20;
+        else if (accuracy >= 50) accuracyBonus = 10;
+        if (accuracyBonus > 0) {
+            points += accuracyBonus;
+            pointDetails.push({ label: `🎯 دقة ${accuracy}%`, value: accuracyBonus });
+        }
+
+        // 4. مكافأة الوقت المتبقي (نقطة لكل 5 ثوانٍ متبقية)
+        const timeBonus = Math.floor(remainingTime / 5) * 2;
+        if (timeBonus > 0) {
+            points += timeBonus;
+            pointDetails.push({ label: `⏱ وقت متبقي ${remainingTime}s`, value: timeBonus });
+        }
+
+        // 5. مكافأة الحروف الصحيحة (نقطة لكل حرف صحيح)
+        const letterBonus = correctLetters;
+        if (letterBonus > 0) {
+            points += letterBonus;
+            pointDetails.push({ label: `🔤 ${correctLetters} حرف صحيح`, value: letterBonus });
+        }
+
+        // 6. عقوبة المحاولات الخاطئة (خصم 3 نقاط لكل محاولة خاطئة)
+        const wrongAttempts = CrosswordEngine._wrongAttempts || 0;
+        if (wrongAttempts > 0) {
+            const penalty = Math.min(wrongAttempts * 3, 30); // حد أقصى 30 خصم
+            points = Math.max(0, points - penalty);
+            pointDetails.push({ label: `❌ محاولات خاطئة (${wrongAttempts})`, value: -penalty });
+        }
+
+        // ===== حساب العملات =====
+        // 1. عملات أساسية = 20% من النقاط
+        let baseCoins = Math.round(points * 0.2);
+        if (baseCoins === 0 && points > 0) baseCoins = 2;
+        coins += baseCoins;
+        coinDetails.push({ label: '🪙 20% من النقاط', value: baseCoins });
+
+        // 2. مكافأة إكمال كامل
+        const completionCoinBonus = 10;
+        coins += completionCoinBonus;
+        coinDetails.push({ label: '🎯 مكافأة إكمال', value: completionCoinBonus });
+
+        // 3. مكافأة دقة عالية
+        if (accuracy >= 90) {
+            const accCoinBonus = 8;
+            coins += accCoinBonus;
+            coinDetails.push({ label: `🎯 دقة ${accuracy}%`, value: accCoinBonus });
+        } else if (accuracy >= 70) {
+            const accCoinBonus = 5;
+            coins += accCoinBonus;
+            coinDetails.push({ label: `🎯 دقة ${accuracy}%`, value: accCoinBonus });
+        }
+
+        // 4. مكافأة حروف صحيحة
+        if (correctLetters >= 10) {
+            const letterCoinBonus = 5;
+            coins += letterCoinBonus;
+            coinDetails.push({ label: `🔤 ${correctLetters} حرف صحيح`, value: letterCoinBonus });
+        }
+
+        // 5. مكافأة سرعة (إذا كان متوسط الوقت لكل كلمة أقل من 10 ثوانٍ)
+        const avgTimePerWord = (this._totalTime - remainingTime) / total;
+        if (avgTimePerWord < 10) {
+            const speedBonus = Math.round((10 - avgTimePerWord) * 0.5);
+            if (speedBonus > 0) {
+                coins += speedBonus;
+                coinDetails.push({ label: `⚡ سرعة (متوسط ${avgTimePerWord.toFixed(1)}s)`, value: speedBonus });
+            }
+        }
+
+        // ✅ تسجيل النتيجة
         const roundResult = {
             round: this._currentRoundIndex + 1,
             correct: verifiedCount,
             wrong: 0,
             total: total,
-            accuracy: 100,
+            accuracy: accuracy,
             points: Math.max(points, 0),
             coins: Math.max(coins, 0),
             timeTaken: this._totalTime - this._timeLeft,
@@ -29756,13 +30753,16 @@ CrosswordMatchEngine._handleRoundComplete = function(success, totalWords) {
             totalLetters: totalLetters,
             success: true,
             verifiedCount: verifiedCount,
-            remainingTime: remainingTime
+            remainingTime: remainingTime,
+            pointDetails: pointDetails,
+            coinDetails: coinDetails,
+            pointDetails: pointDetails,   // تفاصيل النقاط
+            coinDetails: coinDetails      // تفاصيل العملات
         };
-        
-        this._results.push(roundResult);
-        console.log(`✅ Round ${roundResult.round} COMPLETED successfully!`, roundResult);
 
-        // ✅ عرض رسالة النجاح
+        this._results.push(roundResult);
+
+        // عرض رسالة النجاح مع التفاصيل
         const resultContainer = document.getElementById('verifyResultContainer');
         if (resultContainer) {
             resultContainer.innerHTML = `
@@ -29774,23 +30774,23 @@ CrosswordMatchEngine._handleRoundComplete = function(success, totalWords) {
                         +${roundResult.points} نقطة • +${roundResult.coins} عملة
                     </span>
                     <div style="font-size:0.7rem;color:var(--gray);margin-top:0.2rem;">
-                        ⏱ الوقت المتبقي: ${remainingTime}s • 📝 ${verifiedCount} كلمة صحيحة
+                        ⏱ الوقت المتبقي: ${remainingTime}s • 📝 ${verifiedCount} كلمة صحيحة • 🎯 دقة ${accuracy}%
                     </div>
                 </div>
             `;
         }
 
-        // ✅ تحديث النقاط في العنوان
+        // تحديث النقاط في العنوان
         const scoreEl = document.getElementById('cwMatchScore');
         if (scoreEl) {
             const totalPoints = this._results.reduce((s, r) => s + (r.points || 0), 0);
             scoreEl.textContent = `⭐ ${totalPoints}`;
         }
 
-        // ✅ تحديث شريط التقدم إلى 100%
+        // تحديث شريط التقدم إلى 100%
         this._updateProgressUI(verifiedCount, total);
 
-        // ✅ الانتقال للجولة التالية بعد تأخير
+        // الانتقال للجولة التالية بعد تأخير
         this._currentRoundIndex++;
         this._isWaitingForNext = false;
         
@@ -29805,7 +30805,7 @@ CrosswordMatchEngine._handleRoundComplete = function(success, totalWords) {
                 this._endMatch();
             }, 1500);
         }
-        
+
     } catch (e) {
         console.error('❌ Error handling round complete:', e);
         this._isWaitingForNext = false;
