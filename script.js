@@ -15422,6 +15422,45 @@ _updateBatchProgress(completed, total, errors, statusText) {
 },
 
 // ============================================================
+// دالة تبديل إظهار/إخفاء قسم الإنجازات
+// ============================================================
+_toggleAchievementSection: function(sectionId) {
+    const content = document.getElementById(sectionId);
+    if (!content) {
+        console.warn('⚠️ Achievement section not found:', sectionId);
+        return;
+    }
+
+    const wrapper = content.parentElement;
+    if (!wrapper) return;
+
+    const header = wrapper.querySelector('.achievement-section-header');
+    if (!header) return;
+
+    const isOpen = content.style.display === 'block';
+
+    if (isOpen) {
+        content.style.display = 'none';
+        content.style.padding = '0';
+        const arrow = header.querySelector('.toggle-icon');
+        if (arrow) arrow.textContent = '▼';
+        const badge = header.querySelector('.status-badge');
+        if (badge) badge.textContent = 'مغلق';
+        header.style.borderBottom = 'none';
+        wrapper.style.borderColor = 'var(--border-color)';
+    } else {
+        content.style.display = 'block';
+        content.style.padding = '0.5rem';
+        const arrow = header.querySelector('.toggle-icon');
+        if (arrow) arrow.textContent = '▲';
+        const badge = header.querySelector('.status-badge');
+        if (badge) badge.textContent = 'مفتوح';
+        header.style.borderBottom = '1px solid var(--border-color)';
+        wrapper.style.borderColor = 'var(--accent)';
+    }
+},
+
+// ============================================================
 // إعدادات الأطوار
 // ============================================================
 
@@ -17042,6 +17081,10 @@ async _addGems(amount) {
 // عرض صفحة الملف الشخصي - نسخة معدلة (بطاقة مستطيلة)
 // ============================================================
 
+// ============================================================
+// عرض صفحة الملف الشخصي - نسخة معدلة (مع تبويبات الإحصائيات والإنجازات)
+// ============================================================
+
 _renderProfileSection() {
     return `
         <div class="profile-page">
@@ -17057,6 +17100,7 @@ _renderProfileSection() {
                     <div class="profile-name" id="profileName">زائر</div>
                     <div class="profile-username" id="profileUsername">@guest</div>
                     <div class="profile-clan">🏰 القبيلة: <span id="profileClan">غير منضم</span></div>
+                    <div class="profile-role" id="profileRole">👀 لاعب</div>
                 </div>
                 
                 <!-- الرتبة -->
@@ -17065,111 +17109,39 @@ _renderProfileSection() {
                 </div>
             </div>
             
-            <!-- ===== شريط تقدم المستوى (مبسط - بدون تفاصيل إضافية) ===== -->
-            <div class="profile-level-card" style="margin-top: 1rem; padding: 0.8rem 1.2rem; background: var(--glass); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
-                    <span style="font-weight: 700; font-size: 0.9rem; color: var(--light);">
-                        <i class="fas fa-star" style="color: var(--accent);"></i> المستوى <span id="profileLevelNumber">1</span>
-                    </span>
-                    <span style="font-size: 0.8rem; color: var(--gray);">
-                        <span id="profileCurrentPoints">0</span> نقطة
-                    </span>
+            <!-- ===== شريط تقدم المستوى (مبسط) ===== -->
+            <div class="profile-level-card">
+                <div class="level-header">
+                    <span class="level-label"><i class="fas fa-star"></i> المستوى <span id="profileLevelNumber">1</span></span>
+                    <span class="level-points"><span id="profileCurrentPoints">0</span> نقطة</span>
                 </div>
-                <div class="progress-bar" style="height: 6px; background: var(--glass); border-radius: 10px; overflow: hidden;">
-                    <div class="fill" id="profileLevelProgress" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); border-radius: 10px; transition: width 0.5s ease;"></div>
+                <div class="progress-bar">
+                    <div class="fill" id="profileLevelProgress" style="width:0%;"></div>
                 </div>
-                <!-- ✅ تم حذف المستوى الحالي والمستوى التالي والنقاط التالية -->
             </div>
             
-            <!-- ===== الأزرار (أسفل البطاقة) ===== -->
-            <div class="profile-actions">
-                <button class="btn btn-outline" id="profileStatsBtn">
-                    <i class="fas fa-chart-line"></i> الإحصائيات
-                </button>
-                <button class="btn btn-outline" id="profileAchievementsBtn" style="border-color: var(--accent); color: var(--accent);">
-                    <i class="fas fa-star"></i> الإنجازات
-                    <span class="badge" id="profileAchievementsBadge" style="background: var(--accent); color: var(--dark); font-size: 0.6rem; padding: 1px 8px; border-radius: 30px; margin-right: 4px;">0</span>
-                </button>
-                <button class="btn btn-outline" id="profileFriendsBtn">
-                    <i class="fas fa-user-friends"></i> الأصدقاء
-                    <span class="badge" id="friendsCount" style="background: var(--primary); color: #fff; font-size: 0.6rem; padding: 1px 8px; border-radius: 30px; margin-right: 4px;">0</span>
-                </button>
-                <button class="btn btn-outline" id="showFollowersBtn">
-                    <i class="fas fa-user-plus"></i> المتابعين
-                    <span class="badge" id="followersCount" style="background: var(--info); color: #fff; font-size: 0.6rem; padding: 1px 8px; border-radius: 30px; margin-right: 4px;">0</span>
-                </button>
-                <button class="btn btn-outline" id="showFollowingBtn">
-                    <i class="fas fa-user-check"></i> المتابَعين
-                    <span class="badge" id="followingCount" style="background: var(--success); color: #fff; font-size: 0.6rem; padding: 1px 8px; border-radius: 30px; margin-right: 4px;">0</span>
-                </button>
-                <button class="btn btn-outline" id="shareProfileBtn">
-                    <i class="fas fa-share-alt"></i> مشاركة
-                </button>
-            </div>
-
-            <!-- ===== الإحصائيات السريعة ===== -->
-            <div class="profile-quick-stats grid-5" style="margin-top: 1.5rem;">
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-gamepad"></i></div>
-                    <div class="stat-number" id="profileGamesPlayed">0</div>
-                    <div class="stat-label">مباريات لعبت</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-trophy"></i></div>
-                    <div class="stat-number" id="profileGamesWon">0</div>
-                    <div class="stat-label">فوز</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
-                    <div class="stat-number" id="profileCorrectAnswers">0</div>
-                    <div class="stat-label">إجابات صحيحة</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-coins"></i></div>
-                    <div class="stat-number" id="profileCoins">0</div>
-                    <div class="stat-label">عملات</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon"><i class="fas fa-star"></i></div>
-                    <div class="stat-number" id="profileScore">0</div>
-                    <div class="stat-label">نقاط</div>
-                </div>
-            </div>
-
-            <!-- ===== شارات المستخدم ===== -->
-            <div class="profile-badges-container" id="profileBadgesContainer">
-                <!-- سيتم تعبئتها بـ JS -->
-            </div>
-
-            <!-- ===== تبويبات المحتوى ===== -->
+            <!-- ===== تبويبات المحتوى (تمرير أفقي) ===== -->
             <div class="profile-tabs">
-                <button class="tab-btn" data-tab="activity"><i class="fas fa-clock"></i> النشاطات</button>
+                <button class="tab-btn active" data-tab="activity"><i class="fas fa-clock"></i> النشاطات</button>
+                <button class="tab-btn" data-tab="inventory"><i class="fas fa-box"></i> المخزون</button>
+                <button class="tab-btn" data-tab="collectibles"><i class="fas fa-gem"></i> المقتنيات</button>
+                <button class="tab-btn" data-tab="history"><i class="fas fa-history"></i> سجل اللعب</button>
                 <button class="tab-btn" data-tab="achievements"><i class="fas fa-medal"></i> الإنجازات</button>
-                <button class="tab-btn active" data-tab="inventory"><i class="fas fa-box"></i> المخزون</button>
                 <button class="tab-btn" data-tab="stats"><i class="fas fa-chart-bar"></i> الإحصائيات</button>
-                <button class="tab-btn" data-tab="friends"><i class="fas fa-user-friends"></i> الأصدقاء</button>
             </div>
 
             <!-- ===== محتوى التبويبات ===== -->
             <div class="profile-tab-content">
                 <!-- النشاطات -->
-                <div class="tab-panel" id="tab-activity">
+                <div class="tab-panel active" id="tab-activity">
                     <div class="card">
                         <div class="card-title"><i class="fas fa-history"></i> النشاطات الأخيرة</div>
                         <div id="profileActivity"><div class="text-gray">لا توجد نشاطات</div></div>
                     </div>
                 </div>
 
-                <!-- الإنجازات -->
-                <div class="tab-panel" id="tab-achievements">
-                    <div class="card">
-                        <div class="card-title"><i class="fas fa-medal"></i> الإنجازات <span class="badge badge-primary" id="achievementCount">0</span></div>
-                        <div class="grid-4" id="profileAchievementsGrid"><div class="text-gray">جاري التحميل...</div></div>
-                    </div>
-                </div>
-
                 <!-- المخزون -->
-                <div class="tab-panel active" id="tab-inventory">
+                <div class="tab-panel" id="tab-inventory">
                     <div class="card">
                         <div class="card-title">
                             <i class="fas fa-box"></i> المخزون 
@@ -17181,40 +17153,295 @@ _renderProfileSection() {
                     </div>
                 </div>
 
-                <!-- الإحصائيات -->
-                <div class="tab-panel" id="tab-stats">
+                <!-- ===== المقتنيات (مع أقسام فرعية) ===== -->
+                <div class="tab-panel" id="tab-collectibles">
                     <div class="card">
-                        <div class="card-title"><i class="fas fa-chart-bar"></i> الإحصائيات المتقدمة</div>
-                        <div class="grid-3" id="profileStatsGrid">
-                            <div class="stat-card"><div class="stat-number" id="statWinRate">0%</div><div class="stat-label">نسبة الفوز</div></div>
-                            <div class="stat-card"><div class="stat-number" id="statAvgScore">0</div><div class="stat-label">متوسط النقاط</div></div>
-                            <div class="stat-card"><div class="stat-number" id="statBestStreak">0</div><div class="stat-label">أفضل سلسلة</div></div>
+                        <div class="card-title">
+                            <i class="fas fa-gem"></i> المقتنيات
+                            <span class="badge badge-primary" id="collectiblesCount">0</span>
                         </div>
-                        <div class="chart-container" style="height:200px;margin-top:1rem;">
-                            <canvas id="profileScoreChart"></canvas>
+                        
+                        <!-- ✅ أقسام المقتنيات الفرعية -->
+                        <div class="collectibles-subtabs" style="display:flex;gap:0.3rem;flex-wrap:nowrap;overflow-x:auto;padding:0.3rem 0.2rem 0.6rem;margin-bottom:0.8rem;border-bottom:1px solid var(--glass-border);">
+                            <button class="collectibles-subtab active" data-subtab="cards" style="
+                                padding:0.3rem 0.8rem;
+                                border-radius:30px;
+                                border:1px solid var(--glass-border);
+                                background:var(--primary);
+                                color:#fff;
+                                font-weight:600;
+                                font-size:0.7rem;
+                                cursor:pointer;
+                                transition:all 0.3s ease;
+                                font-family:var(--font);
+                                flex-shrink:0;
+                                white-space:nowrap;
+                            ">
+                                <i class="fas fa-image"></i> البطاقات
+                            </button>
+                            <button class="collectibles-subtab" data-subtab="frames" style="
+                                padding:0.3rem 0.8rem;
+                                border-radius:30px;
+                                border:1px solid var(--glass-border);
+                                background:transparent;
+                                color:var(--gray);
+                                font-weight:600;
+                                font-size:0.7rem;
+                                cursor:pointer;
+                                transition:all 0.3s ease;
+                                font-family:var(--font);
+                                flex-shrink:0;
+                                white-space:nowrap;
+                            ">
+                                <i class="fas fa-border-all"></i> الإطارات
+                            </button>
+                            <button class="collectibles-subtab" data-subtab="badges" style="
+                                padding:0.3rem 0.8rem;
+                                border-radius:30px;
+                                border:1px solid var(--glass-border);
+                                background:transparent;
+                                color:var(--gray);
+                                font-weight:600;
+                                font-size:0.7rem;
+                                cursor:pointer;
+                                transition:all 0.3s ease;
+                                font-family:var(--font);
+                                flex-shrink:0;
+                                white-space:nowrap;
+                            ">
+                                <i class="fas fa-medal"></i> الشارات
+                            </button>
+                            <button class="collectibles-subtab" data-subtab="themes" style="
+                                padding:0.3rem 0.8rem;
+                                border-radius:30px;
+                                border:1px solid var(--glass-border);
+                                background:transparent;
+                                color:var(--gray);
+                                font-weight:600;
+                                font-size:0.7rem;
+                                cursor:pointer;
+                                transition:all 0.3s ease;
+                                font-family:var(--font);
+                                flex-shrink:0;
+                                white-space:nowrap;
+                            ">
+                                <i class="fas fa-palette"></i> السمات
+                            </button>
+                            <button class="collectibles-subtab" data-subtab="emotes" style="
+                                padding:0.3rem 0.8rem;
+                                border-radius:30px;
+                                border:1px solid var(--glass-border);
+                                background:transparent;
+                                color:var(--gray);
+                                font-weight:600;
+                                font-size:0.7rem;
+                                cursor:pointer;
+                                transition:all 0.3s ease;
+                                font-family:var(--font);
+                                flex-shrink:0;
+                                white-space:nowrap;
+                            ">
+                                <i class="fas fa-smile"></i> الرموز
+                            </button>
+                        </div>
+                        
+                        <!-- ✅ محتوى المقتنيات -->
+                        <div id="collectiblesContent">
+                            <!-- سيتم تعبئته بواسطة JavaScript -->
+                            <div class="text-gray" style="text-align:center;padding:1rem;">
+                                <i class="fas fa-spinner fa-spin"></i> جاري التحميل...
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- الأصدقاء -->
-                <div class="tab-panel" id="tab-friends">
+                <!-- سجل اللعب -->
+                <div class="tab-panel" id="tab-history">
                     <div class="card">
-                        <div class="card-title"><i class="fas fa-user-friends"></i> الأصدقاء</div>
-                        <div id="profileFriendsList"><div class="text-gray">لا توجد أصدقاء</div></div>
-                        <div class="mt-1">
-                            <div class="form-group">
-                                <label>إضافة صديق</label>
-                                <div style="display:flex;gap:0.5rem;">
-                                    <input type="text" id="addFriendInput" placeholder="اسم المستخدم أو البريد" style="flex:1;">
-                                    <button class="btn btn-primary" id="addFriendBtn"><i class="fas fa-user-plus"></i> إضافة</button>
-                                </div>
+                        <div class="card-title"><i class="fas fa-history"></i> سجل اللعب</div>
+                        <div id="profileHistory">
+                            <div class="text-gray" style="text-align:center;padding:2rem;">
+                                <i class="fas fa-spinner fa-spin" style="font-size:2rem;color:var(--accent);display:block;margin-bottom:0.5rem;"></i>
+                                جاري تحميل سجل اللعب...
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- الإنجازات -->
+                <div class="tab-panel" id="tab-achievements">
+                    <div class="card">
+                        <div class="card-title">
+                            <i class="fas fa-medal"></i> الإنجازات 
+                            <span class="badge badge-primary" id="achievementCount">0</span>
+                        </div>
+                        <div id="profileAchievementsGrid"><div class="text-gray">جاري التحميل...</div></div>
+                    </div>
+                </div>
+
+                <!-- الإحصائيات -->
+                <div class="tab-panel" id="tab-stats">
+                    <div class="card">
+                        <div class="card-title"><i class="fas fa-chart-bar"></i> الإحصائيات المتقدمة</div>
+                        <div id="profileStatsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.5rem;">
+                            <div class="stat-card"><div class="stat-number" id="statWinRate">0%</div><div class="stat-label">نسبة الفوز</div></div>
+                            <div class="stat-card"><div class="stat-number" id="statAvgScore">0</div><div class="stat-label">متوسط النقاط</div></div>
+                            <div class="stat-card"><div class="stat-number" id="statBestStreak">0</div><div class="stat-label">أفضل سلسلة</div></div>
+                            <div class="stat-card"><div class="stat-number" id="statTotalMatches">0</div><div class="stat-label">إجمالي المباريات</div></div>
+                            <div class="stat-card"><div class="stat-number" id="statTotalWins">0</div><div class="stat-label">إجمالي الفوز</div></div>
+                            <div class="stat-card"><div class="stat-number" id="statAccuracy">0%</div><div class="stat-label">الدقة</div></div>
+                            <div class="stat-card"><div class="stat-number" id="statTotalQuestions">0</div><div class="stat-label">إجمالي الأسئلة</div></div>
+                            <div class="stat-card"><div class="stat-number" id="statCorrectAnswers">0</div><div class="stat-label">إجابات صحيحة</div></div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     `;
+},
+
+// ============================================================
+// عرض المقتنيات (حسب التبويب الفرعي)
+// ============================================================
+_renderCollectibles: function(subtab = 'cards') {
+    const container = document.getElementById('collectiblesContent');
+    if (!container) return;
+    
+    const user = AuthService.currentUser;
+    if (!user) {
+        container.innerHTML = '<div class="text-gray" style="text-align:center;padding:2rem;">سجل الدخول لعرض المقتنيات</div>';
+        return;
+    }
+    
+    const inventory = user.inventory || [];
+    const activeItems = user.activeItems || [];
+    const storeItems = DataManager.data.storeItems || [];
+    
+    // تحديث عدد المقتنيات
+    const countEl = document.getElementById('collectiblesCount');
+    if (countEl) countEl.textContent = inventory.length;
+    
+    // تصفية العناصر حسب التبويب الفرعي
+    const categoryMap = {
+        'cards': 'backgrounds',
+        'frames': 'frames',
+        'badges': 'badges',
+        'themes': 'themes',
+        'emotes': 'emotes'
+    };
+    
+    const category = categoryMap[subtab] || 'backgrounds';
+    
+    const ownedItems = inventory
+        .filter(inv => {
+            const item = storeItems.find(s => s.id === inv.itemId);
+            return item && item.category === category;
+        })
+        .map(inv => {
+            const item = storeItems.find(s => s.id === inv.itemId);
+            return {
+                ...inv,
+                item: item,
+                isActive: activeItems.includes(inv.itemId)
+            };
+        });
+    
+    if (ownedItems.length === 0) {
+        const subtabNames = {
+            'cards': 'بطاقات وخلفيات',
+            'frames': 'إطارات',
+            'badges': 'شارات',
+            'themes': 'سمات',
+            'emotes': 'رموز'
+        };
+        container.innerHTML = `
+            <div class="empty-state" style="text-align:center;padding:2rem;">
+                <i class="fas fa-box-open" style="font-size:2.5rem;color:var(--gray-dark);display:block;margin-bottom:0.5rem;"></i>
+                <h3 style="font-size:1.1rem;">لا توجد ${subtabNames[subtab] || 'عناصر'}</h3>
+                <p class="text-gray" style="font-size:0.85rem;">اذهب إلى المتجر لشراء المقتنيات!</p>
+                <button class="btn btn-primary btn-sm mt-1" onclick="App._activateSection('store')">
+                    <i class="fas fa-store"></i> زيارة المتجر
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    // أسماء الخلفيات مع رموز تعبيرية مميزة
+    const bgEmojis = {
+        'bg_wizard_library': '📚',
+        'bg_neon_city': '🌃',
+        'bg_world_explorer': '🗺️',
+        'bg_moon_castle': '🌙',
+        'bg_winter_night': '❄️',
+        'bg_pirate_bay': '🏴‍☠️',
+        'bg_moon_base': '🚀',
+        'bg_ocean_deep': '🌊',
+        'bg_pharaoh_civilization': '🏛️',
+        'bg_samurai_gardens': '🌸'
+    };
+    
+    // عرض العناصر
+    let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.8rem;">`;
+    
+    ownedItems.forEach(item => {
+        const storeItem = item.item;
+        const isActive = item.isActive;
+        const rarityColor = this._getRarityColor(storeItem.rarity);
+        const rarityLabel = this._getRarityLabel(storeItem.rarity);
+        const imagePath = storeItem.imagePath || '';
+        const quantity = item.quantity || 0;
+        const emoji = bgEmojis[storeItem.id] || '🖼️';
+        
+        html += `
+            <div class="collectible-item ${isActive ? 'active' : ''}" style="
+                background:var(--card-bg);
+                border:2px solid ${isActive ? 'var(--accent)' : 'var(--border-color)'};
+                border-radius:var(--radius-sm);
+                overflow:hidden;
+                transition:all 0.3s ease;
+                ${isActive ? 'box-shadow:0 0 30px rgba(255,217,61,0.15);' : ''}
+                cursor:pointer;
+                position:relative;
+            "
+            onclick="App._toggleActiveItem('${storeItem.id}')">
+                ${isActive ? '<span style="position:absolute;top:6px;right:6px;font-size:0.45rem;padding:0.1rem 0.4rem;border-radius:30px;background:var(--accent);color:var(--dark);font-weight:700;z-index:2;">مفعل</span>' : ''}
+                ${quantity > 1 ? `<span style="position:absolute;top:6px;left:6px;font-size:0.4rem;padding:0.05rem 0.3rem;border-radius:30px;background:rgba(0,0,0,0.7);color:#fff;font-weight:700;z-index:2;">×${quantity}</span>` : ''}
+                <div style="
+                    aspect-ratio:16/9;
+                    background-image:url('${imagePath}');
+                    background-size:cover;
+                    background-position:center;
+                    background-color:var(--glass);
+                    position:relative;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                ">
+                    ${!imagePath ? `<span style="font-size:3rem;opacity:0.3;">${emoji}</span>` : ''}
+                </div>
+                <div style="padding:0.5rem;">
+                    <div style="font-weight:700;font-size:0.8rem;color:var(--light);display:flex;align-items:center;gap:0.3rem;">
+                        <span>${emoji}</span>
+                        <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${storeItem.name}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.2rem;">
+                        <span style="font-size:0.5rem;padding:0.05rem 0.4rem;border-radius:30px;color:${rarityColor};background:${rarityColor}33;border:1px solid ${rarityColor}66;">
+                            ${rarityLabel}
+                        </span>
+                        <button class="btn ${isActive ? 'btn-danger' : 'btn-primary'}" 
+                                onclick="event.stopPropagation(); App._toggleActiveItem('${storeItem.id}');"
+                                style="font-size:0.5rem;padding:0.1rem 0.4rem;min-height:22px;border-radius:30px;">
+                            ${isActive ? 'إلغاء' : 'تفعيل'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
 },
 
 // ===== دوال الملف الشخصي المتقدمة =====
@@ -17226,10 +17453,26 @@ _updateProfileTabContent(user) {
     this._updateProfileActivity(user);
     this._updateProfileInventory(user);  // ✅ تحديث المخزون
     this._updateProfileStats(user);
-    this._updateProfileFriends(user);
     this._updateProfileBadges(user);
     this._updateProfileChart(user);
     this._updateProfileAchievements(user);
+    this._applyUserCustomizations(user);  // ✅ تطبيق الخلفيات والإطارات
+
+    // ✅ تحديث الإحصائيات عند فتح الملف الشخصي
+    if (document.getElementById('tab-stats')?.classList.contains('active')) {
+        this._renderProfileStats(user);
+    }
+    
+    // ✅ تحديث الإنجازات عند فتح الملف الشخصي
+    if (document.getElementById('tab-achievements')?.classList.contains('active')) {
+        this._renderProfileAchievements();
+    }
+    // ✅ تحديث المقتنيات عند فتح التبويب
+    if (document.getElementById('tab-collectibles')?.classList.contains('active')) {
+        const activeSubtab = document.querySelector('.collectibles-subtab.active');
+        const subtab = activeSubtab ? activeSubtab.dataset.subtab : 'cards';
+        this._renderCollectibles(subtab);
+    }
 },
 
 _updateProfileActivity(user) {
@@ -17506,18 +17749,33 @@ _getCategoryIcon(category) {
     return icons[category] || '📌';
 },
 
-_updateProfileStats(user) {
-    const stats = user.stats || {};
-    const gamesPlayed = stats.gamesPlayed || 0;
-    const gamesWon = stats.gamesWon || 0;
-    const winRate = gamesPlayed > 0 ? Math.round((gamesWon / gamesPlayed) * 100) : 0;
-    const avgScore = gamesPlayed > 0 ? Math.round((user.totalScore || 0) / gamesPlayed) : 0;
-    // أفضل سلسلة - يمكن تخزينها في قاعدة البيانات أو حسابها
-    const bestStreak = parseInt(localStorage.getItem('bestStreak') || '0');
+// ============================================================
+// تحديث إحصائيات الملف الشخصي (معدل لتجنب الأخطاء)
+// ============================================================
 
-    document.getElementById('statWinRate').textContent = winRate + '%';
-    document.getElementById('statAvgScore').textContent = avgScore;
-    document.getElementById('statBestStreak').textContent = bestStreak;
+_updateProfileStats(user) {
+    // تم حذف هذه الدالة أو جعلها فارغة لأن الإحصائيات السريعة لم تعد موجودة
+    // إذا كانت لا تزال مستخدمة في مكان آخر، أضف تحقق من وجود العناصر
+    const elements = [
+        'statWinRate', 'statAvgScore', 'statBestStreak'
+    ];
+    elements.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            // تحديث القيم إذا كانت العناصر موجودة
+            const stats = user?.stats || {};
+            if (id === 'statWinRate') {
+                const gamesPlayed = stats.gamesPlayed || 0;
+                const gamesWon = stats.gamesWon || 0;
+                el.textContent = gamesPlayed > 0 ? Math.round((gamesWon / gamesPlayed) * 100) + '%' : '0%';
+            } else if (id === 'statAvgScore') {
+                const gamesPlayed = stats.gamesPlayed || 0;
+                el.textContent = gamesPlayed > 0 ? Math.round((user.totalScore || 0) / gamesPlayed) : 0;
+            } else if (id === 'statBestStreak') {
+                el.textContent = parseInt(localStorage.getItem('bestStreak') || '0');
+            }
+        }
+    });
 },
 
 _updateProfileFriends(user) {
@@ -22294,6 +22552,33 @@ _updateUserUI(user) {
     const changeAvatarBtn = document.getElementById('changeAvatarBtn');
     const removeAvatarBtn = document.getElementById('removeAvatarBtn');
 
+const userData = AuthService.currentUser;
+if (userData) {
+    const activeItems = userData.activeItems || [];
+    const storeItems = DataManager.data.storeItems || [];
+    const activeBg = storeItems.find(item => 
+        activeItems.includes(item.id) && item.category === 'backgrounds'
+    );
+    
+    const playerCard = document.querySelector('.player-card-new');
+    if (playerCard) {
+        if (activeBg && activeBg.imagePath) {
+            playerCard.style.backgroundImage = `url('${activeBg.imagePath}')`;
+            playerCard.style.backgroundSize = 'cover';
+            playerCard.style.backgroundPosition = 'center';
+            playerCard.style.backgroundRepeat = 'no-repeat';
+            playerCard.style.borderColor = 'var(--accent)';
+        } else {
+            playerCard.style.backgroundImage = '';
+            playerCard.style.backgroundSize = '';
+            playerCard.style.backgroundPosition = '';
+            playerCard.style.backgroundRepeat = '';
+            playerCard.style.background = 'rgba(255,255,255,0.04)';
+            playerCard.style.borderColor = 'rgba(255,255,255,0.06)';
+        }
+    }
+}
+
     if (user) {
         // ===== 1. معلومات المستخدم الأساسية =====
         const displayName = user.fullName || user.displayName || user.username || user.email || 'مستخدم';
@@ -22523,10 +22808,129 @@ _updateUserUI(user) {
     if (levelProgressFill) levelProgressFill.style.width = '0%';
 },
 
-/**
- * تطبيق جميع التخصيصات (الإطار، الخلفية، الشارة، السمة)
- */
-_applyUserCustomizations(user) {
+// ============================================================
+// عرض البطاقات (الخلفيات المملوكة) في الملف الشخصي
+// ============================================================
+_renderProfileCards: function(user) {
+    const container = document.getElementById('profileCardsGrid');
+    if (!container) return;
+    
+    if (!user) {
+        container.innerHTML = '<div class="text-gray" style="grid-column:1/-1;text-align:center;padding:2rem;">سجل الدخول لعرض البطاقات</div>';
+        return;
+    }
+    
+    const inventory = user.inventory || [];
+    const activeItems = user.activeItems || [];
+    const storeItems = DataManager.data.storeItems || [];
+    
+    // جلب جميع الخلفيات المملوكة
+    const ownedCards = inventory
+        .filter(inv => {
+            const item = storeItems.find(s => s.id === inv.itemId);
+            return item && item.category === 'backgrounds';
+        })
+        .map(inv => {
+            const item = storeItems.find(s => s.id === inv.itemId);
+            return {
+                ...inv,
+                item: item,
+                isActive: activeItems.includes(inv.itemId)
+            };
+        });
+    
+    // تحديث العدد
+    const countEl = document.getElementById('cardsCount');
+    if (countEl) countEl.textContent = ownedCards.length;
+    
+    if (ownedCards.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state" style="grid-column:1/-1;text-align:center;padding:2rem;">
+                <i class="fas fa-image" style="font-size:2.5rem;color:var(--gray-dark);display:block;margin-bottom:0.5rem;"></i>
+                <h3 style="font-size:1.1rem;">لا توجد بطاقات</h3>
+                <p class="text-gray" style="font-size:0.85rem;">اذهب إلى المتجر لشراء خلفيات وبطاقات مميزة!</p>
+                <button class="btn btn-primary btn-sm mt-1" onclick="App._activateSection('store')">
+                    <i class="fas fa-store"></i> زيارة المتجر
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    // عرض البطاقات
+    let html = '';
+    ownedCards.forEach(card => {
+        const item = card.item;
+        const isActive = card.isActive;
+        const rarityColor = this._getRarityColor(item.rarity);
+        const rarityLabel = this._getRarityLabel(item.rarity);
+        const imagePath = item.imagePath || '';
+        const previewImage = item.previewImage || imagePath;
+        
+        html += `
+            <div class="card-item" style="
+                background: var(--card-bg);
+                border: 2px solid ${isActive ? 'var(--accent)' : 'var(--border-color)'};
+                border-radius: var(--radius-sm);
+                overflow: hidden;
+                transition: all 0.3s ease;
+                ${isActive ? 'box-shadow: 0 0 30px rgba(255,217,61,0.15);' : ''}
+                cursor: pointer;
+            "
+            onclick="App._toggleCardBackground('${item.id}')">
+                <div style="
+                    aspect-ratio: 16/9;
+                    background-image: url('${imagePath}');
+                    background-size: cover;
+                    background-position: center;
+                    background-color: var(--glass);
+                    position: relative;
+                ">
+                    ${isActive ? '<span style="position:absolute;top:6px;right:6px;font-size:0.5rem;padding:0.1rem 0.5rem;border-radius:30px;background:var(--accent);color:var(--dark);font-weight:700;">مفعل</span>' : ''}
+                    ${card.quantity > 1 ? `<span style="position:absolute;top:6px;left:6px;font-size:0.4rem;padding:0.05rem 0.3rem;border-radius:30px;background:rgba(0,0,0,0.7);color:#fff;font-weight:700;">×${card.quantity}</span>` : ''}
+                </div>
+                <div style="padding:0.6rem;">
+                    <div style="font-weight:700;font-size:0.85rem;color:var(--light);">${item.name}</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.2rem;">
+                        <span style="font-size:0.55rem;padding:0.05rem 0.5rem;border-radius:30px;color:${rarityColor};background:${rarityColor}33;border:1px solid ${rarityColor}66;">
+                            ${rarityLabel}
+                        </span>
+                        <button class="btn ${isActive ? 'btn-danger' : 'btn-primary'}" 
+                                onclick="event.stopPropagation(); App._toggleActiveItem('${item.id}');"
+                                style="font-size:0.55rem;padding:0.1rem 0.5rem;min-height:24px;border-radius:30px;">
+                            ${isActive ? 'إلغاء' : 'تفعيل'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+},
+
+// ============================================================
+// تبديل خلفية البطاقة (تفعيل/إلغاء)
+// ============================================================
+_toggleCardBackground: function(itemId) {
+    // هذه الدالة تستدعي _toggleActiveItem الموجودة بالفعل
+    // مع تحديث واجهة البطاقات بعد التفعيل
+    this._toggleActiveItem(itemId);
+    
+    // تحديث عرض البطاقات بعد التأخير
+    setTimeout(() => {
+        const user = AuthService.currentUser;
+        if (user) {
+            this._renderProfileCards(user);
+            this._applyUserCustomizations(user);
+        }
+    }, 300);
+},
+
+// ============================================================
+// تطبيق جميع التخصيصات (الإطار، الخلفية، الشارة، السمة)
+// ============================================================
+_applyUserCustomizations: function(user) {
     if (!user) return;
     
     const activeItems = user.activeItems || [];
@@ -22560,29 +22964,53 @@ _applyUserCustomizations(user) {
         }
     }
     
-    // 2️⃣ الخلفية المفعّلة على غلاف الملف الشخصي
+    // 2️⃣ ✅ الخلفية المفعّلة على غلاف الملف الشخصي (باستخدام الصورة)
     const activeBg = storeItems.find(item => 
         activeItems.includes(item.id) && item.category === 'backgrounds'
     );
-    const cover = document.querySelector('.profile-cover');
-    if (cover) {
-        if (activeBg) {
-            const bgStyles = {
-                'stadium': 'linear-gradient(135deg, #1a3a2a, #2d7d46)',
-                'crowd': 'linear-gradient(135deg, #1a252f, #2c3e50)',
-                'trophy': 'linear-gradient(135deg, #d4ac0d, #f1c40f)',
-                'night': 'linear-gradient(135deg, #0a0a1a, #1a1a3e)',
-                'sunset': 'linear-gradient(135deg, #c0392b, #f39c12)',
-                'sky': 'linear-gradient(135deg, #2980b9, #27ae60)',
-                'lights': 'linear-gradient(135deg, #8e44ad, #3498db)',
-                'legend_bg': 'linear-gradient(135deg, #f1c40f, #e67e22, #f1c40f)'
-            };
-            cover.style.background = bgStyles[activeBg.value] || 'var(--card-bg)';
-            cover.style.backgroundSize = 'cover';
-            cover.style.borderColor = 'var(--accent)';
+    
+    // تطبيق على غلاف الملف الشخصي
+    const profileCover = document.querySelector('.profile-cover');
+    if (profileCover) {
+        if (activeBg && activeBg.imagePath) {
+            // ✅ استخدام الصورة كخلفية
+            profileCover.style.backgroundImage = `url('${activeBg.imagePath}')`;
+            profileCover.style.backgroundSize = 'cover';
+            profileCover.style.backgroundPosition = 'center';
+            profileCover.style.backgroundRepeat = 'no-repeat';
+            profileCover.style.borderColor = 'var(--accent)';
+            // إضافة طبقة تعتيم فوق الصورة لجعل النص مقروء
+            profileCover.style.position = 'relative';
+            // إزالة أي خلفية سابقة
+            profileCover.style.background = `url('${activeBg.imagePath}') center/cover no-repeat`;
         } else {
-            cover.style.background = 'var(--card-bg)';
-            cover.style.borderColor = 'var(--border-color)';
+            profileCover.style.backgroundImage = '';
+            profileCover.style.backgroundSize = '';
+            profileCover.style.backgroundPosition = '';
+            profileCover.style.backgroundRepeat = '';
+            profileCover.style.background = 'var(--card-bg)';
+            profileCover.style.borderColor = 'var(--border-color)';
+        }
+    }
+    
+    // ✅ تطبيق الخلفية على بطاقة الصفحة الرئيسية
+    const playerCard = document.querySelector('.player-card-new');
+    if (playerCard) {
+        if (activeBg && activeBg.imagePath) {
+            playerCard.style.backgroundImage = `url('${activeBg.imagePath}')`;
+            playerCard.style.backgroundSize = 'cover';
+            playerCard.style.backgroundPosition = 'center';
+            playerCard.style.backgroundRepeat = 'no-repeat';
+            playerCard.style.borderColor = 'var(--accent)';
+            // إضافة طبقة تعتيم
+            playerCard.style.position = 'relative';
+        } else {
+            playerCard.style.backgroundImage = '';
+            playerCard.style.backgroundSize = '';
+            playerCard.style.backgroundPosition = '';
+            playerCard.style.backgroundRepeat = '';
+            playerCard.style.background = 'rgba(255,255,255,0.04)';
+            playerCard.style.borderColor = 'rgba(255,255,255,0.06)';
         }
     }
     
@@ -22598,7 +23026,6 @@ _applyUserCustomizations(user) {
             if (oldBadge) oldBadge.remove();
             const badgeSpan = document.createElement('span');
             badgeSpan.className = 'active-badge-icon';
-            // ✅ استخدام الأيقونة الحقيقية من الشارة
             const badgeIcon = this._getBadgeIcon(activeBadge.id) || activeBadge.icon || '🏅';
             badgeSpan.textContent = badgeIcon;
             badgeSpan.style.marginRight = '8px';
@@ -22620,7 +23047,6 @@ _applyUserCustomizations(user) {
         activeItems.includes(item.id) && item.category === 'themes'
     );
     
-    // ألوان السمات
     const themeColors = {
         'gold': { primary: '#f1c40f', accent: '#f39c12', secondary: '#e67e22' },
         'electric': { primary: '#00d4ff', accent: '#0099ff', secondary: '#0066cc' },
@@ -22637,7 +23063,6 @@ _applyUserCustomizations(user) {
         root.style.setProperty('--secondary', colors.secondary);
         console.log(`🎨 تم تطبيق سمة: ${activeTheme.name}`);
     } else {
-        // العودة للألوان الافتراضية
         root.style.setProperty('--primary', '#6C63FF');
         root.style.setProperty('--accent', '#FFD93D');
         root.style.setProperty('--secondary', '#FF6B6B');
@@ -22668,7 +23093,6 @@ _getBadgeIcon(badgeId) {
 _activateSection(id) {
     this.currentSection = id;
     
-    // إظهار/إخفاء الأقسام
     document.querySelectorAll('.section').forEach(el => {
         el.classList.toggle('active', el.id === `section-${id}`);
     });
@@ -22682,11 +23106,7 @@ _activateSection(id) {
         document.querySelectorAll('.section').forEach(el => {
             const backBtn = el.querySelector('.back-to-home');
             if (backBtn) {
-                if (el.classList.contains('active')) {
-                    backBtn.style.display = 'inline-flex';
-                } else {
-                    backBtn.style.display = 'none';
-                }
+                backBtn.style.display = el.classList.contains('active') ? 'inline-flex' : 'none';
             }
         });
     }
@@ -22711,32 +23131,8 @@ _activateSection(id) {
     }
 
     // ===== قسم التحليلات =====
-    if (id === 'analytics') {
-        // تأكد من وجود القسم وعرض الإحصائيات
-        const section = document.getElementById('section-analytics');
-        if (section) {
-            // إعادة عرض الإحصائيات لتحديث البيانات
-            section.innerHTML = App._renderAnalyticsSection();
-        }
-        // تحديث بيانات المستخدم قبل العرض
-        const user = AuthService.currentUser;
-        if (user) {
-            db.collection('users').doc(user.uid).get().then(doc => {
-                if (doc.exists) {
-                    const data = doc.data();
-                    Object.assign(user, data);
-                    AuthService._notifyListeners();
-                    // تحديث القسم مرة أخرى بعد جلب البيانات
-                    if (section) {
-                        section.innerHTML = App._renderAnalyticsSection();
-                    }
-                }
-            }).catch(err => {
-                console.warn('Could not refresh user data:', err);
-            });
-        }
-        return;
-    }
+    // ✅ تم إزالة التحويل إلى صفحة الإحصائيات المنفصلة
+    // الإحصائيات تعرض ضمن الملف الشخصي
 
     if (id === 'multiplayer') {
         this._refreshMultiplayerGames();
@@ -22765,11 +23161,17 @@ _activateSection(id) {
     if (id === 'store') {
         this._renderStore(DataManager.data.storeItems || []);
     }
-if (id === 'game') {
-    this._updateGameSettingsDisplay();
-    document.getElementById('gameStartScreen').style.display = 'block';
-    document.getElementById('gamePlayScreen').style.display = 'none';
-}
+    if (id === 'game') {
+        this._updateGameSettingsDisplay();
+        document.getElementById('gameStartScreen').style.display = 'block';
+        document.getElementById('gamePlayScreen').style.display = 'none';
+    }
+    if (id === 'profile') {
+        const user = AuthService.currentUser;
+        if (user) {
+            this._updateProfileTabContent(user);
+        }
+    }
 },
 
 _waitForElement(selector, callback, timeout = 5000) {
@@ -24737,16 +25139,224 @@ _getDefaultStoreItems() {
     // ============================================================
     // 7. خلفيات الملف الشخصي (Backgrounds)
     // ============================================================
-    const backgrounds = [
-        { id: 'bg_stadium', name: 'خلفية ملعب', imagePath: 'images/store/backgrounds/bg_stadium.png', desc: 'خلفية ملعب كرة قدم', price: 120, currency: 'coins', rarity: 'common', effect: 'profile_bg', value: 'stadium' },
-        { id: 'bg_crowd', name: 'خلفية جماهير', imagePath: 'images/store/backgrounds/bg_crowd.png', desc: 'خلفية مع جماهير', price: 150, currency: 'coins', rarity: 'uncommon', effect: 'profile_bg', value: 'crowd' },
-        { id: 'bg_trophy', name: 'خلفية كأس', imagePath: 'images/store/backgrounds/bg_trophy.png', desc: 'خلفية مع الكؤوس', price: 200, currency: 'coins', rarity: 'rare', effect: 'profile_bg', value: 'trophy' },
-        { id: 'bg_night', name: 'خلفية ليلية', imagePath: 'images/store/backgrounds/bg_night.png', desc: 'خلفية ليلية هادئة', price: 180, currency: 'coins', rarity: 'uncommon', effect: 'profile_bg', value: 'night' },
-        { id: 'bg_sunset', name: 'خلفية غروب', imagePath: 'images/store/backgrounds/bg_sunset.png', desc: 'خلفية غروب شمس', price: 220, currency: 'coins', rarity: 'rare', effect: 'profile_bg', value: 'sunset' },
-        { id: 'bg_sky', name: 'خلفية سماء', imagePath: 'images/store/backgrounds/bg_sky.png', desc: 'خلفية سماء صافية', price: 130, currency: 'coins', rarity: 'common', effect: 'profile_bg', value: 'sky' },
-        { id: 'bg_lights', name: 'خلفية أضواء', imagePath: 'images/store/backgrounds/bg_lights.png', desc: 'خلفية أضواء ملونة', price: 300, currency: 'coins', rarity: 'epic', effect: 'profile_bg', value: 'lights' },
-        { id: 'bg_legend', name: 'خلفية أسطورية', imagePath: 'images/store/backgrounds/bg_legend.png', desc: 'خلفية أسطورية نادرة', price: 40, currency: 'gems', rarity: 'legendary', effect: 'profile_bg', value: 'legend_bg' }
-    ];
+const backgrounds = [
+    { 
+        id: 'bg_stadium', 
+        name: 'خلفية ملعب', 
+        imagePath: 'images/store/backgrounds/bg_stadium.png',
+        desc: 'خلفية ملعب كرة قدم', 
+        price: 120, 
+        currency: 'coins', 
+        rarity: 'common', 
+        effect: 'profile_bg', 
+        value: 'stadium',
+        previewImage: 'images/store/backgrounds/preview/bg_stadium_preview.jpg'
+    },
+    { 
+        id: 'bg_crowd', 
+        name: 'خلفية جماهير', 
+        imagePath: 'images/store/backgrounds/bg_crowd.png',
+        desc: 'خلفية مع جماهير', 
+        price: 150, 
+        currency: 'coins', 
+        rarity: 'uncommon', 
+        effect: 'profile_bg', 
+        value: 'crowd',
+        previewImage: 'images/store/backgrounds/preview/bg_crowd_preview.jpg'
+    },
+    { 
+        id: 'bg_trophy', 
+        name: 'خلفية كأس', 
+        imagePath: 'images/store/backgrounds/bg_trophy.png',
+        desc: 'خلفية مع الكؤوس', 
+        price: 200, 
+        currency: 'coins', 
+        rarity: 'rare', 
+        effect: 'profile_bg', 
+        value: 'trophy',
+        previewImage: 'images/store/backgrounds/preview/bg_trophy_preview.jpg'
+    },
+    { 
+        id: 'bg_night', 
+        name: 'خلفية ليلية', 
+        imagePath: 'images/store/backgrounds/bg_night.png',
+        desc: 'خلفية ليلية هادئة', 
+        price: 180, 
+        currency: 'coins', 
+        rarity: 'uncommon', 
+        effect: 'profile_bg', 
+        value: 'night',
+        previewImage: 'images/store/backgrounds/preview/bg_night_preview.jpg'
+    },
+    { 
+        id: 'bg_sunset', 
+        name: 'خلفية غروب', 
+        imagePath: 'images/store/backgrounds/bg_sunset.png',
+        desc: 'خلفية غروب شمس', 
+        price: 220, 
+        currency: 'coins', 
+        rarity: 'rare', 
+        effect: 'profile_bg', 
+        value: 'sunset',
+        previewImage: 'images/store/backgrounds/preview/bg_sunset_preview.jpg'
+    },
+    { 
+        id: 'bg_sky', 
+        name: 'خلفية سماء', 
+        imagePath: 'images/store/backgrounds/bg_sky.png',
+        desc: 'خلفية سماء صافية', 
+        price: 130, 
+        currency: 'coins', 
+        rarity: 'common', 
+        effect: 'profile_bg', 
+        value: 'sky',
+        previewImage: 'images/store/backgrounds/preview/bg_sky_preview.jpg'
+    },
+    { 
+        id: 'bg_lights', 
+        name: 'خلفية أضواء', 
+        imagePath: 'images/store/backgrounds/bg_lights.png',
+        desc: 'خلفية أضواء ملونة', 
+        price: 300, 
+        currency: 'coins', 
+        rarity: 'epic', 
+        effect: 'profile_bg', 
+        value: 'lights',
+        previewImage: 'images/store/backgrounds/preview/bg_lights_preview.jpg'
+    },
+    { 
+        id: 'bg_legend', 
+        name: 'خلفية أسطورية', 
+        imagePath: 'images/store/backgrounds/bg_legend.png',
+        desc: 'خلفية أسطورية نادرة', 
+        price: 40, 
+        currency: 'gems', 
+        rarity: 'legendary', 
+        effect: 'profile_bg', 
+        value: 'legend_bg',
+        previewImage: 'images/store/backgrounds/preview/bg_legend_preview.jpg'
+    },
+    { 
+        id: 'bg_wizard_library', 
+        name: '📚 مكتبة السحرة', 
+        imagePath: 'images/store/backgrounds/bg_wizard_library.png',
+        desc: 'مكتبة غامضة مليئة بكتب السحر والأسرار القديمة', 
+        price: 350, 
+        currency: 'coins', 
+        rarity: 'epic', 
+        effect: 'profile_bg', 
+        value: 'wizard_library'
+    },
+    { 
+        id: 'bg_neon_city', 
+        name: '🌃 مدينة النيون', 
+        imagePath: 'images/store/backgrounds/bg_neon_city.png',
+        desc: 'شوارع مضاءة بأضواء النيون في ليلة لا تنسى', 
+        price: 400, 
+        currency: 'coins', 
+        rarity: 'epic', 
+        effect: 'profile_bg', 
+        value: 'neon_city'
+    },
+    { 
+        id: 'bg_world_explorer', 
+        name: '🗺️ مستكشف العالم', 
+        imagePath: 'images/store/backgrounds/bg_world_explorer.png',
+        desc: 'خريطة قديمة ومغامرات في أقاصي الدنيا', 
+        price: 280, 
+        currency: 'coins', 
+        rarity: 'rare', 
+        effect: 'profile_bg', 
+        value: 'world_explorer'
+    },
+    { 
+        id: 'bg_moon_castle', 
+        name: '🌙 قلعة القمر', 
+        imagePath: 'images/store/backgrounds/bg_moon_castle.png',
+        desc: 'قلعة أسطورية تحت ضوء القمر الساطع', 
+        price: 500, 
+        currency: 'coins', 
+        rarity: 'epic', 
+        effect: 'profile_bg', 
+        value: 'moon_castle'
+    },
+    { 
+        id: 'bg_winter_night', 
+        name: '❄️ ليلة الشتاء', 
+        imagePath: 'images/store/backgrounds/bg_winter_night.png',
+        desc: 'ليلة شتوية هادئة مع تساقط الثلوج', 
+        price: 250, 
+        currency: 'coins', 
+        rarity: 'rare', 
+        effect: 'profile_bg', 
+        value: 'winter_night'
+    },
+    { 
+        id: 'bg_pirate_bay', 
+        name: '🏴‍☠️ خليج القراصنة', 
+        imagePath: 'images/store/backgrounds/bg_pirate_bay.png',
+        desc: 'مغامرات القراصنة في خليج الكاريبي', 
+        price: 320, 
+        currency: 'coins', 
+        rarity: 'rare', 
+        effect: 'profile_bg', 
+        value: 'pirate_bay'
+    },
+    { 
+        id: 'bg_moon_base', 
+        name: '🚀 قاعدة القمر', 
+        imagePath: 'images/store/backgrounds/bg_moon_base.png',
+        desc: 'قاعدة فضائية متطورة على سطح القمر', 
+        price: 450, 
+        currency: 'coins', 
+        rarity: 'epic', 
+        effect: 'profile_bg', 
+        value: 'moon_base'
+    },
+    { 
+        id: 'bg_ocean_deep', 
+        name: '🌊 أعماق المحيط', 
+        imagePath: 'images/store/backgrounds/bg_ocean_deep.png',
+        desc: 'استكشاف أعماق المحيطات وأسرارها', 
+        price: 300, 
+        currency: 'coins', 
+        rarity: 'rare', 
+        effect: 'profile_bg', 
+        value: 'ocean_deep'
+    },
+    { 
+        id: 'bg_pharaoh_civilization', 
+        name: '🏛️ حضارة الفراعنة', 
+        imagePath: 'images/store/backgrounds/bg_pharaoh_civilization.png',
+        desc: 'أهرامات ومعابد مصر القديمة', 
+        price: 380, 
+        currency: 'coins', 
+        rarity: 'epic', 
+        effect: 'profile_bg', 
+        value: 'pharaoh_civilization'
+    },
+    { 
+        id: 'bg_samurai_gardens', 
+        name: '🌸 حدائق الساموراي', 
+        imagePath: 'images/store/backgrounds/bg_samurai_gardens.png',
+        desc: 'حدائق يابانية هادئة مع لمسات الساموراي', 
+        price: 280, 
+        currency: 'coins', 
+        rarity: 'rare', 
+        effect: 'profile_bg', 
+        value: 'samurai_gardens'
+    }
+];
+
+backgrounds.forEach(b => items.push({ 
+    ...b, 
+    category: 'backgrounds', 
+    duration: 'permanent', 
+    effectType: b.effect, 
+    effectValue: b.value, 
+    stackable: false 
+}));
+
 
     backgrounds.forEach(b => items.push({ 
         ...b, 
@@ -24868,131 +25478,947 @@ _getDefaultStoreItems() {
         };
     },
 
-    _setupProfileHandlers() {
-    document.getElementById('editProfileBtn')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (!AuthService.currentUser) {
-            showToast('يجب تسجيل الدخول أولاً', 'error');
-            return;
-        }
-        const user = AuthService.currentUser;
-        
-        // تعبئة النموذج ببيانات المستخدم
-        const usernameInput = document.getElementById('editUsername');
-        const bioInput = document.getElementById('editBio');
-        const locationInput = document.getElementById('editLocation');
-        
-        if (usernameInput) usernameInput.value = user.username || user.displayName || '';
-        if (bioInput) bioInput.value = user.bio || '';
-        if (locationInput) locationInput.value = user.location || '';
-        
-        // فتح المودال
-        const modal = document.getElementById('profileEditModal');
-        if (modal) modal.classList.add('open');
-    });
+// ============================================================
+// عرض سجل اللعب
+// ============================================================
 
-    document.getElementById('profileSettingsBtn')?.addEventListener('click', () => {
-        if (!AuthService.currentUser) {
-            showToast('يجب تسجيل الدخول', 'error');
-            return;
-        }
-        const user = AuthService.currentUser;
-        document.getElementById('editUsername').value = user.username || user.displayName || '';
-        document.getElementById('editBio').value = user.bio || '';
-        document.getElementById('editLocation').value = user.location || '';
-        // ⚠️ تم إزالة حقل الرابط (editAvatar)
-        document.getElementById('profileEditModal').classList.add('open');
-    });
+_updateProfileHistory(user) {
+    const container = document.getElementById('profileHistory');
+    if (!container) return;
 
-    // ===== زر الإحصائيات =====
-    document.getElementById('profileStatsBtn')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        // التوجيه إلى صفحة الإحصائيات
-        App._activateSection('analytics');
-        showToast('📊 جاري تحميل الإحصائيات المتقدمة...', 'info', 1500);
-    });
-
-
-    // ===== عرض المتابعين =====
-    document.getElementById('showFollowersBtn')?.addEventListener('click', () => {
-        this._showFollowers();
-    });
+    // يمكنك جلب سجل المباريات من Firestore
+    // مثال: جلب آخر 10 مباريات
+    const history = user.matchHistory || [];
     
-    // ===== عرض المتابَعين =====
-    document.getElementById('showFollowingBtn')?.addEventListener('click', () => {
-        this._showFollowing();
+    if (history.length === 0) {
+        container.innerHTML = `
+            <div class="text-gray" style="text-align:center;padding:2rem;">
+                <i class="fas fa-gamepad" style="font-size:2rem;color:var(--gray-dark);display:block;margin-bottom:0.5rem;"></i>
+                <p>لا توجد مباريات مسجلة بعد</p>
+                <p style="font-size:0.8rem;">ابدأ اللعب لتظهر نتائجك هنا</p>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '<div style="display:flex;flex-direction:column;gap:0.3rem;">';
+    history.slice(0, 10).forEach((match, index) => {
+        const date = match.date ? new Date(match.date).toLocaleDateString('ar-SA') : '—';
+        html += `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0.6rem;background:var(--glass);border-radius:8px;border-bottom:1px solid var(--glass-border);">
+                <span style="font-weight:600;font-size:0.85rem;">${match.mode || 'مباراة'}</span>
+                <span style="color:${match.win ? 'var(--success)' : 'var(--secondary)'};font-weight:700;">
+                    ${match.win ? '✅ فوز' : '❌ خسارة'}
+                </span>
+                <span style="font-size:0.7rem;color:var(--gray);">${date}</span>
+                <span style="font-size:0.8rem;font-weight:700;color:var(--accent);">⭐ ${match.score || 0}</span>
+            </div>
+        `;
     });
+    html += '</div>';
     
-document.getElementById('profileFriendsBtn')?.addEventListener('click', () => {
-    App._activateSection('friends');
-    setTimeout(() => App._loadFriendsPage(), 150);
-});
+    container.innerHTML = html;
+},
 
-   // زر تغيير الصورة
-    document.getElementById('changeAvatarBtn')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (!AuthService.currentUser) {
-            showToast('يجب تسجيل الدخول أولاً', 'error');
-            return;
-        }
-        // فتح نافذة اختيار الملف
-        document.getElementById('avatarFileInput').click();
-    });
-
-        document.getElementById('avatarFileInput')?.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            // التحقق من نوع الملف
-            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-            if (!allowedTypes.includes(file.type)) {
-                showToast('❌ نوع الملف غير مدعوم. يرجى استخدام JPG, PNG, GIF, أو WebP', 'error');
-                e.target.value = '';
-                return;
-            }
-            // التحقق من الحجم
-            if (file.size > 5 * 1024 * 1024) {
-                showToast('❌ حجم الصورة كبير جداً (الحد الأقصى 5MB)', 'error');
-                e.target.value = '';
-                return;
-            }
-            this._handleAvatarUpload(file);
-        }
-        e.target.value = ''; // إعادة تعيين الإدخال
-    });
-
-        document.getElementById('removeAvatarBtn')?.addEventListener('click', () => {
-        this._handleRemoveAvatar();
-    });
-
-    // زر مشاركة الملف
-    document.getElementById('shareProfileBtn')?.addEventListener('click', () => {
-        this.shareProfile();
-    });
-
-    // إضافة صديق
-    document.getElementById('addFriendBtn')?.addEventListener('click', () => {
-        const input = document.getElementById('addFriendInput');
-        this.addFriend(input.value);
-        input.value = '';
-    });
-    
-    document.getElementById('addFriendInput')?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            document.getElementById('addFriendBtn')?.click();
-        }
-    });
-
-    // تبويبات الملف الشخصي
-    document.querySelectorAll('.tab-btn').forEach(btn => {
+// ============================================================
+// إعداد معالجات الملف الشخصي (معدل مع المقتنيات)
+// ============================================================
+_setupProfileHandlers: function() {
+    // ===== تبويبات المحتوى الرئيسية =====
+    document.querySelectorAll('.profile-tabs .tab-btn').forEach(btn => {
         btn.addEventListener('click', function() {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.profile-tabs .tab-btn').forEach(b => b.classList.remove('active'));
             this.classList.add('active');
+            
             const tab = this.dataset.tab;
             document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
             const panel = document.getElementById(`tab-${tab}`);
-            if (panel) panel.classList.add('active');
+            
+            if (panel) {
+                panel.classList.add('active');
+                
+                // تحميل المحتوى حسب التبويب
+                if (tab === 'history') {
+                    App._loadMatchHistory();
+                } else if (tab === 'achievements') {
+                    App._renderProfileAchievements();
+                } else if (tab === 'stats') {
+                    App._renderProfileStats(AuthService.currentUser);
+                } else if (tab === 'activity') {
+                    App._updateProfileActivity(AuthService.currentUser);
+                } else if (tab === 'inventory') {
+                    App._updateProfileInventory(AuthService.currentUser);
+                } else if (tab === 'collectibles') {
+                    // عرض المقتنيات مع التبويب الفرعي النشط
+                    const activeSubtab = document.querySelector('.collectibles-subtab.active');
+                    const subtab = activeSubtab ? activeSubtab.dataset.subtab : 'cards';
+                    App._renderCollectibles(subtab);
+                }
+            }
+            
+            // التمرير إلى التبويب المحدد
+            setTimeout(() => {
+                this.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'nearest', 
+                    inline: 'center' 
+                });
+            }, 100);
         });
     });
+    
+    // ===== تبويبات المقتنيات الفرعية =====
+    document.querySelectorAll('.collectibles-subtab').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.collectibles-subtab').forEach(b => {
+                b.classList.remove('active');
+                b.style.background = 'transparent';
+                b.style.color = 'var(--gray)';
+                b.style.borderColor = 'var(--glass-border)';
+            });
+            this.classList.add('active');
+            this.style.background = 'var(--primary)';
+            this.style.color = '#fff';
+            this.style.borderColor = 'var(--primary)';
+            
+            const subtab = this.dataset.subtab;
+            App._renderCollectibles(subtab);
+        });
+    });
+    
+    // ===== دالة تبديل أقسام الإحصائيات (متاحة عالمياً) =====
+    window._toggleStatsSection = function(sectionId) {
+        App._toggleStatsSection(sectionId);
+    };
+    
+    // ===== دالة تبديل أقسام الإنجازات (متاحة عالمياً) =====
+    window._toggleAchievementSection = function(sectionId) {
+        App._toggleAchievementSection(sectionId);
+    };
+},
+
+// ============================================================
+// عرض الإنجازات في تبويب الملف الشخصي
+// ============================================================
+
+_renderProfileAchievements: function() {
+    const container = document.getElementById('profileAchievementsGrid');
+    if (!container) return;
+    
+    const user = AuthService.currentUser;
+    if (!user) {
+        container.innerHTML = '<div class="text-gray">سجل الدخول لعرض الإنجازات</div>';
+        return;
+    }
+    
+    // استخدام AchievementManager
+    const allAchievements = AchievementManager.getAllAchievements();
+    const unlocked = allAchievements.filter(a => a.unlocked);
+    
+    // تحديث عدد الإنجازات في الشارة
+    const countEl = document.getElementById('achievementCount');
+    if (countEl) countEl.textContent = unlocked.length;
+    
+    // تحديث شارة زر الإنجازات
+    const badge = document.getElementById('profileAchievementsBadge');
+    if (badge) badge.textContent = unlocked.length;
+    
+    if (allAchievements.length === 0) {
+        container.innerHTML = '<div class="text-gray">لا توجد إنجازات</div>';
+        return;
+    }
+    
+    // تصنيف الإنجازات حسب الفئة
+    const categories = {};
+    allAchievements.forEach(ach => {
+        const cat = ach.category || 'عام';
+        if (!categories[cat]) categories[cat] = [];
+        categories[cat].push(ach);
+    });
+    
+    // ترتيب الفئات حسب الاسم
+    const sortedCategories = Object.keys(categories).sort((a, b) => a.localeCompare(b));
+    
+    let html = '';
+    sortedCategories.forEach(cat => {
+        const items = categories[cat];
+        const unlockedCount = items.filter(a => a.unlocked).length;
+        const totalCount = items.length;
+        const sectionId = 'achievement_section_' + cat.replace(/\s/g, '_') + '_' + Date.now().toString(36);
+        
+        html += `
+            <div class="achievement-section-wrapper" style="
+                margin-bottom: 0.5rem;
+                border: 1px solid var(--border-color);
+                border-radius: var(--radius-sm);
+                overflow: hidden;
+                background: var(--card-bg);
+                transition: border-color 0.3s ease;
+            ">
+                <!-- رأس القسم -->
+                <div class="achievement-section-header" 
+                     style="
+                         display: flex;
+                         justify-content: space-between;
+                         align-items: center;
+                         padding: 0.4rem 0.8rem;
+                         cursor: pointer;
+                         background: var(--glass);
+                         border-bottom: 1px solid var(--border-color);
+                         user-select: none;
+                         transition: background 0.2s, border-color 0.3s;
+                     "
+                     onmouseover="this.style.background='rgba(255,255,255,0.05)'"
+                     onmouseout="this.style.background='var(--glass)'"
+                     onclick="App._toggleAchievementSection('${sectionId}')">
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <span class="toggle-icon" style="font-size:0.7rem;color:var(--gray);">▼</span>
+                        <span style="font-weight:700;font-size:0.9rem;color:var(--light);">${cat}</span>
+                        <span class="status-badge" style="font-size:0.6rem;color:var(--gray);background:var(--glass);padding:0.05rem 0.5rem;border-radius:30px;border:1px solid var(--glass-border);">مغلق</span>
+                    </div>
+                    <span style="font-size:0.7rem;color:var(--gray);">
+                        ${unlockedCount}/${totalCount} مكتمل
+                    </span>
+                </div>
+                
+                <!-- محتوى القسم -->
+                <div id="${sectionId}" style="display:none;padding:0.5rem;">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:0.5rem;">
+        `;
+        
+        items.forEach(ach => {
+            const isUnlocked = ach.unlocked;
+            html += `
+                <div class="achievement-card ${isUnlocked ? 'unlocked' : 'locked'}" 
+                     style="background:${isUnlocked ? 'var(--card-bg)' : 'var(--glass)'};
+                            border:1px solid ${isUnlocked ? 'var(--accent)' : 'var(--glass-border)'};
+                            border-radius:var(--radius-sm);
+                            padding:0.6rem;
+                            text-align:center;
+                            transition:var(--transition);
+                            ${isUnlocked ? 'box-shadow:0 0 20px rgba(255,217,61,0.1);' : 'opacity:0.6;'}">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; overflow: hidden; margin: 0 auto 0.3rem; border: 2px solid ${isUnlocked ? 'var(--accent)' : 'var(--gray-dark)'};">
+                        <img src="${ach.image}" alt="${ach.name}" style="width: 100%; height: 100%; object-fit: cover; ${!isUnlocked ? 'filter: grayscale(1);' : ''}">
+                    </div>
+                    <div style="font-weight:700; font-size:0.75rem; color: ${isUnlocked ? 'var(--light)' : 'var(--gray)'};">${ach.name}</div>
+                    <div style="font-size:0.55rem; color:var(--gray);">${ach.description}</div>
+                    <div style="font-size:0.65rem; color:var(--accent);">+${ach.points} نقطة</div>
+                    ${isUnlocked ? '<div style="color:var(--success);font-size:0.55rem;">✅ مكتمل</div>' : '<div style="color:var(--gray);font-size:0.55rem;">🔒 مغلق</div>'}
+                </div>
+            `;
+        });
+        
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+},
+
+// ============================================================
+// عرض الإحصائيات في تبويب الملف الشخصي (نسخة كاملة مع طي قابل للعمل)
+// ============================================================
+
+_renderProfileStats(user) {
+    const container = document.getElementById('profileStatsGrid');
+    if (!container) return;
+    
+    if (!user) {
+        container.innerHTML = '<div class="text-gray">سجل الدخول لعرض الإحصائيات</div>';
+        return;
+    }
+    
+    const stats = user.stats || {};
+    
+    // دالة مساعدة للحصول على قيمة مع افتراضي
+    const getStat = (obj, path, defaultValue = 0) => {
+        try {
+            const parts = path.split('.');
+            let current = obj;
+            for (const part of parts) {
+                if (current === undefined || current === null) return defaultValue;
+                current = current[part];
+            }
+            return current !== undefined && current !== null ? current : defaultValue;
+        } catch (e) {
+            return defaultValue;
+        }
+    };
+    
+    // ===== جمع جميع الإحصائيات =====
+    const statsData = {
+        general: {
+            totalMatches: getStat(stats, 'general.totalMatches', 0),
+            completedMatches: getStat(stats, 'general.completedMatches', 0),
+            withdrawnMatches: getStat(stats, 'general.withdrawnMatches', 0),
+            wins: getStat(stats, 'general.wins', 0),
+            draws: getStat(stats, 'general.draws', 0),
+            losses: getStat(stats, 'general.losses', 0),
+            firstPlace: getStat(stats, 'general.firstPlace', 0),
+            thirdPlace: getStat(stats, 'general.thirdPlace', 0),
+            lastPlace: getStat(stats, 'general.lastPlace', 0),
+        },
+        questions: {
+            answered: getStat(stats, 'questions.answered', 0),
+            correct: getStat(stats, 'questions.correct', 0),
+            wrong: getStat(stats, 'questions.wrong', 0),
+            skipped: getStat(stats, 'questions.skipped', 0),
+            timeout: getStat(stats, 'questions.timeout', 0),
+        },
+        speed: {
+            firstAnswer: getStat(stats, 'speed.firstAnswer', 0),
+            lastAnswer: getStat(stats, 'speed.lastAnswer', 0),
+            answersInFirstSecond: getStat(stats, 'speed.answersInFirstSecond', 0),
+            answersInLastSecond: getStat(stats, 'speed.answersInLastSecond', 0),
+            fastestMatch: getStat(stats, 'speed.fastestMatch', 0),
+            slowestMatch: getStat(stats, 'speed.slowestMatch', 0),
+        },
+        performance: {
+            allCorrectMatches: getStat(stats, 'performance.allCorrectMatches', 0),
+            allWrongMatches: getStat(stats, 'performance.allWrongMatches', 0),
+        },
+        averages: {
+            match: {
+                avgDuration: getStat(stats, 'averages.match.avgDuration', 0),
+                avgPosition: getStat(stats, 'averages.match.avgPosition', 0),
+                avgPoints: getStat(stats, 'averages.match.avgPoints', 0),
+                avgRankPoints: getStat(stats, 'averages.match.avgRankPoints', 0),
+                avgCoins: getStat(stats, 'averages.match.avgCoins', 0),
+            },
+            question: {
+                avgCorrectPerMatch: getStat(stats, 'averages.question.avgCorrectPerMatch', 0),
+                avgWrongPerMatch: getStat(stats, 'averages.question.avgWrongPerMatch', 0),
+                avgSkippedPerMatch: getStat(stats, 'averages.question.avgSkippedPerMatch', 0),
+            },
+            speed: {
+                avgAnswerTime: getStat(stats, 'averages.speed.avgAnswerTime', 0),
+                avgCorrectAnswerTime: getStat(stats, 'averages.speed.avgCorrectAnswerTime', 0),
+                avgWrongAnswerTime: getStat(stats, 'averages.speed.avgWrongAnswerTime', 0),
+                avgSpeedRank: getStat(stats, 'averages.speed.avgSpeedRank', 0),
+            },
+            performance: {
+                avgWinRate: getStat(stats, 'averages.performance.avgWinRate', 0),
+                avgFirstPlaceRate: getStat(stats, 'averages.performance.avgFirstPlaceRate', 0),
+                avgCompletionRate: getStat(stats, 'averages.performance.avgCompletionRate', 0),
+                avgWithdrawalRate: getStat(stats, 'averages.performance.avgWithdrawalRate', 0),
+            }
+        },
+        records: {
+            highestStreak: getStat(stats, 'records.highestStreak', 0),
+            fastestMatch: getStat(stats, 'records.fastestMatch', 0),
+            highestPointsMatch: getStat(stats, 'records.highestPointsMatch', 0),
+            highestCoinsMatch: getStat(stats, 'records.highestCoinsMatch', 0),
+            longestWinStreak: getStat(stats, 'records.longestWinStreak', 0),
+        },
+        currentSeason: {
+            matches: getStat(stats, 'currentSeason.matches', 0),
+            winRate: getStat(stats, 'currentSeason.winRate', 0),
+            avgAccuracy: getStat(stats, 'currentSeason.avgAccuracy', 0),
+            highestStreak: getStat(stats, 'currentSeason.highestStreak', 0),
+            highestRank: getStat(stats, 'currentSeason.highestRank', 'برونزي 1'),
+        },
+        ranked: {
+            matches: getStat(stats, 'ranked.matches', 0),
+            wins: getStat(stats, 'ranked.wins', 0),
+            streak: getStat(stats, 'ranked.streak', 0),
+            bestStreak: getStat(stats, 'ranked.bestStreak', 0),
+            perfect: getStat(stats, 'ranked.perfect', 0),
+            totalScore: getStat(stats, 'ranked.totalScore', 0),
+            avgScore: getStat(stats, 'ranked.avgScore', 0)
+        },
+        unranked: {
+            matches: getStat(stats, 'unranked.matches', 0),
+            wins: getStat(stats, 'unranked.wins', 0),
+            streak: getStat(stats, 'unranked.streak', 0),
+            perfect: getStat(stats, 'unranked.perfect', 0),
+            totalScore: getStat(stats, 'unranked.totalScore', 0),
+            avgScore: getStat(stats, 'unranked.avgScore', 0)
+        },
+        training: {
+            completed: getStat(stats, 'training.completed', 0),
+            bestScore: getStat(stats, 'training.bestScore', 0),
+            survivalWins: getStat(stats, 'training.survivalWins', 0),
+            speedWins: getStat(stats, 'training.speedWins', 0),
+            survivalStreak: getStat(stats, 'training.survivalStreak', 0),
+            speedCorrect: getStat(stats, 'training.speedCorrect', 0),
+            totalScore: getStat(stats, 'training.totalScore', 0),
+            avgScore: getStat(stats, 'training.avgScore', 0)
+        },
+        rooms: {
+            joined: getStat(stats, 'rooms.joined', 0),
+            hosted: getStat(stats, 'rooms.hosted', 0),
+            wins: getStat(stats, 'rooms.wins', 0),
+            bestScore: getStat(stats, 'rooms.bestScore', 0),
+            megaJoined: getStat(stats, 'rooms.megaJoined', 0),
+            totalScore: getStat(stats, 'rooms.totalScore', 0),
+            avgScore: getStat(stats, 'rooms.avgScore', 0)
+        },
+        power: getStat(stats, 'power', 0),
+        accuracy: getStat(stats, 'accuracy', 0)
+    };
+    
+    // ===== دالة عرض بطاقة إحصائية =====
+    const statCard = (label, value, icon = '📊', color = 'var(--primary)') => {
+        const displayValue = (value !== undefined && value !== null && value !== '') ? value : '—';
+        return `
+            <div style="
+                display: flex;
+                align-items: center;
+                gap: 0.6rem;
+                padding: 0.4rem 0.6rem;
+                background: var(--glass);
+                border-radius: 8px;
+                border: 1px solid var(--border-color);
+                transition: 0.2s;
+            ">
+                <div style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:50%;background:${color}22;color:${color};font-size:1.1rem;">
+                    ${icon}
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:0.55rem;color:var(--gray);font-weight:600;">${label}</div>
+                    <div style="font-weight:800;font-size:1rem;color:var(--light);">${displayValue}</div>
+                </div>
+            </div>
+        `;
+    };
+    
+    // ===== دالة عرض قسم مع طي قابل للعمل =====
+    const renderSection = (title, icon, contentHtml, defaultOpen = false) => {
+        const sectionId = 'stats_section_' + title.replace(/\s/g, '_') + '_' + Date.now().toString(36);
+        return `
+            <div class="stats-section-wrapper" style="
+                margin-bottom: 0.5rem;
+                border: 1px solid var(--border-color);
+                border-radius: var(--radius-sm);
+                overflow: hidden;
+                background: var(--card-bg);
+            ">
+                <div class="stats-section-header" 
+                     data-section-id="${sectionId}"
+                     style="
+                         display: flex;
+                         justify-content: space-between;
+                         align-items: center;
+                         padding: 0.4rem 0.8rem;
+                         cursor: pointer;
+                         background: var(--glass);
+                         border-bottom: 1px solid var(--border-color);
+                         user-select: none;
+                         transition: background 0.2s;
+                     "
+                     onmouseover="this.style.background='rgba(255,255,255,0.08)'"
+                     onmouseout="this.style.background='var(--glass)'"
+                     onclick="App._toggleStatsSection('${sectionId}')">
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <span style="font-size:1.2rem;">${icon}</span>
+                        <span style="font-weight:700;font-size:0.9rem;color:var(--light);">${title}</span>
+                        <span style="font-size:0.6rem;color:var(--gray);background:var(--glass);padding:0.05rem 0.5rem;border-radius:30px;border:1px solid var(--glass-border);">
+                            ${defaultOpen ? 'مفتوح' : 'مغلق'}
+                        </span>
+                    </div>
+                    <span style="font-size:0.7rem;color:var(--gray);transition:transform 0.3s;">${defaultOpen ? '▲' : '▼'}</span>
+                </div>
+                <div class="stats-section-content" 
+                     id="${sectionId}"
+                     style="
+                         display: ${defaultOpen ? 'block' : 'none'};
+                         padding: ${defaultOpen ? '0.5rem' : '0'};
+                         transition: all 0.3s ease;
+                     ">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.3rem;">
+                        ${contentHtml}
+                    </div>
+                </div>
+            </div>
+        `;
+    };
+    
+    // ===== بناء الأقسام =====
+    const accuracy = statsData.accuracy || 0;
+    const accuracyColor = accuracy >= 80 ? '#2ecc71' : accuracy >= 60 ? '#FFD93D' : accuracy >= 40 ? '#f39c12' : '#FF6B6B';
+    const power = statsData.power || 0;
+    const powerColor = power >= 80 ? '#2ecc71' : power >= 60 ? '#FFD93D' : power >= 40 ? '#f39c12' : '#FF6B6B';
+    
+    // 1. الدقة والقوة
+const specialSection = `
+    <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:0.5rem;">
+        <!-- القوة -->
+        <div style="background:var(--glass);border-radius:8px;padding:0.5rem 0.8rem;border:1px solid var(--border-color);">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <div style="width:40px;height:40px;border-radius:50%;background:${powerColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <span style="font-size:1.2rem;color:#fff;">💪</span>
+                </div>
+                <div style="flex:1;">
+                    <div style="display:flex;justify-content:space-between;font-weight:700;">
+                        <span style="font-size:0.75rem;color:var(--gray);">القوة</span>
+                        <span style="color:${powerColor};">${power}%</span>
+                    </div>
+                    <div style="height:4px;background:var(--glass);border-radius:10px;overflow:hidden;margin-top:0.1rem;">
+                        <div style="height:100%;width:${power}%;background:${powerColor};border-radius:10px;"></div>
+                    </div>
+                    <div style="font-size:0.5rem;color:var(--gray);margin-top:0.05rem;">${power >= 80 ? '🏅 لاعب خارق!' : power >= 60 ? '🌟 لاعب محترف' : '🌱 لاعب مبتدئ'}</div>
+                </div>
+            </div>
+        </div>
+        <!-- الدقة -->
+        <div style="background:var(--glass);border-radius:8px;padding:0.5rem 0.8rem;border:1px solid var(--border-color);">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <div style="width:40px;height:40px;border-radius:50%;background:${accuracyColor};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <span style="font-size:1.2rem;color:#fff;">🎯</span>
+                </div>
+                <div style="flex:1;">
+                    <div style="display:flex;justify-content:space-between;font-weight:700;">
+                        <span style="font-size:0.75rem;color:var(--gray);">الدقة</span>
+                        <span style="color:${accuracyColor};">${accuracy}%</span>
+                    </div>
+                    <div style="height:4px;background:var(--glass);border-radius:10px;overflow:hidden;margin-top:0.1rem;">
+                        <div style="height:100%;width:${accuracy}%;background:${accuracyColor};border-radius:10px;"></div>
+                    </div>
+                    <div style="font-size:0.5rem;color:var(--gray);margin-top:0.05rem;">${accuracy >= 80 ? '🎯 قناص خارق!' : accuracy >= 60 ? '🎯 دقة عالية' : '🎯 يحتاج إلى تحسين'}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+`;
+    
+    // 2. الإحصائيات العامة
+    const generalSection = `
+        ${statCard('إجمالي المباريات', statsData.general.totalMatches, '🏆')}
+        ${statCard('مباريات مكتملة', statsData.general.completedMatches, '✅')}
+        ${statCard('مباريات منسحب', statsData.general.withdrawnMatches, '🚫')}
+        ${statCard('انتصارات', statsData.general.wins, '🏅', '#FFD93D')}
+        ${statCard('تعادلات', statsData.general.draws, '🤝')}
+        ${statCard('هزائم', statsData.general.losses, '💔', '#FF6B6B')}
+        ${statCard('المركز الأول', statsData.general.firstPlace, '🥇', '#FFD93D')}
+        ${statCard('المركز الثالث', statsData.general.thirdPlace, '🥉', '#CD7F32')}
+        ${statCard('المركز الأخير', statsData.general.lastPlace, '💀', '#FF6B6B')}
+    `;
+    
+    // 3. الأسئلة
+    const questionsSection = `
+        ${statCard('أسئلة مجاب عنها', statsData.questions.answered, '📝')}
+        ${statCard('إجابات صحيحة', statsData.questions.correct, '✅', '#2ecc71')}
+        ${statCard('إجابات خاطئة', statsData.questions.wrong, '❌', '#FF6B6B')}
+        ${statCard('أسئلة متخطاة', statsData.questions.skipped, '⏭️')}
+        ${statCard('انتهاء الوقت', statsData.questions.timeout, '⏰', '#f39c12')}
+    `;
+    
+    // 4. السرعة
+    const speedSection = `
+        ${statCard('أول لاعب يجيب', statsData.speed.firstAnswer, '⚡', '#FFD93D')}
+        ${statCard('آخر لاعب يجيب', statsData.speed.lastAnswer, '🐢', '#FF6B6B')}
+        ${statCard('إجابات في أول ثانية', statsData.speed.answersInFirstSecond, '🚀', '#2ecc71')}
+        ${statCard('إجابات في آخر ثانية', statsData.speed.answersInLastSecond, '🏃', '#f39c12')}
+        ${statCard('أسرع مباراة', statsData.speed.fastestMatch || '—', '🏎️')}
+        ${statCard('أبطأ مباراة', statsData.speed.slowestMatch || '—', '🐌')}
+    `;
+    
+    // 5. الأداء
+    const performanceSection = `
+        ${statCard('كل الإجابات صحيحة', statsData.performance.allCorrectMatches, '💯', '#2ecc71')}
+        ${statCard('كل الإجابات خاطئة', statsData.performance.allWrongMatches, '😅', '#FF6B6B')}
+    `;
+    
+    // 6. المتوسطات - المباريات
+    const avgMatchSection = `
+        ${statCard('متوسط المدة', statsData.averages.match.avgDuration + 's', '⏱️')}
+        ${statCard('متوسط المركز', statsData.averages.match.avgPosition, '📊')}
+        ${statCard('متوسط النقاط', statsData.averages.match.avgPoints, '⭐', '#FFD93D')}
+        ${statCard('متوسط نقاط الرتبة', statsData.averages.match.avgRankPoints, '🏅')}
+        ${statCard('متوسط العملات', statsData.averages.match.avgCoins, '🪙', '#FFD93D')}
+    `;
+    
+    // 7. المتوسطات - الأسئلة
+    const avgQuestionSection = `
+        ${statCard('متوسط الصحيح/مباراة', statsData.averages.question.avgCorrectPerMatch, '✅', '#2ecc71')}
+        ${statCard('متوسط الخاطئ/مباراة', statsData.averages.question.avgWrongPerMatch, '❌', '#FF6B6B')}
+        ${statCard('متوسط المتخطي/مباراة', statsData.averages.question.avgSkippedPerMatch, '⏭️')}
+    `;
+    
+    // 8. المتوسطات - السرعة
+    const avgSpeedSection = `
+        ${statCard('متوسط زمن الإجابة', statsData.averages.speed.avgAnswerTime + 's', '⏱️')}
+        ${statCard('متوسط زمن الصحيح', statsData.averages.speed.avgCorrectAnswerTime + 's', '✅')}
+        ${statCard('متوسط زمن الخاطئ', statsData.averages.speed.avgWrongAnswerTime + 's', '❌')}
+        ${statCard('متوسط ترتيب السرعة', statsData.averages.speed.avgSpeedRank, '🏃')}
+    `;
+    
+    // 9. المتوسطات - الأداء
+    const avgPerformanceSection = `
+        ${statCard('متوسط نسبة الفوز', statsData.averages.performance.avgWinRate + '%', '🏆', '#FFD93D')}
+        ${statCard('متوسط نسبة المركز الأول', statsData.averages.performance.avgFirstPlaceRate + '%', '🥇', '#FFD93D')}
+        ${statCard('متوسط نسبة الإكمال', statsData.averages.performance.avgCompletionRate + '%', '✅', '#2ecc71')}
+        ${statCard('متوسط نسبة الانسحاب', statsData.averages.performance.avgWithdrawalRate + '%', '🚫', '#FF6B6B')}
+    `;
+    
+    // 10. الأرقام القياسية
+    const recordsSection = `
+        ${statCard('أعلى سلسلة إجابات', statsData.records.highestStreak, '🔥', '#FFD93D')}
+        ${statCard('أسرع مباراة', statsData.records.fastestMatch || '—', '🏎️')}
+        ${statCard('أعلى نقاط مباراة', statsData.records.highestPointsMatch, '⭐', '#FFD93D')}
+        ${statCard('أعلى عملات مباراة', statsData.records.highestCoinsMatch, '🪙', '#FFD93D')}
+        ${statCard('أطول سلسلة انتصارات', statsData.records.longestWinStreak, '🏆', '#2ecc71')}
+    `;
+    
+    // 11. الموسم الحالي
+    const seasonSection = `
+        ${statCard('مباريات الموسم', statsData.currentSeason.matches, '📅')}
+        ${statCard('نسبة الفوز الموسم', statsData.currentSeason.winRate + '%', '🏆', '#FFD93D')}
+        ${statCard('متوسط الدقة الموسم', statsData.currentSeason.avgAccuracy + '%', '🎯')}
+        ${statCard('أعلى سلسلة الموسم', statsData.currentSeason.highestStreak, '🔥')}
+        ${statCard('أعلى رتبة الموسم', statsData.currentSeason.highestRank, '👑', '#FFD93D')}
+    `;
+    
+    // 12. الأطوار التصنيفية
+    const rankedSection = `
+        ${statCard('مباريات مصنفة', statsData.ranked.matches, '🏅')}
+        ${statCard('انتصارات مصنفة', statsData.ranked.wins, '🏆', '#FFD93D')}
+        ${statCard('سلسلة مصنفة', statsData.ranked.streak, '🔥')}
+        ${statCard('أفضل سلسلة مصنفة', statsData.ranked.bestStreak, '⭐', '#2ecc71')}
+        ${statCard('مباريات كاملة مصنفة', statsData.ranked.perfect, '💯', '#2ecc71')}
+    `;
+    
+    // 13. الأطوار الودية
+    const unrankedSection = `
+        ${statCard('مباريات ودية', statsData.unranked.matches, '🎮')}
+        ${statCard('انتصارات ودية', statsData.unranked.wins, '🏆', '#FFD93D')}
+        ${statCard('سلسلة ودية', statsData.unranked.streak, '🔥')}
+        ${statCard('مباريات كاملة ودية', statsData.unranked.perfect, '💯', '#2ecc71')}
+    `;
+    
+    // 14. أطوار التدريب
+    const trainingSection = `
+        ${statCard('جولات تدريبية', statsData.training.completed, '📚')}
+        ${statCard('أفضل نقاط تدريب', statsData.training.bestScore, '⭐', '#FFD93D')}
+        ${statCard('انتصارات الصمود', statsData.training.survivalWins, '❤️', '#FF6B6B')}
+        ${statCard('انتصارات السرعة', statsData.training.speedWins, '⚡', '#f39c12')}
+        ${statCard('سلسلة الصمود', statsData.training.survivalStreak, '🔥', '#2ecc71')}
+        ${statCard('إجابات صحيحة في السرعة', statsData.training.speedCorrect, '✅', '#9b59b6')}
+    `;
+    
+    // 15. الغرف
+    const roomsSection = `
+        ${statCard('غرف انضم إليها', statsData.rooms.joined, '🏠')}
+        ${statCard('غرف أنشأها', statsData.rooms.hosted, '🏗️')}
+        ${statCard('انتصارات في الغرف', statsData.rooms.wins, '🏆', '#FFD93D')}
+        ${statCard('أفضل نقاط في غرفة', statsData.rooms.bestScore, '⭐', '#FFD93D')}
+        ${statCard('غرف ميجا', statsData.rooms.megaJoined, '🏟️', '#9b59b6')}
+    `;
+    
+    // ===== تجميع كل الأقسام =====
+    let html = `
+        <div style="grid-column:1/-1;">
+            ${specialSection}
+        </div>
+    `;
+    
+    // إضافة الأقسام القابلة للطي
+    html += renderSection('الإحصائيات العامة', '🏆', generalSection, true);
+    html += renderSection('الأسئلة', '❓', questionsSection, false);
+    html += renderSection('السرعة', '⚡', speedSection, false);
+    html += renderSection('الأداء', '📈', performanceSection, false);
+    html += renderSection('متوسطات المباريات', '📊', avgMatchSection, false);
+    html += renderSection('متوسطات الأسئلة', '❓', avgQuestionSection, false);
+    html += renderSection('متوسطات السرعة', '⏱️', avgSpeedSection, false);
+    html += renderSection('متوسطات الأداء', '🏆', avgPerformanceSection, false);
+    html += renderSection('الأرقام القياسية', '👑', recordsSection, false);
+    html += renderSection('الموسم الحالي', '📅', seasonSection, false);
+    html += renderSection('الأطوار التصنيفية', '🏅', rankedSection, false);
+    html += renderSection('الأطوار الودية', '🎮', unrankedSection, false);
+    html += renderSection('أطوار التدريب', '📚', trainingSection, false);
+    html += renderSection('الغرف', '🏠', roomsSection, false);
+    
+    // زر تحديث الإحصائيات
+    html += `
+        <div style="grid-column:1/-1;text-align:center;padding-top:0.5rem;border-top:1px solid var(--glass-border);">
+            <button class="btn btn-sm btn-outline" onclick="App._renderProfileStats(AuthService.currentUser);" style="font-size:0.7rem;padding:4px 16px;">
+                <i class="fas fa-sync"></i> تحديث الإحصائيات
+            </button>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+},
+
+// ============================================================
+// دالة تبديل إظهار/إخفاء قسم الإحصائيات
+// ============================================================
+
+// ============================================================
+// دالة تبديل إظهار/إخفاء قسم الإحصائيات (العمل على العنصر مباشرة)
+// ============================================================
+_toggleStatsSection: function(sectionId) {
+    const content = document.getElementById(sectionId);
+    if (!content) {
+        console.warn('⚠️ Section not found:', sectionId);
+        return;
+    }
+
+    // العثور على الرأس (الوالد المباشر)
+    const wrapper = content.parentElement;
+    if (!wrapper) return;
+
+    const header = wrapper.querySelector('.stats-section-header');
+    if (!header) return;
+
+    // التحقق من الحالة الحالية
+    const isOpen = content.style.display === 'block';
+
+    // تبديل الحالة
+    if (isOpen) {
+        content.style.display = 'none';
+        content.style.padding = '0';
+        // تحديث السهم والنص
+        const arrow = header.querySelector('span:last-child');
+        if (arrow) arrow.textContent = '▼';
+        const badge = header.querySelector('.status-badge');
+        if (badge) badge.textContent = 'مغلق';
+    } else {
+        content.style.display = 'block';
+        content.style.padding = '0.5rem';
+        const arrow = header.querySelector('span:last-child');
+        if (arrow) arrow.textContent = '▲';
+        const badge = header.querySelector('.status-badge');
+        if (badge) badge.textContent = 'مفتوح';
+    }
+
+    // تحديث المظهر البصري للرأس
+    if (isOpen) {
+        header.style.borderBottom = 'none';
+        wrapper.style.borderColor = 'var(--border-color)';
+    } else {
+        header.style.borderBottom = '1px solid var(--border-color)';
+        wrapper.style.borderColor = 'var(--accent)';
+    }
+},
+
+// ============================================================
+// تحميل سجل اللعب (نسخة معدلة - بدون orderBy)
+// ============================================================
+
+_loadMatchHistory() {
+    const container = document.getElementById('profileHistory');
+    if (!container) return;
+
+    const user = AuthService.currentUser;
+    if (!user) {
+        container.innerHTML = `
+            <div class="text-gray" style="text-align:center;padding:2rem;">
+                <i class="fas fa-lock" style="font-size:2rem;color:var(--gray-dark);display:block;margin-bottom:0.5rem;"></i>
+                سجل الدخول لعرض سجل اللعب
+            </div>
+        `;
+        return;
+    }
+
+    // عرض حالة تحميل
+    container.innerHTML = `
+        <div class="text-gray" style="text-align:center;padding:1rem;">
+            <i class="fas fa-spinner fa-spin" style="font-size:1.5rem;color:var(--accent);display:block;margin-bottom:0.5rem;"></i>
+            جاري تحميل سجل المباريات...
+        </div>
+    `;
+
+    // ✅ استخدام getWhere بدلاً من orderBy لتجنب الحاجة للفهرس
+    db.collection('leaderboard')
+        .where('userId', '==', user.uid)
+        .get()
+        .then((snapshot) => {
+            if (snapshot.empty) {
+                container.innerHTML = `
+                    <div class="text-gray" style="text-align:center;padding:2rem;">
+                        <i class="fas fa-gamepad" style="font-size:2rem;color:var(--gray-dark);display:block;margin-bottom:0.5rem;"></i>
+                        <p style="font-size:1.1rem;font-weight:600;color:var(--light);">لا توجد مباريات مسجلة بعد</p>
+                        <p style="font-size:0.85rem;color:var(--gray);">ابدأ اللعب لتظهر نتائجك هنا</p>
+                        <button class="btn btn-primary btn-sm mt-1" onclick="App._activateSection('game')">
+                            <i class="fas fa-play"></i> ابدأ اللعب الآن
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            // ✅ ترتيب يدوي حسب التاريخ (بدون الحاجة للفهرس)
+            const matches = [];
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                // تحويل التاريخ إلى كائن Date للمقارنة
+                let date = data.date;
+                if (date && typeof date.toDate === 'function') {
+                    date = date.toDate();
+                } else if (typeof date === 'string' || typeof date === 'number') {
+                    date = new Date(date);
+                } else if (!(date instanceof Date)) {
+                    date = new Date(0);
+                }
+                matches.push({ id: doc.id, ...data, _date: date });
+            });
+
+            // ✅ الترتيب التنازلي (الأحدث أولاً)
+            matches.sort((a, b) => b._date - a._date);
+
+            // ✅ أخذ آخر 50 مباراة
+            const recentMatches = matches.slice(0, 50);
+
+            let html = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;padding:0 0.3rem;">
+                    <span class="text-gray" style="font-size:0.75rem;">📋 آخر ${recentMatches.length} مباراة</span>
+                    <button class="btn btn-xs btn-outline" onclick="App._loadMatchHistory()" style="font-size:0.6rem;padding:2px 10px;">
+                        <i class="fas fa-sync"></i> تحديث
+                    </button>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:0.4rem;max-height:400px;overflow-y:auto;padding:0.2rem 0.1rem;">
+            `;
+            
+            recentMatches.forEach((data) => {
+                const date = data._date;
+                const formattedDate = formatDate(date);
+                const score = data.score || 0;
+                const accuracy = data.accuracy || 0;
+                const correct = data.correctAnswers || 0;
+                const total = data.totalQuestions || 0;
+                const mode = data.mode || 'عادي';
+                const difficulty = data.difficulty || 'متوسط';
+                const streak = data.streak || 0;
+                const coins = data.coins || 0;
+                const isWin = data.win === true || (accuracy >= 70 && total > 0);
+
+                // تحديد لون الحالة
+                let statusColor = 'var(--gray)';
+                let statusText = '—';
+                if (isWin && accuracy >= 70) {
+                    statusColor = 'var(--success)';
+                    statusText = '✅ فوز';
+                } else if (accuracy < 30 && total > 0) {
+                    statusColor = 'var(--secondary)';
+                    statusText = '❌ خسارة';
+                } else if (accuracy >= 50) {
+                    statusColor = 'var(--accent)';
+                    statusText = '🤝 تعادل';
+                }
+
+                html += `
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0.8rem;background:var(--glass);border-radius:8px;border:1px solid var(--glass-border);flex-wrap:wrap;gap:0.3rem;transition:all 0.2s ease;">
+                        <div style="display:flex;flex-direction:column;gap:0.1rem;flex:1;min-width:120px;">
+                            <span style="font-weight:700;font-size:0.9rem;color:var(--light);">⭐ ${score} نقطة</span>
+                            <span style="font-size:0.6rem;color:var(--gray);">${formattedDate}</span>
+                        </div>
+                        <div style="display:flex;gap:0.4rem;font-size:0.7rem;color:var(--gray);flex-wrap:wrap;align-items:center;">
+                            <span style="color:${statusColor};font-weight:700;">${statusText}</span>
+                            <span>🎯 ${accuracy}%</span>
+                            <span>✅ ${correct}/${total}</span>
+                            ${streak > 0 ? `<span style="color:var(--accent);">🔥${streak}</span>` : ''}
+                            ${coins > 0 ? `<span style="color:var(--accent);">🪙${coins}</span>` : ''}
+                        </div>
+                        <div style="display:flex;gap:0.3rem;font-size:0.6rem;color:var(--gray-dark);">
+                            <span class="badge badge-sm">${mode}</span>
+                            <span class="badge badge-sm">${difficulty}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        })
+        .catch((error) => {
+            console.error('Error loading match history:', error);
+            
+            // ✅ محاولة بديلة بدون أي ترتيب
+            db.collection('leaderboard')
+                .where('userId', '==', user.uid)
+                .limit(50)
+                .get()
+                .then((snapshot) => {
+                    if (snapshot.empty) {
+                        container.innerHTML = `
+                            <div class="text-gray" style="text-align:center;padding:2rem;">
+                                <i class="fas fa-gamepad" style="font-size:2rem;color:var(--gray-dark);display:block;margin-bottom:0.5rem;"></i>
+                                <p style="font-size:1.1rem;font-weight:600;color:var(--light);">لا توجد مباريات مسجلة بعد</p>
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    let html = `
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;padding:0 0.3rem;">
+                            <span class="text-gray" style="font-size:0.75rem;">📋 آخر ${snapshot.size} مباراة</span>
+                        </div>
+                        <div style="display:flex;flex-direction:column;gap:0.4rem;max-height:400px;overflow-y:auto;padding:0.2rem 0.1rem;">
+                    `;
+                    
+                    snapshot.forEach((doc) => {
+                        const data = doc.data();
+                        const date = data.date?.toDate?.() || new Date(data.date);
+                        const formattedDate = formatDate(date);
+                        const score = data.score || 0;
+                        const accuracy = data.accuracy || 0;
+                        const correct = data.correctAnswers || 0;
+                        const total = data.totalQuestions || 0;
+                        const mode = data.mode || 'عادي';
+                        const difficulty = data.difficulty || 'متوسط';
+                        const streak = data.streak || 0;
+                        const coins = data.coins || 0;
+                        const isWin = data.win === true || (accuracy >= 70 && total > 0);
+
+                        let statusColor = 'var(--gray)';
+                        let statusText = '—';
+                        if (isWin && accuracy >= 70) {
+                            statusColor = 'var(--success)';
+                            statusText = '✅ فوز';
+                        } else if (accuracy < 30 && total > 0) {
+                            statusColor = 'var(--secondary)';
+                            statusText = '❌ خسارة';
+                        } else if (accuracy >= 50) {
+                            statusColor = 'var(--accent)';
+                            statusText = '🤝 تعادل';
+                        }
+
+                        html += `
+                            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0.8rem;background:var(--glass);border-radius:8px;border:1px solid var(--glass-border);flex-wrap:wrap;gap:0.3rem;">
+                                <div style="display:flex;flex-direction:column;gap:0.1rem;flex:1;min-width:120px;">
+                                    <span style="font-weight:700;font-size:0.9rem;color:var(--light);">⭐ ${score} نقطة</span>
+                                    <span style="font-size:0.6rem;color:var(--gray);">${formattedDate}</span>
+                                </div>
+                                <div style="display:flex;gap:0.4rem;font-size:0.7rem;color:var(--gray);flex-wrap:wrap;align-items:center;">
+                                    <span style="color:${statusColor};font-weight:700;">${statusText}</span>
+                                    <span>🎯 ${accuracy}%</span>
+                                    <span>✅ ${correct}/${total}</span>
+                                    ${streak > 0 ? `<span style="color:var(--accent);">🔥${streak}</span>` : ''}
+                                    ${coins > 0 ? `<span style="color:var(--accent);">🪙${coins}</span>` : ''}
+                                </div>
+                                <div style="display:flex;gap:0.3rem;font-size:0.6rem;color:var(--gray-dark);">
+                                    <span class="badge badge-sm">${mode}</span>
+                                    <span class="badge badge-sm">${difficulty}</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    container.innerHTML = html;
+                })
+                .catch((fallbackError) => {
+                    console.error('Fallback error:', fallbackError);
+                    container.innerHTML = `
+                        <div class="text-gray" style="text-align:center;padding:2rem;color:var(--secondary);">
+                            <i class="fas fa-exclamation-circle" style="font-size:2rem;display:block;margin-bottom:0.5rem;"></i>
+                            <p style="font-size:1rem;font-weight:600;">حدث خطأ في تحميل سجل اللعب</p>
+                            <p style="font-size:0.85rem;">يرجى إنشاء الفهرس المطلوب من خلال رابط وحدة التحكم</p>
+                            <a href="https://console.firebase.google.com/v1/r/project/football-808ec/firestore/indexes?create_composite=ClJwcm9qZWN0cy9mb290YmFsbC04MDhlYy9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvbGVhZGVyYm9hcmQvaW5kZXhlcy9fEAEaCgoGdXNlcklkEAEaCAoEZGF0ZRACGgwKCF9fbmFtZV9fEAI" 
+                               target="_blank" class="btn btn-primary btn-sm mt-1" style="display:inline-flex;align-items:center;gap:0.3rem;">
+                                <i class="fas fa-external-link-alt"></i> إنشاء الفهرس
+                            </a>
+                            <button class="btn btn-sm btn-outline mt-1" onclick="App._loadMatchHistory()" style="display:block;margin:0.5rem auto 0;">
+                                <i class="fas fa-sync"></i> إعادة المحاولة
+                            </button>
+                        </div>
+                    `;
+                });
+        });
 },
 
 async _fixBadgeIcons() {
@@ -32751,23 +34177,7 @@ App._renderStatsSection = function(title, icon, content, sectionKey) {
     `;
 };
 
-// ✅ دالة تبديل إظهار/إخفاء القسم
-App._toggleStatsSection = function(sectionKey) {
-    // إذا كان نفس القسم مفتوحاً، أغلقه
-    if (App._openStatsSection === sectionKey) {
-        App._openStatsSection = null;
-    } else {
-        App._openStatsSection = sectionKey;
-    }
-    
-    // إعادة تحميل صفحة الإحصائيات
-    const section = document.getElementById('section-analytics');
-    if (section) {
-        section.innerHTML = App._renderAnalyticsSection();
-        // إعادة ربط الأحداث بعد إعادة التحميل
-        App._bindStatsEvents();
-    }
-};
+
 
 // ✅ دالة ربط الأحداث (بعد إعادة التحميل)
 App._bindStatsEvents = function() {
