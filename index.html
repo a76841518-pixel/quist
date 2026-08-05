@@ -389,7 +389,7 @@
                 cursor: pointer;
                 box-shadow: 0 4px 20px rgba(46, 204, 113, 0.3);
                 transition: all 0.3s ease;
-            " disabled>
+            " >
                 <i class="fas fa-user-plus"></i> إنشاء حساب
             </button>
 
@@ -398,7 +398,6 @@
                 🔒 جميع بياناتك آمنة ومشفرة
             </div>
         </div>
-
         <!-- ===== رسالة أسفل الشاشة ===== -->
         <div style="text-align: center; margin-top: 1rem; color: #a7a9be; font-size: 0.75rem;">
             🔒 بياناتك آمنة ومشفرة
@@ -514,6 +513,164 @@
     </div>
 </div>
 
+<!-- ============================================================
+     مودال تعبئة البيانات الشخصية بعد التسجيل
+     ============================================================ -->
+<div class="modal-overlay" id="profileSetupModal">
+    <div class="modal-card" style="max-width: 480px; max-height: 90vh; overflow-y: auto;">
+        <div class="modal-header">
+            <h3><i class="fas fa-user-cog" style="color: var(--accent);"></i> أكمل بياناتك الشخصية</h3>
+            <button class="modal-close-btn" onclick="App._closeModal('profileSetupModal')" style="display: none;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div style="padding: 0.2rem 0 0.8rem;">
+            <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 1rem; text-align: center;">
+                <i class="fas fa-info-circle" style="color: var(--accent);"></i>
+                هذه البيانات ستساعدنا في تخصيص تجربتك
+            </p>
+            
+            <!-- معاينة الصورة -->
+            <div style="text-align: center; margin-bottom: 1rem;">
+                <div id="avatarPreview" style="
+                    width: 100px;
+                    height: 100px;
+                    border-radius: 50%;
+                    margin: 0 auto;
+                    background: var(--primary);
+                    background-size: cover;
+                    background-position: center;
+                    border: 4px solid var(--accent);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 3rem;
+                    color: #fff;
+                    transition: all 0.3s ease;
+                ">
+                    👤
+                </div>
+                <div style="font-size: 0.7rem; color: var(--gray); margin-top: 0.3rem;">
+                    الصورة الافتراضية حسب بياناتك
+                </div>
+            </div>
+            
+            <!-- العمر -->
+            <div class="form-group">
+                <label>🎂 العمر *</label>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button class="age-btn active" data-age="under_18" style="
+                        padding: 0.5rem 1.5rem;
+                        border-radius: 30px;
+                        border: 2px solid var(--primary);
+                        background: var(--primary);
+                        color: #fff;
+                        font-weight: 700;
+                        font-size: 0.9rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                        flex: 1;
+                    ">
+                        👦 أقل من 18
+                    </button>
+                    <button class="age-btn" data-age="over_18" style="
+                        padding: 0.5rem 1.5rem;
+                        border-radius: 30px;
+                        border: 2px solid var(--glass-border);
+                        background: transparent;
+                        color: var(--gray);
+                        font-weight: 700;
+                        font-size: 0.9rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                        flex: 1;
+                    ">
+                        👨 أكثر من 18
+                    </button>
+                </div>
+            </div>
+            
+            <!-- الجنس -->
+            <div class="form-group">
+                <label>⚧ الجنس *</label>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button class="gender-btn active" data-gender="male" style="
+                        padding: 0.5rem 1.5rem;
+                        border-radius: 30px;
+                        border: 2px solid var(--primary);
+                        background: var(--primary);
+                        color: #fff;
+                        font-weight: 700;
+                        font-size: 0.9rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                        flex: 1;
+                    ">
+                        👨 ذكر
+                    </button>
+                    <button class="gender-btn" data-gender="female" style="
+                        padding: 0.5rem 1.5rem;
+                        border-radius: 30px;
+                        border: 2px solid var(--glass-border);
+                        background: transparent;
+                        color: var(--gray);
+                        font-weight: 700;
+                        font-size: 0.9rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                        flex: 1;
+                    ">
+                        👩 أنثى
+                    </button>
+                </div>
+            </div>
+            
+<!-- الدولة -->
+<div class="form-group">
+    <label>🌍 الدولة *</label>
+    <select id="countrySelect" style="
+        width: 100%;
+        padding: 10px 16px;
+        border-radius: 12px;
+        background: var(--glass);
+        border: 1px solid var(--glass-border);
+        color: var(--light);
+        font-size: 0.95rem;
+        font-family: var(--font);
+    ">
+        <option value="">-- اختر دولتك --</option>
+        ${ARAB_COUNTRIES.map(c => 
+            `<option value="${c.code}">${c.name}</option>`
+        ).join('')}
+    </select>
+    <!-- عرض العلم بجانب الدولة المختارة -->
+    <div id="selectedCountryDisplay" style="display:none; margin-top: 8px; padding: 8px 12px; background: var(--glass); border-radius: 8px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 10px;">
+        <img id="selectedCountryFlag" src="" alt="العلم" style="width: 32px; height: 24px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color);">
+        <span id="selectedCountryName" style="font-weight: 600; color: var(--light);"></span>
+    </div>
+</div>
+            
+            <!-- أزرار التحكم -->
+            <div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;">
+                <button class="btn btn-primary" id="saveProfileSetupBtn" style="flex: 1; justify-content: center; min-width: 120px; padding: 12px;">
+                    <i class="fas fa-check"></i> حفظ ومتابعة
+                </button>
+                <button class="btn btn-outline" onclick="App._skipProfileSetup()" style="justify-content: center; padding: 12px 20px;">
+                    <i class="fas fa-skip"></i> تخطي لاحقاً
+                </button>
+            </div>
+            
+            <div style="text-align: center; margin-top: 0.5rem; font-size: 0.65rem; color: var(--gray-dark);">
+                <i class="fas fa-lock"></i> يمكنك تغيير هذه البيانات لاحقاً من الملف الشخصي
+            </div>
+        </div>
+    </div>
+</div>
 
     <!-- Connection Status -->
     <div class="connection-status" id="connectionStatus">

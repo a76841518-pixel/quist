@@ -1,6 +1,56 @@
 // ============================================================
 // app.js – التطبيق الكامل (إعادة بناء مع تصحيح الأخطاء)
 // ============================================================
+const DEFAULT_AVATAR_PATH = 'images/default-avatar.png';
+// ===== الصور الافتراضية حسب العمر والجنس =====
+const DEFAULT_AVATARS = {
+    'male_adult': 'images/default-avatars/male-adult.png',
+    'female_adult': 'images/default-avatars/female-adult.png',
+    'male_young': 'images/default-avatars/male-young.png',
+    'female_young': 'images/default-avatars/female-young.png'
+};
+
+// ============================================================
+// قائمة الدول العربية مع صور الأعلام
+// ============================================================
+// ============================================================
+// قائمة الدول العربية (بأسماء ملفات مختصرة)
+// ============================================================
+const ARAB_COUNTRIES = [
+    { code: 'SA', name: 'السعودية', flag: 'images/flags/sa.png' },
+    { code: 'AE', name: 'الإمارات', flag: 'images/flags/ae.png' },
+    { code: 'KW', name: 'الكويت', flag: 'images/flags/kw.png' },
+    { code: 'QA', name: 'قطر', flag: 'images/flags/qa.png' },
+    { code: 'BH', name: 'البحرين', flag: 'images/flags/bh.png' },
+    { code: 'OM', name: 'عُمان', flag: 'images/flags/om.png' },
+    { code: 'YE', name: 'اليمن', flag: 'images/flags/ye.png' },
+    { code: 'JO', name: 'الأردن', flag: 'images/flags/jo.png' },
+    { code: 'PS', name: 'فلسطين', flag: 'images/flags/ps.png' },
+    { code: 'LB', name: 'لبنان', flag: 'images/flags/lb.png' },
+    { code: 'SY', name: 'سوريا', flag: 'images/flags/sy.png' },
+    { code: 'IQ', name: 'العراق', flag: 'images/flags/iq.png' },
+    { code: 'EG', name: 'مصر', flag: 'images/flags/eg.png' },
+    { code: 'SD', name: 'السودان', flag: 'images/flags/sd.png' },
+    { code: 'LY', name: 'ليبيا', flag: 'images/flags/ly.png' },
+    { code: 'TN', name: 'تونس', flag: 'images/flags/tn.png' },
+    { code: 'DZ', name: 'الجزائر', flag: 'images/flags/dz.png' },
+    { code: 'MA', name: 'المغرب', flag: 'images/flags/ma.png' },
+    { code: 'MR', name: 'موريتانيا', flag: 'images/flags/mr.png' },
+    { code: 'SO', name: 'الصومال', flag: 'images/flags/so.png' },
+    { code: 'DJ', name: 'جيبوتي', flag: 'images/flags/dj.png' },
+    { code: 'KM', name: 'جزر القمر', flag: 'images/flags/km.png' }
+];
+
+// دالة مساعدة للحصول على الدولة حسب الكود
+function getCountryByCode(code) {
+    return ARAB_COUNTRIES.find(c => c.code === code) || null;
+}
+
+// دالة للحصول على صورة العلم
+function getCountryFlag(code) {
+    const country = getCountryByCode(code);
+    return country ? country.flag : null;
+}
 
 // ============================================================
 // 1. إعدادات Firebase
@@ -2654,24 +2704,35 @@ const AuthService = {
                         const doc = await db.collection('users').doc(user.uid).get();
                         const data = doc.exists ? doc.data() : {};
                         this.currentUser = {
-                            uid: user.uid,
-                            email: user.email,
-                            displayName: user.displayName || data.displayName || user.email,
-                            username: data.username || user.displayName || user.email,
-                            role: data.role || 'user',
-                            totalScore: data.totalScore || 0,
-                            coins: data.coins || 0,
-                            achievements: data.achievements || [],
-                            inventory: data.inventory || [],
-                            bio: data.bio || '',
-                            location: data.location || '',
-                            avatar: data.avatar || null,
-                            createdAt: data.createdAt || new Date().toISOString(),
-                            adminRole: data.adminRole || null,
-                            friends: data.friends || [],
-                            blocked: data.blocked || [],
-                            rankPoints: data.rankPoints || 0,
-                            stats: data.stats || { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 }
+    uid: user.uid,
+    email: user.email,
+    displayName: user.displayName || data.displayName || user.email,
+    username: data.username || user.displayName || user.email,
+    fullName: data.fullName || data.displayName || user.displayName || user.email,
+    role: data.role || 'user',
+    totalScore: data.totalScore || 0,
+    coins: data.coins || 0,
+    gems: data.gems || 0,
+    achievements: data.achievements || [],
+    inventory: data.inventory || [],
+    activeItems: data.activeItems || [],
+    activeItemDetails: data.activeItemDetails || [],
+    bio: data.bio || '',
+    location: data.location || '',
+    avatar: data.avatar || null,
+    age: data.age || null,
+    gender: data.gender || null,
+    country: data.country || null,
+    countryName: data.countryName || null,
+    countryFlag: data.countryFlag || null,
+    profileCompleted: data.profileCompleted || false,
+    ageGroup: data.ageGroup || null,
+    createdAt: data.createdAt || new Date().toISOString(),
+    adminRole: data.adminRole || null,
+    friends: data.friends || [],
+    blocked: data.blocked || [],
+    rankPoints: data.rankPoints || 0,
+    stats: data.stats || { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 }
                         };
                         localStorage.setItem('football_user_uid', user.uid);
                     } catch (e) {
@@ -2761,6 +2822,37 @@ async register(email, password, username, fullName) {
     try {
         console.log('📡 Creating user with email:', email);
         
+        // ✅ التحقق من توفر اسم المستخدم (بطريقة مباشرة وبدون transaction)
+        try {
+            const checkSnapshot = await db.collection('users')
+                .where('username', '==', username)
+                .get();
+            
+            if (!checkSnapshot.empty) {
+                throw new Error('اسم المستخدم مستخدم بالفعل');
+            }
+        } catch (checkError) {
+            // إذا فشل التحقق بسبب نقص الفهرس، نعتبر اسم المستخدم غير متوفر
+            if (checkError.message && checkError.message.includes('index')) {
+                console.warn('⚠️ Firestore index not ready, using fallback check');
+                // محاولة بديلة: التحقق من خلال جلب جميع المستخدمين (تجنباً للفهرس)
+                const allUsersSnap = await db.collection('users').get();
+                let usernameExists = false;
+                allUsersSnap.forEach(doc => {
+                    const data = doc.data();
+                    if (data.username === username) {
+                        usernameExists = true;
+                    }
+                });
+                if (usernameExists) {
+                    throw new Error('اسم المستخدم مستخدم بالفعل');
+                }
+            } else {
+                // إعادة رمي الخطأ إذا كان خطأ آخر
+                throw checkError;
+            }
+        }
+        
         // ✅ إنشاء المستخدم
         const cred = await auth.createUserWithEmailAndPassword(email, password);
         console.log('✅ User created:', cred.user.uid);
@@ -2845,6 +2937,7 @@ async register(email, password, username, fullName) {
             accuracy: 0,
         };
         
+        // ✅ حفظ بيانات المستخدم في Firestore
         await db.collection('users').doc(cred.user.uid).set({
             email: email,
             username: username,
@@ -2855,17 +2948,21 @@ async register(email, password, username, fullName) {
             coins: 100,
             achievements: [],
             inventory: [],
+            activeItems: [],
+            activeItemDetails: [],
             bio: '',
             location: '',
-            avatar: null,
+            avatar: DEFAULT_AVATAR_PATH,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             adminRole: null,
             friends: [],
             blocked: [],
-            stats: defaultStats,  // ✅ إضافة الإحصائيات الافتراضية
-            rankPoints: 0
+            stats: defaultStats,
+            rankPoints: 0,
+            profileCompleted: false // ✅ أضف هذا السطر
         });
         
+        // ✅ تعيين المستخدم الحالي (بدون استخدام data غير المعرفة)
         this.currentUser = {
             uid: cred.user.uid,
             email: email,
@@ -2877,14 +2974,16 @@ async register(email, password, username, fullName) {
             coins: 100,
             achievements: [],
             inventory: [],
+            activeItems: [],
+            activeItemDetails: [],
             bio: '',
             location: '',
-            avatar: null,
+            avatar: DEFAULT_AVATAR_PATH,
             createdAt: new Date().toISOString(),
             adminRole: null,
             friends: [],
             blocked: [],
-            stats: defaultStats,  // ✅ إضافة الإحصائيات الافتراضية
+            stats: defaultStats,
             rankPoints: 0
         };
         
@@ -2901,6 +3000,7 @@ async register(email, password, username, fullName) {
         else if (e.code === 'auth/weak-password') message = 'كلمة المرور ضعيفة (6 أحرف على الأقل)';
         else if (e.code === 'auth/invalid-email') message = 'البريد الإلكتروني غير صحيح';
         else if (e.code === 'auth/network-request-failed') message = 'فشل الاتصال بالإنترنت';
+        else if (e.message && e.message.includes('اسم المستخدم مستخدم بالفعل')) message = 'اسم المستخدم غير متوفر';
         else message = e.message;
         throw new Error(message);
     }
@@ -11908,6 +12008,9 @@ const App = {
     _isOnline: navigator.onLine, // حالة الاتصال الحالية
     _modeSettingsCache: {}, // تخزين مؤقت للإعدادات المحملة من Firebase
     _modeSettingsLoaded: false,
+    _isLoadingFriends: false,
+    _friendsUnsubscribe: null,
+    _friendsRefreshTimeout: null,
 
 async start() {
     // تهيئة Firebase (للاستخدام الفوري)
@@ -12493,53 +12596,59 @@ _setupAuthPage() {
     console.log('✅ Auth page setup complete');
 },
 
-/**
- * عند نجاح تسجيل الدخول أو التسجيل
- */
 _onAuthSuccess() {
     console.log('🎉 Auth success! Loading app...');
 
-    // إخفاء شاشة الدخول
     const authPage = document.getElementById('authPage');
     if (authPage) {
         authPage.style.display = 'none';
         authPage.style.opacity = '0';
     }
 
-    // إظهار شاشة التحميل
     const loadingScreen = document.getElementById('loadingScreen');
     if (loadingScreen) {
         loadingScreen.style.display = 'flex';
         loadingScreen.style.opacity = '1';
     }
 
-    // إظهار المحتوى الرئيسي
     const mainContent = document.querySelector('.main-content');
     if (mainContent) {
         mainContent.style.display = 'block';
     }
 
-    // تحميل التطبيق
     this._loadApp();
+    
+    // ✅ ✅ ✅ تأكد من وجود هذا الكود ✅ ✅ ✅
+    setTimeout(() => {
+        const user = AuthService.currentUser;
+        console.log('🔍 Checking user profile:', user);
+        
+        if (user && !user.profileCompleted) {
+            console.log('📝 User profile not completed, showing setup modal');
+            // تأخير إضافي لضمان تحميل DOM
+            setTimeout(() => {
+                this._showProfileSetupModal();
+            }, 500);
+        } else if (user && user.profileCompleted) {
+            console.log('✅ User profile already completed');
+            this._updateUserCountryDisplay(user);
+        } else {
+            console.warn('⚠️ No user found after login');
+        }
+    }, 2000);
 },
 
-/**
- * التحقق من توفر اسم المستخدم
- */
 async _checkUsernameAvailability(username) {
     if (!username || username.length < 3) {
-        return { available: false, message: 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل' };
+        return { available: false, message: '⚠️ اسم المستخدم يجب أن يكون 3 أحرف على الأقل' };
     }
-
     if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
-        return { available: false, message: 'يسمح بالحروف والأرقام و _ (3-20 حرف)' };
+        return { available: false, message: '⚠️ يسمح بالحروف والأرقام و _ (3-20 حرف)' };
     }
-
     try {
         const snapshot = await db.collection('users')
             .where('username', '==', username)
             .get();
-
         if (!snapshot.empty) {
             return { available: false, message: '⚠️ اسم المستخدم غير متوفر' };
         }
@@ -12600,6 +12709,117 @@ _updateModeUI: function() {
     localStorage.setItem('selectedGameMode', mode);
     
     console.log('✅ Mode UI updated successfully');
+},
+
+_updateDashboardAvatar: function() {
+    const dashAvatar = document.getElementById('dashboardAvatar');
+    if (!dashAvatar) {
+        console.warn('⚠️ dashboardAvatar element not found, retrying...');
+        setTimeout(() => this._updateDashboardAvatar(), 100);
+        return;
+    }
+
+    const user = AuthService.currentUser;
+    const activeItems = user?.activeItems || [];
+    const storeItems = DataManager.data.storeItems || [];
+    const activeAvatar = storeItems.find(item => activeItems.includes(item.id) && item.category === 'avatars');
+    const activeFrame = storeItems.find(item => activeItems.includes(item.id) && item.category === 'frames');
+
+    // تنظيف الحاوية
+    dashAvatar.innerHTML = '';
+    dashAvatar.style.backgroundImage = 'none';
+    dashAvatar.style.background = 'var(--primary)';
+    dashAvatar.style.border = 'none';
+    dashAvatar.style.boxShadow = 'none';
+    dashAvatar.style.padding = '0';
+    dashAvatar.style.position = 'relative';
+    dashAvatar.style.overflow = 'hidden';
+    dashAvatar.style.display = 'flex';
+    dashAvatar.style.alignItems = 'center';
+    dashAvatar.style.justifyContent = 'center';
+    dashAvatar.style.color = '#fff';
+
+    if (!user) {
+        const defaultText = document.createElement('span');
+        defaultText.textContent = '👤';
+        defaultText.style.cssText = `
+            font-size: 1.8rem;
+            font-weight: 700;
+            position: relative;
+            z-index: 1;
+        `;
+        dashAvatar.appendChild(defaultText);
+        return;
+    }
+
+    // تحديد الصورة المطلوب عرضها
+    let imageUrl = null;
+
+    // 1️⃣ الأولوية القصوى: الصورة المشتراة من المتجر
+    if (activeAvatar && activeAvatar.imagePath) {
+        imageUrl = activeAvatar.imagePath;
+    }
+    // 2️⃣ الصورة المرفوعة من المستخدم (إذا لم تكن هناك صورة مشتراة)
+    else if (user.avatar && user.avatar !== DEFAULT_AVATAR_PATH && user.avatar.startsWith('data:image')) {
+        imageUrl = user.avatar;
+    }
+    // 3️⃣ الصورة الافتراضية
+    else if (user.avatar) {
+        imageUrl = user.avatar;
+    }
+
+    // تطبيق الصورة أو الحرف الأول
+    if (imageUrl) {
+        const imgElement = document.createElement('img');
+        imgElement.style.cssText = `
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        `;
+        imgElement.src = imageUrl;
+        imgElement.alt = user.username || 'مستخدم';
+        dashAvatar.appendChild(imgElement);
+    } else {
+        const firstLetter = document.createElement('span');
+        firstLetter.textContent = (user.username || '👤').charAt(0).toUpperCase();
+        firstLetter.style.cssText = `
+            font-size: 1.8rem;
+            font-weight: 700;
+            position: relative;
+            z-index: 1;
+            color: #fff;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        `;
+        dashAvatar.appendChild(firstLetter);
+    }
+
+    // إضافة الإطار إذا كان مفعّلاً
+    if (activeFrame && activeFrame.imagePath) {
+        const oldFrame = dashAvatar.querySelector('.frame-overlay-dash');
+        if (oldFrame) oldFrame.remove();
+
+        const frameImg = document.createElement('img');
+        frameImg.className = 'frame-overlay-dash';
+        frameImg.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            object-fit: contain;
+        `;
+        frameImg.src = activeFrame.imagePath;
+        dashAvatar.appendChild(frameImg);
+    } else {
+        const frameImg = dashAvatar.querySelector('.frame-overlay-dash');
+        if (frameImg) frameImg.remove();
+    }
 },
 
 // في App
@@ -12725,7 +12945,11 @@ async _loadApp() {
         await this._loadModeSettingsFromFirebase();
         updateTaskStatus('auth', '✅ تم', '✅');
         updateProgress(30, '✅ تم التحقق من المستخدم', `مرحباً ${AuthService.currentUser.username || 'لاعب'}`);
-    } else {
+    // ✅ تحديث العلم
+    setTimeout(() => {
+        this._updateUserCountryDisplay(AuthService.currentUser);
+    }, 500);
+} else {
         updateTaskStatus('auth', '⏳ لا يوجد مستخدم', '👤');
         updateProgress(30, '📝 لا يوجد حساب مسجل', 'يمكنك تسجيل الدخول أو إنشاء حساب');
     }
@@ -12737,6 +12961,7 @@ async _loadApp() {
     // ============================================================
     updateProgress(35, '📚 جاري التحميل...', 'جلب الأسئلة والبيانات من الخادم');
     updateTaskStatus('data', '🔄 جاري...', '📡');
+    this._updateDashboardAvatar();
 
     try {
         // تحميل البيانات مع مهلة
@@ -12818,8 +13043,13 @@ async _loadApp() {
     // 10. تسجيل المستمعين النهائيين
     // ============================================================
     DataManager.addListener((data) => { this._onDataUpdate(data); });
-    AuthService.addListener((user) => { this._onUserUpdate(user); });
-
+AuthService.addListener((user) => { 
+    this._onUserUpdate(user);
+    // ✅ تحديث العلم عند أي تغيير في المستخدم
+    if (user) {
+        this._updateUserCountryDisplay(user);
+    }
+});
     // ============================================================
     // 11. فتح نافذة الدخول إذا لم يكن مستخدم
     // ============================================================
@@ -12859,10 +13089,27 @@ async _loadApp() {
         showToast('🔴 تم فقدان الاتصال بالإنترنت', 'error');
     });
 
-    // ============================================================
-    // 14. إنهاء التحميل - إظهار التطبيق
-    // ============================================================
-    updateProgress(100, '✅ جاهز!', 'مرحباً بك في معركة العقول 🚀');
+// ============================================================
+// ✅ تطبيق الصورة والتخصيصات بعد اكتمال التحميل
+// ============================================================
+updateProgress(98, '📚 جاري التحميل...', 'تطبيق التخصيصات');
+
+// انتظار حتى يتم تحميل جميع البيانات وتطبيقها
+if (AuthService.currentUser) {
+    // ✅ تأخير تطبيق الصورة للتأكد من تحميل جميع عناصر DOM
+    setTimeout(() => {
+        console.log('🔄 تطبيق التخصيصات على الصورة الشخصية...');
+        this._applyUserCustomizations(AuthService.currentUser);
+        this._updateDashboardAvatar();
+        this._updateUserUI(AuthService.currentUser);
+        console.log('✅ تم تطبيق التخصيصات على الصورة الشخصية');
+    }, 500);
+}
+
+// ============================================================
+// 14. إنهاء التحميل - إظهار التطبيق
+// ============================================================
+updateProgress(100, '✅ جاهز!', 'مرحباً بك في معركة العقول 🚀');
     
     // تحديث جميع المهام إلى ✅
     document.querySelectorAll('.loading-task').forEach(task => {
@@ -12893,16 +13140,24 @@ async _loadApp() {
     // تحديث واجهة الداشبورد
     this._updateDashboardUI();
 
-    // ✅ إخفاء شاشة التحميل بعد تأخير قصير لإظهار اكتمال التقدم
+if (AuthService.currentUser) {
+    // انتظار تحميل بيانات المتجر أولاً
     setTimeout(() => {
-        if (loadingScreen) {
-            loadingScreen.style.opacity = '0';
-            setTimeout(() => {
-                loadingScreen.style.display = 'none';
-            }, 500);
-        }
-        showToast('مرحباً بك في معركة العقول المتطورة! 🚀', 'success', 3000);
-    }, 600);
+        this._applyUserCustomizations(AuthService.currentUser);
+        console.log('✅ تم تطبيق التخصيصات على الصورة الشخصية');
+    }, 500);
+}
+
+// ✅ إخفاء شاشة التحميل بعد تأخير قصير لإظهار اكتمال التقدم
+setTimeout(() => {
+    if (loadingScreen) {
+        loadingScreen.style.opacity = '0';
+        setTimeout(() => {
+            loadingScreen.style.display = 'none';
+        }, 500);
+    }
+    showToast('مرحباً بك في معركة العقول المتطورة! 🚀', 'success', 3000);
+}, 600);
 },
 
 
@@ -14011,6 +14266,12 @@ _renderDashboard() {
     
     const imgPath = 'images/dashboard/';
 
+    // ✅ الحصول على معلومات الدولة والعلم
+    const countryInfo = user?.country ? getCountryByCode(user.country) : null;
+    const countryHtml = countryInfo 
+        ? `<img src="${countryInfo.flag}" alt="${countryInfo.name}" style="width: 24px; height: 18px; object-fit: cover; border-radius: 3px; margin-right: 4px; border: 1px solid var(--border-color); display: inline-block; vertical-align: middle;">`
+        : '';
+
     return `
     <div class="dashboard-container" style="
         background-image: url('images/dashboard-bg.jpg');
@@ -14086,8 +14347,10 @@ _renderDashboard() {
                 </div>
                 <div class="player-info">
                     <div class="player-name" id="dashboardUserName">${user?.displayName || user?.username || 'زائر'}</div>
-                    <div class="player-clan">🏰 القبيلة: <span id="dashboardClanName">${clanName}</span></div>
-                </div>
+                <div class="player-clan">
+                    🏰 القبيلة: <span id="dashboardClanName">${clanName}</span>
+                    ${countryHtml}
+                </div>                </div>
                 <div class="player-rank">
                     <img src="images/ranks/${rank.image || 'bronze1.png'}" alt="${rank.name}" onerror="this.style.display='none';this.parentElement.textContent='${rank.icon || '🏅'}'">
                 </div>
@@ -14224,6 +14487,134 @@ case 'friends':
     }
 },
 
+_showLevelsPage() {
+    const user = AuthService.currentUser;
+    if (!user) {
+        showToast('يجب تسجيل الدخول أولاً', 'error');
+        return;
+    }
+    const totalScore = user.totalScore || 0;
+    const container = document.getElementById('levelsPageContainer');
+    if (!container) {
+        // إنشاء القسم إذا لم يكن موجوداً
+        let section = document.getElementById('section-levels');
+        if (!section) {
+            const main = document.getElementById('sectionsContainer');
+            section = document.createElement('section');
+            section.id = 'section-levels';
+            section.className = 'section';
+            section.innerHTML = `
+                <div class="back-to-home" onclick="App._activateSection('dashboard')">
+                    <i class="fas fa-arrow-right"></i> العودة للرئيسية
+                </div>
+                <div id="levelsPageContainer"></div>
+            `;
+            main.appendChild(section);
+        }
+        this._activateSection('levels');
+        setTimeout(() => this._showLevelsPage(), 100);
+        return;
+    }
+
+    const totalLevels = 100;
+    const currentLevel = getLevel(totalScore);
+    const currentLevelNumber = currentLevel.level;
+
+    let html = `
+        <div class="levels-page" style="max-width:100%;margin:0 auto;padding:1rem 0.5rem;">
+            <h2 style="text-align:center;font-size:1.6rem;font-weight:800;margin-bottom:0.3rem;">
+                <i class="fas fa-star" style="color:var(--accent);"></i> 
+                المستويات
+            </h2>
+            <div style="text-align:center;padding:0.3rem;margin-bottom:0.5rem;">
+                <span style="font-size:1rem;font-weight:700;">نقاط المستوى: <span style="color:var(--accent);">${totalScore}</span></span>
+                <span style="display:block;font-size:0.75rem;color:var(--gray);">المستوى الحالي: <strong style="color:var(--accent);">${currentLevelNumber}</strong></span>
+                <span style="display:block;font-size:0.7rem;color:var(--gray);">← اسحب لليمين لعرض جميع المستويات →</span>
+            </div>
+            <div style="display:flex;flex-direction:row;align-items:center;width:100%;overflow-x:auto;padding:0.5rem 0.2rem 1.5rem;gap:0.3rem;scroll-snap-type:x mandatory;scrollbar-width:thin;direction:ltr;justify-content:flex-start;">
+    `;
+
+    for (let i = 1; i <= totalLevels; i++) {
+        const levelNum = i;
+        const levelMin = (levelNum - 1) * 1000;
+        const nextMin = levelNum * 1000;
+        const isUnlocked = totalScore >= levelMin;
+        const isCompleted = totalScore >= nextMin;
+        const isCurrent = isUnlocked && !isCompleted;
+
+        // حساب التقدم لنقطة المنتصف (للشريط بين المستويات)
+        let progress = 0;
+        if (isUnlocked && !isCompleted) {
+            const range = nextMin - levelMin;
+            progress = range > 0 ? ((totalScore - levelMin) / range) * 100 : 100;
+        } else if (isCompleted) {
+            progress = 100;
+        }
+        progress = Math.min(Math.max(progress, 0), 100);
+
+        // حالة المستوى
+        let statusText = '';
+        let statusColor = '';
+        let extraClass = '';
+        if (isCompleted) {
+            statusText = '✅';
+            statusColor = 'var(--success)';
+            extraClass = 'completed';
+        } else if (isCurrent) {
+            statusText = '👈';
+            statusColor = 'var(--accent)';
+            extraClass = 'current';
+        } else {
+            statusText = '🔒';
+            statusColor = 'var(--gray)';
+            extraClass = 'locked';
+        }
+
+        // يمكن إضافة أيقونة مكافأة هنا (سيتم تفعيلها لاحقاً)
+        const rewardIcon = (levelNum % 10 === 0) ? '🎁' : ''; // كل 10 مستويات جائزة
+
+        // بناء بطاقة المستوى
+        html += `
+            <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;scroll-snap-align:start;min-width:70px;padding:0.2rem 0.1rem;position:relative;">
+                <div style="
+                    width:52px;height:52px;border-radius:50%;
+                    background:${isUnlocked ? 'var(--primary)' : 'var(--glass)'};
+                    display:flex;align-items:center;justify-content:center;
+                    font-size:1.2rem;font-weight:900;color:#fff;
+                    border:3px solid ${isCurrent ? 'var(--accent)' : (isCompleted ? 'var(--success)' : 'var(--border-color)')};
+                    box-shadow:${isCurrent ? '0 0 25px rgba(255,217,61,0.3)' : 'none'};
+                    transition:all 0.3s ease;
+                    position:relative;
+                ">
+                    ${levelNum}
+                    ${rewardIcon ? `<span style="position:absolute;top:-10px;right:-10px;font-size:0.8rem;">${rewardIcon}</span>` : ''}
+                </div>
+                <div style="text-align:center;margin-top:0.15rem;">
+                    <div style="font-weight:700;font-size:0.65rem;color:${isUnlocked ? 'var(--light)' : 'var(--gray)'};">${levelNum}</div>
+                    <div style="font-size:0.5rem;color:${statusColor};">${statusText}</div>
+                    <div style="font-size:0.45rem;color:var(--gray);">${levelMin}+</div>
+                </div>
+            </div>
+        `;
+
+        // شريط التقدم بين المستويات (ما عدا بعد المستوى 100)
+        if (i < totalLevels) {
+            const barWidth = 40; // عرض الشريط
+            const progressWidth = (progress / 100) * barWidth;
+            html += `
+                <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:${barWidth}px;padding:0 0.1rem;">
+                    <div style="width:100%;height:4px;background:var(--glass);border-radius:10px;overflow:hidden;position:relative;">
+                        <div style="width:${progressWidth}px;height:100%;background:${isCompleted ? 'var(--success)' : 'linear-gradient(90deg, var(--primary), var(--accent))'};border-radius:10px;transition:width 0.8s ease;"></div>
+                    </div>
+                    <div style="font-size:0.4rem;color:var(--gray);margin-top:0.05rem;">${isCompleted ? '✓' : (isCurrent ? Math.round(progress)+'%' : '')}</div>
+                </div>
+            `;
+        }
+    }
+    container.innerHTML = html;
+    this._activateSection('levels');
+},
+
 // ============================================================
 // إصلاح دالة _updateDashboardUI في script.js
 // ============================================================
@@ -14231,16 +14622,6 @@ case 'friends':
 _updateDashboardUI() {
     const user = AuthService.currentUser;
     if (!user) return;
-
-    // تحديث الصورة الشخصية
-    const avatar = document.getElementById('dashboardAvatar');
-    if (avatar) {
-        if (user.avatar) {
-            avatar.innerHTML = `<img src="${user.avatar}" alt="${user.username}">`;
-        } else {
-            avatar.textContent = (user.username || user.displayName || '👤').charAt(0).toUpperCase();
-        }
-    }
 
     // تحديث الاسم
     const name = document.getElementById('dashboardUserName');
@@ -14277,7 +14658,7 @@ _updateDashboardUI() {
             setTimeout(() => gemsEl.classList.remove('updating'), 300);
         }
     }
-
+            this._updateUserCountryDisplay(user);
     // تحديث المستوى وشريط التقدم
     const progress = getLevelProgress(user.totalScore || 0);
     const levelProgress = document.getElementById('dashboardLevelProgress');
@@ -14871,36 +15252,57 @@ _showUserProfile(userId) {
 },
 
 /**
- * فتح مودال ملف المستخدم
+ * فتح مودال عرض الملف الشخصي لمستخدم
+ * @param {string} userId - معرف المستخدم
  */
 async _openUserProfileModal(userId) {
+    if (!userId) {
+        showToast('معرف المستخدم غير صحيح', 'error');
+        return;
+    }
+
+    // ✅ إذا كان المستخدم الحالي، افتح الملف الشخصي
+    if (AuthService.currentUser && AuthService.currentUser.uid === userId) {
+        this._activateSection('profile');
+        return;
+    }
+
     try {
         const doc = await db.collection('users').doc(userId).get();
         if (!doc.exists) {
             showToast('المستخدم غير موجود', 'error');
             return;
         }
+
         const userData = doc.data();
         const user = {
             uid: userId,
-            username: userData.username || userData.displayName || 'مجهول',
-            displayName: userData.displayName || userData.username || 'مجهول',
+            id: userId,
+            username: userData.username || 'guest',
+            displayName: userData.displayName || userData.fullName || userData.username || 'مجهول',
+            fullName: userData.fullName || userData.displayName || userData.username || 'مجهول',
             avatar: userData.avatar || null,
             bio: userData.bio || 'لا توجد سيرة ذاتية',
             location: userData.location || 'غير محدد',
             totalScore: userData.totalScore || 0,
             coins: userData.coins || 0,
+            gems: userData.gems || 0,
             role: userData.role || 'user',
             achievements: userData.achievements || [],
             stats: userData.stats || { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 },
             friends: userData.friends || [],
-            joinedAt: userData.createdAt || new Date().toISOString()
+            rankPoints: userData.rankPoints || 0,
+            clan: userData.clan || 'غير منضم',
+            joinedAt: userData.createdAt || new Date().toISOString(),
+            activeItems: userData.activeItems || [],
+            inventory: userData.inventory || []
         };
-        
+
         this._displayUserProfileModal(user);
+
     } catch (e) {
+        console.error('❌ Error loading user profile:', e);
         showToast('❌ خطأ في تحميل الملف الشخصي', 'error');
-        console.error(e);
     }
 },
 
@@ -14930,44 +15332,132 @@ _selectGameMode(mode) {
 },
 
 /**
- * عرض مودال ملف المستخدم
+ * إعادة تطبيق جميع التخصيصات على الواجهة
+ * هذه الدالة تضمن عرض الصورة الشخصية، الإطار، العلم، الخلفية، والمستوى بشكل صحيح
+ */
+_applyAllCustomizations() {
+    const user = AuthService.currentUser;
+    if (!user) {
+        console.log('ℹ️ No user logged in, skipping customizations');
+        return;
+    }
+    
+    try {
+        // ✅ 1. تطبيق التخصيصات الأساسية (الصورة، الإطار، الخلفية، السمة)
+        this._applyUserCustomizations(user);
+        
+        // ✅ 2. تحديث الصورة في الداشبورد
+        this._updateDashboardAvatar();
+        
+        // ✅ 3. تحديث العلم في الداشبورد والملف الشخصي
+        this._updateUserCountryDisplay(user);
+        
+        // ✅ 4. تحديث المضاعفات النشطة
+        this._refreshActiveBoosts();
+        
+        // ✅ 5. تحديث صورة الرتبة في الداشبورد
+        const rank = getRank(user.rankPoints || 0);
+        const rankImg = document.querySelector('.player-rank img');
+        if (rankImg) {
+            rankImg.src = `images/ranks/${rank.image || 'bronze1.png'}`;
+            rankImg.alt = rank.name;
+        }
+        
+        // ✅ 6. تحديث صورة الرتبة في الملف الشخصي
+        const profileRankImg = document.querySelector('.profile-rank img');
+        if (profileRankImg) {
+            profileRankImg.src = `images/ranks/${rank.image || 'bronze1.png'}`;
+            profileRankImg.alt = rank.name;
+        }
+        
+        // ✅ 7. تحديث اسم المستوى في الداشبورد
+        const level = getLevel(user.totalScore || 0);
+        const levelNumber = document.getElementById('dashboardLevelNumber');
+        if (levelNumber) {
+            levelNumber.textContent = level.level;
+        }
+        
+        // ✅ 8. تحديث شريط تقدم المستوى
+        const progress = getLevelProgress(user.totalScore || 0);
+        const levelProgress = document.getElementById('dashboardLevelProgress');
+        if (levelProgress) {
+            levelProgress.style.width = `${Math.min(progress.progress, 100)}%`;
+        }
+        
+        // ✅ 9. تحديث شريط تقدم المستوى في الملف الشخصي
+        const profileProgress = document.getElementById('profileLevelProgress');
+        if (profileProgress) {
+            profileProgress.style.width = `${Math.min(progress.progress, 100)}%`;
+        }
+        
+        // ✅ 10. تحديث المستوى في الملف الشخصي
+        const profileLevelNumber = document.getElementById('profileLevelNumber');
+        if (profileLevelNumber) {
+            profileLevelNumber.textContent = level.level;
+        }
+        
+        // ✅ 11. تحديث النقاط في الملف الشخصي
+        const profilePoints = document.getElementById('profileCurrentPoints');
+        if (profilePoints) {
+            profilePoints.textContent = user.totalScore || 0;
+        }
+        
+        console.log('✅ All customizations reapplied successfully');
+        
+    } catch (error) {
+        console.warn('⚠️ Error applying customizations:', error);
+    }
+},
+
+/**
+ * عرض مودال الملف الشخصي
+ * @param {Object} user - بيانات المستخدم
  */
 _displayUserProfileModal(user) {
     const currentUser = AuthService.currentUser;
     const isOwnProfile = currentUser && currentUser.uid === user.uid;
-    
-    // التحقق من حالة المتابعة
-    let isFollowing = false;
-    let isFriend = false;
-    
-    // جلب الحالة من Firestore (إذا كان المستخدم مسجلاً)
-    if (currentUser && !isOwnProfile) {
-        // سيتم تحديثها بعد تحميل المودال
-    }
-    
+    const rank = getRank(user.rankPoints || 0);
+    const level = getLevel(user.totalScore || 0);
+    const avatar = user.avatar || null;
+
     const modal = document.createElement('div');
     modal.className = 'modal-overlay open';
+    modal.style.zIndex = '1000000';
     modal.innerHTML = `
-        <div class="modal-card user-profile-modal" style="max-width:500px;position:relative;z-index:100000;">
+        <div class="modal-card user-profile-modal" style="max-width:500px;position:relative;z-index:1000001;">
             <div class="modal-header">
                 <h3><i class="fas fa-user"></i> ملف المستخدم</h3>
-                <button class="btn btn-sm" onclick="this.closest('.modal-overlay').remove()">
+                <button class="modal-close-btn" onclick="this.closest('.modal-overlay').remove()">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <div style="text-align:center;">
-                <div class="user-profile-avatar" style="width:100px;height:100px;border-radius:50%;margin:0 auto;background:${user.avatar ? `url('${user.avatar}') center/cover` : 'var(--primary)'};display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:#fff;border:3px solid var(--accent);">
-                    ${!user.avatar ? (user.username?.charAt(0) || '👤') : ''}
+            <div style="text-align:center;padding:0.5rem 0;">
+                <div class="user-profile-avatar" style="
+                    width: 100px;
+                    height: 100px;
+                    border-radius: 50%;
+                    margin: 0 auto;
+                    background: ${avatar ? `url('${avatar}') center/cover` : 'var(--primary)'};
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 2.5rem;
+                    color: #fff;
+                    border: 4px solid ${rank.color || 'var(--accent)'};
+                ">
+                    ${!avatar ? (user.username?.charAt(0)?.toUpperCase() || '👤') : ''}
                 </div>
-                <h2 style="margin:0.5rem 0 0.2rem;">${user.username}</h2>
-                <div class="text-gray">${user.bio || 'لا توجد سيرة ذاتية'}</div>
-                <div class="text-gray" style="font-size:0.85rem;">📍 ${user.location || 'غير محدد'}</div>
-                <div style="margin:0.5rem 0;">
-                    <span class="badge badge-primary">${user.role || 'مستخدم'}</span>
+                <h2 style="margin:0.5rem 0 0.2rem;font-size:1.4rem;font-weight:800;">${user.displayName || user.username}</h2>
+                <div style="color:var(--gray);font-size:0.85rem;">@${user.username}</div>
+                <div style="color:var(--gray);font-size:0.8rem;">🏰 ${user.clan || 'غير منضم'}</div>
+                <div style="color:var(--gray);font-size:0.85rem;margin:0.3rem 0;">${user.bio || ''}</div>
+                <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;margin:0.5rem 0;">
+                    <span class="badge badge-primary">${rank.icon || '🏅'} ${rank.name}</span>
                     <span class="badge badge-warning">⭐ ${user.totalScore || 0}</span>
                     <span class="badge badge-info">🪙 ${user.coins || 0}</span>
+                    <span class="badge" style="background:var(--glass);">🏅 المستوى ${level.level}</span>
                 </div>
-                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;margin:1rem 0;">
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;margin:0.8rem 0;">
                     <div class="stat-card" style="padding:0.5rem;">
                         <div class="stat-number" style="font-size:1.2rem;">${user.stats?.gamesPlayed || 0}</div>
                         <div class="stat-label">مباريات</div>
@@ -14982,17 +15472,12 @@ _displayUserProfileModal(user) {
                     </div>
                 </div>
                 <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;">
-                    ${currentUser && !isOwnProfile ? `
-                        <button class="btn ${isFollowing ? (isFriend ? 'btn-primary friend' : 'btn-success following') : 'btn-outline'}" 
-                                id="modalFollowBtn" 
-                                data-follow-user="${user.uid}"
-                                onclick="App._handleModalFollow('${user.uid}')">
-                            <i class="fas ${isFollowing ? (isFriend ? 'fa-user-friends' : 'fa-user-check') : 'fa-user-plus'}"></i>
-                            ${isFollowing ? (isFriend ? 'صديق' : 'متابَع') : 'متابعة'}
+                    ${!isOwnProfile ? `
+                        <button class="btn btn-primary btn-sm" onclick="App._sendFriendRequest('${user.uid}')">
+                            <i class="fas fa-user-plus"></i> إضافة صديق
                         </button>
-                        <!-- ✅ تم حذف زر إضافة صديق -->
                     ` : ''}
-                    <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">
+                    <button class="btn btn-outline btn-sm" onclick="this.closest('.modal-overlay').remove()">
                         <i class="fas fa-times"></i> إغلاق
                     </button>
                 </div>
@@ -15002,35 +15487,13 @@ _displayUserProfileModal(user) {
             </div>
         </div>
     `;
-    
+
     document.body.appendChild(modal);
+    
+    // ✅ إغلاق عند النقر خارج المودال
     modal.addEventListener('click', (e) => {
         if (e.target === modal) modal.remove();
     });
-    
-    // تحديث حالة زر المتابعة في المودال
-    if (currentUser && !isOwnProfile) {
-        this._checkFollowStatus(user.uid).then(({ isFollowing, isFriend }) => {
-            const btn = document.getElementById('modalFollowBtn');
-            if (btn) {
-                if (isFollowing) {
-                    if (isFriend) {
-                        btn.innerHTML = '<i class="fas fa-user-friends"></i> صديق';
-                        btn.className = 'btn btn-primary friend';
-                        btn.dataset.status = 'friend';
-                    } else {
-                        btn.innerHTML = '<i class="fas fa-user-check"></i> متابَع';
-                        btn.className = 'btn btn-success following';
-                        btn.dataset.status = 'following';
-                    }
-                } else {
-                    btn.innerHTML = '<i class="fas fa-user-plus"></i> متابعة';
-                    btn.className = 'btn btn-outline';
-                    btn.dataset.status = 'none';
-                }
-            }
-        });
-    }
 },
 
 /**
@@ -15091,55 +15554,6 @@ async _followUser(userId) {
             });
             showToast('✅ تم المتابعة', 'success');
         }
-    } catch (e) {
-        showToast('❌ خطأ: ' + e.message, 'error');
-    }
-},
-
-/**
- * إرسال طلب صداقة
- */
-async _sendFriendRequest(userId) {
-    if (!AuthService.currentUser) {
-        showToast('يجب تسجيل الدخول أولاً', 'error');
-        return;
-    }
-    if (AuthService.currentUser.uid === userId) {
-        showToast('لا يمكن إضافة نفسك', 'error');
-        return;
-    }
-    
-    try {
-        const currentUser = AuthService.currentUser;
-        const userDoc = await db.collection('users').doc(userId).get();
-        if (!userDoc.exists) {
-            showToast('المستخدم غير موجود', 'error');
-            return;
-        }
-        const userData = userDoc.data();
-        
-        // التحقق من وجود طلب سابق
-        const existingRequest = await db.collection('friendRequests')
-            .where('from', '==', currentUser.uid)
-            .where('to', '==', userId)
-            .where('status', '==', 'pending')
-            .get();
-        
-        if (!existingRequest.empty) {
-            showToast('تم إرسال طلب صداقة بالفعل', 'info');
-            return;
-        }
-        
-        await db.collection('friendRequests').add({
-            from: currentUser.uid,
-            fromName: currentUser.username || currentUser.displayName || 'مجهول',
-            to: userId,
-            toName: userData.username || userData.displayName || 'مجهول',
-            status: 'pending',
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        showToast('✅ تم إرسال طلب صداقة', 'success');
     } catch (e) {
         showToast('❌ خطأ: ' + e.message, 'error');
     }
@@ -16118,6 +16532,585 @@ _saveModeSettings() {
 
     // إغلاق المودال
     this._closeModal('modeSettingsModal');
+},
+
+// ============================================================
+// نظام تعبئة البيانات الشخصية بعد التسجيل
+// ============================================================
+
+_showProfileSetupModal() {
+    console.log('📝 Showing profile setup modal');
+    
+    let modal = document.getElementById('profileSetupModal');
+    
+    if (!modal) {
+        console.warn('⚠️ profileSetupModal not found, creating it...');
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.id = 'profileSetupModal';
+        
+        const card = document.createElement('div');
+        card.className = 'modal-card';
+        card.style.cssText = 'max-width: 480px; max-height: 90vh; overflow-y: auto;';
+        
+        const header = document.createElement('div');
+        header.className = 'modal-header';
+        header.innerHTML = `
+            <h3><i class="fas fa-user-cog" style="color: var(--accent);"></i> أكمل بياناتك الشخصية</h3>
+            <button class="modal-close-btn" onclick="App._closeModal('profileSetupModal')" style="display: none;">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        card.appendChild(header);
+        
+        const content = document.createElement('div');
+        content.style.cssText = 'padding: 0.2rem 0 0.8rem;';
+        content.innerHTML = `
+            <p style="color: var(--gray); font-size: 0.9rem; margin-bottom: 1rem; text-align: center;">
+                <i class="fas fa-info-circle" style="color: var(--accent);"></i>
+                هذه البيانات ستساعدنا في تخصيص تجربتك
+            </p>
+            
+            <div style="text-align: center; margin-bottom: 1rem;">
+                <div id="avatarPreview" style="
+                    width: 100px;
+                    height: 100px;
+                    border-radius: 50%;
+                    margin: 0 auto;
+                    background: var(--primary);
+                    background-size: cover;
+                    background-position: center;
+                    border: 4px solid var(--accent);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 3rem;
+                    color: #fff;
+                    transition: all 0.3s ease;
+                ">
+                    👤
+                </div>
+                <div style="font-size: 0.7rem; color: var(--gray); margin-top: 0.3rem;">
+                    الصورة الافتراضية حسب بياناتك
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>🎂 العمر *</label>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button class="age-btn active" data-age="under_18" style="
+                        padding: 0.5rem 1.5rem;
+                        border-radius: 30px;
+                        border: 2px solid var(--primary);
+                        background: var(--primary);
+                        color: #fff;
+                        font-weight: 700;
+                        font-size: 0.9rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                        flex: 1;
+                    ">
+                        👦 أقل من 18
+                    </button>
+                    <button class="age-btn" data-age="over_18" style="
+                        padding: 0.5rem 1.5rem;
+                        border-radius: 30px;
+                        border: 2px solid var(--glass-border);
+                        background: transparent;
+                        color: var(--gray);
+                        font-weight: 700;
+                        font-size: 0.9rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                        flex: 1;
+                    ">
+                        👨 أكثر من 18
+                    </button>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>⚧ الجنس *</label>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button class="gender-btn active" data-gender="male" style="
+                        padding: 0.5rem 1.5rem;
+                        border-radius: 30px;
+                        border: 2px solid var(--primary);
+                        background: var(--primary);
+                        color: #fff;
+                        font-weight: 700;
+                        font-size: 0.9rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                        flex: 1;
+                    ">
+                        👨 ذكر
+                    </button>
+                    <button class="gender-btn" data-gender="female" style="
+                        padding: 0.5rem 1.5rem;
+                        border-radius: 30px;
+                        border: 2px solid var(--glass-border);
+                        background: transparent;
+                        color: var(--gray);
+                        font-weight: 700;
+                        font-size: 0.9rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                        flex: 1;
+                    ">
+                        👩 أنثى
+                    </button>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>🌍 الدولة *</label>
+                <select id="countrySelect" style="
+                    width: 100%;
+                    padding: 10px 16px;
+                    border-radius: 12px;
+                    background: var(--glass);
+                    border: 1px solid var(--glass-border);
+                    color: var(--light);
+                    font-size: 0.95rem;
+                    font-family: var(--font);
+                ">
+                    <option value="">-- اختر دولتك --</option>
+                </select>
+                <!-- عرض العلم المختار -->
+                <div id="selectedCountryDisplay" style="
+                    display: none;
+                    margin-top: 8px;
+                    padding: 8px 12px;
+                    background: var(--glass);
+                    border-radius: 8px;
+                    border: 1px solid var(--border-color);
+                    align-items: center;
+                    gap: 10px;
+                ">
+                    <img id="selectedCountryFlag" src="" alt="العلم" style="width: 32px; height: 24px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color);">
+                    <span id="selectedCountryName" style="font-weight: 600; color: var(--light);"></span>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;">
+                <button class="btn btn-primary" id="saveProfileSetupBtn" style="flex: 1; justify-content: center; min-width: 120px; padding: 12px;">
+                    <i class="fas fa-check"></i> حفظ ومتابعة
+                </button>
+                <button class="btn btn-outline" onclick="App._skipProfileSetup()" style="justify-content: center; padding: 12px 20px;">
+                    <i class="fas fa-skip"></i> تخطي لاحقاً
+                </button>
+            </div>
+            
+            <div style="text-align: center; margin-top: 0.5rem; font-size: 0.65rem; color: var(--gray-dark);">
+                <i class="fas fa-lock"></i> يمكنك تغيير هذه البيانات لاحقاً من الملف الشخصي
+            </div>
+        `;
+        card.appendChild(content);
+        overlay.appendChild(card);
+        
+        const container = document.getElementById('modalsContainer');
+        if (container) {
+            container.appendChild(overlay);
+        } else {
+            document.body.appendChild(overlay);
+        }
+        
+        modal = document.getElementById('profileSetupModal');
+        console.log('✅ Profile setup modal created');
+    }
+    
+    // ✅ تعبئة قائمة الدول
+    this._populateCountrySelect();
+    
+    // ✅ ربط حدث تغيير الدولة
+    const countrySelect = document.getElementById('countrySelect');
+    if (countrySelect) {
+        countrySelect.removeEventListener('change', this._handleCountryChange);
+        countrySelect.addEventListener('change', this._handleCountryChange);
+    }
+    
+    // ✅ إعادة تعيين القيم الافتراضية
+    const ageBtns = modal.querySelectorAll('.age-btn');
+    const genderBtns = modal.querySelectorAll('.gender-btn');
+    
+    ageBtns.forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = 'transparent';
+        btn.style.color = 'var(--gray)';
+        btn.style.borderColor = 'var(--glass-border)';
+    });
+    const firstAge = modal.querySelector('.age-btn[data-age="under_18"]');
+    if (firstAge) {
+        firstAge.classList.add('active');
+        firstAge.style.background = 'var(--primary)';
+        firstAge.style.color = '#fff';
+        firstAge.style.borderColor = 'var(--primary)';
+    }
+    
+    genderBtns.forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = 'transparent';
+        btn.style.color = 'var(--gray)';
+        btn.style.borderColor = 'var(--glass-border)';
+    });
+    const firstGender = modal.querySelector('.gender-btn[data-gender="male"]');
+    if (firstGender) {
+        firstGender.classList.add('active');
+        firstGender.style.background = 'var(--primary)';
+        firstGender.style.color = '#fff';
+        firstGender.style.borderColor = 'var(--primary)';
+    }
+    
+    // ✅ تحديث معاينة الصورة
+    this._updateAvatarPreview('under_18', 'male');
+    
+    // ✅ ربط الأحداث
+    this._bindProfileSetupEvents();
+    
+    // ✅ فتح المودال
+    App._openModal('profileSetupModal');
+    
+    // ✅ منع إغلاق المودال عند النقر خارج المحتوى
+    modal.addEventListener('click', function(e) {
+        if (e.target === this) {
+            // لا نغلق المودال
+        }
+    });
+    
+    console.log('✅ Profile setup modal opened successfully');
+},
+
+_populateCountrySelect() {
+    const select = document.getElementById('countrySelect');
+    if (!select) {
+        console.warn('⚠️ countrySelect not found');
+        return;
+    }
+    
+    // إفراغ القائمة
+    select.innerHTML = '<option value="">-- اختر دولتك --</option>';
+    
+    // إضافة الدول
+    if (typeof ARAB_COUNTRIES !== 'undefined' && ARAB_COUNTRIES.length > 0) {
+        ARAB_COUNTRIES.forEach(country => {
+            const option = document.createElement('option');
+            option.value = country.code;
+            option.textContent = country.name;
+            option.dataset.flag = country.flag;
+            select.appendChild(option);
+        });
+        console.log(`✅ تم تعبئة ${ARAB_COUNTRIES.length} دولة في القائمة`);
+    } else {
+        console.warn('⚠️ ARAB_COUNTRIES is not defined or empty');
+        // قائمة احتياطية
+        const fallbackCountries = [
+            { code: 'SA', name: 'السعودية' },
+            { code: 'AE', name: 'الإمارات' },
+            { code: 'KW', name: 'الكويت' },
+            { code: 'QA', name: 'قطر' },
+            { code: 'BH', name: 'البحرين' },
+            { code: 'OM', name: 'عُمان' },
+            { code: 'YE', name: 'اليمن' },
+            { code: 'JO', name: 'الأردن' },
+            { code: 'PS', name: 'فلسطين' },
+            { code: 'LB', name: 'لبنان' },
+            { code: 'SY', name: 'سوريا' },
+            { code: 'IQ', name: 'العراق' },
+            { code: 'EG', name: 'مصر' },
+            { code: 'SD', name: 'السودان' },
+            { code: 'LY', name: 'ليبيا' },
+            { code: 'TN', name: 'تونس' },
+            { code: 'DZ', name: 'الجزائر' },
+            { code: 'MA', name: 'المغرب' },
+            { code: 'MR', name: 'موريتانيا' },
+            { code: 'SO', name: 'الصومال' },
+            { code: 'DJ', name: 'جيبوتي' },
+            { code: 'KM', name: 'جزر القمر' }
+        ];
+        fallbackCountries.forEach(country => {
+            const option = document.createElement('option');
+            option.value = country.code;
+            option.textContent = country.name;
+            select.appendChild(option);
+        });
+        console.log(`✅ تم تعبئة ${fallbackCountries.length} دولة (احتياطي)`);
+    }
+},
+
+_handleCountryChange(e) {
+    const select = e.target;
+    const code = select.value;
+    
+    console.log('🌍 Country selected:', code);
+    
+    // ✅ فقط تحديث عرض العلم المختار (أسفل القائمة)
+    const display = document.getElementById('selectedCountryDisplay');
+    const flagImg = document.getElementById('selectedCountryFlag');
+    const nameEl = document.getElementById('selectedCountryName');
+    
+    if (code) {
+        const country = getCountryByCode(code);
+        if (country) {
+            console.log('🇵🇸 Country found:', country.name, 'Flag:', country.flag);
+            
+            // ✅ تحديث عرض العلم المختار فقط
+            if (display && flagImg && nameEl) {
+                flagImg.src = country.flag;
+                flagImg.alt = country.name;
+                nameEl.textContent = country.name;
+                display.style.display = 'flex';
+                console.log('✅ Flag displayed in selection:', country.flag);
+            }
+            
+            // ❌ لا نغير معاينة الصورة الشخصية - نتركها كما هي
+            // لا نقوم بتحديث avatarPreview هنا
+            
+        } else {
+            console.warn('⚠️ Country not found for code:', code);
+        }
+    } else {
+        // ❌ إذا لم يتم اختيار دولة، إخفاء عرض العلم فقط
+        if (display) display.style.display = 'none';
+        // لا نغير معاينة الصورة الشخصية
+    }
+},
+
+_updateAvatarPreview(age, gender) {
+    const isAdult = age === 'over_18';
+    const genderKey = gender || 'male';
+    const key = `${genderKey}_${isAdult ? 'adult' : 'young'}`;
+    const avatarPath = DEFAULT_AVATARS[key] || DEFAULT_AVATARS['male_adult'];
+
+    const preview = document.getElementById('avatarPreview');
+    if (preview) {
+        // ✅ فقط الصورة الافتراضية حسب العمر والجنس
+        preview.style.backgroundImage = `url('${avatarPath}')`;
+        preview.style.backgroundSize = 'cover';
+        preview.style.backgroundPosition = 'center';
+        preview.textContent = '';
+        preview.setAttribute('title', `${age === 'under_18' ? 'أقل من 18' : 'أكثر من 18'} - ${genderKey === 'male' ? 'ذكر' : 'أنثى'}`);
+        console.log('✅ Avatar preview set to default avatar:', avatarPath);
+    }
+},
+
+_bindProfileSetupEvents() {
+    // أحداث أزرار العمر
+    document.querySelectorAll('.age-btn').forEach(btn => {
+        btn.removeEventListener('click', this._handleAgeClick);
+        btn.addEventListener('click', this._handleAgeClick);
+    });
+    
+    // أحداث أزرار الجنس
+    document.querySelectorAll('.gender-btn').forEach(btn => {
+        btn.removeEventListener('click', this._handleGenderClick);
+        btn.addEventListener('click', this._handleGenderClick);
+    });
+    
+    // زر الحفظ
+    const saveBtn = document.getElementById('saveProfileSetupBtn');
+    if (saveBtn) {
+        saveBtn.removeEventListener('click', this._handleSaveProfile);
+        saveBtn.addEventListener('click', this._handleSaveProfile);
+    }
+},
+
+_handleAgeClick(e) {
+    const btn = e.currentTarget;
+    const age = btn.dataset.age;
+    
+    document.querySelectorAll('.age-btn').forEach(b => {
+        b.classList.remove('active');
+        b.style.background = 'transparent';
+        b.style.color = 'var(--gray)';
+        b.style.borderColor = 'var(--glass-border)';
+    });
+    btn.classList.add('active');
+    btn.style.background = 'var(--primary)';
+    btn.style.color = '#fff';
+    btn.style.borderColor = 'var(--primary)';
+    
+    const gender = document.querySelector('.gender-btn.active')?.dataset.gender || 'male';
+    App._updateAvatarPreview(age, gender);
+},
+
+_handleGenderClick(e) {
+    const btn = e.currentTarget;
+    const gender = btn.dataset.gender;
+    
+    document.querySelectorAll('.gender-btn').forEach(b => {
+        b.classList.remove('active');
+        b.style.background = 'transparent';
+        b.style.color = 'var(--gray)';
+        b.style.borderColor = 'var(--glass-border)';
+    });
+    btn.classList.add('active');
+    btn.style.background = 'var(--primary)';
+    btn.style.color = '#fff';
+    btn.style.borderColor = 'var(--primary)';
+    
+    const age = document.querySelector('.age-btn.active')?.dataset.age || 'under_18';
+    App._updateAvatarPreview(age, gender);
+},
+
+/**
+ * حفظ البيانات الشخصية
+ */
+_handleSaveProfile(e) {
+    e.preventDefault();
+    
+    const ageBtn = document.querySelector('.age-btn.active');
+    const genderBtn = document.querySelector('.gender-btn.active');
+    const countrySelect = document.getElementById('countrySelect');
+    
+    const age = ageBtn?.dataset.age || 'under_18';
+    const gender = genderBtn?.dataset.gender || 'male';
+    const country = countrySelect?.value || '';
+    
+    if (!country) {
+        showToast('⚠️ يرجى اختيار دولتك', 'error');
+        countrySelect?.focus();
+        return;
+    }
+    
+    const isAdult = age === 'over_18';
+    const key = `${gender}_${isAdult ? 'adult' : 'young'}`;
+    const avatarPath = DEFAULT_AVATARS[key] || DEFAULT_AVATARS['male_adult'];
+    const countryInfo = getCountryByCode(country);
+    
+    const user = AuthService.currentUser;
+    if (user) {
+        const updateData = {
+            age: age,
+            gender: gender,
+            country: country,
+            countryName: countryInfo?.name || '',
+            countryFlag: countryInfo?.flag || '',
+            avatar: avatarPath,
+            profileCompleted: true,
+            ageGroup: isAdult ? 'adult' : 'young'
+        };
+        
+        const saveBtn = document.getElementById('saveProfileSetupBtn');
+        const originalText = saveBtn?.innerHTML || '';
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
+        }
+        
+        AuthService.updateUser(updateData)
+            .then(() => {
+                console.log('✅ Profile data saved successfully');
+                App._closeModal('profileSetupModal');
+                showToast('✅ تم حفظ بياناتك الشخصية بنجاح!', 'success', 3000);
+                App._updateUserUI(AuthService.currentUser);
+                App._updateDashboardAvatar();
+                App._applyUserCustomizations(AuthService.currentUser);
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = originalText;
+                }
+            })
+            .catch((err) => {
+                console.error('❌ Error saving profile:', err);
+                showToast('❌ فشل حفظ البيانات: ' + err.message, 'error');
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = originalText;
+                }
+            });
+    } else {
+        showToast('❌ حدث خطأ في حفظ البيانات', 'error');
+    }
+},
+
+_skipProfileSetup() {
+    if (confirm('⚠️ يمكنك إكمال بياناتك لاحقاً من الملف الشخصي. هل أنت متأكد؟')) {
+        App._closeModal('profileSetupModal');
+        const user = AuthService.currentUser;
+        if (user) {
+            AuthService.updateUser({
+                age: 'under_18',
+                gender: 'male',
+                country: 'SA',
+                avatar: DEFAULT_AVATARS['male_young'],
+                profileCompleted: false
+            }).catch(() => {});
+        }
+        showToast('ℹ️ يمكنك إكمال بياناتك لاحقاً من الملف الشخصي', 'info', 4000);
+    }
+},
+
+/**
+ * عرض أيقونة الدولة في بطاقة المستخدم
+ */
+_getCountryDisplay(countryCode) {
+    if (!countryCode) return null;
+    const country = getCountryByCode(countryCode);
+    if (!country) return null;
+    return country;
+},
+
+_updateUserCountryDisplay(user) {
+    if (!user || !user.country) {
+        console.log('ℹ️ No country to display');
+        // إزالة أي علم موجود إذا لم تكن هناك دولة
+        this._removeCountryFlags();
+        return;
+    }
+    
+    const country = getCountryByCode(user.country);
+    if (!country) {
+        console.warn('⚠️ Country not found for code:', user.country);
+        this._removeCountryFlags();
+        return;
+    }
+    
+    console.log('🇵🇸 Updating country display:', country.name);
+    
+    // ✅ تحديث العلم في بطاقة الداشبورد
+    const clanEl = document.getElementById('dashboardClanName');
+    if (clanEl) {
+        // إزالة أي علم سابق
+        const parent = clanEl.parentElement;
+        const oldFlag = parent?.querySelector('.country-flag');
+        if (oldFlag) oldFlag.remove();
+        
+        // إضافة العلم الجديد
+        const flagImg = document.createElement('img');
+        flagImg.className = 'country-flag';
+        flagImg.src = country.flag;
+        flagImg.alt = country.name;
+        flagImg.style.cssText = 'width: 24px; height: 18px; object-fit: cover; border-radius: 3px; margin-right: 4px; border: 1px solid var(--border-color); display: inline-block; vertical-align: middle;';
+        parent?.appendChild(flagImg);
+        console.log('✅ Country flag added to dashboard');
+    }
+    
+    // ✅ تحديث العلم في الملف الشخصي
+    const profileClan = document.getElementById('profileClan');
+    if (profileClan) {
+        const parent = profileClan.parentElement;
+        const oldFlag = parent?.querySelector('.profile-country-flag');
+        if (oldFlag) oldFlag.remove();
+        
+        const flagImg = document.createElement('img');
+        flagImg.className = 'profile-country-flag';
+        flagImg.src = country.flag;
+        flagImg.alt = country.name;
+        flagImg.style.cssText = 'width: 24px; height: 18px; object-fit: cover; border-radius: 3px; margin-right: 4px; border: 1px solid var(--border-color); display: inline-block; vertical-align: middle;';
+        parent?.appendChild(flagImg);
+        console.log('✅ Country flag added to profile');
+    }
+},
+
+// ✅ دالة مساعدة لإزالة جميع الأعلام
+_removeCountryFlags() {
+    document.querySelectorAll('.country-flag, .profile-country-flag').forEach(el => el.remove());
 },
 
 // ============================================================
@@ -17162,88 +18155,105 @@ _renderProfileSection() {
                         </div>
                         
                         <!-- ✅ أقسام المقتنيات الفرعية -->
-                        <div class="collectibles-subtabs" style="display:flex;gap:0.3rem;flex-wrap:nowrap;overflow-x:auto;padding:0.3rem 0.2rem 0.6rem;margin-bottom:0.8rem;border-bottom:1px solid var(--glass-border);">
-                            <button class="collectibles-subtab active" data-subtab="cards" style="
-                                padding:0.3rem 0.8rem;
-                                border-radius:30px;
-                                border:1px solid var(--glass-border);
-                                background:var(--primary);
-                                color:#fff;
-                                font-weight:600;
-                                font-size:0.7rem;
-                                cursor:pointer;
-                                transition:all 0.3s ease;
-                                font-family:var(--font);
-                                flex-shrink:0;
-                                white-space:nowrap;
-                            ">
-                                <i class="fas fa-image"></i> البطاقات
-                            </button>
-                            <button class="collectibles-subtab" data-subtab="frames" style="
-                                padding:0.3rem 0.8rem;
-                                border-radius:30px;
-                                border:1px solid var(--glass-border);
-                                background:transparent;
-                                color:var(--gray);
-                                font-weight:600;
-                                font-size:0.7rem;
-                                cursor:pointer;
-                                transition:all 0.3s ease;
-                                font-family:var(--font);
-                                flex-shrink:0;
-                                white-space:nowrap;
-                            ">
-                                <i class="fas fa-border-all"></i> الإطارات
-                            </button>
-                            <button class="collectibles-subtab" data-subtab="badges" style="
-                                padding:0.3rem 0.8rem;
-                                border-radius:30px;
-                                border:1px solid var(--glass-border);
-                                background:transparent;
-                                color:var(--gray);
-                                font-weight:600;
-                                font-size:0.7rem;
-                                cursor:pointer;
-                                transition:all 0.3s ease;
-                                font-family:var(--font);
-                                flex-shrink:0;
-                                white-space:nowrap;
-                            ">
-                                <i class="fas fa-medal"></i> الشارات
-                            </button>
-                            <button class="collectibles-subtab" data-subtab="themes" style="
-                                padding:0.3rem 0.8rem;
-                                border-radius:30px;
-                                border:1px solid var(--glass-border);
-                                background:transparent;
-                                color:var(--gray);
-                                font-weight:600;
-                                font-size:0.7rem;
-                                cursor:pointer;
-                                transition:all 0.3s ease;
-                                font-family:var(--font);
-                                flex-shrink:0;
-                                white-space:nowrap;
-                            ">
-                                <i class="fas fa-palette"></i> السمات
-                            </button>
-                            <button class="collectibles-subtab" data-subtab="emotes" style="
-                                padding:0.3rem 0.8rem;
-                                border-radius:30px;
-                                border:1px solid var(--glass-border);
-                                background:transparent;
-                                color:var(--gray);
-                                font-weight:600;
-                                font-size:0.7rem;
-                                cursor:pointer;
-                                transition:all 0.3s ease;
-                                font-family:var(--font);
-                                flex-shrink:0;
-                                white-space:nowrap;
-                            ">
-                                <i class="fas fa-smile"></i> الرموز
-                            </button>
-                        </div>
+<div class="collectibles-subtabs" style="display:flex;gap:0.3rem;flex-wrap:nowrap;overflow-x:auto;padding:0.3rem 0.2rem 0.6rem;margin-bottom:0.8rem;border-bottom:1px solid var(--glass-border);">
+    <button class="collectibles-subtab active" data-subtab="cards" style="
+        padding:0.3rem 0.8rem;
+        border-radius:30px;
+        border:1px solid var(--glass-border);
+        background:var(--primary);
+        color:#fff;
+        font-weight:600;
+        font-size:0.7rem;
+        cursor:pointer;
+        transition:all 0.3s ease;
+        font-family:var(--font);
+        flex-shrink:0;
+        white-space:nowrap;
+    ">
+        <i class="fas fa-image"></i> البطاقات
+    </button>
+    <button class="collectibles-subtab" data-subtab="frames" style="
+        padding:0.3rem 0.8rem;
+        border-radius:30px;
+        border:1px solid var(--glass-border);
+        background:transparent;
+        color:var(--gray);
+        font-weight:600;
+        font-size:0.7rem;
+        cursor:pointer;
+        transition:all 0.3s ease;
+        font-family:var(--font);
+        flex-shrink:0;
+        white-space:nowrap;
+    ">
+        <i class="fas fa-border-all"></i> الإطارات
+    </button>
+    <button class="collectibles-subtab" data-subtab="badges" style="
+        padding:0.3rem 0.8rem;
+        border-radius:30px;
+        border:1px solid var(--glass-border);
+        background:transparent;
+        color:var(--gray);
+        font-weight:600;
+        font-size:0.7rem;
+        cursor:pointer;
+        transition:all 0.3s ease;
+        font-family:var(--font);
+        flex-shrink:0;
+        white-space:nowrap;
+    ">
+        <i class="fas fa-medal"></i> الشارات
+    </button>
+    <button class="collectibles-subtab" data-subtab="themes" style="
+        padding:0.3rem 0.8rem;
+        border-radius:30px;
+        border:1px solid var(--glass-border);
+        background:transparent;
+        color:var(--gray);
+        font-weight:600;
+        font-size:0.7rem;
+        cursor:pointer;
+        transition:all 0.3s ease;
+        font-family:var(--font);
+        flex-shrink:0;
+        white-space:nowrap;
+    ">
+        <i class="fas fa-palette"></i> السمات
+    </button>
+    <button class="collectibles-subtab" data-subtab="emotes" style="
+        padding:0.3rem 0.8rem;
+        border-radius:30px;
+        border:1px solid var(--glass-border);
+        background:transparent;
+        color:var(--gray);
+        font-weight:600;
+        font-size:0.7rem;
+        cursor:pointer;
+        transition:all 0.3s ease;
+        font-family:var(--font);
+        flex-shrink:0;
+        white-space:nowrap;
+    ">
+        <i class="fas fa-smile"></i> الرموز
+    </button>
+    <!-- ✅ تبويب الصور الشخصية الجديد -->
+    <button class="collectibles-subtab" data-subtab="avatars" style="
+        padding:0.3rem 0.8rem;
+        border-radius:30px;
+        border:1px solid var(--glass-border);
+        background:transparent;
+        color:var(--gray);
+        font-weight:600;
+        font-size:0.7rem;
+        cursor:pointer;
+        transition:all 0.3s ease;
+        font-family:var(--font);
+        flex-shrink:0;
+        white-space:nowrap;
+    ">
+        <i class="fas fa-user-circle"></i> الصور الشخصية
+    </button>
+</div>
                         
                         <!-- ✅ محتوى المقتنيات -->
                         <div id="collectiblesContent">
@@ -17300,9 +18310,6 @@ _renderProfileSection() {
     `;
 },
 
-// ============================================================
-// عرض المقتنيات (حسب التبويب الفرعي)
-// ============================================================
 _renderCollectibles: function(subtab = 'cards') {
     const container = document.getElementById('collectiblesContent');
     if (!container) return;
@@ -17327,7 +18334,8 @@ _renderCollectibles: function(subtab = 'cards') {
         'frames': 'frames',
         'badges': 'badges',
         'themes': 'themes',
-        'emotes': 'emotes'
+        'emotes': 'emotes',
+        'avatars': 'avatars' // ✅ إضافة تبويب الصور الشخصية
     };
     
     const category = categoryMap[subtab] || 'backgrounds';
@@ -17348,11 +18356,12 @@ _renderCollectibles: function(subtab = 'cards') {
     
     if (ownedItems.length === 0) {
         const subtabNames = {
-            'cards': 'بطاقات وخلفيات',
+            'cards': 'خلفيات',
             'frames': 'إطارات',
             'badges': 'شارات',
             'themes': 'سمات',
-            'emotes': 'رموز'
+            'emotes': 'رموز',
+            'avatars': 'صور شخصية' // ✅ اسم التبويب الجديد
         };
         container.innerHTML = `
             <div class="empty-state" style="text-align:center;padding:2rem;">
@@ -20105,6 +21114,208 @@ async _updateFollowCounts() {
     }
 },
 
+/**
+ * عرض بطاقة لاعب مصغرة - مطابقة لبطاقة الداشبورد
+ * @param {Object} player - بيانات اللاعب
+ * @param {Object} options - خيارات إضافية
+ * @param {boolean} options.showActions - عرض أزرار الإجراءات
+ * @param {string} options.context - سياق الاستخدام
+ * @param {boolean} options.isFriend - هل هو صديق؟
+ * @param {boolean} options.isBlocked - هل هو محظور؟
+ * @param {boolean} options.isPending - هل طلب الصداقة معلق؟
+ * @param {string} options.extraInfo - معلومات إضافية للعرض
+ * @returns {string} HTML للبطاقة
+ */
+_renderPlayerCard(player, options = {}) {
+    const {
+        showActions = true,
+        context = 'default',
+        isFriend = false,
+        isBlocked = false,
+        isPending = false,
+        extraInfo = ''
+    } = options;
+
+    if (!player) return '<div class="text-gray">بيانات غير صالحة</div>';
+
+    const user = AuthService.currentUser;
+    const isOwnProfile = user && user.uid === (player.uid || player.id);
+
+    // ✅ استخراج البيانات
+    const name = player.displayName || player.fullName || player.username || 'مجهول';
+    const username = player.username || 'guest';
+    const avatar = player.avatar || null;
+    const rank = getRank(player.rankPoints || 0);
+    const level = getLevel(player.totalScore || 0);
+    const clanName = player.clan || 'غير منضم';
+    
+    // ✅ حساب حالة الاتصال
+    let isOnline = false;
+    if (player.lastActive) {
+        const lastActive = player.lastActive.toDate?.() || new Date(player.lastActive);
+        isOnline = (Date.now() - lastActive.getTime()) < 5 * 60 * 1000;
+    }
+
+    // ✅ الحصول على الإطار المفعّل للمستخدم
+    const storeItems = DataManager.data.storeItems || [];
+    const activeItems = player.activeItems || [];
+    
+    let frameImage = null;
+    let activeAvatar = null;
+    
+    // ✅ الإطار المفعّل (من المتجر)
+    const activeFrame = storeItems.find(item => 
+        activeItems.includes(item.id) && item.category === 'frames'
+    );
+    if (activeFrame && activeFrame.imagePath) {
+        frameImage = activeFrame.imagePath;
+    }
+    
+    // ✅ الصورة الشخصية المفعّلة (من المتجر)
+    const activeAvatarItem = storeItems.find(item => 
+        activeItems.includes(item.id) && item.category === 'avatars'
+    );
+    if (activeAvatarItem && activeAvatarItem.imagePath) {
+        activeAvatar = activeAvatarItem.imagePath;
+    }
+
+    // ✅ تحديد الصورة النهائية (الأولوية: صورة المتجر > الصورة المرفوعة)
+    let finalAvatar = activeAvatar || avatar;
+
+    // ✅ بناء HTML الصورة
+    let avatarHtml = '';
+    if (finalAvatar) {
+        avatarHtml = `<img src="${finalAvatar}" alt="${name}" class="player-avatar-img" 
+                           onerror="this.style.display='none';this.parentElement.querySelector('.player-avatar-placeholder').style.display='flex'">`;
+    }
+    
+    const firstLetter = name.charAt(0).toUpperCase();
+    avatarHtml += `<span class="player-avatar-placeholder" style="${finalAvatar ? 'display:none;' : ''}">${firstLetter}</span>`;
+
+    // ✅ إضافة الإطار فقط إذا كان موجوداً (لا يوجد إطار افتراضي)
+    const frameHtml = frameImage ? `<img src="${frameImage}" class="player-avatar-frame" alt="إطار">` : '';
+
+    // ✅ حالة الاتصال
+    const statusHtml = isOnline
+        ? `<span class="status-dot online" title="متصل"></span>`
+        : `<span class="status-dot offline" title="غير متصل"></span>`;
+
+    // ✅ صورة الرتبة
+    const rankImage = rank.image ? `images/ranks/${rank.image}` : null;
+    const rankHtml = rankImage ? `
+        <div class="player-rank-mini">
+            <img src="${rankImage}" alt="${rank.name}" title="${rank.name}">
+        </div>
+    ` : `<div class="player-rank-mini" style="background:${rank.color || 'var(--primary)'};">${rank.icon || '🏅'}</div>`;
+
+    // ✅ بناء أزرار الإجراءات حسب السياق
+    let actionsHtml = '';
+
+    if (showActions && !isOwnProfile) {
+        if (context === 'friends') {
+            actionsHtml = `
+                ${isBlocked ? `
+                    <button class="btn btn-xs btn-success" onclick="App._unblockUser('${player.uid || player.id}')" title="إلغاء الحظر">
+                        <i class="fas fa-unlock"></i>
+                    </button>
+                ` : `
+                    <button class="btn btn-xs btn-danger" onclick="App._removeFriend('${player.uid || player.id}')" title="إزالة صديق">
+                        <i class="fas fa-user-minus"></i>
+                    </button>
+                    <button class="btn btn-xs btn-danger" onclick="App._blockUser('${player.uid || player.id}')" title="حظر">
+                        <i class="fas fa-ban"></i>
+                    </button>
+                `}
+                <button class="btn btn-xs btn-primary" onclick="App._openUserProfileModal('${player.uid || player.id}')" title="عرض الملف">
+                    <i class="fas fa-eye"></i>
+                </button>
+            `;
+        } else if (context === 'search') {
+            if (isFriend) {
+                actionsHtml = `<span class="badge badge-success" style="font-size:0.6rem;">✅ صديق</span>`;
+            } else if (isPending) {
+                actionsHtml = `<span class="badge badge-warning" style="font-size:0.6rem;">⏳ معلق</span>`;
+            } else {
+                actionsHtml = `
+                    <button class="btn btn-xs btn-primary" onclick="App._sendFriendRequest('${player.uid || player.id}')" title="إضافة صديق">
+                        <i class="fas fa-user-plus"></i>
+                    </button>
+                    <button class="btn btn-xs btn-outline" onclick="App._openUserProfileModal('${player.uid || player.id}')" title="عرض الملف">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                `;
+            }
+        } else if (context === 'pending') {
+            actionsHtml = `
+                <button class="btn btn-xs btn-success" onclick="App._acceptFriendRequest('${player.requestId || player.id}')" title="قبول">
+                    <i class="fas fa-check"></i>
+                </button>
+                <button class="btn btn-xs btn-danger" onclick="App._rejectFriendRequest('${player.requestId || player.id}')" title="رفض">
+                    <i class="fas fa-times"></i>
+                </button>
+                <button class="btn btn-xs btn-outline" onclick="App._openUserProfileModal('${player.uid || player.id}')" title="عرض الملف">
+                    <i class="fas fa-eye"></i>
+                </button>
+            `;
+        } else if (context === 'admin') {
+            const canEdit = AuthService.checkPermission('admin') || AuthService.checkPermission('super_admin');
+            const isBanned = player.banned === true;
+            actionsHtml = `
+                ${canEdit ? `
+                    <button class="btn btn-xs btn-primary" onclick="App._openAdminEditUser('${player.uid || player.id}')" title="تعديل">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-xs ${isBanned ? 'btn-success' : 'btn-danger'}" 
+                            onclick="App._toggleUserBan('${player.uid || player.id}','${isBanned ? 'banned' : 'active'}')" 
+                            title="${isBanned ? 'إلغاء الحظر' : 'حظر'}">
+                        <i class="fas fa-${isBanned ? 'unlock' : 'ban'}"></i>
+                    </button>
+                ` : ''}
+                <button class="btn btn-xs btn-outline" onclick="App._openUserProfileModal('${player.uid || player.id}')" title="عرض الملف">
+                    <i class="fas fa-eye"></i>
+                </button>
+            `;
+        } else {
+            // سياق افتراضي
+            actionsHtml = `
+                <button class="btn btn-xs btn-outline" onclick="App._openUserProfileModal('${player.uid || player.id}')" title="عرض الملف">
+                    <i class="fas fa-eye"></i>
+                </button>
+            `;
+        }
+    }
+
+    // ✅ معلومات إضافية
+    const extraHtml = extraInfo ? `<div class="player-card-extra">${extraInfo}</div>` : '';
+
+    // ✅ HTML البطاقة - بدون إطار افتراضي
+    return `
+        <div class="player-card-mini" data-uid="${player.uid || player.id}">
+            <!-- الصورة -->
+            <div class="player-card-avatar">
+                ${avatarHtml}
+                ${frameHtml} <!-- ✅ الإطار يظهر فقط إذا كان موجوداً -->
+                ${statusHtml}
+            </div>
+            
+            <!-- المعلومات -->
+            <div class="player-card-info">
+                <div class="player-card-name" title="${name}">${name}</div>
+                <div class="player-card-clan">🏰 القبيلة: <span>${clanName}</span></div>
+                ${extraHtml}
+            </div>
+            
+            <!-- الرتبة -->
+            <div class="player-card-rank">
+                ${rankHtml}
+            </div>
+            
+            <!-- الإجراءات -->
+            ${actionsHtml ? `<div class="player-card-actions">${actionsHtml}</div>` : ''}
+        </div>
+    `;
+},
+
 // ============================================================
 // قوائم المتابعين والمتابَعين والأصدقاء
 // ============================================================
@@ -20740,16 +21951,16 @@ _renderAdminUsersContent() {
                         <option value="inactive">غير نشط</option>
                     </select>
                     <button class="btn btn-sm btn-primary" onclick="App._adminAddUser()"><i class="fas fa-user-plus"></i> إضافة</button>
-                    <button class="btn btn-sm btn-outline" onclick="App._exportUsersCSV()"><i class="fas fa-file-export"></i> CSV</button>
-                    <button class="btn btn-sm btn-outline" onclick="App._renderAdminUsers()"><i class="fas fa-sync"></i> تحديث</button>
+                    <button class="btn btn-sm btn-outline" onclick="App._renderUserTable()"><i class="fas fa-sync"></i> تحديث</button>
                 </div>
                 <span class="text-gray" id="adminUsersCount">0 مستخدم</span>
             </div>
-            <div class="table-wrap">
-                <table>
-                    <thead><tr><th>#</th><th>المستخدم</th><th>البريد</th><th>الدور</th><th>النقاط</th><th>العملات</th><th>الحالة</th><th>آخر نشاط</th><th>الإجراءات</th></tr></thead>
-                    <tbody id="adminUsersTableBody"><tr><td colspan="9" class="text-center text-gray"><i class="fas fa-spinner fa-spin"></i> جاري التحميل...</td></tr></tbody>
-                </table>
+            <!-- ✅ حاوية المستخدمين الجديدة -->
+            <div id="adminUsersContainer" style="padding:0.5rem 0;">
+                <div style="text-align:center;padding:2rem;color:var(--gray);">
+                    <i class="fas fa-spinner fa-spin" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
+                    جاري تحميل المستخدمين...
+                </div>
             </div>
             <div class="pagination" id="adminUsersPagination"></div>
         </div>
@@ -21989,100 +23200,213 @@ async _renderAdminUsers() {
     }
 },
 
-// ✅ دالة مساعدة لعرض الجدول (مستقلة عن مصدر البيانات)
 _renderUserTable(users, page = 1) {
-    const tbody = document.getElementById('adminUsersTableBody');
-    if (!tbody) return;
-
-    // تطبيق البحث والفلترة
-    const search = document.getElementById('adminSearchUser')?.value?.toLowerCase() || '';
-    const roleFilter = document.getElementById('adminFilterRole')?.value || '';
-    const statusFilter = document.getElementById('adminFilterStatus')?.value || '';
-
-    let filteredUsers = users.filter(u => {
-        const name = (u.username || u.displayName || u.email || '').toLowerCase();
-        const matchSearch = name.includes(search);
-        const matchRole = roleFilter ? u.role === roleFilter : true;
-        let status = 'active';
-        if (u.banned) status = 'banned';
-        else if (u.lastActive) {
-            const last = u.lastActive.toDate?.() || new Date(u.lastActive);
-            if (Date.now() - last.getTime() > 7 * 24 * 60 * 60 * 1000) status = 'inactive';
+    const container = document.getElementById('adminUsersContainer');
+    if (!container) {
+        // إنشاء الحاوية إذا لم تكن موجودة
+        const content = document.getElementById('adminContentContainer');
+        if (content) {
+            const newContainer = document.createElement('div');
+            newContainer.id = 'adminUsersContainer';
+            newContainer.style.cssText = 'padding: 0.5rem 0;';
+            content.appendChild(newContainer);
         }
-        const matchStatus = statusFilter ? status === statusFilter : true;
-        return matchSearch && matchRole && matchStatus;
-    });
-
-    filteredUsers.sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
-
-    const total = filteredUsers.length;
-    const pageSize = 10;
-    const totalPages = Math.ceil(total / pageSize);
-    const currentPage = Math.min(page, totalPages) || 1;
-    const start = (currentPage - 1) * pageSize;
-    const paginated = filteredUsers.slice(start, start + pageSize);
-
-    // تحديث العدد
-    const countEl = document.getElementById('adminUsersCount');
-    if (countEl) countEl.textContent = `${total} مستخدم`;
-
-    if (paginated.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-gray">لا توجد نتائج مطابقة</td></tr>`;
-    } else {
-        let html = '';
-        const canEdit = AuthService.checkPermission('admin') || AuthService.checkPermission('super_admin');
-
-    paginated.forEach((u, idx) => {
-        // ✅ الاسم الكامل هو المعروض
-        const fullName = u.fullName || u.displayName || u.username || 'مجهول';
-        const username = u.username || 'guest';            const status = u.banned ? 'banned' : 'active';
-            const statusColor = status === 'active' ? 'success' : 'danger';
-            const statusText = status === 'active' ? '🟢 نشط' : '🔴 محظور';
-            const avatarHtml = u.avatar 
-                ? `<div style="width:32px;height:32px;border-radius:50%;background:url('${u.avatar}') center/cover;flex-shrink:0;"></div>` 
-                : `<div style="width:32px;height:32px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:0.8rem;flex-shrink:0;">${(u.username?.charAt(0) || '👤').toUpperCase()}</div>`;
-
-            const joinDate = u.createdAt ? formatDate(u.createdAt) : '—';
-
-        html += `
-            <tr>
-                <td>${start + idx + 1}</td>
-                <td>
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        ${avatarHtml}
-                        <div>
-                            <div style="font-weight:600;">${fullName}</div>
-                            <div style="font-size:0.7rem;color:var(--gray);">@${username}</div>
-                        </div>
-                    </div>
-                </td>
-                    <td>${u.email || '—'}</td>
-                    <td><span class="badge badge-primary">${AuthService.getRoleLabel(u.role || 'user')}</span></td>
-                    <td>⭐ ${u.totalScore || 0}</td>
-                    <td>💰 ${u.coins || 0}</td>
-                    <td><span class="badge badge-${statusColor}">${statusText}</span></td>
-                    <td>${joinDate}</td>
-                    <td>
-                        <div style="display:flex;gap:4px;flex-wrap:wrap;">
-                            ${canEdit ? `
-                                <button class="btn btn-xs btn-primary" onclick="App._openAdminEditUser('${u.uid}')" title="تعديل"><i class="fas fa-edit"></i></button>
-                                <button class="btn btn-xs btn-${status === 'banned' ? 'success' : 'danger'}" onclick="App._toggleUserBan('${u.uid}','${status}')" title="${status === 'banned' ? 'إلغاء الحظر' : 'حظر'}">
-                                    <i class="fas fa-${status === 'banned' ? 'unlock' : 'ban'}"></i>
-                                </button>
-                            ` : ''}
-                            <button class="btn btn-xs btn-outline" onclick="App._viewUserProfile('${u.uid}')" title="عرض الملف"><i class="fas fa-eye"></i></button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        });
-        tbody.innerHTML = html;
+        setTimeout(() => this._renderUserTable(users, page), 100);
+        return;
     }
 
-    // الترقيم
-    this._renderAdminPagination('adminUsersPagination', totalPages, currentPage, (p) => {
-        this._renderUserTable(filteredUsers, p); // استخدام البيانات المفلترة نفسها
+    if (!users || users.length === 0) {
+        if (this._cachedUsers && this._cachedUsers.length > 0) {
+            users = this._cachedUsers;
+        } else {
+            container.innerHTML = `
+                <div style="text-align:center;padding:2rem;color:var(--gray);">
+                    <i class="fas fa-spinner fa-spin" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
+                    جاري تحميل المستخدمين...
+                </div>
+            `;
+            this._fetchAdminUsers();
+            return;
+        }
+    }
+
+    // فلترة وترتيب...
+    const filteredUsers = this._filterAdminUsers(users);
+    const paginated = this._paginateUsers(filteredUsers, page);
+
+    if (paginated.length === 0) {
+        container.innerHTML = `
+            <div style="text-align:center;padding:2rem;color:var(--gray);">
+                <i class="fas fa-search" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
+                لا توجد نتائج مطابقة
+            </div>
+        `;
+        return;
+    }
+
+    let html = '<div class="player-cards-grid">';
+    paginated.forEach((u, idx) => {
+        const player = {
+            uid: u.uid || u.id,
+            displayName: u.fullName || u.displayName || u.username,
+            fullName: u.fullName || u.displayName || u.username,
+            username: u.username || 'guest',
+            avatar: u.avatar || null,
+            rankPoints: u.rankPoints || 0,
+            totalScore: u.totalScore || 0,
+            lastActive: u.lastActive,
+            clan: u.clan || 'غير منضم',
+            banned: u.banned === true,
+            activeItems: u.activeItems || [],
+            inventory: u.inventory || []
+        };
+        
+        html += this._renderPlayerCard(player, {
+            showActions: true,
+            context: 'admin',
+            isBlocked: u.banned === true,
+            extraInfo: `#${idx + 1} • ⭐ ${u.totalScore || 0} نقطة • ${u.email || '—'}`
+        });
     });
+    html += '</div>';
+    container.innerHTML = html;
+
+    this._renderAdminPagination('adminUsersPagination', totalPages, currentPage, (p) => {
+        this._renderUserTable(filteredUsers, p);
+    });
+},
+
+/**
+ * جلب المستخدمين من Firestore للوحة المشرفين
+ */
+async _fetchAdminUsers() {
+    try {
+        const container = document.getElementById('adminUsersContainer');
+        if (container) {
+            container.innerHTML = `
+                <div style="text-align:center;padding:2rem;color:var(--gray);">
+                    <i class="fas fa-spinner fa-spin" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
+                    جاري تحميل المستخدمين...
+                </div>
+            `;
+        }
+
+        const snapshot = await db.collection('users').get();
+        const users = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            users.push({ 
+                id: doc.id, 
+                uid: doc.id, 
+                ...data,
+                // ✅ ضمان وجود الحقول الأساسية
+                displayName: data.displayName || data.fullName || data.username || 'مجهول',
+                fullName: data.fullName || data.displayName || data.username || 'مجهول',
+                username: data.username || 'guest'
+            });
+        });
+        
+        this._cachedUsers = users;
+        this._renderUserTable(users, 1);
+        
+    } catch (error) {
+        console.error('❌ Error fetching admin users:', error);
+        const container = document.getElementById('adminUsersContainer');
+        if (container) {
+            container.innerHTML = `
+                <div style="text-align:center;padding:2rem;color:var(--secondary);">
+                    <i class="fas fa-exclamation-circle" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
+                    ❌ خطأ في تحميل المستخدمين: ${error.message}
+                    <button class="btn btn-primary btn-sm mt-1" onclick="App._fetchAdminUsers()">
+                        <i class="fas fa-sync"></i> إعادة المحاولة
+                    </button>
+                </div>
+            `;
+        }
+    }
+},
+
+/**
+ * جلب المستخدمين من Firestore للوحة المشرفين
+ */
+async _fetchAdminUsers() {
+    try {
+        const snapshot = await db.collection('users').get();
+        const users = [];
+        snapshot.forEach(doc => {
+            users.push({ id: doc.id, uid: doc.id, ...doc.data() });
+        });
+        this._cachedUsers = users;
+        this._renderUserTable(users, 1);
+    } catch (error) {
+        console.error('❌ Error fetching admin users:', error);
+        const tbody = document.getElementById('adminUsersTableBody');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center text-gray">❌ خطأ في تحميل المستخدمين: ${error.message}</td></tr>`;
+        }
+    }
+},
+
+/**
+ * عرض رسالة تسجيل الدخول
+ */
+_renderLoginPrompt() {
+    return `
+        <div class="empty-state" style="text-align:center;padding:2rem;">
+            <i class="fas fa-user-friends" style="font-size:2.5rem;color:var(--gray-dark);"></i>
+            <h3>سجل الدخول لعرض الأصدقاء</h3>
+            <p class="text-gray">يجب تسجيل الدخول لتتمكن من رؤية أصدقائك</p>
+            <button class="btn btn-primary mt-1" onclick="document.getElementById('loginModal').classList.add('open')">
+                <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
+            </button>
+        </div>
+    `;
+},
+
+/**
+ * عرض رسالة مستخدم غير موجود
+ */
+_renderUserNotFound() {
+    return `
+        <div class="empty-state" style="text-align:center;padding:2rem;">
+            <i class="fas fa-exclamation-circle" style="font-size:2.5rem;color:var(--secondary);"></i>
+            <h3>المستخدم غير موجود</h3>
+            <p class="text-gray">لم يتم العثور على بيانات حسابك</p>
+            <button class="btn btn-primary mt-1" onclick="location.reload()">
+                <i class="fas fa-sync"></i> إعادة تحميل
+            </button>
+        </div>
+    `;
+},
+
+/**
+ * عرض رسالة خطأ
+ */
+_renderErrorState(message) {
+    return `
+        <div class="empty-state" style="text-align:center;padding:2rem;">
+            <i class="fas fa-wifi-slash" style="font-size:2.5rem;color:var(--secondary);"></i>
+            <h3>تعذر تحميل الأصدقاء</h3>
+            <p class="text-gray">${message || 'حدث خطأ في الاتصال'}</p>
+            <button class="btn btn-primary mt-1" onclick="App._loadFriendsPage()">
+                <i class="fas fa-sync"></i> إعادة المحاولة
+            </button>
+        </div>
+    `;
+},
+
+/**
+ * تحديث إحصائيات الأصدقاء
+ */
+_updateFriendsStats(totalFriends, pendingRequests) {
+    const totalEl = document.getElementById('friendsTotalCount');
+    const onlineEl = document.getElementById('friendsOnlineCount');
+    const requestsEl = document.getElementById('friendsRequestsCount');
+    
+    if (totalEl) totalEl.textContent = totalFriends;
+    if (requestsEl) requestsEl.textContent = pendingRequests;
+    
+    // ✅ تحديث عدد المتصلين (سيتم حسابه في _renderFriendsList)
 },
 
 // ✅ دالة للحصول على بيانات تجريبية (في حالة عدم وجود أي بيانات)
@@ -22497,7 +23821,7 @@ _updateStats(stats) {
 // تحديث واجهة المستخدم بناءً على بيانات المستخدم
 // ============================================================
 
-_updateUserUI(user) {
+_updateUserUI: function(user) {
     // ✅ عناصر رئيسية - التحقق من وجودها قبل التعديل
     const nameEl = document.getElementById('userNameDisplay');
     const roleEl = document.getElementById('userRoleDisplay');
@@ -22528,7 +23852,7 @@ _updateUserUI(user) {
     const profileCoins = document.getElementById('profileCoins');
     const profileScore = document.getElementById('profileScore');
     
-    // ✅ عناصر المستوى المبسط (بدون تفاصيل إضافية)
+    // ✅ عناصر المستوى المبسط
     const profileLevelNumber = document.getElementById('profileLevelNumber');
     const profileCurrentPoints = document.getElementById('profileCurrentPoints');
     const profileLevelProgress = document.getElementById('profileLevelProgress');
@@ -22552,34 +23876,51 @@ _updateUserUI(user) {
     const changeAvatarBtn = document.getElementById('changeAvatarBtn');
     const removeAvatarBtn = document.getElementById('removeAvatarBtn');
 
-const userData = AuthService.currentUser;
-if (userData) {
-    const activeItems = userData.activeItems || [];
-    const storeItems = DataManager.data.storeItems || [];
-    const activeBg = storeItems.find(item => 
-        activeItems.includes(item.id) && item.category === 'backgrounds'
-    );
-    
-    const playerCard = document.querySelector('.player-card-new');
-    if (playerCard) {
-        if (activeBg && activeBg.imagePath) {
-            playerCard.style.backgroundImage = `url('${activeBg.imagePath}')`;
-            playerCard.style.backgroundSize = 'cover';
-            playerCard.style.backgroundPosition = 'center';
-            playerCard.style.backgroundRepeat = 'no-repeat';
-            playerCard.style.borderColor = 'var(--accent)';
-        } else {
-            playerCard.style.backgroundImage = '';
-            playerCard.style.backgroundSize = '';
-            playerCard.style.backgroundPosition = '';
-            playerCard.style.backgroundRepeat = '';
-            playerCard.style.background = 'rgba(255,255,255,0.04)';
-            playerCard.style.borderColor = 'rgba(255,255,255,0.06)';
+    // ✅ تحديث الخلفية المفعّلة على بطاقة اللاعب (إذا كانت موجودة)
+    const userData = AuthService.currentUser;
+    if (userData) {
+        const activeItems = userData.activeItems || [];
+        const storeItems = DataManager.data.storeItems || [];
+        const activeBg = storeItems.find(item => 
+            activeItems.includes(item.id) && item.category === 'backgrounds'
+        );
+        
+        const playerCard = document.querySelector('.player-card-new');
+        if (playerCard) {
+            if (activeBg && activeBg.imagePath) {
+                playerCard.style.backgroundImage = `url('${activeBg.imagePath}')`;
+                playerCard.style.backgroundSize = 'cover';
+                playerCard.style.backgroundPosition = 'center';
+                playerCard.style.backgroundRepeat = 'no-repeat';
+                playerCard.style.borderColor = 'var(--accent)';
+            } else {
+                playerCard.style.backgroundImage = '';
+                playerCard.style.backgroundSize = '';
+                playerCard.style.backgroundPosition = '';
+                playerCard.style.backgroundRepeat = '';
+                playerCard.style.background = 'rgba(255,255,255,0.04)';
+                playerCard.style.borderColor = 'rgba(255,255,255,0.06)';
+            }
         }
     }
-}
 
     if (user) {
+        // ✅ عرض الدولة في الملف الشخصي
+        if (user.country) {
+            const country = getCountryByCode(user.country);
+            if (country) {
+                // تحديث اسم الدولة في الملف الشخصي
+                const profileLocation = document.getElementById('profileLocation');
+                if (profileLocation) {
+                    profileLocation.innerHTML = `📍 ${country.icon} ${country.name}`;
+                    profileLocation.style.display = 'block';
+                }
+            }
+        }
+        
+        // تحديث أيقونة الدولة في بطاقة الداشبورد
+        this._updateUserCountryDisplay(user);
+
         // ===== 1. معلومات المستخدم الأساسية =====
         const displayName = user.fullName || user.displayName || user.username || user.email || 'مستخدم';
         const username = user.username || 'guest';
@@ -22603,41 +23944,45 @@ if (userData) {
         if (gemsEl) gemsEl.textContent = user.gems || 0;
         
         // ===== 2. الملف الشخصي (البطاقة) =====
-        // الاسم واسم المستخدم
         if (profileName) profileName.textContent = displayName;
         if (profileUsername) profileUsername.textContent = `@${username}`;
-        
-        // ✅ القبيلة (تم إضافتها حديثاً)
-        if (profileClan) {
-            profileClan.textContent = user.clan || 'غير منضم';
-        }
-        
-        // الدور
+        if (profileClan) profileClan.textContent = user.clan || 'غير منضم';
         if (profileRole) profileRole.textContent = `دور: ${AuthService.getRoleLabel(user.role)}`;
-        
-        // الصورة الشخصية (مربعة)
+
+        // ===== الصورة الشخصية =====
         if (profileAvatar) {
-            if (user.avatar && user.avatar.startsWith('data:image')) {
-                profileAvatar.style.backgroundImage = `url(${user.avatar})`;
-                profileAvatar.style.backgroundSize = 'cover';
-                profileAvatar.style.backgroundPosition = 'center';
-                profileAvatar.textContent = '';
-            } else {
-                profileAvatar.style.backgroundImage = '';
-                profileAvatar.textContent = displayName.charAt(0).toUpperCase();
-            }
+            // ✅ إزالة أي خلفية أو محتوى سابق
+            profileAvatar.style.backgroundImage = 'none';
+            profileAvatar.style.background = 'var(--primary)';
+            profileAvatar.style.border = 'none';
+            profileAvatar.style.boxShadow = 'none';
+            profileAvatar.style.padding = '0';
+            profileAvatar.style.position = 'relative';
+            profileAvatar.style.overflow = 'hidden';
+            profileAvatar.textContent = ''; // سيتم تعبئته بواسطة _applyUserCustomizations
+
+            // ✅ إذا كان هناك صورة (مرفوعة أو افتراضية)، نضيفها كـ img
+            // ولكننا نترك التطبيق لـ _applyUserCustomizations و _updateDashboardAvatar
         }
-        
-        // ===== 3. المستوى المبسط (بدون تفاصيل إضافية) =====
+
+        // تحديث صورة الداشبورد (سيتم تطبيقها بشكل كامل في _applyUserCustomizations)
+        const dashAvatar = document.getElementById('dashboardAvatar');
+        if (dashAvatar) {
+            dashAvatar.style.border = 'none';
+            dashAvatar.style.boxShadow = 'none';
+            dashAvatar.style.padding = '0';
+            dashAvatar.style.overflow = 'hidden';
+            dashAvatar.style.background = 'var(--primary)';
+            dashAvatar.style.position = 'relative';
+            // سيتم تعبئته بواسطة _applyUserCustomizations
+        }
+
+        // ===== 3. المستوى المبسط =====
         const level = getLevel(user.totalScore || 0);
         const progress = getLevelProgress(user.totalScore || 0);
         
-        if (profileLevelNumber) {
-            profileLevelNumber.textContent = level.level;
-        }
-        if (profileCurrentPoints) {
-            profileCurrentPoints.textContent = user.totalScore || 0;
-        }
+        if (profileLevelNumber) profileLevelNumber.textContent = level.level;
+        if (profileCurrentPoints) profileCurrentPoints.textContent = user.totalScore || 0;
         if (profileLevelProgress) {
             profileLevelProgress.style.width = `${Math.min(progress.progress, 100)}%`;
         }
@@ -22650,9 +23995,7 @@ if (userData) {
                 <img src="images/ranks/${rank.image}" alt="${rank.name}" style="width:100%;height:100%;object-fit:contain;">
             `;
         }
-        if (rankPointsEl) {
-            rankPointsEl.textContent = user.rankPoints || 0;
-        }
+        if (rankPointsEl) rankPointsEl.textContent = user.rankPoints || 0;
         if (rankProgress) {
             rankProgress.style.width = `${Math.min(rank.progress, 100)}%`;
             rankProgress.style.background = `linear-gradient(90deg, ${rank.color}, var(--accent))`;
@@ -22672,16 +24015,14 @@ if (userData) {
         if (profileScore) profileScore.textContent = user.totalScore || 0;
         
         // ===== 6. إنجازات المستخدم =====
-        if (achLevel) {
-            achLevel.style.color = level.color;
-        }
+        if (achLevel) achLevel.style.color = level.color;
         if (achCount) {
             const unlocked = AchievementManager.getUnlockedAchievements();
             const total = ACHIEVEMENTS_DATA.length;
             achCount.textContent = `${unlocked.length}/${total}`;
         }
         
-        // ===== 7. شارة الإنجازات في زر الإنجازات =====
+        // ===== 7. شارة الإنجازات =====
         const badge = document.getElementById('profileAchievementsBadge');
         if (badge) {
             const unlocked = AchievementManager.getUnlockedAchievements();
@@ -22698,7 +24039,7 @@ if (userData) {
         if (changeAvatarBtn) changeAvatarBtn.style.display = 'none';
         if (removeAvatarBtn) removeAvatarBtn.style.display = 'none';
         
-        // ===== 10. تطبيق التخصيصات =====
+        // ===== 10. تطبيق التخصيصات (الصورة، الإطار، الخلفية، السمة) =====
         this._applyUserCustomizations(user);
 
     } else {
@@ -22729,6 +24070,8 @@ if (userData) {
         if (profileAvatar) {
             profileAvatar.style.backgroundImage = '';
             profileAvatar.textContent = '👤';
+            profileAvatar.style.border = '4px solid var(--accent)';
+            profileAvatar.style.boxShadow = 'none';
         }
         
         // المستوى المبسط
@@ -22774,12 +24117,6 @@ if (userData) {
         root.style.setProperty('--accent', '#FFD93D');
         root.style.setProperty('--secondary', '#FF6B6B');
         
-        // ✅ إعادة تعيين الإطار إلى الافتراضي
-        if (profileAvatar) {
-            profileAvatar.style.border = `4px solid var(--accent)`;
-            profileAvatar.style.boxShadow = 'none';
-        }
-        
         // ✅ إزالة الشارة من الاسم
         const nameEl2 = document.querySelector('.profile-name');
         if (nameEl2) {
@@ -22791,15 +24128,9 @@ if (userData) {
     // ============================================================
     // ✅ تحديث العناصر القديمة (للتوافق مع الكود القديم)
     // ============================================================
-    // هذه العناصر قد تكون موجودة في أجزاء أخرى من التطبيق
-    // نقوم بتحديثها إذا كانت موجودة
-    
-    // العناصر المحذوفة (نجعلها فارغة أو مخفية)
     if (profileBio) profileBio.textContent = '';
     if (profileLocation) profileLocation.textContent = '';
     if (profileJoinDate) profileJoinDate.textContent = '';
-    
-    // عناصر المستوى القديمة (نجعلها فارغة أو مخفية)
     if (levelCurrentLabel) levelCurrentLabel.textContent = '';
     if (levelNextLabel) levelNextLabel.textContent = '';
     if (levelCurrent) levelCurrent.textContent = '';
@@ -22927,62 +24258,180 @@ _toggleCardBackground: function(itemId) {
     }, 300);
 },
 
-// ============================================================
-// تطبيق جميع التخصيصات (الإطار، الخلفية، الشارة، السمة)
-// ============================================================
 _applyUserCustomizations: function(user) {
-    if (!user) return;
-    
+    if (!user) {
+        // إذا لم يكن هناك مستخدم، قم بإزالة التخصيصات
+        const avatarContainer = document.getElementById('profileAvatar');
+        if (avatarContainer) {
+            avatarContainer.innerHTML = '';
+            avatarContainer.style.backgroundImage = 'none';
+            avatarContainer.style.background = 'var(--primary)';
+            avatarContainer.style.border = 'none';
+            avatarContainer.style.boxShadow = 'none';
+            const frameOverlay = avatarContainer.querySelector('.frame-overlay');
+            if (frameOverlay) frameOverlay.remove();
+        }
+        const dashAvatar = document.getElementById('dashboardAvatar');
+        if (dashAvatar) {
+            dashAvatar.innerHTML = '';
+            dashAvatar.textContent = '👤';
+            dashAvatar.style.background = 'var(--primary)';
+            dashAvatar.style.border = 'none';
+            dashAvatar.style.boxShadow = 'none';
+            const frameImg = dashAvatar.querySelector('.frame-overlay-dash');
+            if (frameImg) frameImg.remove();
+        }
+        return;
+    }
+
+        // ✅ تحديث العلم إذا كانت الدولة محددة
+    if (user.country) {
+        this._updateUserCountryDisplay(user);
+    }
+
+    // ✅ إذا كانت الصورة الافتراضية ولم يكمل المستخدم بياناته، استخدم الصورة المناسبة
+    if (user.avatar && user.avatar.startsWith('images/avatars/default/')) {
+        // الصورة محفوظة بالفعل، نستخدمها
+    } else if (!user.avatar || user.avatar === DEFAULT_AVATAR_PATH) {
+        // إذا لم تكن هناك صورة، استخدم الصورة الافتراضية حسب العمر والجنس
+        if (user.age && user.gender) {
+            const isAdult = user.age === 'over_18';
+            const key = `${user.gender}_${isAdult ? 'adult' : 'young'}`;
+            const avatarPath = DEFAULT_AVATARS[key] || DEFAULT_AVATARS['male_adult'];
+            user.avatar = avatarPath;
+            // تحديث في قاعدة البيانات
+            AuthService.updateUser({ avatar: avatarPath }).catch(() => {});
+        }
+    }
+
     const activeItems = user.activeItems || [];
     const storeItems = DataManager.data.storeItems || [];
     const root = document.documentElement;
-    
-    // 1️⃣ الإطار المفعّل
-    const activeFrame = storeItems.find(item => 
-        activeItems.includes(item.id) && item.category === 'frames'
-    );
+
+    // ============================================================
+    // 0. الصورة الشخصية المفعّلة (من المتجر)
+    // ============================================================
+    const activeAvatar = storeItems.find(item => activeItems.includes(item.id) && item.category === 'avatars');
     const avatarContainer = document.getElementById('profileAvatar');
+
+    // تنظيف الحاوية
     if (avatarContainer) {
-        if (activeFrame) {
-            const frameColors = {
-                'bronze': '#cd7f32',
-                'silver': '#c0c0c0',
-                'gold': '#FFD700',
-                'platinum': '#e5e4e2',
-                'diamond': '#b9f2ff',
-                'fire': '#ff4500',
-                'legend': '#f1c40f',
-                'glow': '#00ffff'
-            };
-            const color = frameColors[activeFrame.value] || 'var(--accent)';
-            avatarContainer.style.border = `4px solid ${color}`;
-            avatarContainer.style.boxShadow = `0 0 25px ${color}66`;
-            avatarContainer.style.transition = 'all 0.3s ease';
+        avatarContainer.innerHTML = '';
+        avatarContainer.style.backgroundImage = 'none';
+        avatarContainer.style.background = 'var(--primary)';
+        avatarContainer.style.border = 'none';
+        avatarContainer.style.boxShadow = 'none';
+        avatarContainer.style.padding = '0';
+        avatarContainer.style.position = 'relative';
+        avatarContainer.style.overflow = 'hidden';
+        avatarContainer.style.display = 'flex';
+        avatarContainer.style.alignItems = 'center';
+        avatarContainer.style.justifyContent = 'center';
+        avatarContainer.style.color = '#fff';
+    }
+
+    // ✅ تحديد الصورة المطلوب عرضها (الأولوية للصورة المشتراة)
+    let imageUrl = null;
+
+    // 1️⃣ الأولوية القصوى: الصورة المشتراة من المتجر
+    if (activeAvatar && activeAvatar.imagePath) {
+        imageUrl = activeAvatar.imagePath;
+        console.log('✅ استخدام الصورة المشتراة من المتجر:', activeAvatar.name);
+    }
+    // 2️⃣ الصورة المرفوعة من المستخدم (إذا لم تكن هناك صورة مشتراة)
+    else if (user.avatar && user.avatar !== DEFAULT_AVATAR_PATH && user.avatar.startsWith('data:image')) {
+        imageUrl = user.avatar;
+        console.log('✅ استخدام الصورة المرفوعة من المستخدم');
+    }
+    // 3️⃣ الصورة الافتراضية (إذا لم تكن هناك صورة مشتراة ولا مرفوعة)
+    else if (user.avatar) {
+        imageUrl = user.avatar;
+        console.log('✅ استخدام الصورة الافتراضية');
+    }
+
+    // ✅ تطبيق الصورة أو الحرف الأول
+    if (avatarContainer) {
+        if (imageUrl) {
+            const imgElement = document.createElement('img');
+            imgElement.style.cssText = `
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                position: absolute;
+                top: 0;
+                left: 0;
+                z-index: 1;
+            `;
+            imgElement.src = imageUrl;
+            imgElement.alt = user.username || 'مستخدم';
+            avatarContainer.appendChild(imgElement);
         } else {
-            avatarContainer.style.border = `4px solid var(--accent)`;
-            avatarContainer.style.boxShadow = '0 0 15px rgba(255,217,61,0.2)';
+            // إذا لم تكن هناك صورة على الإطلاق، نعرض الحرف الأول
+            const firstLetter = document.createElement('span');
+            firstLetter.textContent = (user.username || 'U').charAt(0).toUpperCase();
+            firstLetter.style.cssText = `
+                font-size: 2.5rem;
+                font-weight: 700;
+                position: relative;
+                z-index: 1;
+                color: #fff;
+            `;
+            avatarContainer.appendChild(firstLetter);
         }
     }
+
+    // ============================================================
+    // 1. الإطار المفعّل (كصورة فقط)
+    // ============================================================
+    const activeFrame = storeItems.find(item => activeItems.includes(item.id) && item.category === 'frames');
+
+    if (activeFrame && activeFrame.imagePath && avatarContainer) {
+        // إزالة أي إطار سابق
+        const oldFrame = avatarContainer.querySelector('.frame-overlay');
+        if (oldFrame) oldFrame.remove();
+
+        const frameOverlay = document.createElement('img');
+        frameOverlay.className = 'frame-overlay';
+        frameOverlay.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            object-fit: contain;
+        `;
+        frameOverlay.src = activeFrame.imagePath;
+        avatarContainer.style.position = 'relative';
+        avatarContainer.appendChild(frameOverlay);
+        avatarContainer.style.border = 'none';
+        avatarContainer.style.boxShadow = 'none';
+    } else if (avatarContainer) {
+        const frameOverlay = avatarContainer.querySelector('.frame-overlay');
+        if (frameOverlay) frameOverlay.remove();
+        avatarContainer.style.border = 'none';
+        avatarContainer.style.boxShadow = 'none';
+    }
+
+    // ============================================================
+    // تحديث صورة الداشبورد
+    // ============================================================
+    this._updateDashboardAvatar();
+
+    // ============================================================
+    // 2. الخلفية المفعّلة (على غلاف الملف الشخصي وبطاقة اللاعب)
+    // ============================================================
+    const activeBg = storeItems.find(item => activeItems.includes(item.id) && item.category === 'backgrounds');
     
-    // 2️⃣ ✅ الخلفية المفعّلة على غلاف الملف الشخصي (باستخدام الصورة)
-    const activeBg = storeItems.find(item => 
-        activeItems.includes(item.id) && item.category === 'backgrounds'
-    );
-    
-    // تطبيق على غلاف الملف الشخصي
     const profileCover = document.querySelector('.profile-cover');
     if (profileCover) {
         if (activeBg && activeBg.imagePath) {
-            // ✅ استخدام الصورة كخلفية
             profileCover.style.backgroundImage = `url('${activeBg.imagePath}')`;
             profileCover.style.backgroundSize = 'cover';
             profileCover.style.backgroundPosition = 'center';
             profileCover.style.backgroundRepeat = 'no-repeat';
             profileCover.style.borderColor = 'var(--accent)';
-            // إضافة طبقة تعتيم فوق الصورة لجعل النص مقروء
-            profileCover.style.position = 'relative';
-            // إزالة أي خلفية سابقة
-            profileCover.style.background = `url('${activeBg.imagePath}') center/cover no-repeat`;
         } else {
             profileCover.style.backgroundImage = '';
             profileCover.style.backgroundSize = '';
@@ -22992,8 +24441,7 @@ _applyUserCustomizations: function(user) {
             profileCover.style.borderColor = 'var(--border-color)';
         }
     }
-    
-    // ✅ تطبيق الخلفية على بطاقة الصفحة الرئيسية
+
     const playerCard = document.querySelector('.player-card-new');
     if (playerCard) {
         if (activeBg && activeBg.imagePath) {
@@ -23002,8 +24450,6 @@ _applyUserCustomizations: function(user) {
             playerCard.style.backgroundPosition = 'center';
             playerCard.style.backgroundRepeat = 'no-repeat';
             playerCard.style.borderColor = 'var(--accent)';
-            // إضافة طبقة تعتيم
-            playerCard.style.position = 'relative';
         } else {
             playerCard.style.backgroundImage = '';
             playerCard.style.backgroundSize = '';
@@ -23013,17 +24459,17 @@ _applyUserCustomizations: function(user) {
             playerCard.style.borderColor = 'rgba(255,255,255,0.06)';
         }
     }
-    
-    // 3️⃣ الشارة المفعّلة
-    const activeBadge = storeItems.find(item => 
-        activeItems.includes(item.id) && item.category === 'badges'
-    );
-    const badgeContainer = document.querySelector('.profile-badges-container');
-    if (badgeContainer && activeBadge) {
-        const nameEl = document.querySelector('.profile-name');
-        if (nameEl) {
-            const oldBadge = nameEl.querySelector('.active-badge-icon');
-            if (oldBadge) oldBadge.remove();
+
+    // ============================================================
+    // 3. الشارة المفعّلة
+    // ============================================================
+    const activeBadge = storeItems.find(item => activeItems.includes(item.id) && item.category === 'badges');
+    const nameEl = document.querySelector('.profile-name');
+    if (nameEl) {
+        const oldBadge = nameEl.querySelector('.active-badge-icon');
+        if (oldBadge) oldBadge.remove();
+        
+        if (activeBadge) {
             const badgeSpan = document.createElement('span');
             badgeSpan.className = 'active-badge-icon';
             const badgeIcon = this._getBadgeIcon(activeBadge.id) || activeBadge.icon || '🏅';
@@ -23041,11 +24487,11 @@ _applyUserCustomizations: function(user) {
             nameEl.prepend(badgeSpan);
         }
     }
-    
-    // 4️⃣ السمة المفعّلة
-    const activeTheme = storeItems.find(item => 
-        activeItems.includes(item.id) && item.category === 'themes'
-    );
+
+    // ============================================================
+    // 4. السمة المفعّلة
+    // ============================================================
+    const activeTheme = storeItems.find(item => activeItems.includes(item.id) && item.category === 'themes');
     
     const themeColors = {
         'gold': { primary: '#f1c40f', accent: '#f39c12', secondary: '#e67e22' },
@@ -23171,6 +24617,12 @@ _activateSection(id) {
         if (user) {
             this._updateProfileTabContent(user);
         }
+    }
+    // ✅ بعد تغيير القسم، أعد تطبيق التخصيصات
+    if (id === 'friends' || id === 'profile' || id === 'dashboard') {
+        setTimeout(() => {
+            this._applyAllCustomizations();
+        }, 300);
     }
 },
 
@@ -23677,7 +25129,7 @@ document.getElementById('dashboardNotificationsBtn')?.addEventListener('click', 
 });
 
 document.getElementById('dashboardLevelClick')?.addEventListener('click', () => {
-    App._activateSection('profile');
+    App._showLevelsPage();
 });
 
 // ===== أزرار القائمة الجانبية =====
@@ -24355,15 +25807,15 @@ _setupAuthHandlers() {
         App._updateRegisterButton();
     });
     
-    // ===== تقييم قوة كلمة المرور (فوري) =====
+    // ===== تقييم قوة كلمة المرور (فوري) – إصلاح الأشرطة =====
     const passwordInput = document.getElementById('regPassword');
     passwordInput?.addEventListener('input', function() {
         const password = this.value;
         const strength = App._evaluatePasswordStrength(password);
         
-        // تحديث أشرطة القوة
+        // تحديث أشرطة القوة (عددها 4)
         const bars = document.querySelectorAll('.strength-bar');
-        const maxScore = 5;
+        const totalBars = bars.length; // 4
         bars.forEach((bar, index) => {
             if (index < strength.score) {
                 bar.style.background = strength.color;
@@ -24484,96 +25936,105 @@ _setupAuthHandlers() {
         });
     }
     
-// ===== نموذج التسجيل =====
-const registerForm = document.getElementById('registerForm');
-if (registerForm) {
-    registerForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        console.log('🔐 Register form submitted');
-        
-        const fullName = document.getElementById('regFullName')?.value?.trim() || '';
-        const username = document.getElementById('regUsername')?.value?.trim() || '';
-        const email = document.getElementById('regEmail')?.value?.trim() || '';
-        const password = document.getElementById('regPassword')?.value || '';
-        const errorEl = document.getElementById('registerError');
-        const submitBtn = document.getElementById('registerSubmitBtn');
-        
-        // ✅ التحقق النهائي
-        if (!fullName || !username || !email || !password) {
-            errorEl.textContent = '❌ يرجى ملء جميع الحقول';
+    // ===== نموذج التسجيل – مع تحسينات التحقق من اسم المستخدم =====
+    const registerForm = document.getElementById('registerForm');
+    if (registerForm) {
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            console.log('🔐 Register form submitted');
+            
+            const fullName = document.getElementById('regFullName')?.value?.trim() || '';
+            const username = document.getElementById('regUsername')?.value?.trim() || '';
+            const email = document.getElementById('regEmail')?.value?.trim() || '';
+            const password = document.getElementById('regPassword')?.value || '';
+            const errorEl = document.getElementById('registerError');
+            const submitBtn = document.getElementById('registerSubmitBtn');
+            
+            // التحقق النهائي
+            if (!fullName || !username || !email || !password) {
+                errorEl.textContent = '❌ يرجى ملء جميع الحقول';
+                errorEl.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> إنشاء حساب';
+                return;
+            }
+            
+            if (password.length < 6) {
+                errorEl.textContent = '❌ كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+                errorEl.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> إنشاء حساب';
+                return;
+            }
+            
+            // ✅ التحقق من توفر اسم المستخدم
+            errorEl.textContent = '⏳ جاري التحقق من اسم المستخدم...';
             errorEl.style.display = 'block';
-            return;
-        }
-        
-        if (password.length < 6) {
-            errorEl.textContent = '❌ كلمة المرور يجب أن تكون 6 أحرف على الأقل';
-            errorEl.style.display = 'block';
-            return;
-        }
-        
-        // ✅ التحقق من توفر اسم المستخدم
-        errorEl.textContent = '⏳ جاري التحقق من اسم المستخدم...';
-        errorEl.style.display = 'block';
-        errorEl.style.color = 'var(--gray)';
-        
-        try {
-            const availability = await App._checkUsernameAvailability(username);
-            if (!availability.available) {
-                errorEl.textContent = '❌ اسم المستخدم غير متوفر';
+            errorEl.style.color = 'var(--gray)';
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري...';
+            
+            try {
+                const availability = await App._checkUsernameAvailability(username);
+                if (!availability.available) {
+                    errorEl.textContent = '❌ ' + availability.message;
+                    errorEl.style.color = 'var(--secondary)';
+                    errorEl.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> إنشاء حساب';
+                    return;
+                }
+            } catch (checkError) {
+                console.warn('⚠️ Username check failed:', checkError);
+                // إذا فشل التحقق، نعتبره غير متوفر احترازياً
+                errorEl.textContent = '⚠️ تعذر التحقق من اسم المستخدم، حاول مرة أخرى';
                 errorEl.style.color = 'var(--secondary)';
                 errorEl.style.display = 'block';
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> إنشاء حساب';
                 return;
             }
-        } catch (checkError) {
-            console.warn('⚠️ Username check failed:', checkError);
-        }
-        
-        errorEl.style.display = 'none';
-        
-        // ✅ تعطيل الزر
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري...';
-        
-        try {
-            console.log('📡 Attempting registration with:', { fullName, username, email });
             
-            // ✅ التسجيل مع إرسال الاسم الكامل
-            const user = await AuthService.register(email, password, username, fullName);
-            console.log('✅ Registration successful:', user);
+            errorEl.style.display = 'none';
             
-            // ✅ إغلاق المودال
-            document.getElementById('loginModal').classList.remove('open');
-            await DataManager.loadAll();
-            showToast(`✅ مرحباً ${fullName}! تم إنشاء حسابك بنجاح`, 'success', 5000);
-            
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> إنشاء حساب';
-            
-        } catch (err) {
-            console.error('❌ Register error:', err);
-            
-            let errorMessage = err.message || 'حدث خطأ غير متوقع';
-            if (errorMessage.includes('email-already-in-use')) {
-                errorMessage = 'البريد الإلكتروني مستخدم بالفعل';
-            } else if (errorMessage.includes('weak-password')) {
-                errorMessage = 'كلمة المرور ضعيفة جداً (استخدم 6 أحرف على الأقل)';
-            } else if (errorMessage.includes('invalid-email')) {
-                errorMessage = 'صيغة البريد الإلكتروني غير صحيحة';
-            } else if (errorMessage.includes('network-request-failed')) {
-                errorMessage = 'فشل الاتصال بالإنترنت، تحقق من اتصالك';
+            try {
+                // ✅ التسجيل مع إرسال الاسم الكامل (مع استخدام معاملة في AuthService.register)
+                const user = await AuthService.register(email, password, username, fullName);
+                console.log('✅ Registration successful:', user);
+                
+                // إغلاق المودال
+                document.getElementById('loginModal').classList.remove('open');
+                await DataManager.loadAll();
+                showToast(`✅ مرحباً ${fullName}! تم إنشاء حسابك بنجاح`, 'success', 5000);
+                
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> إنشاء حساب';
+                
+            } catch (err) {
+                console.error('❌ Register error:', err);
+                
+                let errorMessage = err.message || 'حدث خطأ غير متوقع';
+                if (errorMessage.includes('email-already-in-use')) {
+                    errorMessage = 'البريد الإلكتروني مستخدم بالفعل';
+                } else if (errorMessage.includes('weak-password')) {
+                    errorMessage = 'كلمة المرور ضعيفة جداً (استخدم 6 أحرف على الأقل)';
+                } else if (errorMessage.includes('invalid-email')) {
+                    errorMessage = 'صيغة البريد الإلكتروني غير صحيحة';
+                } else if (errorMessage.includes('network-request-failed')) {
+                    errorMessage = 'فشل الاتصال بالإنترنت، تحقق من اتصالك';
+                } else if (errorMessage.includes('اسم المستخدم مستخدم بالفعل')) {
+                    errorMessage = 'اسم المستخدم غير متوفر';
+                }
+                
+                errorEl.textContent = '❌ ' + errorMessage;
+                errorEl.style.color = 'var(--secondary)';
+                errorEl.style.display = 'block';
+                
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> إنشاء حساب';
             }
-            
-            errorEl.textContent = '❌ ' + errorMessage;
-            errorEl.style.color = 'var(--secondary)';
-            errorEl.style.display = 'block';
-            
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> إنشاء حساب';
-        }
-    });
-}
+        });
+    }
     
     // ===== إغلاق المودال =====
     document.getElementById('closeLoginModal')?.addEventListener('click', () => {
@@ -25113,239 +26574,66 @@ _getDefaultStoreItems() {
         maxStack: 99 
     }));
 
-    // ============================================================
-    // 6. إطارات الملف الشخصي (Frames)
-    // ============================================================
-    const frames = [
-        { id: 'frame_bronze', name: 'إطار برونزي', imagePath: 'images/store/frames/frame_bronze.png', desc: 'إطار برونزي أنيق', price: 50, currency: 'coins', rarity: 'common', effect: 'profile_frame', value: 'bronze' },
-        { id: 'frame_silver', name: 'إطار فضي', imagePath: 'images/store/frames/frame_silver.png', desc: 'إطار فضي لامع', price: 100, currency: 'coins', rarity: 'uncommon', effect: 'profile_frame', value: 'silver' },
-        { id: 'frame_gold', name: 'إطار ذهبي', imagePath: 'images/store/frames/frame_gold.png', desc: 'إطار ذهبي فاخر', price: 200, currency: 'coins', rarity: 'rare', effect: 'profile_frame', value: 'gold' },
-        { id: 'frame_platinum', name: 'إطار بلاتيني', imagePath: 'images/store/frames/frame_platinum.png', desc: 'إطار بلاتيني نادر', price: 350, currency: 'coins', rarity: 'epic', effect: 'profile_frame', value: 'platinum' },
-        { id: 'frame_diamond', name: 'إطار ألماس', imagePath: 'images/store/frames/frame_diamond.png', desc: 'إطار ألماسي متلألئ', price: 30, currency: 'gems', rarity: 'epic', effect: 'profile_frame', value: 'diamond' },
-        { id: 'frame_fire', name: 'إطار ناري', imagePath: 'images/store/frames/frame_fire.png', desc: 'إطار ناري متوهج', price: 50, currency: 'gems', rarity: 'legendary', effect: 'profile_frame', value: 'fire' },
-        { id: 'frame_legend', name: 'إطار أسطوري', imagePath: 'images/store/frames/frame_legend.png', desc: 'إطار أسطوري نادر', price: 100, currency: 'gems', rarity: 'legendary', effect: 'profile_frame', value: 'legend' },
-        { id: 'frame_glow', name: 'إطار متوهج', imagePath: 'images/store/frames/frame_glow.png', desc: 'إطار متوهج بأنيميشن', price: 80, currency: 'gems', rarity: 'epic', effect: 'profile_frame', value: 'glow' }
-    ];
+// ============================================================
+// 6. إطارات الملف الشخصي (Frames) - النسخة الكاملة
+// ============================================================
+const frames = [
+    { id: 'frame_bronze', name: 'إطار برونزي', imagePath: 'images/store/frames/frame_bronze.png', desc: 'إطار برونزي أنيق', price: 50, currency: 'coins', rarity: 'common', effect: 'profile_frame', value: 'bronze' },
+    { id: 'frame_silver', name: 'إطار فضي', imagePath: 'images/store/frames/frame_silver.png', desc: 'إطار فضي لامع', price: 100, currency: 'coins', rarity: 'uncommon', effect: 'profile_frame', value: 'silver' },
+    { id: 'frame_gold', name: 'إطار ذهبي', imagePath: 'images/store/frames/frame_gold.png', desc: 'إطار ذهبي فاخر', price: 200, currency: 'coins', rarity: 'rare', effect: 'profile_frame', value: 'gold' },
+    { id: 'frame_premium_gold', name: 'إطار ذهبي فاخر', imagePath: 'images/store/frames/frame_premium_gold.png', desc: 'إطار ذهبي لامع للمتألقين', price: 250, currency: 'coins', rarity: 'rare', effect: 'profile_frame', value: 'gold' },
+    { id: 'frame_platinum', name: 'إطار بلاتيني', imagePath: 'images/store/frames/frame_platinum.png', desc: 'إطار بلاتيني نادر', price: 350, currency: 'coins', rarity: 'epic', effect: 'profile_frame', value: 'platinum' },
+    { id: 'frame_silver_shine', name: 'إطار فضي لامع', imagePath: 'images/store/frames/frame_silver_shine.png', desc: 'إطار فضي براق', price: 180, currency: 'coins', rarity: 'rare', effect: 'profile_frame', value: 'silver' },
+    { id: 'frame_diamond', name: 'إطار ألماس', imagePath: 'images/store/frames/frame_diamond.png', desc: 'إطار ألماسي متلألئ', price: 30, currency: 'gems', rarity: 'epic', effect: 'profile_frame', value: 'diamond' },
+    { id: 'frame_diamond_elite', name: 'إطار ألماسي راقٍ', imagePath: 'images/store/frames/frame_diamond_elite.png', desc: 'إطار ألماسي للنخبة', price: 50, currency: 'gems', rarity: 'epic', effect: 'profile_frame', value: 'diamond' },
+    { id: 'frame_fire', name: 'إطار ناري', imagePath: 'images/store/frames/frame_fire.png', desc: 'إطار ناري متوهج', price: 50, currency: 'gems', rarity: 'epic', effect: 'profile_frame', value: 'fire' },
+    { id: 'frame_glow', name: 'إطار متوهج', imagePath: 'images/store/frames/frame_glow.png', desc: 'إطار متوهج بأنيميشن', price: 80, currency: 'gems', rarity: 'epic', effect: 'profile_frame', value: 'glow' },
+    { id: 'frame_legend', name: 'إطار أسطوري', imagePath: 'images/store/frames/frame_legend.png', desc: 'إطار أسطوري نادر', price: 100, currency: 'gems', rarity: 'legendary', effect: 'profile_frame', value: 'legend' },
+    { id: 'frame_legendary_gold', name: 'إطار ذهبي أسطوري', imagePath: 'images/store/frames/frame_legendary_gold.png', desc: 'إطار ذهبي أسطوري', price: 120, currency: 'gems', rarity: 'legendary', effect: 'profile_frame', value: 'gold' },
+    { id: 'frame_purple_glow', name: 'إطار متوهج أرجواني', imagePath: 'images/store/frames/frame_purple_glow.png', desc: 'إطار أرجواني متوهج', price: 150, currency: 'gems', rarity: 'legendary', effect: 'profile_frame', value: 'glow' },
+    { id: 'frame_king', name: 'إطار الملك', imagePath: 'images/store/frames/frame_king.png', desc: 'إطار الملك المتوج', price: 200, currency: 'gems', rarity: 'legendary', effect: 'profile_frame', value: 'gold' }
+];
 
-    frames.forEach(b => items.push({ 
-        ...b, 
-        category: 'frames', 
-        duration: 'permanent', 
-        effectType: b.effect, 
-        effectValue: b.value, 
-        stackable: false 
-    }));
+frames.forEach(b => items.push({ 
+    ...b, 
+    category: 'frames', 
+    duration: 'permanent', 
+    effectType: b.effect, 
+    effectValue: b.value, 
+    stackable: false 
+}));
 
-    // ============================================================
-    // 7. خلفيات الملف الشخصي (Backgrounds)
-    // ============================================================
+// ============================================================
+// 7. خلفيات الملف الشخصي (Backgrounds) - النسخة الكاملة
+// ============================================================
 const backgrounds = [
-    { 
-        id: 'bg_stadium', 
-        name: 'خلفية ملعب', 
-        imagePath: 'images/store/backgrounds/bg_stadium.png',
-        desc: 'خلفية ملعب كرة قدم', 
-        price: 120, 
-        currency: 'coins', 
-        rarity: 'common', 
-        effect: 'profile_bg', 
-        value: 'stadium',
-        previewImage: 'images/store/backgrounds/preview/bg_stadium_preview.jpg'
-    },
-    { 
-        id: 'bg_crowd', 
-        name: 'خلفية جماهير', 
-        imagePath: 'images/store/backgrounds/bg_crowd.png',
-        desc: 'خلفية مع جماهير', 
-        price: 150, 
-        currency: 'coins', 
-        rarity: 'uncommon', 
-        effect: 'profile_bg', 
-        value: 'crowd',
-        previewImage: 'images/store/backgrounds/preview/bg_crowd_preview.jpg'
-    },
-    { 
-        id: 'bg_trophy', 
-        name: 'خلفية كأس', 
-        imagePath: 'images/store/backgrounds/bg_trophy.png',
-        desc: 'خلفية مع الكؤوس', 
-        price: 200, 
-        currency: 'coins', 
-        rarity: 'rare', 
-        effect: 'profile_bg', 
-        value: 'trophy',
-        previewImage: 'images/store/backgrounds/preview/bg_trophy_preview.jpg'
-    },
-    { 
-        id: 'bg_night', 
-        name: 'خلفية ليلية', 
-        imagePath: 'images/store/backgrounds/bg_night.png',
-        desc: 'خلفية ليلية هادئة', 
-        price: 180, 
-        currency: 'coins', 
-        rarity: 'uncommon', 
-        effect: 'profile_bg', 
-        value: 'night',
-        previewImage: 'images/store/backgrounds/preview/bg_night_preview.jpg'
-    },
-    { 
-        id: 'bg_sunset', 
-        name: 'خلفية غروب', 
-        imagePath: 'images/store/backgrounds/bg_sunset.png',
-        desc: 'خلفية غروب شمس', 
-        price: 220, 
-        currency: 'coins', 
-        rarity: 'rare', 
-        effect: 'profile_bg', 
-        value: 'sunset',
-        previewImage: 'images/store/backgrounds/preview/bg_sunset_preview.jpg'
-    },
-    { 
-        id: 'bg_sky', 
-        name: 'خلفية سماء', 
-        imagePath: 'images/store/backgrounds/bg_sky.png',
-        desc: 'خلفية سماء صافية', 
-        price: 130, 
-        currency: 'coins', 
-        rarity: 'common', 
-        effect: 'profile_bg', 
-        value: 'sky',
-        previewImage: 'images/store/backgrounds/preview/bg_sky_preview.jpg'
-    },
-    { 
-        id: 'bg_lights', 
-        name: 'خلفية أضواء', 
-        imagePath: 'images/store/backgrounds/bg_lights.png',
-        desc: 'خلفية أضواء ملونة', 
-        price: 300, 
-        currency: 'coins', 
-        rarity: 'epic', 
-        effect: 'profile_bg', 
-        value: 'lights',
-        previewImage: 'images/store/backgrounds/preview/bg_lights_preview.jpg'
-    },
-    { 
-        id: 'bg_legend', 
-        name: 'خلفية أسطورية', 
-        imagePath: 'images/store/backgrounds/bg_legend.png',
-        desc: 'خلفية أسطورية نادرة', 
-        price: 40, 
-        currency: 'gems', 
-        rarity: 'legendary', 
-        effect: 'profile_bg', 
-        value: 'legend_bg',
-        previewImage: 'images/store/backgrounds/preview/bg_legend_preview.jpg'
-    },
-    { 
-        id: 'bg_wizard_library', 
-        name: '📚 مكتبة السحرة', 
-        imagePath: 'images/store/backgrounds/bg_wizard_library.png',
-        desc: 'مكتبة غامضة مليئة بكتب السحر والأسرار القديمة', 
-        price: 350, 
-        currency: 'coins', 
-        rarity: 'epic', 
-        effect: 'profile_bg', 
-        value: 'wizard_library'
-    },
-    { 
-        id: 'bg_neon_city', 
-        name: '🌃 مدينة النيون', 
-        imagePath: 'images/store/backgrounds/bg_neon_city.png',
-        desc: 'شوارع مضاءة بأضواء النيون في ليلة لا تنسى', 
-        price: 400, 
-        currency: 'coins', 
-        rarity: 'epic', 
-        effect: 'profile_bg', 
-        value: 'neon_city'
-    },
-    { 
-        id: 'bg_world_explorer', 
-        name: '🗺️ مستكشف العالم', 
-        imagePath: 'images/store/backgrounds/bg_world_explorer.png',
-        desc: 'خريطة قديمة ومغامرات في أقاصي الدنيا', 
-        price: 280, 
-        currency: 'coins', 
-        rarity: 'rare', 
-        effect: 'profile_bg', 
-        value: 'world_explorer'
-    },
-    { 
-        id: 'bg_moon_castle', 
-        name: '🌙 قلعة القمر', 
-        imagePath: 'images/store/backgrounds/bg_moon_castle.png',
-        desc: 'قلعة أسطورية تحت ضوء القمر الساطع', 
-        price: 500, 
-        currency: 'coins', 
-        rarity: 'epic', 
-        effect: 'profile_bg', 
-        value: 'moon_castle'
-    },
-    { 
-        id: 'bg_winter_night', 
-        name: '❄️ ليلة الشتاء', 
-        imagePath: 'images/store/backgrounds/bg_winter_night.png',
-        desc: 'ليلة شتوية هادئة مع تساقط الثلوج', 
-        price: 250, 
-        currency: 'coins', 
-        rarity: 'rare', 
-        effect: 'profile_bg', 
-        value: 'winter_night'
-    },
-    { 
-        id: 'bg_pirate_bay', 
-        name: '🏴‍☠️ خليج القراصنة', 
-        imagePath: 'images/store/backgrounds/bg_pirate_bay.png',
-        desc: 'مغامرات القراصنة في خليج الكاريبي', 
-        price: 320, 
-        currency: 'coins', 
-        rarity: 'rare', 
-        effect: 'profile_bg', 
-        value: 'pirate_bay'
-    },
-    { 
-        id: 'bg_moon_base', 
-        name: '🚀 قاعدة القمر', 
-        imagePath: 'images/store/backgrounds/bg_moon_base.png',
-        desc: 'قاعدة فضائية متطورة على سطح القمر', 
-        price: 450, 
-        currency: 'coins', 
-        rarity: 'epic', 
-        effect: 'profile_bg', 
-        value: 'moon_base'
-    },
-    { 
-        id: 'bg_ocean_deep', 
-        name: '🌊 أعماق المحيط', 
-        imagePath: 'images/store/backgrounds/bg_ocean_deep.png',
-        desc: 'استكشاف أعماق المحيطات وأسرارها', 
-        price: 300, 
-        currency: 'coins', 
-        rarity: 'rare', 
-        effect: 'profile_bg', 
-        value: 'ocean_deep'
-    },
-    { 
-        id: 'bg_pharaoh_civilization', 
-        name: '🏛️ حضارة الفراعنة', 
-        imagePath: 'images/store/backgrounds/bg_pharaoh_civilization.png',
-        desc: 'أهرامات ومعابد مصر القديمة', 
-        price: 380, 
-        currency: 'coins', 
-        rarity: 'epic', 
-        effect: 'profile_bg', 
-        value: 'pharaoh_civilization'
-    },
-    { 
-        id: 'bg_samurai_gardens', 
-        name: '🌸 حدائق الساموراي', 
-        imagePath: 'images/store/backgrounds/bg_samurai_gardens.png',
-        desc: 'حدائق يابانية هادئة مع لمسات الساموراي', 
-        price: 280, 
-        currency: 'coins', 
-        rarity: 'rare', 
-        effect: 'profile_bg', 
-        value: 'samurai_gardens'
-    }
+    // عادية
+    { id: 'bg_stadium', name: 'خلفية ملعب', imagePath: 'images/store/backgrounds/bg_stadium.png', desc: 'خلفية ملعب كرة قدم', price: 120, currency: 'coins', rarity: 'common', effect: 'profile_bg', value: 'stadium' },
+    { id: 'bg_sky', name: 'خلفية سماء', imagePath: 'images/store/backgrounds/bg_sky.png', desc: 'خلفية سماء صافية', price: 130, currency: 'coins', rarity: 'common', effect: 'profile_bg', value: 'sky' },
+    { id: 'bg_forest', name: 'خلفية غابة', imagePath: 'images/store/backgrounds/bg_forest.png', desc: 'خلفية غابة خضراء', price: 140, currency: 'coins', rarity: 'common', effect: 'profile_bg', value: 'forest' },
+    // غير عادية
+    { id: 'bg_crowd', name: 'خلفية جماهير', imagePath: 'images/store/backgrounds/bg_crowd.png', desc: 'خلفية مع جماهير', price: 150, currency: 'coins', rarity: 'uncommon', effect: 'profile_bg', value: 'crowd' },
+    { id: 'bg_night', name: 'خلفية ليلية', imagePath: 'images/store/backgrounds/bg_night.png', desc: 'خلفية ليلية هادئة', price: 180, currency: 'coins', rarity: 'uncommon', effect: 'profile_bg', value: 'night' },
+    { id: 'bg_beach', name: 'خلفية شاطئ', imagePath: 'images/store/backgrounds/bg_beach.png', desc: 'خلفية شاطئ جميل', price: 160, currency: 'coins', rarity: 'uncommon', effect: 'profile_bg', value: 'beach' },
+    // نادرة
+    { id: 'bg_trophy', name: 'خلفية كأس', imagePath: 'images/store/backgrounds/bg_trophy.png', desc: 'خلفية مع الكؤوس', price: 200, currency: 'coins', rarity: 'rare', effect: 'profile_bg', value: 'trophy' },
+    { id: 'bg_sunset', name: 'خلفية غروب', imagePath: 'images/store/backgrounds/bg_sunset.png', desc: 'خلفية غروب شمس', price: 220, currency: 'coins', rarity: 'rare', effect: 'profile_bg', value: 'sunset' },
+    { id: 'bg_world_explorer', name: 'مستكشف العالم', imagePath: 'images/store/backgrounds/bg_world_explorer.png', desc: 'خريطة قديمة ومغامرات', price: 280, currency: 'coins', rarity: 'rare', effect: 'profile_bg', value: 'world_explorer' },
+    { id: 'bg_winter_night', name: 'ليلة الشتاء', imagePath: 'images/store/backgrounds/bg_winter_night.png', desc: 'ليلة شتوية هادئة مع تساقط الثلوج', price: 250, currency: 'coins', rarity: 'rare', effect: 'profile_bg', value: 'winter_night' },
+    { id: 'bg_pirate_bay', name: 'خليج القراصنة', imagePath: 'images/store/backgrounds/bg_pirate_bay.png', desc: 'مغامرات القراصنة في خليج الكاريبي', price: 320, currency: 'coins', rarity: 'rare', effect: 'profile_bg', value: 'pirate_bay' },
+    { id: 'bg_ocean_deep', name: 'أعماق المحيط', imagePath: 'images/store/backgrounds/bg_ocean_deep.png', desc: 'استكشاف أعماق المحيطات وأسرارها', price: 300, currency: 'coins', rarity: 'rare', effect: 'profile_bg', value: 'ocean_deep' },
+    { id: 'bg_samurai_gardens', name: 'حدائق الساموراي', imagePath: 'images/store/backgrounds/bg_samurai_gardens.png', desc: 'حدائق يابانية هادئة مع لمسات الساموراي', price: 280, currency: 'coins', rarity: 'rare', effect: 'profile_bg', value: 'samurai_gardens' },
+    // أسطورية
+    { id: 'bg_lights', name: 'خلفية أضواء', imagePath: 'images/store/backgrounds/bg_lights.png', desc: 'خلفية أضواء ملونة', price: 300, currency: 'coins', rarity: 'epic', effect: 'profile_bg', value: 'lights' },
+    { id: 'bg_stadium_night', name: 'ملعب ليلي', imagePath: 'images/store/backgrounds/bg_stadium_night.png', desc: 'خلفية ملعب تحت الأضواء الساطعة', price: 300, currency: 'coins', rarity: 'epic', effect: 'profile_bg', value: 'stadium_night' },
+    { id: 'bg_wizard_library', name: 'مكتبة السحرة', imagePath: 'images/store/backgrounds/bg_wizard_library.png', desc: 'مكتبة غامضة مليئة بكتب السحر والأسرار القديمة', price: 350, currency: 'coins', rarity: 'epic', effect: 'profile_bg', value: 'wizard_library' },
+    { id: 'bg_neon_city', name: 'مدينة النيون', imagePath: 'images/store/backgrounds/bg_neon_city.png', desc: 'شوارع مضاءة بأضواء النيون في ليلة لا تنسى', price: 400, currency: 'coins', rarity: 'epic', effect: 'profile_bg', value: 'neon_city' },
+    { id: 'bg_moon_castle', name: 'قلعة القمر', imagePath: 'images/store/backgrounds/bg_moon_castle.png', desc: 'قلعة أسطورية تحت ضوء القمر الساطع', price: 500, currency: 'coins', rarity: 'epic', effect: 'profile_bg', value: 'moon_castle' },
+    { id: 'bg_moon_base', name: 'قاعدة القمر', imagePath: 'images/store/backgrounds/bg_moon_base.png', desc: 'قاعدة فضائية متطورة على سطح القمر', price: 450, currency: 'coins', rarity: 'epic', effect: 'profile_bg', value: 'moon_base' },
+    { id: 'bg_pharaoh_civilization', name: 'حضارة الفراعنة', imagePath: 'images/store/backgrounds/bg_pharaoh_civilization.png', desc: 'أهرامات ومعابد مصر القديمة', price: 380, currency: 'coins', rarity: 'epic', effect: 'profile_bg', value: 'pharaoh_civilization' },
+    // خرافية
+    { id: 'bg_galaxy', name: 'خلفية مجرة', imagePath: 'images/store/backgrounds/bg_galaxy.png', desc: 'خلفية مجرة درب التبانة الساحرة', price: 400, currency: 'coins', rarity: 'legendary', effect: 'profile_bg', value: 'galaxy' },
+    { id: 'bg_legend', name: 'خلفية أسطورية', imagePath: 'images/store/backgrounds/bg_legend.png', desc: 'خلفية أسطورية نادرة', price: 40, currency: 'gems', rarity: 'legendary', effect: 'profile_bg', value: 'legend_bg' }
 ];
 
 backgrounds.forEach(b => items.push({ 
@@ -25357,15 +26645,33 @@ backgrounds.forEach(b => items.push({
     stackable: false 
 }));
 
+// ============================================================
+// 8. الصور الشخصية (Avatars) - جديدة
+// ============================================================
+const avatars = [
+    { id: 'avatar_warrior', name: 'صورة محارب', imagePath: 'images/store/avatars/avatar_warrior.png', desc: 'صورة محارب شجاع', price: 100, currency: 'coins', rarity: 'common', effect: 'profile_avatar', value: 'warrior' },
+    { id: 'avatar_king', name: 'صورة ملك', imagePath: 'images/store/avatars/avatar_king.png', desc: 'صورة ملك متوج', price: 200, currency: 'coins', rarity: 'uncommon', effect: 'profile_avatar', value: 'king' },
+    { id: 'avatar_knight', name: 'صورة فارس', imagePath: 'images/store/avatars/avatar_knight.png', desc: 'صورة فارس مدرع', price: 150, currency: 'coins', rarity: 'common', effect: 'profile_avatar', value: 'knight' },
+    { id: 'avatar_wizard', name: 'صورة ساحر', imagePath: 'images/store/avatars/avatar_wizard.png', desc: 'صورة ساحر حكيم', price: 180, currency: 'coins', rarity: 'uncommon', effect: 'profile_avatar', value: 'wizard' },
+    { id: 'avatar_princess', name: 'صورة أميرة', imagePath: 'images/store/avatars/avatar_princess.png', desc: 'صورة أميرة جميلة', price: 200, currency: 'coins', rarity: 'uncommon', effect: 'profile_avatar', value: 'princess' },
+    { id: 'avatar_dragon', name: 'صورة تنين', imagePath: 'images/store/avatars/avatar_dragon.png', desc: 'صورة تنين أسطوري', price: 300, currency: 'coins', rarity: 'rare', effect: 'profile_avatar', value: 'dragon' },
+    { id: 'avatar_ninja', name: 'صورة نينجا', imagePath: 'images/store/avatars/avatar_ninja.png', desc: 'صورة نينجا خفي', price: 250, currency: 'coins', rarity: 'rare', effect: 'profile_avatar', value: 'ninja' },
+    { id: 'avatar_pirate', name: 'صورة قرصان', imagePath: 'images/store/avatars/avatar_pirate.png', desc: 'صورة قرصان مغامر', price: 220, currency: 'coins', rarity: 'uncommon', effect: 'profile_avatar', value: 'pirate' },
+    { id: 'avatar_robot', name: 'صورة روبوت', imagePath: 'images/store/avatars/avatar_robot.png', desc: 'صورة روبوت متطور', price: 280, currency: 'coins', rarity: 'rare', effect: 'profile_avatar', value: 'robot' },
+    { id: 'avatar_angel', name: 'صورة ملاك', imagePath: 'images/store/avatars/avatar_angel.png', desc: 'صورة ملاك نقي', price: 350, currency: 'coins', rarity: 'epic', effect: 'profile_avatar', value: 'angel' },
+    { id: 'avatar_ghost', name: 'صورة شبح', imagePath: 'images/store/avatars/avatar_ghost.png', desc: 'صورة شبح غامض', price: 30, currency: 'gems', rarity: 'rare', effect: 'profile_avatar', value: 'ghost' },
+    { id: 'avatar_demon', name: 'صورة عفريت', imagePath: 'images/store/avatars/avatar_demon.png', desc: 'صورة عفريت قوي', price: 40, currency: 'gems', rarity: 'epic', effect: 'profile_avatar', value: 'demon' },
+    { id: 'avatar_god', name: 'صورة إله', imagePath: 'images/store/avatars/avatar_god.png', desc: 'صورة إله قدير', price: 50, currency: 'gems', rarity: 'legendary', effect: 'profile_avatar', value: 'god' }
+];
 
-    backgrounds.forEach(b => items.push({ 
-        ...b, 
-        category: 'backgrounds', 
-        duration: 'permanent', 
-        effectType: b.effect, 
-        effectValue: b.value, 
-        stackable: false 
-    }));
+avatars.forEach(b => items.push({ 
+    ...b, 
+    category: 'avatars', 
+    duration: 'permanent', 
+    effectType: b.effect, 
+    effectValue: b.value, 
+    stackable: false 
+}));
 
     // ============================================================
     // 8. شارات (Badges)
@@ -26714,6 +28020,7 @@ _renderStoreFilters(activeFilter = 'all') {
         boosts: '⚡ تعزيزات',
         room_boosts: '🏠 غرف',
         tickets: '🎫 تذاكر',
+        avatars: '👤 صور شخصية',
         frames: '🖼️ إطارات',
         backgrounds: '🌄 خلفيات',
         badges: '🏅 شارات',
@@ -27027,43 +28334,178 @@ _refreshActiveBoosts() {
 },
 
 /**
- * البحث عن مستخدم وإضافة صديق
+ * البحث عن مستخدمين وإضافتهم كأصدقاء
+ * @param {string} query - نص البحث
  */
 async _searchAndAddFriend(query) {
+    if (!query || query.length < 2) {
+        showToast('يرجى إدخال حرفين على الأقل للبحث', 'info');
+        return;
+    }
+
+    const container = document.getElementById('friendsSearchResults');
+    if (!container) {
+        console.warn('⚠️ friendsSearchResults not found');
+        return;
+    }
+
+    // عرض حالة البحث
+    container.style.display = 'block';
+    container.innerHTML = `
+        <div style="text-align:center;padding:0.8rem;color:var(--gray);">
+            <i class="fas fa-spinner fa-spin" style="font-size:1.2rem;display:block;margin-bottom:0.3rem;"></i>
+            جاري البحث عن "<strong>${query}</strong>"...
+        </div>
+    `;
+
     try {
-        const snapshot = await db.collection('users')
-            .where('username', '>=', query)
-            .where('username', '<=', query + '\uf8ff')
-            .limit(5)
-            .get();
-
-        const results = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            if (doc.id !== AuthService.currentUser.uid) {
-                results.push({ id: doc.id, ...data });
-            }
-        });
-
-        const container = document.getElementById('friendsSearchResults');
-        if (results.length === 0) {
-            container.style.display = 'block';
-            container.innerHTML = '<div class="text-gray">🔍 لا توجد نتائج</div>';
+        const user = AuthService.currentUser;
+        if (!user) {
+            showToast('يجب تسجيل الدخول أولاً', 'error');
+            container.innerHTML = `
+                <div style="text-align:center;padding:1rem;color:var(--secondary);">
+                    <i class="fas fa-exclamation-circle"></i> يجب تسجيل الدخول أولاً
+                </div>
+            `;
             return;
         }
 
-        container.style.display = 'block';
-        container.innerHTML = results.map(u => `
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem;border-bottom:1px solid var(--glass-border);">
-                <span><strong>${u.displayName || u.username}</strong> <span class="text-gray">@${u.username}</span></span>
-                <button class="btn btn-xs btn-success" onclick="App._sendFriendRequest('${u.id}')">
-                    <i class="fas fa-user-plus"></i> إضافة
+        const queryLower = query.toLowerCase().trim();
+        const friends = user.friends || [];
+        const friendIds = friends.map(f => f.id || f);
+
+        // ✅ جلب طلبات الصداقة المعلقة
+        let pendingRequests = [];
+        try {
+            const pendingSnap = await db.collection('friendRequests')
+                .where('from', '==', user.uid)
+                .where('status', '==', 'pending')
+                .get();
+            pendingSnap.forEach(doc => {
+                pendingRequests.push(doc.data().to);
+            });
+        } catch (e) {
+            console.warn('⚠️ Could not fetch pending requests:', e);
+        }
+
+        // ✅ البحث في Firebase
+        let results = [];
+        
+        // 1. البحث في username
+        try {
+            const snapshot = await db.collection('users')
+                .where('username', '>=', queryLower)
+                .where('username', '<=', queryLower + '\uf8ff')
+                .limit(15)
+                .get();
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                if (doc.id !== user.uid) {
+                    results.push({ 
+                        id: doc.id, 
+                        uid: doc.id,
+                        ...data,
+                        isFriend: friendIds.includes(doc.id),
+                        isPending: pendingRequests.includes(doc.id),
+                        displayName: data.displayName || data.fullName || data.username || 'مجهول',
+                        fullName: data.fullName || data.displayName || data.username || 'مجهول',
+                        username: data.username || 'guest'
+                    });
+                }
+            });
+        } catch (e) {
+            console.warn('⚠️ Username search error:', e);
+        }
+
+        // 2. إذا لم تكن هناك نتائج، نبحث في displayName
+        if (results.length < 5) {
+            try {
+                const allUsers = await db.collection('users').get();
+                allUsers.forEach(doc => {
+                    const data = doc.data();
+                    if (doc.id !== user.uid && !results.some(r => r.id === doc.id)) {
+                        const name = (data.displayName || data.fullName || '').toLowerCase();
+                        if (name.includes(queryLower)) {
+                            results.push({ 
+                                id: doc.id, 
+                                uid: doc.id,
+                                ...data,
+                                isFriend: friendIds.includes(doc.id),
+                                isPending: pendingRequests.includes(doc.id),
+                                displayName: data.displayName || data.fullName || data.username || 'مجهول',
+                                fullName: data.fullName || data.displayName || data.username || 'مجهول',
+                                username: data.username || 'guest'
+                            });
+                        }
+                    }
+                });
+            } catch (e) {
+                console.warn('⚠️ DisplayName search error:', e);
+            }
+        }
+
+        // ✅ عرض النتائج
+        if (results.length === 0) {
+            container.innerHTML = `
+                <div style="text-align:center;padding:1.5rem;color:var(--gray);">
+                    <i class="fas fa-search" style="font-size:2rem;display:block;margin-bottom:0.5rem;color:var(--gray-dark);"></i>
+                    لا توجد نتائج لـ "<strong>${query}</strong>"
+                    <div style="font-size:0.8rem;margin-top:0.3rem;color:var(--gray-dark);">
+                        تأكد من صحة الإملاء أو جرب كلمات بحث مختلفة
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        // ✅ عرض النتائج باستخدام البطاقة المصغرة
+        let html = `
+            <div style="margin-top:0.5rem;padding:0.5rem 0.5rem 0.2rem;background:var(--glass);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;padding:0 0.3rem;">
+                    <span style="font-weight:700;font-size:0.85rem;color:var(--gray);">
+                        <i class="fas fa-search"></i> نتائج البحث (${results.length})
+                    </span>
+                    <button class="btn btn-xs btn-outline" onclick="document.getElementById('friendsSearchResults').style.display='none'" style="font-size:0.6rem;padding:0.1rem 0.5rem;">
+                        <i class="fas fa-times"></i> إغلاق
+                    </button>
+                </div>
+                <div class="player-cards-grid">
+        `;
+
+        results.forEach(result => {
+            html += this._renderPlayerCard(result, {
+                showActions: true,
+                context: 'search',
+                isFriend: result.isFriend || false,
+                isPending: result.isPending || false,
+                extraInfo: `⭐ ${result.totalScore || 0} نقطة`
+            });
+        });
+
+        html += `
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = html;
+
+        // ✅ التمرير إلى نتائج البحث
+        setTimeout(() => {
+            container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 200);
+
+    } catch (error) {
+        console.error('❌ Search error:', error);
+        container.innerHTML = `
+            <div style="text-align:center;padding:1.5rem;color:var(--secondary);">
+                <i class="fas fa-exclamation-circle" style="font-size:1.5rem;display:block;margin-bottom:0.3rem;"></i>
+                خطأ في البحث: ${error.message}
+                <button class="btn btn-xs btn-outline mt-1" onclick="App._searchAndAddFriend('${query}')" style="display:block;margin:0.5rem auto 0;">
+                    <i class="fas fa-sync"></i> إعادة المحاولة
                 </button>
             </div>
-        `).join('');
-
-    } catch (e) {
-        showToast('❌ خطأ في البحث: ' + e.message, 'error');
+        `;
     }
 },
 
@@ -27241,7 +28683,10 @@ async _purchaseItem(itemId, quantity = 1) {
 },
 
 async _toggleActiveItem(itemId) {
-    if (!AuthService.currentUser) return;
+    if (!AuthService.currentUser) {
+        showToast('يجب تسجيل الدخول أولاً', 'error');
+        return;
+    }
 
     const user = AuthService.currentUser;
     const inventory = user.inventory || [];
@@ -27252,74 +28697,105 @@ async _toggleActiveItem(itemId) {
     }
 
     const storeItem = DataManager.data.storeItems.find(i => i.id === itemId);
-    if (!storeItem) return;
+    if (!storeItem) {
+        showToast('العنصر غير موجود', 'error');
+        return;
+    }
 
     const activeItems = user.activeItems || [];
     const activeDetails = user.activeItemDetails || [];
     const isActive = activeItems.includes(itemId);
 
-    if (isActive) {
-        // إلغاء التفعيل
-        const newActiveItems = activeItems.filter(id => id !== itemId);
-        const newActiveDetails = activeDetails.filter(d => d.itemId !== itemId);
-        await AuthService.updateUser({
-            activeItems: newActiveItems,
-            activeItemDetails: newActiveDetails
-        });
-        showToast(`تم إلغاء تفعيل "${storeItem.name}"`, 'info');
-    } else {
-        // تفعيل العنصر
-        let newActiveItems = [...activeItems];
-        let newActiveDetails = [...activeDetails];
+    try {
+        if (isActive) {
+            // ===== إلغاء التفعيل =====
+            const newActiveItems = activeItems.filter(id => id !== itemId);
+            const newActiveDetails = activeDetails.filter(d => d.itemId !== itemId);
+            
+            // حفظ في Firestore
+            await AuthService.updateUser({
+                activeItems: newActiveItems,
+                activeItemDetails: newActiveDetails
+            });
+            
+            // تحديث الكائن المحلي
+            AuthService.currentUser.activeItems = newActiveItems;
+            AuthService.currentUser.activeItemDetails = newActiveDetails;
+            
+            showToast(`تم إلغاء تفعيل "${storeItem.name}"`, 'info');
+        } else {
+            // ===== تفعيل العنصر =====
+            let newActiveItems = [...activeItems];
+            let newActiveDetails = [...activeDetails];
 
-        // إذا كان من نفس الفئة (إطارات، خلفيات، شارات، سمات) نزيل السابق
-        const category = storeItem.category;
-        if (['frames', 'backgrounds', 'badges', 'themes'].includes(category)) {
-            const toRemove = activeDetails.filter(d => {
-                const s = DataManager.data.storeItems.find(i => i.id === d.itemId);
-                return s?.category === category;
+            // إذا كان من نفس الفئة (إطارات، خلفيات، شارات، سمات، صور) نزيل السابق
+            const category = storeItem.category;
+            const exclusiveCategories = ['frames', 'backgrounds', 'badges', 'themes', 'avatars'];
+            if (exclusiveCategories.includes(category)) {
+                const toRemove = activeDetails.filter(d => {
+                    const s = DataManager.data.storeItems.find(i => i.id === d.itemId);
+                    return s?.category === category;
+                });
+                toRemove.forEach(d => {
+                    newActiveItems = newActiveItems.filter(id => id !== d.itemId);
+                    newActiveDetails = newActiveDetails.filter(detail => detail.itemId !== d.itemId);
+                });
+            }
+
+            // إضافة العنصر الجديد مع تفاصيل الصلاحية
+            let expiry = null;
+            let remainingRounds = null;
+            let durationType = storeItem.durationType || 'time';
+            let durationValue = storeItem.durationValue || 0;
+
+            if (durationType === 'time' && durationValue > 0) {
+                expiry = new Date(Date.now() + durationValue * 60 * 60 * 1000).toISOString();
+            } else if (durationType === 'rounds' && durationValue > 0) {
+                remainingRounds = durationValue;
+            }
+
+            newActiveItems.push(itemId);
+            newActiveDetails.push({
+                itemId: itemId,
+                type: storeItem.effectType,
+                multiplier: storeItem.effectValue || 1,
+                durationType: durationType,
+                expiresAt: expiry,
+                remainingRounds: remainingRounds,
+                activatedAt: new Date().toISOString()
             });
-            toRemove.forEach(d => {
-                newActiveItems = newActiveItems.filter(id => id !== d.itemId);
-                newActiveDetails = newActiveDetails.filter(detail => detail.itemId !== d.itemId);
+
+            // حفظ في Firestore
+            await AuthService.updateUser({
+                activeItems: newActiveItems,
+                activeItemDetails: newActiveDetails
             });
+
+            // تحديث الكائن المحلي
+            AuthService.currentUser.activeItems = newActiveItems;
+            AuthService.currentUser.activeItemDetails = newActiveDetails;
+
+            showToast(`✅ تم تفعيل "${storeItem.name}"`, 'success');
         }
 
-        // إضافة العنصر الجديد مع تفاصيل الصلاحية
-        let expiry = null;
-        let remainingRounds = null;
-        let durationType = storeItem.durationType || 'time';
-        let durationValue = storeItem.durationValue || 0;
-
-        if (durationType === 'time') {
-            expiry = new Date(Date.now() + durationValue * 60 * 60 * 1000).toISOString();
-        } else if (durationType === 'rounds') {
-            remainingRounds = durationValue;
+        // تحديث الواجهات
+        this._applyUserCustomizations(AuthService.currentUser);
+        this._updateProfileInventory(AuthService.currentUser);
+        this._renderStore(DataManager.data.storeItems || []);
+        
+        // تحديث المقتنيات إذا كان التبويب مفتوحاً
+        const activeSubtab = document.querySelector('.collectibles-subtab.active');
+        if (activeSubtab) {
+            this._renderCollectibles(activeSubtab.dataset.subtab);
         }
+        
+        // تحديث الإشعارات
+        AuthService._notifyListeners();
 
-        newActiveItems.push(itemId);
-        newActiveDetails.push({
-            itemId: itemId,
-            type: storeItem.effectType,
-            multiplier: storeItem.effectValue || 1,
-            durationType: durationType,
-            expiresAt: expiry,
-            remainingRounds: remainingRounds,
-            activatedAt: new Date().toISOString()
-        });
-
-        await AuthService.updateUser({
-            activeItems: newActiveItems,
-            activeItemDetails: newActiveDetails
-        });
-
-        showToast(`✅ تم تفعيل "${storeItem.name}"`, 'success');
+    } catch (e) {
+        console.error('Error toggling active item:', e);
+        showToast('❌ حدث خطأ: ' + e.message, 'error');
     }
-
-    // تحديث الواجهة
-    this._applyUserCustomizations(AuthService.currentUser);
-    this._updateProfileInventory(AuthService.currentUser);
-    this._renderStore(DataManager.data.storeItems || []);
 },
 
 // ============================================================
@@ -27825,6 +29301,10 @@ _updateUI() {
     },
 
 _onDataUpdate(data) {
+    if (!data || typeof data !== 'object') {
+        console.warn('⚠️ _onDataUpdate called with invalid data:', data);
+        return;
+    }
     // تحديث الإحصائيات في صفحة التحليلات
     const stats = DataManager.getStats();
     const user = AuthService.currentUser;
@@ -27882,6 +29362,10 @@ _onUserUpdate: function(user) {
     this._updateDashboardUI();
 
     if (user) {
+        this._applyUserCustomizations(user);
+        this._updateDashboardAvatar();
+        this._updateUserCountryDisplay(user);
+        this._refreshActiveBoosts();
         // ✅ تحميل إعدادات الأطوار من Firebase (إذا لم تكن محملة)
         if (!this._modeSettingsLoaded) {
             this._loadModeSettingsFromFirebase().then(() => {
@@ -27988,12 +29472,20 @@ _onUserUpdate: function(user) {
             rankImg.alt = rank.name;
         }
 
+        // ============================================================
+        // ✅ ✅ ✅ التعديل الرئيسي: تطبيق التخصيصات فوراً عند تحديث المستخدم
+        // ============================================================
+        this._applyUserCustomizations(user);
+
     } else {
         // ❌ المستخدم سجل الخروج
         this._updateUserUI(null);
         this._updateDashboardUI(); // ✅ تحديث الداشبورد بحالة الخروج
         const adminMenuItem = document.querySelector('.dropdown-item[data-action="admin"]');
         if (adminMenuItem) adminMenuItem.style.display = 'none';
+        
+        // ✅ تطبيق التخصيصات الفارغة (إزالة الإطارات والخلفيات)
+        this._applyUserCustomizations(null);
     }
 },
 
@@ -28588,7 +30080,7 @@ _openModal(modalId) {
         return false;
     }
     
-    // ✅ حفظ موضع التمرير الحالي
+    // حفظ موضع التمرير الحالي
     sessionStorage.setItem('modalScrollY', window.scrollY);
     
     // إغلاق جميع المودالات المفتوحة
@@ -30552,31 +32044,10 @@ if (mode === 'training_crossword') {
 },
 
 _renderFriendsPage() {
-    // ✅ نستخدم AuthService.currentUser مباشرة
     const user = AuthService.currentUser;
     
-    console.log('👤 _renderFriendsPage - Current user:', user);
-
-    // إذا لم يكن هناك مستخدم، نعرض صفحة تسجيل الدخول
     if (!user) {
-        return `
-            <div class="friends-page">
-                <div class="flex-between mb-2">
-                    <h2 style="font-size:1.8rem;font-weight:800;">
-                        <i class="fas fa-user-friends" style="color:var(--accent);"></i> 
-                        الأصدقاء
-                    </h2>
-                </div>
-                <div class="card empty-state" style="text-align:center;padding:3rem;">
-                    <i class="fas fa-user-friends" style="font-size:3rem;color:var(--gray-dark);"></i>
-                    <h3>سجل الدخول لعرض الأصدقاء</h3>
-                    <p class="text-gray">يجب تسجيل الدخول لتتمكن من رؤية أصدقائك</p>
-                    <button class="btn btn-primary mt-1" onclick="document.getElementById('loginModal').classList.add('open')">
-                        <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
-                    </button>
-                </div>
-            </div>
-        `;
+        return this._renderLoginPage('friends');
     }
 
     return `
@@ -30627,7 +32098,7 @@ _renderFriendsPage() {
             <!-- قائمة الأصدقاء -->
             <div class="card" style="padding:0;">
                 <div id="friendsListContainer" style="padding:1rem;">
-                    <!-- ✅ سيتم عرض شاشة التحميل هنا فوراً -->
+                    <!-- سيتم تعبئتها بواسطة JavaScript -->
                 </div>
             </div>
 
@@ -30635,9 +32106,11 @@ _renderFriendsPage() {
             <div class="card mt-2">
                 <div class="card-title"><i class="fas fa-user-plus"></i> إضافة صديق جديد</div>
                 <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-                    <input type="text" id="friendsAddInput" placeholder="اسم المستخدم أو البريد الإلكتروني" 
-                           style="flex:1;min-width:200px;padding:10px 16px;border-radius:12px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
-                    <button class="btn btn-primary" id="friendsAddSubmitBtn"><i class="fas fa-search"></i> بحث وإضافة</button>
+                    <input type="text" id="friendsAddInput" placeholder="ابحث باسم المستخدم..." 
+                           style="flex:1;min-width:200px;padding:10px 16px;border-radius:12px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);font-size:0.95rem;">
+                    <button class="btn btn-primary" id="friendsAddSubmitBtn">
+                        <i class="fas fa-search"></i> بحث
+                    </button>
                 </div>
                 <div id="friendsSearchResults" style="margin-top:0.8rem;display:none;"></div>
             </div>
@@ -30645,150 +32118,420 @@ _renderFriendsPage() {
     `;
 },
 
+/**
+ * تحميل صفحة الأصدقاء - نسخة مستقرة
+ */
 async _loadFriendsPage() {
+    // ✅ منع التحميل المتكرر
+    if (this._isLoadingFriends) {
+        console.log('⏳ Friends already loading, skipping...');
+        return;
+    }
+    
+    // ✅ إلغاء أي مؤقت سابق
+    if (this._friendsRefreshTimeout) {
+        clearTimeout(this._friendsRefreshTimeout);
+        this._friendsRefreshTimeout = null;
+    }
+    
+    // ✅ إلغاء أي مستمع سابق
+    if (this._friendsUnsubscribe) {
+        this._friendsUnsubscribe();
+        this._friendsUnsubscribe = null;
+    }
+
     const container = document.getElementById('friendsListContainer');
     if (!container) {
         console.warn('⚠️ friendsListContainer not found, retrying...');
-        setTimeout(() => this._loadFriendsPage(), 200);
+        this._friendsRefreshTimeout = setTimeout(() => this._loadFriendsPage(), 300);
         return;
     }
 
-    console.log('🔍 _loadFriendsPage called');
-    console.log('🔍 AuthService.currentUser:', AuthService.currentUser);
-    console.log('🔍 auth.currentUser:', auth.currentUser);
+    // ✅ بدء التحميل
+    this._isLoadingFriends = true;
 
-    // ✅ عرض شاشة تحميل فورية مع دوران
+    // ✅ عرض شاشة تحميل بسيطة
     container.innerHTML = `
-        <div style="text-align:center;padding:3rem 1rem;">
-            <div style="display:inline-block;width:50px;height:50px;border:4px solid var(--glass);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:1rem;"></div>
-            <h4 style="color:var(--gray);font-weight:400;">جاري تحميل الأصدقاء...</h4>
-            <p style="color:var(--gray-dark);font-size:0.85rem;">يرجى الانتظار</p>
+        <div class="loading-container">
+            <div class="loading-spinner"></div>
+            <p>جاري تحميل الأصدقاء...</p>
         </div>
     `;
 
-    // 1. الحصول على المستخدم من Firebase Auth مباشرة
-    const firebaseUser = auth.currentUser;
-    
-    // 2. إذا لم يكن هناك مستخدم مصادق، نعرض رسالة تسجيل الدخول
-    if (!firebaseUser || !firebaseUser.uid) {
-        container.innerHTML = `
-            <div class="empty-state" style="text-align:center;padding:2rem;">
-                <i class="fas fa-user-friends" style="font-size:2.5rem;color:var(--gray-dark);"></i>
-                <h3>سجل الدخول لعرض الأصدقاء</h3>
-                <p class="text-gray">يجب تسجيل الدخول لتتمكن من رؤية أصدقائك</p>
-                <button class="btn btn-primary mt-1" onclick="document.getElementById('loginModal').classList.add('open')">
-                    <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
-                </button>
-            </div>
-        `;
-        return;
-    }
-
     try {
-        // 3. جلب بيانات المستخدم من Firestore
-        const doc = await db.collection('users').doc(firebaseUser.uid).get();
+        const user = AuthService.currentUser;
+        if (!user || !user.uid) {
+            container.innerHTML = this._renderLoginPrompt();
+            this._isLoadingFriends = false;
+            return;
+        }
+
+        // ✅ جلب بيانات المستخدم من Firestore
+        const doc = await db.collection('users').doc(user.uid).get();
         if (!doc.exists) {
-            container.innerHTML = `
-                <div class="empty-state" style="text-align:center;padding:2rem;">
-                    <i class="fas fa-exclamation-circle" style="font-size:2.5rem;color:var(--secondary);"></i>
-                    <h3>المستخدم غير موجود</h3>
-                    <p class="text-gray">لم يتم العثور على بيانات حسابك</p>
-                    <button class="btn btn-primary mt-1" onclick="AuthService.logout(); location.reload();">
-                        <i class="fas fa-sync"></i> إعادة تحميل
-                    </button>
-                </div>
-            `;
+            container.innerHTML = this._renderUserNotFound();
+            this._isLoadingFriends = false;
             return;
         }
 
         const userData = doc.data();
-
-        // 4. تحديث AuthService.currentUser
-        AuthService.currentUser = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            displayName: firebaseUser.displayName || userData.displayName,
-            username: userData.username || firebaseUser.displayName || firebaseUser.email,
-            role: userData.role || 'user',
-            totalScore: userData.totalScore || 0,
-            coins: userData.coins || 0,
-            achievements: userData.achievements || [],
-            inventory: userData.inventory || [],
-            bio: userData.bio || '',
-            location: userData.location || '',
-            avatar: userData.avatar || null,
-            createdAt: userData.createdAt || new Date().toISOString(),
-            adminRole: userData.adminRole || null,
+        
+        // ✅ تحديث بيانات المستخدم مع الحفاظ على التخصيصات
+        Object.assign(AuthService.currentUser, {
             friends: userData.friends || [],
             blocked: userData.blocked || [],
+            username: userData.username || user.username,
+            displayName: userData.displayName || user.displayName,
+            fullName: userData.fullName || userData.displayName,
+            avatar: userData.avatar || user.avatar,
+            country: userData.country || user.country,
+            countryName: userData.countryName || user.countryName,
+            countryFlag: userData.countryFlag || user.countryFlag,
+            age: userData.age || user.age,
+            gender: userData.gender || user.gender,
+            profileCompleted: userData.profileCompleted || false,
             rankPoints: userData.rankPoints || 0,
+            totalScore: userData.totalScore || 0,
+            coins: userData.coins || 0,
+            gems: userData.gems || 0,
+            activeItems: userData.activeItems || [],
+            activeItemDetails: userData.activeItemDetails || [],
+            inventory: userData.inventory || [],
+            achievements: userData.achievements || [],
             stats: userData.stats || { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 }
-        };
-        AuthService._notifyListeners();
+        });
 
-        const user = AuthService.currentUser;
         const friends = userData.friends || [];
 
-        // 5. جلب طلبات الصداقة المعلقة
-        let requests = [];
+        // ✅ جلب طلبات الصداقة المعلقة
+    // ✅ جلب طلبات الصداقة المعلقة
+    let requests = [];
+    try {
+        const requestsSnap = await db.collection('friendRequests')
+            .where('to', '==', user.uid)
+            .where('status', '==', 'pending')
+            .get();
+        requestsSnap.forEach(doc => requests.push({ id: doc.id, ...doc.data() }));
+    } catch (e) {
+        console.warn('⚠️ Could not fetch friend requests:', e);
+    }
+
+    // ✅ تحديث الإحصائيات
+    this._updateFriendsStats(friends.length, requests.length);
+
+    // ✅ جلب بيانات الأصدقاء
+    let friendsData = [];
+    if (friends.length > 0) {
+        const friendIds = friends.map(f => f.id || f);
+        const friendDocs = await Promise.all(
+            friendIds.map(id => db.collection('users').doc(id).get())
+        );
+        friendsData = friendDocs
+            .filter(doc => doc.exists)
+            .map(doc => ({ id: doc.id, ...doc.data() }));
+    }
+
+    // ✅ عرض القائمة حسب التبويب النشط
+    const activeTab = document.querySelector('.friends-tabs .tab-btn.active')?.dataset?.tab || 'all';
+    
+    if (activeTab === 'pending') {
+        // ✅ عرض طلبات الصداقة المعلقة
+        await this._renderFriendRequests(requests);
+    } else {
+        // ✅ عرض قائمة الأصدقاء
+        this._renderFriendsList(friendsData, requests, AuthService.currentUser);
+    }
+
+    // ✅ إعادة تطبيق التخصيصات
+    setTimeout(() => {
         try {
-            const requestsSnap = await db.collection('friendRequests')
-                .where('to', '==', firebaseUser.uid)
-                .where('status', '==', 'pending')
-                .get();
-            requestsSnap.forEach(doc => requests.push({ id: doc.id, ...doc.data() }));
+            this._applyAllCustomizations();
         } catch (e) {
-            console.warn('⚠️ Could not fetch friend requests:', e);
+            console.warn('⚠️ Could not apply customizations:', e);
+        }
+    }, 100);
+
+    this._isLoadingFriends = false;
+} catch (error) {
+        console.error('❌ Error loading friends:', error);
+        container.innerHTML = this._renderErrorState(error.message);
+        this._isLoadingFriends = false;
+    }
+},
+
+/**
+ * إرسال طلب صداقة
+ * @param {string} userId - معرف المستخدم المستهدف
+ */
+async _sendFriendRequest(userId) {
+    if (!AuthService.currentUser) {
+        showToast('يجب تسجيل الدخول أولاً', 'error');
+        return;
+    }
+
+    const currentUser = AuthService.currentUser;
+    if (currentUser.uid === userId) {
+        showToast('لا يمكن إضافة نفسك', 'error');
+        return;
+    }
+
+    try {
+        // ✅ التحقق من وجود طلب سابق
+        const existing = await db.collection('friendRequests')
+            .where('from', '==', currentUser.uid)
+            .where('to', '==', userId)
+            .where('status', '==', 'pending')
+            .get();
+
+        if (!existing.empty) {
+            showToast('تم إرسال طلب صداقة بالفعل', 'info');
+            return;
         }
 
-        // 6. تحديث الإحصائيات
-        const totalEl = document.getElementById('friendsTotalCount');
-        const requestsEl = document.getElementById('friendsRequestsCount');
-        const onlineEl = document.getElementById('friendsOnlineCount');
-
-        if (totalEl) totalEl.textContent = friends.length;
-        if (requestsEl) requestsEl.textContent = requests.length;
-
-        // 7. جلب بيانات الأصدقاء
-        let friendsData = [];
-        if (friends.length > 0) {
-            const friendIds = friends.map(f => f.id || f);
-            const friendDocs = await Promise.all(
-                friendIds.map(id => db.collection('users').doc(id).get())
-            );
-            friendsData = friendDocs
-                .filter(doc => doc.exists)
-                .map(doc => ({ id: doc.id, ...doc.data() }));
-
-            // حساب عدد المتصلين
-            const now = Date.now();
-            const onlineCount = friendsData.filter(f => {
-                const lastActive = f.lastActive?.toDate?.() || new Date(f.lastActive);
-                return now - lastActive.getTime() < 5 * 60 * 1000;
-            }).length;
-            if (onlineEl) onlineEl.textContent = onlineCount;
-        } else {
-            if (onlineEl) onlineEl.textContent = '0';
+        // ✅ التحقق من أن المستخدم ليس صديقاً بالفعل
+        const friends = currentUser.friends || [];
+        if (friends.some(f => f.id === userId)) {
+            showToast('هذا المستخدم صديق بالفعل', 'info');
+            return;
         }
 
-        // 8. عرض قائمة الأصدقاء (مع تأخير بسيط للشعور بالتحميل)
-        setTimeout(() => {
-            this._renderFriendsList(friendsData, requests, user);
-        }, 300);
+        // ✅ جلب اسم المستخدم المستهدف
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            showToast('المستخدم غير موجود', 'error');
+            return;
+        }
+        const targetData = userDoc.data();
+        const targetName = targetData.displayName || targetData.fullName || targetData.username || 'مستخدم';
+
+        // ✅ إرسال طلب الصداقة
+        await db.collection('friendRequests').add({
+            from: currentUser.uid,
+            fromName: currentUser.displayName || currentUser.fullName || currentUser.username || 'مجهول',
+            to: userId,
+            toName: targetName,
+            status: 'pending',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        showToast(`✅ تم إرسال طلب صداقة إلى ${targetName}`, 'success', 3000);
+
+        // ✅ تحديث نتائج البحث
+        const searchInput = document.getElementById('friendsAddInput');
+        if (searchInput && searchInput.value.trim()) {
+            this._searchAndAddFriend(searchInput.value.trim());
+        }
+
+        // ✅ تحديث قائمة الأصدقاء
+        setTimeout(() => this._loadFriendsPage(), 500);
 
     } catch (error) {
-        console.error('❌ Error loading friends:', error);
-        container.innerHTML = `
-            <div class="empty-state" style="text-align:center;padding:2rem;">
-                <i class="fas fa-wifi-slash" style="font-size:2.5rem;color:var(--secondary);"></i>
-                <h3>تعذر تحميل الأصدقاء</h3>
-                <p class="text-gray">حدث خطأ في الاتصال بقاعدة البيانات</p>
-                <p class="text-gray" style="font-size:0.8rem;">${error.message || 'يرجى المحاولة مرة أخرى'}</p>
-                <button class="btn btn-primary mt-1" onclick="App._loadFriendsPage()">
-                    <i class="fas fa-sync"></i> إعادة المحاولة
-                </button>
-            </div>
-        `;
+        console.error('❌ Error sending friend request:', error);
+        showToast('❌ فشل إرسال طلب الصداقة: ' + error.message, 'error');
+    }
+},
+
+/**
+ * قبول طلب صداقة
+ */
+async _acceptFriendRequest(requestId) {
+    if (!AuthService.currentUser) {
+        showToast('يجب تسجيل الدخول', 'error');
+        return;
+    }
+
+    try {
+        const doc = await db.collection('friendRequests').doc(requestId).get();
+        if (!doc.exists) {
+            showToast('طلب الصداقة غير موجود', 'error');
+            return;
+        }
+
+        const data = doc.data();
+        if (data.to !== AuthService.currentUser.uid) {
+            showToast('ليس لديك صلاحية', 'error');
+            return;
+        }
+
+        // ✅ تحديث حالة الطلب
+        await db.collection('friendRequests').doc(requestId).update({
+            status: 'accepted',
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // ✅ إضافة الصديقين لبعضهما
+        const currentUser = AuthService.currentUser;
+        const friendId = data.from;
+        const friendName = data.fromName || 'مستخدم';
+
+        // ✅ تحديث قائمة أصدقاء المستخدم الحالي
+        const userDoc = await db.collection('users').doc(currentUser.uid).get();
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            const friends = userData.friends || [];
+            if (!friends.some(f => f.id === friendId)) {
+                friends.push({ id: friendId, name: friendName, since: new Date().toISOString() });
+                await db.collection('users').doc(currentUser.uid).update({ friends });
+            }
+        }
+
+        // ✅ تحديث قائمة أصدقاء الطرف الآخر
+        const friendDoc = await db.collection('users').doc(friendId).get();
+        if (friendDoc.exists) {
+            const friendData = friendDoc.data();
+            const friends = friendData.friends || [];
+            const currentName = currentUser.displayName || currentUser.fullName || currentUser.username || 'مجهول';
+            if (!friends.some(f => f.id === currentUser.uid)) {
+                friends.push({ id: currentUser.uid, name: currentName, since: new Date().toISOString() });
+                await db.collection('users').doc(friendId).update({ friends });
+            }
+        }
+
+        showToast('✅ تم قبول طلب الصداقة', 'success');
+        
+        // ✅ تحديث القوائم
+        this._loadFriendsPage();
+        this._updateFriendsStats();
+
+    } catch (error) {
+        console.error('❌ Error accepting friend request:', error);
+        showToast('❌ فشل قبول الطلب: ' + error.message, 'error');
+    }
+},
+
+/**
+ * رفض طلب صداقة
+ */
+async _rejectFriendRequest(requestId) {
+    if (!AuthService.currentUser) {
+        showToast('يجب تسجيل الدخول', 'error');
+        return;
+    }
+
+    try {
+        const doc = await db.collection('friendRequests').doc(requestId).get();
+        if (!doc.exists) {
+            showToast('طلب الصداقة غير موجود', 'error');
+            return;
+        }
+
+        const data = doc.data();
+        if (data.to !== AuthService.currentUser.uid) {
+            showToast('ليس لديك صلاحية', 'error');
+            return;
+        }
+
+        await db.collection('friendRequests').doc(requestId).update({
+            status: 'rejected',
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        showToast('تم رفض طلب الصداقة', 'info');
+        this._loadFriendsPage();
+        this._updateFriendsStats();
+
+    } catch (error) {
+        console.error('❌ Error rejecting friend request:', error);
+        showToast('❌ فشل رفض الطلب: ' + error.message, 'error');
+    }
+},
+
+/**
+ * إزالة صديق
+ */
+async _removeFriend(friendId) {
+    if (!AuthService.currentUser) {
+        showToast('يجب تسجيل الدخول', 'error');
+        return;
+    }
+
+    if (!confirm('هل أنت متأكد من إزالة هذا الصديق؟')) return;
+
+    try {
+        const currentUser = AuthService.currentUser;
+
+        // ✅ إزالة من قائمة أصدقاء المستخدم الحالي
+        const userDoc = await db.collection('users').doc(currentUser.uid).get();
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            const friends = (userData.friends || []).filter(f => f.id !== friendId);
+            await db.collection('users').doc(currentUser.uid).update({ friends });
+        }
+
+        // ✅ إزالة من قائمة أصدقاء الطرف الآخر
+        const friendDoc = await db.collection('users').doc(friendId).get();
+        if (friendDoc.exists) {
+            const friendData = friendDoc.data();
+            const friends = (friendData.friends || []).filter(f => f.id !== currentUser.uid);
+            await db.collection('users').doc(friendId).update({ friends });
+        }
+
+        showToast('✅ تم إزالة الصديق', 'success');
+        
+        // ✅ تحديث القوائم
+        this._loadFriendsPage();
+        this._updateFriendsStats();
+
+    } catch (error) {
+        console.error('❌ Error removing friend:', error);
+        showToast('❌ فشل إزالة الصديق: ' + error.message, 'error');
+    }
+},
+
+/**
+ * حظر مستخدم
+ */
+async _blockUser(userId) {
+    if (!AuthService.currentUser) {
+        showToast('يجب تسجيل الدخول', 'error');
+        return;
+    }
+
+    if (!confirm('هل أنت متأكد من حظر هذا المستخدم؟')) return;
+
+    try {
+        const currentUser = AuthService.currentUser;
+        const blocked = currentUser.blocked || [];
+        if (!blocked.includes(userId)) {
+            blocked.push(userId);
+            await db.collection('users').doc(currentUser.uid).update({ blocked });
+            AuthService.currentUser.blocked = blocked;
+            
+            // ✅ إزالة من الأصدقاء إذا كان صديقاً
+            const friends = currentUser.friends || [];
+            if (friends.some(f => f.id === userId)) {
+                await this._removeFriend(userId);
+            }
+            
+            showToast('✅ تم حظر المستخدم', 'success');
+            this._loadFriendsPage();
+        }
+    } catch (error) {
+        console.error('❌ Error blocking user:', error);
+        showToast('❌ فشل حظر المستخدم: ' + error.message, 'error');
+    }
+},
+
+/**
+ * إلغاء حظر مستخدم
+ */
+async _unblockUser(userId) {
+    if (!AuthService.currentUser) {
+        showToast('يجب تسجيل الدخول', 'error');
+        return;
+    }
+
+    try {
+        const currentUser = AuthService.currentUser;
+        const blocked = (currentUser.blocked || []).filter(id => id !== userId);
+        await db.collection('users').doc(currentUser.uid).update({ blocked });
+        AuthService.currentUser.blocked = blocked;
+        
+        showToast('✅ تم إلغاء حظر المستخدم', 'success');
+        this._loadFriendsPage();
+    } catch (error) {
+        console.error('❌ Error unblocking user:', error);
+        showToast('❌ فشل إلغاء الحظر: ' + error.message, 'error');
     }
 },
 
@@ -30796,12 +32539,10 @@ _renderFriendsList(friendsData, requests, user) {
     const container = document.getElementById('friendsListContainer');
     if (!container) return;
 
-    // التبويب النشط
     const activeTab = document.querySelector('.friends-tabs .tab-btn.active')?.dataset?.tab || 'all';
 
     let filteredFriends = [...friendsData];
 
-    // تطبيق الفلترة
     switch(activeTab) {
         case 'online':
             const now = Date.now();
@@ -30821,69 +32562,36 @@ _renderFriendsList(friendsData, requests, user) {
             break;
     }
 
-    if (filteredFriends.length === 0 && activeTab !== 'pending') {
-        container.innerHTML = `
-            <div class="empty-state" style="text-align:center;padding:2rem;">
-                <i class="fas fa-user-friends" style="font-size:2.5rem;color:var(--gray-dark);"></i>
-                <h3>لا يوجد أصدقاء</h3>
-                <p class="text-gray">ابدأ بإضافة أصدقاء جدد!</p>
-                ${activeTab === 'online' ? '<p class="text-gray" style="font-size:0.8rem;">لا يوجد أصدقاء متصلون حالياً</p>' : ''}
-                ${activeTab === 'blocked' ? '<p class="text-gray" style="font-size:0.8rem;">ليس لديك مستخدمين محظورين</p>' : ''}
-            </div>
-        `;
+    if (filteredFriends.length === 0) {
+        container.innerHTML = this._renderEmptyFriends(activeTab);
         return;
     }
 
-    let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;">';
+    let html = '<div class="player-cards-grid">';
     
     filteredFriends.forEach(friend => {
-        const name = friend.displayName || friend.username || friend.email || 'مجهول';
-        const username = friend.username || 'guest';
-        const avatar = friend.avatar || null;
-        const isOnline = friend.lastActive && (Date.now() - (friend.lastActive.toDate?.() || new Date(friend.lastActive)).getTime() < 5 * 60 * 1000);
         const isBlocked = (user.blocked || []).includes(friend.id);
-
-        html += `
-            <div class="friend-card" style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:1rem;display:flex;align-items:center;gap:1rem;transition:var(--transition);">
-                <div class="friend-avatar" style="width:56px;height:56px;border-radius:50%;background:${avatar ? `url('${avatar}') center/cover` : 'var(--primary)'};display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:#fff;flex-shrink:0;position:relative;">
-                    ${!avatar ? name.charAt(0).toUpperCase() : ''}
-                    <span style="position:absolute;bottom:2px;right:2px;width:12px;height:12px;border-radius:50%;background:${isOnline ? 'var(--success)' : 'var(--gray)'};border:2px solid var(--dark);"></span>
-                </div>
-                <div style="flex:1;min-width:0;">
-                    <div style="font-weight:700;font-size:1rem;">${name}</div>
-                    <div style="font-size:0.75rem;color:var(--gray);">@${username}</div>
-                    <div style="font-size:0.65rem;color:${isOnline ? 'var(--success)' : 'var(--gray)'};">${isOnline ? '🟢 متصل' : 'غير متصل'}</div>
-                </div>
-                <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
-                    <button class="btn btn-xs btn-primary" onclick="App._openUserProfileModal('${friend.id}')" title="عرض الملف">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                    ${isBlocked ? `
-                        <button class="btn btn-xs btn-success" onclick="App._unblockUser('${friend.id}')" title="إلغاء الحظر">
-                            <i class="fas fa-unlock"></i>
-                        </button>
-                    ` : `
-                        <button class="btn btn-xs btn-danger" onclick="App._blockUser('${friend.id}')" title="حظر">
-                            <i class="fas fa-ban"></i>
-                        </button>
-                        <button class="btn btn-xs btn-danger" onclick="App._removeFriend('${friend.id}')" title="إزالة صديق">
-                            <i class="fas fa-user-minus"></i>
-                        </button>
-                    `}
-                </div>
-            </div>
-        `;
+        html += this._renderPlayerCard(friend, {
+            showActions: true,
+            context: 'friends',
+            isFriend: true,
+            isBlocked: isBlocked
+        });
     });
-
+    
     html += '</div>';
     container.innerHTML = html;
 },
 
-_renderFriendRequests(requests) {
+/**
+ * عرض طلبات الصداقة المعلقة
+ * @param {Array} requests - قائمة الطلبات
+ */
+async _renderFriendRequests(requests) {
     const container = document.getElementById('friendsListContainer');
     if (!container) return;
 
-    if (requests.length === 0) {
+    if (!requests || requests.length === 0) {
         container.innerHTML = `
             <div class="empty-state" style="text-align:center;padding:2rem;">
                 <i class="fas fa-inbox" style="font-size:2.5rem;color:var(--gray-dark);"></i>
@@ -30894,27 +32602,139 @@ _renderFriendRequests(requests) {
         return;
     }
 
-    let html = '<div style="display:flex;flex-direction:column;gap:0.5rem;">';
-    requests.forEach(req => {
-        html += `
-            <div class="friend-request-item" style="display:flex;justify-content:space-between;align-items:center;padding:0.8rem 1rem;background:var(--glass);border-radius:var(--radius-sm);border:1px solid var(--glass-border);">
-                <div>
-                    <span style="font-weight:700;">${req.fromName || 'مجهول'}</span>
-                    <span style="font-size:0.7rem;color:var(--gray);">طلب صداقة</span>
-                </div>
-                <div style="display:flex;gap:0.3rem;">
-                    <button class="btn btn-xs btn-success" onclick="App._acceptFriendRequest('${req.id}')">
-                        <i class="fas fa-check"></i> قبول
-                    </button>
-                    <button class="btn btn-xs btn-danger" onclick="App._rejectFriendRequest('${req.id}')">
-                        <i class="fas fa-times"></i> رفض
-                    </button>
-                </div>
+    // ✅ عرض حالة التحميل
+    container.innerHTML = `
+        <div style="text-align:center;padding:1rem;color:var(--gray);">
+            <i class="fas fa-spinner fa-spin"></i> جاري تحميل الطلبات...
+        </div>
+    `;
+
+    try {
+        // ✅ جلب بيانات جميع المرسلين
+        const senderPromises = requests.map(async (req) => {
+            try {
+                const doc = await db.collection('users').doc(req.from).get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    return {
+                        requestId: req.id,
+                        uid: req.from,
+                        id: req.from,
+                        displayName: data.displayName || data.fullName || req.fromName || 'مجهول',
+                        fullName: data.fullName || data.displayName || req.fromName || 'مجهول',
+                        username: data.username || 'guest',
+                        avatar: data.avatar || null,
+                        rankPoints: data.rankPoints || 0,
+                        totalScore: data.totalScore || 0,
+                        lastActive: data.lastActive || null,
+                        clan: data.clan || 'غير منضم',
+                        activeItems: data.activeItems || [],
+                        inventory: data.inventory || [],
+                        createdAt: req.createdAt
+                    };
+                } else {
+                    // ✅ إذا لم يتم العثور على المستخدم، نستخدم البيانات المتاحة
+                    return {
+                        requestId: req.id,
+                        uid: req.from,
+                        id: req.from,
+                        displayName: req.fromName || 'مجهول',
+                        fullName: req.fromName || 'مجهول',
+                        username: 'guest',
+                        avatar: null,
+                        rankPoints: 0,
+                        totalScore: 0,
+                        lastActive: null,
+                        clan: 'غير منضم',
+                        activeItems: [],
+                        inventory: [],
+                        createdAt: req.createdAt
+                    };
+                }
+            } catch (error) {
+                console.warn(`⚠️ Could not fetch sender data for ${req.from}:`, error);
+                // ✅ في حالة الخطأ، نستخدم البيانات المتاحة
+                return {
+                    requestId: req.id,
+                    uid: req.from,
+                    id: req.from,
+                    displayName: req.fromName || 'مجهول',
+                    fullName: req.fromName || 'مجهول',
+                    username: 'guest',
+                    avatar: null,
+                    rankPoints: 0,
+                    totalScore: 0,
+                    lastActive: null,
+                    clan: 'غير منضم',
+                    activeItems: [],
+                    inventory: [],
+                    createdAt: req.createdAt
+                };
+            }
+        });
+
+        // ✅ انتظار جميع الطلبات
+        const sendersData = await Promise.all(senderPromises);
+
+        // ✅ عرض الطلبات باستخدام البطاقة المصغرة
+        let html = `
+            <div style="margin-bottom:0.5rem;padding:0 0.3rem;">
+                <span style="font-weight:700;font-size:0.85rem;color:var(--gray);">
+                    <i class="fas fa-bell"></i> طلبات صداقة (${sendersData.length})
+                </span>
+            </div>
+            <div class="player-cards-grid">
+        `;
+
+        sendersData.forEach(sender => {
+            const extraInfo = `طلب صداقة • ${formatDate(sender.createdAt)}`;
+            html += this._renderPlayerCard(sender, {
+                showActions: true,
+                context: 'pending',
+                extraInfo: extraInfo,
+                isFriend: false,
+                isBlocked: false,
+                isPending: true
+            });
+        });
+
+        html += '</div>';
+        container.innerHTML = html;
+
+    } catch (error) {
+        console.error('❌ Error rendering friend requests:', error);
+        container.innerHTML = `
+            <div style="text-align:center;padding:2rem;color:var(--secondary);">
+                <i class="fas fa-exclamation-circle" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
+                خطأ في تحميل طلبات الصداقة: ${error.message}
+                <button class="btn btn-xs btn-outline mt-1" onclick="App._loadFriendsPage()">
+                    <i class="fas fa-sync"></i> إعادة المحاولة
+                </button>
             </div>
         `;
-    });
-    html += '</div>';
-    container.innerHTML = html;
+    }
+},
+
+_renderEmptyFriends(activeTab) {
+    const messages = {
+        'online': 'لا يوجد أصدقاء متصلون حالياً',
+        'blocked': 'ليس لديك مستخدمين محظورين',
+        'pending': 'لا توجد طلبات صداقة معلقة',
+        'all': 'ابدأ بإضافة أصدقاء جدد!'
+    };
+    
+    return `
+        <div class="empty-state" style="text-align:center;padding:2rem;">
+            <i class="fas fa-user-friends" style="font-size:2.5rem;color:var(--gray-dark);"></i>
+            <h3>${activeTab === 'blocked' ? 'لا يوجد مستخدمين محظورين' : 'لا يوجد أصدقاء'}</h3>
+            <p class="text-gray">${messages[activeTab] || messages.all}</p>
+            ${activeTab === 'all' ? `
+                <button class="btn btn-primary btn-sm mt-1" onclick="document.getElementById('friendsAddInput').focus();">
+                    <i class="fas fa-user-plus"></i> إضافة صديق
+                </button>
+            ` : ''}
+        </div>
+    `;
 },
 
 // ============================================================
@@ -31422,11 +33242,8 @@ _validateEmail(email) {
     return { valid: true, message: '✅ صيغة صحيحة' };
 },
 
-/**
- * تقييم قوة كلمة المرور
- */
 _evaluatePasswordStrength(password) {
-    if (!password) return { score: 0, label: 'ضعيفة', color: 'var(--secondary)' };
+    if (!password) return { score: 0, label: 'ضعيفة', color: 'var(--secondary)', tips: ['أدخل كلمة مرور'] };
     
     let score = 0;
     const checks = {
@@ -31442,13 +33259,15 @@ _evaluatePasswordStrength(password) {
     score += checks.uppercase ? 1 : 0;
     score += checks.number ? 1 : 0;
     score += checks.special ? 1 : 0;
+    // نجعل النقاط من 0 إلى 4 (نقسم على 5 * 4)
+    score = Math.min(score, 4);
     
     const levels = [
         { min: 0, label: 'ضعيفة 🔴', color: 'var(--secondary)' },
-        { min: 2, label: 'ضعيفة 🟡', color: '#f39c12' },
-        { min: 3, label: 'جيدة 🟢', color: '#2ecc71' },
-        { min: 4, label: 'قوية 🟢', color: '#27ae60' },
-        { min: 5, label: 'قوية جداً 🟣', color: '#9b59b6' }
+        { min: 1, label: 'ضعيفة 🟡', color: '#f39c12' },
+        { min: 2, label: 'جيدة 🟢', color: '#2ecc71' },
+        { min: 3, label: 'قوية 🟢', color: '#27ae60' },
+        { min: 4, label: 'قوية جداً 🟣', color: '#9b59b6' }
     ];
     
     let level = levels[0];
@@ -31456,7 +33275,6 @@ _evaluatePasswordStrength(password) {
         if (score >= l.min) level = l;
     }
     
-    // نصائح إضافية
     let tips = [];
     if (!checks.length) tips.push('8 أحرف على الأقل');
     if (!checks.lowercase) tips.push('حرف صغير');
@@ -31465,7 +33283,7 @@ _evaluatePasswordStrength(password) {
     if (!checks.special) tips.push('رمز خاص (!@#$%...)');
     
     return {
-        score: Math.min(score, 5),
+        score: score,
         label: level.label,
         color: level.color,
         tips: tips,
