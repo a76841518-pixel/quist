@@ -53,6 +53,307 @@ function getCountryFlag(code) {
 }
 
 // ============================================================
+// المتغيرات العالمية الجديدة
+// ============================================================
+
+// ✅ إعدادات المستوى الديناميكي
+const LEVEL_SETTINGS = {
+    type: 'exponential',  // 'exponential' | 'quadratic' | 'custom'
+    baseXP: 100,
+    multiplier: 2,
+    customFormula: '100 * Math.pow(level, 2)'
+};
+
+// ✅ مسارات الصور الافتراضية للمقتنيات
+const DEFAULT_ITEM_IMAGES = {
+    avatars: 'images/store/avatars/default.png',
+    frames: 'images/store/frames/default.png',
+    backgrounds: 'images/store/backgrounds/default.png',
+    badges: 'images/store/badges/default.png',
+    themes: 'images/store/themes/default.png',
+    boosts: 'images/store/boosts/default.png'
+};
+
+// ✅ مصادر المقتنيات
+const ITEM_SOURCES = {
+    store: { label: '🛒 المتجر', color: '#2ecc71' },
+    level: { label: '🎯 المستوى', color: '#FFD93D' },
+    rank: { label: '🏅 الرتبة', color: '#6C63FF' },
+    battlepass: { label: '🎟️ الباتل باس', color: '#9b59b6' },
+    event: { label: '🎪 الحدث', color: '#e67e22' },
+    achievement: { label: '🏆 الإنجاز', color: '#f1c40f' }
+};
+
+// ✅ أنواع المقتنيات
+const ITEM_CATEGORIES = {
+    avatars: { label: '👤 صور شخصية', icon: '👤' },
+    frames: { label: '🖼️ إطارات', icon: '🖼️' },
+    backgrounds: { label: '🌄 خلفيات', icon: '🌄' },
+    badges: { label: '🏅 شارات', icon: '🏅' },
+    themes: { label: '🎨 سمات', icon: '🎨' },
+    boosts: { label: '⚡ تعزيزات', icon: '⚡' }
+};
+
+// ============================================================
+// حذف LEVEL_SETTINGS واستخدام صيغة ثابتة
+// ============================================================
+
+// ✅ صيغة المستويات الثابتة
+// المستوى 1: 0 نقطة
+// المستوى 2: 100 نقطة
+// المستوى 3: 400 نقطة
+// المستوى 4: 900 نقطة
+// ...
+// المستوى N: 100 * (N-1)^2
+
+function getXPForLevel(level) {
+    if (level <= 0) return 0;
+    if (level === 1) return 0;
+    
+    // ✅ صيغة تربيعية ثابتة: 100 * (level - 1)^2
+    return Math.floor(100 * Math.pow(level - 1, 2));
+}
+
+function getLevel(score) {
+    if (typeof score !== 'number' || score < 0) {
+        return { level: 1, min: 0, max: getXPForLevel(2), nextXP: getXPForLevel(2), progress: 0 };
+    }
+    
+    let level = 1;
+    let currentXP = 0;
+    let nextXP = getXPForLevel(2);
+    
+    while (score >= nextXP && level < 100) {
+        level++;
+        currentXP = nextXP;
+        nextXP = getXPForLevel(level + 1);
+    }
+    
+    const progress = nextXP > currentXP ? ((score - currentXP) / (nextXP - currentXP)) * 100 : 100;
+    
+    return {
+        level: level,
+        min: currentXP,
+        max: nextXP,
+        nextXP: nextXP,
+        progress: Math.min(progress, 100)
+    };
+}
+
+function getLevelProgress(score) {
+    const levelInfo = getLevel(score);
+    return {
+        progress: Math.min(levelInfo.progress, 100),
+        currentLevel: levelInfo.level,
+        nextLevel: levelInfo.level + 1,
+        nextMin: levelInfo.nextXP,
+        totalXP: score
+    };
+}
+
+function getXPToNextLevel(score) {
+    const levelInfo = getLevel(score);
+    return Math.max(0, levelInfo.nextXP - score);
+}
+
+// ============================================================
+// LevelRewardsManager - إدارة جوائز المستويات (جديد)
+// ============================================================
+
+const LevelRewardsManager = {
+    _rewards: [],
+    _loaded: false,
+
+    /**
+     * تحميل جوائز المستويات من Firestore
+     */
+    async loadRewards() {
+        try {
+            const snapshot = await db.collection('levelRewards')
+                .where('isActive', '==', true)
+                .get();
+            
+            this._rewards = [];
+            snapshot.forEach(doc => {
+                this._rewards.push({ id: doc.id, ...doc.data() });
+            });
+            
+            this._rewards.sort((a, b) => a.level - b.level);
+            this._loaded = true;
+            return this._rewards;
+        } catch (e) {
+            console.warn('⚠️ Could not load level rewards:', e);
+            this._loaded = true;
+            return [];
+        }
+    },
+
+    /**
+     * الحصول على جائزة مستوى معين
+     */
+    getRewardForLevel(level) {
+        if (!this._loaded) return null;
+        return this._rewards.find(r => r.level === level) || null;
+    },
+
+    /**
+     * التحقق من وجود جائزة للمستوى
+     */
+    hasRewardForLevel(level) {
+        return this.getRewardForLevel(level) !== null;
+    },
+
+// داخل LevelRewardsManager
+
+async applyLevelReward(userId, level) {
+    const reward = this.getRewardForLevel(level);
+    if (!reward) {
+        console.warn(`⚠️ No reward found for level ${level}`);
+        return null;
+    }
+
+    try {
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            console.warn(`⚠️ User ${userId} not found`);
+            return null;
+        }
+        
+        const user = userDoc.data();
+        const updates = {};
+        let rewardDetails = [];
+        
+        // ✅ إضافة النقاط
+        if (reward.pointsReward > 0) {
+            const newScore = (user.totalScore || 0) + reward.pointsReward;
+            updates.totalScore = newScore;
+            rewardDetails.push(`+${reward.pointsReward} نقطة`);
+        }
+        
+        // ✅ إضافة النقود
+        if (reward.coinsReward > 0) {
+            const newCoins = (user.coins || 0) + reward.coinsReward;
+            updates.coins = newCoins;
+            rewardDetails.push(`+${reward.coinsReward} نقود`);
+        }
+        
+        // ✅ إضافة عنصر من المتجر
+        if (reward.itemId) {
+            const inventory = user.inventory || [];
+            const existing = inventory.find(i => i.itemId === reward.itemId);
+            if (existing) {
+                existing.quantity = (existing.quantity || 0) + (reward.quantity || 1);
+            } else {
+                inventory.push({
+                    itemId: reward.itemId,
+                    quantity: reward.quantity || 1,
+                    purchasedAt: new Date().toISOString(),
+                    source: 'level_reward',
+                    sourceLevel: level
+                });
+            }
+            updates.inventory = inventory;
+            rewardDetails.push(`🎁 ${reward.itemName || reward.itemId}`);
+        }
+        
+        // ✅ تسجيل أن المستخدم حصل على الجائزة
+        const claimedRewards = user.claimedLevelRewards || [];
+        if (!claimedRewards.includes(level)) {
+            claimedRewards.push(level);
+            updates.claimedLevelRewards = claimedRewards;
+        }
+        
+        // ✅ حفظ التحديثات
+        await db.collection('users').doc(userId).update(updates);
+        
+        // ✅ تحديث الكائن المحلي
+        if (AuthService.currentUser && AuthService.currentUser.uid === userId) {
+            Object.assign(AuthService.currentUser, updates);
+            AuthService._notifyListeners();
+        }
+        
+        console.log(`✅ Level ${level} reward applied:`, updates);
+        
+        // ✅ إرجاع الجائزة مع التفاصيل
+        return {
+            ...reward,
+            details: rewardDetails.join(' • ')
+        };
+        
+    } catch (e) {
+        console.error('❌ Error applying level reward:', e);
+        return null;
+    }
+},
+
+    /**
+     * التحقق من جوائز المستويات غير المطالب بها
+     */
+    async checkUnclaimedRewards(userId) {
+        try {
+            const userDoc = await db.collection('users').doc(userId).get();
+            if (!userDoc.exists) return [];
+            
+            const user = userDoc.data();
+            const currentLevel = getLevel(user.totalScore || 0).level;
+            const claimed = user.claimedLevelRewards || [];
+            
+            const unclaimed = [];
+            for (const reward of this._rewards) {
+                if (reward.level <= currentLevel && !claimed.includes(reward.level)) {
+                    unclaimed.push(reward);
+                }
+            }
+            return unclaimed;
+        } catch (e) {
+            console.warn('⚠️ Could not check unclaimed rewards:', e);
+            return [];
+        }
+    },
+
+    /**
+     * حفظ تعريف جائزة جديدة (للمشرفين)
+     */
+    async saveReward(data) {
+        if (!AuthService.checkPermission('admin') && !AuthService.checkPermission('super_admin')) {
+            throw new Error('ليس لديك صلاحية');
+        }
+        
+        try {
+            if (data.id) {
+                await db.collection('levelRewards').doc(data.id).update(data);
+            } else {
+                data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                const docRef = await db.collection('levelRewards').add(data);
+                data.id = docRef.id;
+            }
+            await this.loadRewards();
+            return data;
+        } catch (e) {
+            console.error('❌ Error saving level reward:', e);
+            throw e;
+        }
+    },
+
+    /**
+     * حذف تعريف جائزة (للمشرفين)
+     */
+    async deleteReward(id) {
+        if (!AuthService.checkPermission('admin') && !AuthService.checkPermission('super_admin')) {
+            throw new Error('ليس لديك صلاحية');
+        }
+        
+        try {
+            await db.collection('levelRewards').doc(id).delete();
+            await this.loadRewards();
+        } catch (e) {
+            console.error('❌ Error deleting level reward:', e);
+            throw e;
+        }
+    }
+};
+
+// ============================================================
 // 1. إعدادات Firebase
 // ============================================================
 const firebaseConfig = {
@@ -101,15 +402,98 @@ try {
 }
 
 function updateFirebaseStatus(online) {
-    const statusEl = document.getElementById('firebaseStatus');
+    const statusEl = document.getElementById('connectionStatus');
     if (statusEl) {
-        statusEl.textContent = online ? '🟢 متصل' : '🔴 غير متصل';
-        statusEl.style.color = online ? 'var(--success)' : 'var(--secondary)';
+        // ✅ إزالة كلاس visible أولاً
+        statusEl.classList.remove('visible');
+        
+        if (online) {
+            statusEl.className = 'connection-status online';
+            document.getElementById('connectionText').textContent = 'متصل';
+            // ✅ إخفاء تلقائياً عندما يكون الاتصال قوياً
+            statusEl.style.display = 'none';
+        } else {
+            statusEl.className = 'connection-status offline visible';
+            document.getElementById('connectionText').textContent = 'غير متصل';
+            statusEl.style.display = 'flex';
+        }
     }
-    const connStatus = document.getElementById('connectionStatus');
-    if (connStatus) {
-        connStatus.className = `connection-status ${online ? 'online' : 'offline'}`;
-        document.getElementById('connectionText').textContent = online ? 'متصل' : 'غير متصل';
+}
+
+// ============================================================
+// التحقق من جودة الاتصال
+// ============================================================
+
+async function checkConnectionQuality() {
+    try {
+        const startTime = Date.now();
+        const response = await fetch('https://www.google.com/favicon.ico', {
+            mode: 'no-cors',
+            cache: 'no-cache',
+            signal: AbortSignal.timeout(5000)
+        });
+        const endTime = Date.now();
+        const latency = endTime - startTime;
+        
+        const statusEl = document.getElementById('connectionStatus');
+        const textEl = document.getElementById('connectionText');
+        
+        if (!statusEl) return;
+        
+        // إزالة كلاس visible
+        statusEl.classList.remove('visible');
+        
+        if (latency < 200) {
+            // ✅ اتصال ممتاز - إخفاء المؤشر
+            statusEl.className = 'connection-status online';
+            statusEl.style.display = 'none';
+            if (textEl) textEl.textContent = 'متصل';
+            console.log('✅ اتصال ممتاز - مخفي');
+        } else if (latency < 500) {
+            // 🟡 اتصال متوسط - إظهار بلون أصفر
+            statusEl.className = 'connection-status slow visible';
+            statusEl.style.display = 'flex';
+            if (textEl) textEl.textContent = '🟡 اتصال بطيء';
+            console.log('🟡 اتصال بطيء - ظاهر');
+        } else {
+            // 🔴 اتصال ضعيف - إظهار بلون أحمر
+            statusEl.className = 'connection-status offline visible';
+            statusEl.style.display = 'flex';
+            if (textEl) textEl.textContent = '🔴 اتصال ضعيف';
+            console.log('🔴 اتصال ضعيف - ظاهر');
+        }
+    } catch (e) {
+        // ❌ لا يوجد اتصال
+        const statusEl = document.getElementById('connectionStatus');
+        if (statusEl) {
+            statusEl.className = 'connection-status offline visible';
+            statusEl.style.display = 'flex';
+            document.getElementById('connectionText').textContent = '🔴 غير متصل';
+        }
+    }
+}
+
+// ============================================================
+// مراقبة جودة الاتصال بشكل دوري
+// ============================================================
+
+let connectionCheckInterval = null;
+
+function startConnectionMonitoring() {
+    // التحقق فوراً
+    checkConnectionQuality();
+    
+    // التحقق كل 30 ثانية
+    if (connectionCheckInterval) {
+        clearInterval(connectionCheckInterval);
+    }
+    connectionCheckInterval = setInterval(checkConnectionQuality, 30000);
+}
+
+function stopConnectionMonitoring() {
+    if (connectionCheckInterval) {
+        clearInterval(connectionCheckInterval);
+        connectionCheckInterval = null;
     }
 }
 
@@ -2527,52 +2911,6 @@ for (const player of sorted) {
     }
 };
 
-// ============================================================
-// نظام المستويات (أرقام فقط 1-100)
-// ============================================================
-
-function getLevel(score) {
-    const points = typeof score === 'number' ? score : 0;
-    const maxLevel = 100;
-    const pointsPerLevel = 1000;
-    
-    let level = Math.floor(points / pointsPerLevel) + 1;
-    if (level > maxLevel) level = maxLevel;
-    if (level < 1) level = 1;
-    
-    const min = (level - 1) * pointsPerLevel;
-    
-    return { level, min };
-}
-
-function getLevelProgress(score) {
-    const points = typeof score === 'number' ? score : 0;
-    const current = getLevel(points);
-    
-    if (current.level >= 100) {
-        return {
-            progress: 100,
-            currentLevel: 100,
-            nextLevel: 100,
-            nextMin: null,
-            levelsGained: 0
-        };
-    }
-    
-    const nextLevelNum = current.level + 1;
-    const nextMin = nextLevelNum * 1000;
-    const range = 1000;
-    const progress = ((points - current.min) / range) * 100;
-    
-    return {
-        progress: Math.min(Math.max(progress, 0), 100),
-        currentLevel: current.level,
-        nextLevel: nextLevelNum,
-        nextMin: nextMin,
-        levelsGained: 0
-    };
-}
-
 function capitalize(str) {
     if (!str) return '';
     return str.charAt(0).toUpperCase() + str.slice(1);
@@ -2690,88 +3028,107 @@ const AuthService = {
     _listeners: [],
     _isInitialized: false,
 
-    async init() {
-        if (this._isInitialized) return Promise.resolve(this.currentUser);
-        if (!isFirebaseReady) {
-            this._isInitialized = true;
-            return Promise.resolve(null);
-        }
-
-        return new Promise((resolve) => {
-            auth.onAuthStateChanged(async (user) => {
-                if (user) {
-                    try {
-                        const doc = await db.collection('users').doc(user.uid).get();
-                        const data = doc.exists ? doc.data() : {};
-                        this.currentUser = {
-    uid: user.uid,
-    email: user.email,
-    displayName: user.displayName || data.displayName || user.email,
-    username: data.username || user.displayName || user.email,
-    fullName: data.fullName || data.displayName || user.displayName || user.email,
-    role: data.role || 'user',
-    totalScore: data.totalScore || 0,
-    coins: data.coins || 0,
-    gems: data.gems || 0,
-    achievements: data.achievements || [],
-    inventory: data.inventory || [],
-    activeItems: data.activeItems || [],
-    activeItemDetails: data.activeItemDetails || [],
-    bio: data.bio || '',
-    location: data.location || '',
-    avatar: data.avatar || null,
-    age: data.age || null,
-    gender: data.gender || null,
-    country: data.country || null,
-    countryName: data.countryName || null,
-    countryFlag: data.countryFlag || null,
-    profileCompleted: data.profileCompleted || false,
-    ageGroup: data.ageGroup || null,
-    createdAt: data.createdAt || new Date().toISOString(),
-    adminRole: data.adminRole || null,
-    friends: data.friends || [],
-    blocked: data.blocked || [],
-    rankPoints: data.rankPoints || 0,
-    stats: data.stats || { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 }
-                        };
-                        localStorage.setItem('football_user_uid', user.uid);
-                    } catch (e) {
-                        console.warn('Error fetching user data:', e);
-                        this.currentUser = {
-                            uid: user.uid,
-                            email: user.email,
-                            displayName: user.displayName || user.email,
-                            username: user.displayName || user.email,
-                            role: 'user',
-                            totalScore: 0,
-                            coins: 0,
-                            achievements: [],
-                            inventory: [],
-                            bio: '',
-                            location: '',
-                            avatar: null,
-                            createdAt: new Date().toISOString(),
-                            adminRole: null,
-                            friends: [],
-                            blocked: [],
-                            rankPoints: data.rankPoints || 0,
-                            stats: { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 }
-                        };
-                    }
-    // ✅ مزامنة الإنجازات مع المستخدم
-    if (typeof AchievementManager !== 'undefined' && AchievementManager.syncWithUser) {
-        AchievementManager.syncWithUser(user);
+async init() {
+    if (this._isInitialized) return Promise.resolve(this.currentUser);
+    if (!isFirebaseReady) {
+        this._isInitialized = true;
+        return Promise.resolve(null);
     }
-}
- else {
-                    this.currentUser = null;
-                    localStorage.removeItem('football_user_uid');
+
+    return new Promise((resolve) => {
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                try {
+                    const doc = await db.collection('users').doc(user.uid).get();
+                    const data = doc.exists ? doc.data() : {};
+                    
+                    // ✅ تعيين المستخدم مع جميع الحقول
+                    this.currentUser = {
+                        uid: user.uid,
+                        email: user.email,
+                        displayName: user.displayName || data.displayName || user.email,
+                        username: data.username || user.displayName || user.email,
+                        fullName: data.fullName || data.displayName || user.displayName || user.email,
+                        role: data.role || 'user',
+                        totalScore: data.totalScore || 0,
+                        coins: data.coins || 0,
+                        gems: data.gems || 0,
+                        achievements: data.achievements || [],
+                        inventory: data.inventory || [],
+                        activeItems: data.activeItems || [],
+                        activeItemDetails: data.activeItemDetails || [],
+                        bio: data.bio || '',
+                        location: data.location || '',
+                        avatar: data.avatar || null,
+                        // ✅ حقول العمر والجنس والدولة
+                        age: data.age || null,
+                        gender: data.gender || null,
+                        country: data.country || null,
+                        countryName: data.countryName || null,
+                        countryFlag: data.countryFlag || null,
+                        profileCompleted: data.profileCompleted || false,
+                        profileSkipped: data.profileSkipped || false,
+                        ageGroup: data.ageGroup || null,
+                        createdAt: data.createdAt || new Date().toISOString(),
+                        adminRole: data.adminRole || null,
+                        friends: data.friends || [],
+                        blocked: data.blocked || [],
+                        rankPoints: data.rankPoints || 0,
+                        stats: data.stats || { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 },
+                        clan: data.clan || 'غير منضم',
+                        claimedLevelRewards: data.claimedLevelRewards || []
+                    };
+                    localStorage.setItem('football_user_uid', user.uid);
+                } catch (e) {
+                    console.warn('Error fetching user data:', e);
+                    this.currentUser = {
+                        uid: user.uid,
+                        email: user.email,
+                        displayName: user.displayName || user.email,
+                        username: user.displayName || user.email,
+                        fullName: user.displayName || user.email,
+                        role: 'user',
+                        totalScore: 0,
+                        coins: 0,
+                        gems: 0,
+                        achievements: [],
+                        inventory: [],
+                        activeItems: [],
+                        activeItemDetails: [],
+                        bio: '',
+                        location: '',
+                        avatar: null,
+                        age: null,
+                        gender: null,
+                        country: null,
+                        countryName: null,
+                        countryFlag: null,
+                        profileCompleted: false,
+                        profileSkipped: false,
+                        ageGroup: null,
+                        createdAt: new Date().toISOString(),
+                        adminRole: null,
+                        friends: [],
+                        blocked: [],
+                        rankPoints: 0,
+                        stats: { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 },
+                        clan: 'غير منضم',
+                        claimedLevelRewards: []
+                    };
                 }
-                this._isInitialized = true;
-                this._notifyListeners();
-                resolve(this.currentUser);
-            });
+                // ✅ مزامنة الإنجازات مع المستخدم
+                if (typeof AchievementManager !== 'undefined' && AchievementManager.syncWithUser) {
+                    AchievementManager.syncWithUser(user);
+                }
+            } else {
+                this.currentUser = null;
+                localStorage.removeItem('football_user_uid');
+            }
+            this._isInitialized = true;
+            this._notifyListeners();
+            resolve(this.currentUser);
         });
+    });
     if (typeof App._refreshActiveBoosts === 'function') {
         App._refreshActiveBoosts();
     }
@@ -2785,24 +3142,38 @@ const AuthService = {
             const doc = await db.collection('users').doc(cred.user.uid).get();
             const data = doc.exists ? doc.data() : {};
             this.currentUser = {
-                uid: cred.user.uid,
-                email: cred.user.email,
-                displayName: cred.user.displayName || data.displayName || cred.user.email,
-                username: data.username || cred.user.displayName || cred.user.email,
-                role: data.role || 'user',
-                totalScore: data.totalScore || 0,
-                coins: data.coins || 0,
-                achievements: data.achievements || [],
-                inventory: data.inventory || [],
-                bio: data.bio || '',
-                location: data.location || '',
-                avatar: data.avatar || null,
-                createdAt: data.createdAt || new Date().toISOString(),
-                adminRole: data.adminRole || null,
-                friends: data.friends || [],
-                blocked: data.blocked || [],
-                rankPoints: data.rankPoints || 0,
-                stats: data.stats || { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 }
+            uid: cred.user.uid,
+            email: cred.user.email,
+            displayName: cred.user.displayName || data.displayName || cred.user.email,
+            username: data.username || cred.user.displayName || cred.user.email,
+            fullName: data.fullName || data.displayName || cred.user.displayName || cred.user.email,
+            role: data.role || 'user',
+            totalScore: data.totalScore || 0,
+            coins: data.coins || 0,
+            gems: data.gems || 0,
+            achievements: data.achievements || [],
+            inventory: data.inventory || [],
+            activeItems: data.activeItems || [],
+            activeItemDetails: data.activeItemDetails || [],
+            bio: data.bio || '',
+            location: data.location || '',
+            avatar: data.avatar || null,
+            // ✅ حقول العمر والجنس والدولة
+            age: data.age || null,
+            gender: data.gender || null,
+            country: data.country || null,
+            countryName: data.countryName || null,
+            countryFlag: data.countryFlag || null,
+            profileCompleted: data.profileCompleted || false,
+            profileSkipped: data.profileSkipped || false,
+            ageGroup: data.ageGroup || null,
+            createdAt: data.createdAt || new Date().toISOString(),
+            adminRole: data.adminRole || null,
+            friends: data.friends || [],
+            blocked: data.blocked || [],
+            rankPoints: data.rankPoints || 0,
+            stats: data.stats || { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 },
+            clan: data.clan || 'غير منضم'
             };
             localStorage.setItem('football_user_uid', cred.user.uid);
             this._notifyListeners();
@@ -2946,20 +3317,31 @@ async register(email, password, username, fullName) {
             role: 'user',
             totalScore: 0,
             coins: 100,
+            gems: 0,
             achievements: [],
             inventory: [],
             activeItems: [],
             activeItemDetails: [],
             bio: '',
             location: '',
-            avatar: DEFAULT_AVATAR_PATH,
+            avatar: defaultAvatar,
+            // ✅ حقول العمر والجنس والدولة (بقيم افتراضية)
+            age: defaultAge,
+            gender: defaultGender,
+            country: defaultCountry,
+            countryName: 'السعودية',
+            countryFlag: 'images/flags/sa.png',
+            profileCompleted: false,
+            profileSkipped: false,
+            ageGroup: 'young',
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             adminRole: null,
             friends: [],
             blocked: [],
             stats: defaultStats,
             rankPoints: 0,
-            profileCompleted: false // ✅ أضف هذا السطر
+            clan: 'غير منضم',
+            claimedLevelRewards: []
         });
         
         // ✅ تعيين المستخدم الحالي (بدون استخدام data غير المعرفة)
@@ -2972,19 +3354,31 @@ async register(email, password, username, fullName) {
             role: 'user',
             totalScore: 0,
             coins: 100,
+            gems: 0,
             achievements: [],
             inventory: [],
             activeItems: [],
             activeItemDetails: [],
             bio: '',
             location: '',
-            avatar: DEFAULT_AVATAR_PATH,
+            avatar: defaultAvatar,
+            // ✅ حقول العمر والجنس والدولة
+            age: defaultAge,
+            gender: defaultGender,
+            country: defaultCountry,
+            countryName: 'السعودية',
+            countryFlag: 'images/flags/sa.png',
+            profileCompleted: false,
+            profileSkipped: false,
+            ageGroup: 'young',
             createdAt: new Date().toISOString(),
             adminRole: null,
             friends: [],
             blocked: [],
             stats: defaultStats,
-            rankPoints: 0
+            rankPoints: 0,
+            clan: 'غير منضم',
+            claimedLevelRewards: []
         };
         
         localStorage.setItem('football_user_uid', cred.user.uid);
@@ -3235,9 +3629,8 @@ function getSafeElementValue(elementId, defaultValue = 0) {
 const rankRequired = parseInt(getSafeElementValue('qRankRequired', 0)) || 0;
 
 // ============================================================
-// نظام الإنجازات الجديد (67 إنجازاً مع صور)
+// قائمة الإنجازات الافتراضية (تُستخدم كـ fallback إذا لم تكن هناك بيانات في Firestore)
 // ============================================================
-
 const ACHIEVEMENTS_DATA = [
     // ===== 1-6: إنجازات الانتصارات الكلية =====
     {
@@ -3246,6 +3639,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق أول انتصار لك في اللعبة',
         category: 'انتصارات',
         points: 20,
+        coins: 50,   // ✅ نقود إضافية
         image: 'images/achievements/first_win.png',
         check: (data) => data.totalWins >= 1
     },
@@ -3255,6 +3649,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 10 انتصارات في اللعبة',
         category: 'انتصارات',
         points: 40,
+        coins: 100,
         image: 'images/achievements/wins_10.png',
         check: (data) => data.totalWins >= 10
     },
@@ -3264,6 +3659,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 50 انتصاراً في اللعبة',
         category: 'انتصارات',
         points: 80,
+        coins: 200,
         image: 'images/achievements/wins_50.png',
         check: (data) => data.totalWins >= 50
     },
@@ -3273,15 +3669,17 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 100 انتصار في اللعبة',
         category: 'انتصارات',
         points: 150,
+        coins: 350,
         image: 'images/achievements/wins_100.png',
         check: (data) => data.totalWins >= 100
     },
-        {
+    {
         id: 'wins_250',
         name: '250 انتصاراً',
         description: 'حقق 250 انتصار في اللعبة',
         category: 'انتصارات',
         points: 250,
+        coins: 500,
         image: 'images/achievements/wins_250.png',
         check: (data) => data.totalWins >= 250
     },
@@ -3291,6 +3689,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 500 انتصار في اللعبة',
         category: 'انتصارات',
         points: 500,
+        coins: 1000,
         image: 'images/achievements/wins_500.png',
         check: (data) => data.totalWins >= 500
     },
@@ -3300,6 +3699,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 1000 انتصار في اللعبة',
         category: 'انتصارات',
         points: 1000,
+        coins: 2000,
         image: 'images/achievements/wins_1000.png',
         check: (data) => data.totalWins >= 1000
     },
@@ -3309,6 +3709,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 1500 انتصار في اللعبة',
         category: 'انتصارات',
         points: 1500,
+        coins: 3000,
         image: 'images/achievements/wins_1500.png',
         check: (data) => data.totalWins >= 1500
     },
@@ -3318,6 +3719,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 2000 انتصار في اللعبة',
         category: 'انتصارات',
         points: 2000,
+        coins: 4000,
         image: 'images/achievements/wins_2000.png',
         check: (data) => data.totalWins >= 2000
     },
@@ -3329,6 +3731,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'اهزم نفس اللاعب 3 مرات متتالية',
         category: 'خصوم',
         points: 60,
+        coins: 150,
         image: 'images/achievements/beat_same_3.png',
         check: (data) => data.sameOpponentStreak >= 3
     },
@@ -3338,6 +3741,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'اهزم نفس اللاعب 5 مرات متتالية',
         category: 'خصوم',
         points: 100,
+        coins: 250,
         image: 'images/achievements/beat_same_5.png',
         check: (data) => data.sameOpponentStreak >= 5
     },
@@ -3347,6 +3751,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'اهزم نفس اللاعب 10 مرات متتالية',
         category: 'خصوم',
         points: 200,
+        coins: 500,
         image: 'images/achievements/beat_same_10.png',
         check: (data) => data.sameOpponentStreak >= 10
     },
@@ -3356,6 +3761,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'احصل على أعلى نقاط في جولة ضد 3 لاعبين أو أكثر',
         category: 'خصوم',
         points: 150,
+        coins: 400,
         image: 'images/achievements/champion_round.png',
         check: (data) => data.roundChampion === true
     },
@@ -3367,6 +3773,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 3 انتصارات متتالية',
         category: 'سلسلة انتصارات',
         points: 30,
+        coins: 80,
         image: 'images/achievements/streak_3.png',
         check: (data) => data.winStreak >= 3
     },
@@ -3376,6 +3783,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 5 انتصارات متتالية',
         category: 'سلسلة انتصارات',
         points: 50,
+        coins: 120,
         image: 'images/achievements/streak_5.png',
         check: (data) => data.winStreak >= 5
     },
@@ -3385,6 +3793,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 10 انتصارات متتالية',
         category: 'سلسلة انتصارات',
         points: 100,
+        coins: 250,
         image: 'images/achievements/streak_10.png',
         check: (data) => data.winStreak >= 10
     },
@@ -3394,6 +3803,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 20 انتصاراً متتالياً',
         category: 'سلسلة انتصارات',
         points: 200,
+        coins: 500,
         image: 'images/achievements/streak_20.png',
         check: (data) => data.winStreak >= 20
     },
@@ -3403,6 +3813,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 30 انتصاراً متتالياً',
         category: 'سلسلة انتصارات',
         points: 350,
+        coins: 800,
         image: 'images/achievements/streak_30.png',
         check: (data) => data.winStreak >= 30
     },
@@ -3412,6 +3823,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 40 انتصاراً متتالياً',
         category: 'سلسلة انتصارات',
         points: 500,
+        coins: 1200,
         image: 'images/achievements/streak_40.png',
         check: (data) => data.winStreak >= 40
     },
@@ -3421,6 +3833,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 50 انتصاراً متتالياً',
         category: 'سلسلة انتصارات',
         points: 750,
+        coins: 1800,
         image: 'images/achievements/streak_50.png',
         check: (data) => data.winStreak >= 50
     },
@@ -3430,6 +3843,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 100 انتصاراً متتالياً',
         category: 'سلسلة انتصارات',
         points: 1500,
+        coins: 3500,
         image: 'images/achievements/streak_100.png',
         check: (data) => data.winStreak >= 100
     },
@@ -3441,6 +3855,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 10 أسئلة بشكل صحيح متتالي',
         category: 'إجابات متتالية',
         points: 30,
+        coins: 80,
         image: 'images/achievements/correct_10.png',
         check: (data) => data.correctStreak >= 10
     },
@@ -3450,6 +3865,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 25 سؤالاً بشكل صحيح متتالي',
         category: 'إجابات متتالية',
         points: 60,
+        coins: 150,
         image: 'images/achievements/correct_25.png',
         check: (data) => data.correctStreak >= 25
     },
@@ -3459,6 +3875,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 50 سؤالاً بشكل صحيح متتالي',
         category: 'إجابات متتالية',
         points: 120,
+        coins: 300,
         image: 'images/achievements/correct_50.png',
         check: (data) => data.correctStreak >= 50
     },
@@ -3468,15 +3885,17 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 100 سؤال بشكل صحيح متتالي',
         category: 'إجابات متتالية',
         points: 250,
+        coins: 600,
         image: 'images/achievements/correct_100.png',
         check: (data) => data.correctStreak >= 100
     },
-        {
+    {
         id: 'correct_200',
         name: '200 إجابة صحيحة متتالية',
         description: 'أجب على 200 سؤال بشكل صحيح متتالي',
         category: 'إجابات متتالية',
         points: 500,
+        coins: 1200,
         image: 'images/achievements/correct_200.png',
         check: (data) => data.correctStreak >= 200
     },
@@ -3486,6 +3905,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 10 أسئلة بشكل صحيح متتالي في مباراة واحدة',
         category: 'إجابات متتالية',
         points: 150,
+        coins: 350,
         image: 'images/achievements/correct_game_10.png',
         check: (data) => data.gameCorrectStreak >= 10
     },
@@ -3495,6 +3915,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 25 أسئلة بشكل صحيح متتالي في مباراة واحدة',
         category: 'إجابات متتالية',
         points: 300,
+        coins: 700,
         image: 'images/achievements/correct_game_25.png',
         check: (data) => data.gameCorrectStreak >= 25
     },
@@ -3504,6 +3925,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 50 أسئلة بشكل صحيح متتالي في مباراة واحدة',
         category: 'إجابات متتالية',
         points: 600,
+        coins: 1400,
         image: 'images/achievements/correct_game_50.png',
         check: (data) => data.gameCorrectStreak >= 50
     },
@@ -3513,6 +3935,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 100 سؤالاً بشكل صحيح متتالي في مباراة واحدة',
         category: 'إجابات متتالية',
         points: 1200,
+        coins: 2800,
         image: 'images/achievements/correct_game_100.png',
         check: (data) => data.gameCorrectStreak >= 100
     },
@@ -3522,6 +3945,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 200 سؤالاً بشكل صحيح متتالي في مباراة واحدة',
         category: 'إجابات متتالية',
         points: 2400,
+        coins: 5600,
         image: 'images/achievements/correct_game_200.png',
         check: (data) => data.gameCorrectStreak >= 200
     },
@@ -3533,6 +3957,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 10 أسئلة في المجموع',
         category: 'إجابات كلية',
         points: 10,
+        coins: 25,
         image: 'images/achievements/answers_10.png',
         check: (data) => data.totalAnswers >= 10
     },
@@ -3542,6 +3967,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 25 سؤالاً في المجموع',
         category: 'إجابات كلية',
         points: 20,
+        coins: 50,
         image: 'images/achievements/answers_25.png',
         check: (data) => data.totalAnswers >= 25
     },
@@ -3551,6 +3977,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 50 سؤالاً في المجموع',
         category: 'إجابات كلية',
         points: 40,
+        coins: 100,
         image: 'images/achievements/answers_50.png',
         check: (data) => data.totalAnswers >= 50
     },
@@ -3560,6 +3987,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 100 سؤال في المجموع',
         category: 'إجابات كلية',
         points: 80,
+        coins: 200,
         image: 'images/achievements/answers_100.png',
         check: (data) => data.totalAnswers >= 100
     },
@@ -3569,6 +3997,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 250 سؤالاً في المجموع',
         category: 'إجابات كلية',
         points: 150,
+        coins: 400,
         image: 'images/achievements/answers_250.png',
         check: (data) => data.totalAnswers >= 250
     },
@@ -3578,6 +4007,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 500 سؤال في المجموع',
         category: 'إجابات كلية',
         points: 300,
+        coins: 700,
         image: 'images/achievements/answers_500.png',
         check: (data) => data.totalAnswers >= 500
     },
@@ -3587,15 +4017,17 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 1000 سؤال في المجموع',
         category: 'إجابات كلية',
         points: 600,
+        coins: 1500,
         image: 'images/achievements/answers_1000.png',
         check: (data) => data.totalAnswers >= 1000
     },
-        {
+    {
         id: 'answers_2000',
         name: 'أسطورة المثابرة',
         description: 'أجب على 2000 سؤال في المجموع',
         category: 'إجابات كلية',
         points: 1200,
+        coins: 3000,
         image: 'images/achievements/answers_2000.png',
         check: (data) => data.totalAnswers >= 2000
     },
@@ -3607,6 +4039,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أنهِ مباراة بمتوسط وقت 20 ثواني أو أقل',
         category: 'الوقت',
         points: 50,
+        coins: 120,
         image: 'images/achievements/avg_time_20.png',
         check: (data) => data.avgTime <= 20 && data.gamesPlayed > 0
     },
@@ -3616,6 +4049,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أنهِ مباراة بمتوسط وقت 10 ثواني أو أقل',
         category: 'الوقت',
         points: 100,
+        coins: 250,
         image: 'images/achievements/avg_time_10.png',
         check: (data) => data.avgTime <= 10 && data.gamesPlayed > 0
     },
@@ -3625,6 +4059,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أنهِ مباراة بمتوسط وقت 5 ثواني أو أقل',
         category: 'الوقت',
         points: 150,
+        coins: 350,
         image: 'images/achievements/avg_time_5.png',
         check: (data) => data.avgTime <= 5 && data.gamesPlayed > 0
     },
@@ -3634,6 +4069,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على سؤال في أول ثانية',
         category: 'الوقت',
         points: 20,
+        coins: 50,
         image: 'images/achievements/answer_1s.png',
         check: (data) => data.answerIn1s >= 1
     },
@@ -3643,6 +4079,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على سؤالين في أول ثانية من كل سؤال',
         category: 'الوقت',
         points: 40,
+        coins: 100,
         image: 'images/achievements/answers_1s_2.png',
         check: (data) => data.answerIn1s >= 2
     },
@@ -3652,6 +4089,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 5 أسئلة في أول ثانية من كل سؤال',
         category: 'الوقت',
         points: 80,
+        coins: 200,
         image: 'images/achievements/answers_1s_5.png',
         check: (data) => data.answerIn1s >= 5
     },
@@ -3661,6 +4099,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 10 أسئلة في أول ثانية من كل سؤال',
         category: 'الوقت',
         points: 150,
+        coins: 350,
         image: 'images/achievements/answers_1s_10.png',
         check: (data) => data.answerIn1s >= 10
     },
@@ -3670,6 +4109,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على جميع أسئلة الجولة في أول ثانية من كل سؤال',
         category: 'الوقت',
         points: 300,
+        coins: 700,
         image: 'images/achievements/answers_1s_all.png',
         check: (data) => data.allAnswersIn1s === true
     },
@@ -3681,6 +4121,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'قم باللعب لمدة 10 دقائق إجمالية',
         category: 'وقت اللعب',
         points: 20,
+        coins: 50,
         image: 'images/achievements/play_10min.png',
         check: (data) => data.totalPlayMinutes >= 10
     },
@@ -3690,6 +4131,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'قم باللعب لمدة 30 دقيقة إجمالية',
         category: 'وقت اللعب',
         points: 50,
+        coins: 120,
         image: 'images/achievements/play_30min.png',
         check: (data) => data.totalPlayMinutes >= 30
     },
@@ -3699,6 +4141,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'قم باللعب لمدة 60 دقيقة إجمالية',
         category: 'وقت اللعب',
         points: 100,
+        coins: 250,
         image: 'images/achievements/play_60min.png',
         check: (data) => data.totalPlayMinutes >= 60
     },
@@ -3708,6 +4151,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'قم باللعب لمدة 120 دقيقة إجمالية',
         category: 'وقت اللعب',
         points: 200,
+        coins: 500,
         image: 'images/achievements/play_120min.png',
         check: (data) => data.totalPlayMinutes >= 120
     },
@@ -3717,33 +4161,37 @@ const ACHIEVEMENTS_DATA = [
         description: 'قم باللعب لمدة 240 دقيقة إجمالية',
         category: 'وقت اللعب',
         points: 400,
+        coins: 1000,
         image: 'images/achievements/play_240min.png',
         check: (data) => data.totalPlayMinutes >= 240
     },
-        {
+    {
         id: 'play_480min',
         name: 'العب لمدة 480 دقيقة',
         description: 'قم باللعب لمدة 480 دقيقة إجمالية',
         category: 'وقت اللعب',
         points: 800,
+        coins: 2000,
         image: 'images/achievements/play_480min.png',
         check: (data) => data.totalPlayMinutes >= 480
     },
-            {
+    {
         id: 'play_960min',
         name: 'العب لمدة 960 دقيقة',
         description: 'قم باللعب لمدة 960 دقيقة إجمالية',
         category: 'وقت اللعب',
         points: 1600,
+        coins: 4000,
         image: 'images/achievements/play_960min.png',
         check: (data) => data.totalPlayMinutes >= 960
     },
-            {
+    {
         id: 'play_1920min',
         name: 'العب لمدة 1920 دقيقة',
         description: 'قم باللعب لمدة 1920 دقيقة إجمالية',
         category: 'وقت اللعب',
         points: 1600,
+        coins: 4000,
         image: 'images/achievements/play_1920min.png',
         check: (data) => data.totalPlayMinutes >= 1920
     },
@@ -3755,6 +4203,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'افتح صندوقاً واحداً',
         category: 'صناديق',
         points: 10,
+        coins: 25,
         image: 'images/achievements/open_box_1.png',
         check: (data) => data.boxesOpened >= 1
     },
@@ -3764,6 +4213,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'افتح 5 صناديق',
         category: 'صناديق',
         points: 30,
+        coins: 80,
         image: 'images/achievements/open_box_5.png',
         check: (data) => data.boxesOpened >= 5
     },
@@ -3773,6 +4223,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'افتح 10 صناديق',
         category: 'صناديق',
         points: 60,
+        coins: 150,
         image: 'images/achievements/open_box_10.png',
         check: (data) => data.boxesOpened >= 10
     },
@@ -3782,6 +4233,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'افتح 25 صندوقاً',
         category: 'صناديق',
         points: 150,
+        coins: 350,
         image: 'images/achievements/open_box_25.png',
         check: (data) => data.boxesOpened >= 25
     },
@@ -3791,6 +4243,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'افتح 50 صندوقاً',
         category: 'صناديق',
         points: 300,
+        coins: 700,
         image: 'images/achievements/open_box_50.png',
         check: (data) => data.boxesOpened >= 50
     },
@@ -3800,15 +4253,17 @@ const ACHIEVEMENTS_DATA = [
         description: 'افتح 100 صندوق',
         category: 'صناديق',
         points: 600,
+        coins: 1400,
         image: 'images/achievements/open_box_100.png',
         check: (data) => data.boxesOpened >= 100
     },
-        {
+    {
         id: 'open_box_250',
         name: 'افتح 250 صندوق',
         description: 'افتح 250 صندوق',
         category: 'صناديق',
         points: 1500,
+        coins: 3500,
         image: 'images/achievements/open_box_250.png',
         check: (data) => data.boxesOpened >= 250
     },
@@ -3820,6 +4275,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق أول فوز لك في الأطوار التصنيفية',
         category: 'أطوار مصنفة',
         points: 30,
+        coins: 80,
         image: 'images/achievements/ranked_first_win.png',
         check: (data) => data.rankedWins >= 1
     },
@@ -3829,6 +4285,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 10 انتصارات في الأطوار التصنيفية',
         category: 'أطوار مصنفة',
         points: 60,
+        coins: 150,
         image: 'images/achievements/ranked_wins_10.png',
         check: (data) => data.rankedWins >= 10
     },
@@ -3838,6 +4295,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 50 انتصاراً في الأطوار التصنيفية',
         category: 'أطوار مصنفة',
         points: 150,
+        coins: 350,
         image: 'images/achievements/ranked_wins_50.png',
         check: (data) => data.rankedWins >= 50
     },
@@ -3847,6 +4305,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 100 انتصار في الأطوار التصنيفية',
         category: 'أطوار مصنفة',
         points: 300,
+        coins: 700,
         image: 'images/achievements/ranked_wins_100.png',
         check: (data) => data.rankedWins >= 100
     },
@@ -3856,6 +4315,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 5 انتصارات متتالية في الأطوار التصنيفية',
         category: 'أطوار مصنفة',
         points: 80,
+        coins: 200,
         image: 'images/achievements/ranked_streak_5.png',
         check: (data) => data.rankedStreak >= 5
     },
@@ -3865,6 +4325,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 10 انتصارات متتالية في الأطوار التصنيفية',
         category: 'أطوار مصنفة',
         points: 200,
+        coins: 500,
         image: 'images/achievements/ranked_streak_10.png',
         check: (data) => data.rankedStreak >= 10
     },
@@ -3876,6 +4337,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق أول فوز لك في الأطوار الودية',
         category: 'أطوار ودية',
         points: 15,
+        coins: 40,
         image: 'images/achievements/unranked_first_win.png',
         check: (data) => data.unrankedWins >= 1
     },
@@ -3885,6 +4347,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 25 انتصاراً في الأطوار الودية',
         category: 'أطوار ودية',
         points: 50,
+        coins: 120,
         image: 'images/achievements/unranked_wins_25.png',
         check: (data) => data.unrankedWins >= 25
     },
@@ -3894,6 +4357,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'حقق 100 انتصار في الأطوار الودية',
         category: 'أطوار ودية',
         points: 150,
+        coins: 350,
         image: 'images/achievements/unranked_wins_100.png',
         check: (data) => data.unrankedWins >= 100
     },
@@ -3903,6 +4367,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على جميع الأسئلة بشكل صحيح في مباراة ودية',
         category: 'أطوار ودية',
         points: 40,
+        coins: 100,
         image: 'images/achievements/unranked_perfect.png',
         check: (data) => data.unrankedPerfect >= 1
     },
@@ -3914,6 +4379,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أكمل أول جولة تدريبية',
         category: 'أطوار تدريب',
         points: 10,
+        coins: 25,
         image: 'images/achievements/training_first.png',
         check: (data) => data.trainingCompleted >= 1
     },
@@ -3923,6 +4389,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أكمل 10 جولات تدريبية',
         category: 'أطوار تدريب',
         points: 30,
+        coins: 80,
         image: 'images/achievements/training_10.png',
         check: (data) => data.trainingCompleted >= 10
     },
@@ -3932,6 +4399,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أكمل 50 جولة تدريبية',
         category: 'أطوار تدريب',
         points: 80,
+        coins: 200,
         image: 'images/achievements/training_50.png',
         check: (data) => data.trainingCompleted >= 50
     },
@@ -3941,6 +4409,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 10 أسئلة متتالية في وضع الصمود',
         category: 'أطوار تدريب',
         points: 50,
+        coins: 120,
         image: 'images/achievements/training_survival_10.png',
         check: (data) => data.survivalStreak >= 10
     },
@@ -3950,6 +4419,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 20 سؤالاً متتالياً في وضع الصمود',
         category: 'أطوار تدريب',
         points: 100,
+        coins: 250,
         image: 'images/achievements/training_survival_20.png',
         check: (data) => data.survivalStreak >= 20
     },
@@ -3959,6 +4429,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 20 سؤالاً بشكل صحيح في تحدي السرعة',
         category: 'أطوار تدريب',
         points: 60,
+        coins: 150,
         image: 'images/achievements/training_speed_20.png',
         check: (data) => data.speedCorrect >= 20
     },
@@ -3968,6 +4439,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أجب على 50 سؤالاً بشكل صحيح في تحدي السرعة',
         category: 'أطوار تدريب',
         points: 150,
+        coins: 350,
         image: 'images/achievements/training_speed_50.png',
         check: (data) => data.speedCorrect >= 50
     },
@@ -3979,6 +4451,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أنشئ أو انضم إلى أول غرفة',
         category: 'الغرف',
         points: 20,
+        coins: 50,
         image: 'images/achievements/room_first.png',
         check: (data) => data.roomsJoined >= 1
     },
@@ -3988,6 +4461,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'انضم إلى 10 غرف مختلفة',
         category: 'الغرف',
         points: 50,
+        coins: 120,
         image: 'images/achievements/room_10.png',
         check: (data) => data.roomsJoined >= 10
     },
@@ -3997,6 +4471,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'انضم إلى 50 غرفة مختلفة',
         category: 'الغرف',
         points: 120,
+        coins: 300,
         image: 'images/achievements/room_50.png',
         check: (data) => data.roomsJoined >= 50
     },
@@ -4006,6 +4481,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أنشئ أول غرفة لك',
         category: 'الغرف',
         points: 30,
+        coins: 80,
         image: 'images/achievements/room_host_first.png',
         check: (data) => data.roomsHosted >= 1
     },
@@ -4015,6 +4491,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'أنشئ 10 غرف',
         category: 'الغرف',
         points: 80,
+        coins: 200,
         image: 'images/achievements/room_host_10.png',
         check: (data) => data.roomsHosted >= 10
     },
@@ -4024,6 +4501,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'افز بأول مباراة في غرفة',
         category: 'الغرف',
         points: 40,
+        coins: 100,
         image: 'images/achievements/room_winner.png',
         check: (data) => data.roomWins >= 1
     },
@@ -4033,6 +4511,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'افز بـ 10 مباريات في الغرف',
         category: 'الغرف',
         points: 100,
+        coins: 250,
         image: 'images/achievements/room_winner_10.png',
         check: (data) => data.roomWins >= 10
     },
@@ -4042,6 +4521,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'انضم إلى أول غرفة ميجا (16-32 لاعباً)',
         category: 'الغرف',
         points: 60,
+        coins: 150,
         image: 'images/achievements/room_mega_first.png',
         check: (data) => data.megaRoomsJoined >= 1
     },
@@ -4053,6 +4533,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'العب جميع أنواع الأطوار (مصنف، ودي، تدريب، غرفة)',
         category: 'متنوع',
         points: 100,
+        coins: 250,
         image: 'images/achievements/all_modes_player.png',
         check: (data) => data.rankedWins >= 1 && data.unrankedWins >= 1 && data.trainingCompleted >= 1 && data.roomsJoined >= 1
     },
@@ -4062,6 +4543,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'افز بـ 50 مباراة في كل نوع من الأطوار',
         category: 'متنوع',
         points: 500,
+        coins: 1200,
         image: 'images/achievements/master_of_all.png',
         check: (data) => data.rankedWins >= 50 && data.unrankedWins >= 50 && data.trainingCompleted >= 50 && data.roomWins >= 50
     },
@@ -4073,6 +4555,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'الوصول لرتبة فضي مرة واحدة',
         category: 'الرتب',
         points: 50,
+        coins: 120,
         image: 'images/achievements/rank_silver_1.png',
         check: (data) => data.rankSilverCount >= 1
     },
@@ -4082,6 +4565,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'الوصول لرتبة فضي مرتين متتاليتين',
         category: 'الرتب',
         points: 100,
+        coins: 250,
         image: 'images/achievements/rank_silver_2.png',
         check: (data) => data.rankSilverCount >= 2
     },
@@ -4091,6 +4575,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'الوصول لرتبة فضي 3 مرات متتالية',
         category: 'الرتب',
         points: 150,
+        coins: 350,
         image: 'images/achievements/rank_silver_3.png',
         check: (data) => data.rankSilverCount >= 3
     },
@@ -4100,6 +4585,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'الوصول لرتبة ذهبي مرة واحدة',
         category: 'الرتب',
         points: 80,
+        coins: 200,
         image: 'images/achievements/rank_gold_1.png',
         check: (data) => data.rankGoldCount >= 1
     },
@@ -4109,6 +4595,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'الوصول لرتبة ذهبي مرتين متتاليتين',
         category: 'الرتب',
         points: 160,
+        coins: 400,
         image: 'images/achievements/rank_gold_2.png',
         check: (data) => data.rankGoldCount >= 2
     },
@@ -4118,6 +4605,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'الوصول لرتبة ذهبي 3 مرات متتالية',
         category: 'الرتب',
         points: 240,
+        coins: 600,
         image: 'images/achievements/rank_gold_3.png',
         check: (data) => data.rankGoldCount >= 3
     },
@@ -4127,6 +4615,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'الوصول لرتبة بلاتيني مرة واحدة',
         category: 'الرتب',
         points: 120,
+        coins: 300,
         image: 'images/achievements/rank_platinum_1.png',
         check: (data) => data.rankPlatinumCount >= 1
     },
@@ -4136,6 +4625,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'الوصول لرتبة بلاتيني مرتين متتاليتين',
         category: 'الرتب',
         points: 240,
+        coins: 600,
         image: 'images/achievements/rank_platinum_2.png',
         check: (data) => data.rankPlatinumCount >= 2
     },
@@ -4145,6 +4635,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'الوصول لرتبة بلاتيني 3 مرات متتالية',
         category: 'الرتب',
         points: 360,
+        coins: 900,
         image: 'images/achievements/rank_platinum_3.png',
         check: (data) => data.rankPlatinumCount >= 3
     },
@@ -4154,15 +4645,17 @@ const ACHIEVEMENTS_DATA = [
         description: 'الوصول لرتبة ماسي مرة واحدة',
         category: 'الرتب',
         points: 200,
+        coins: 500,
         image: 'images/achievements/rank_diamond_1.png',
         check: (data) => data.rankDiamondCount >= 1
     },
-        {
+    {
         id: 'rank_diamond_2',
         name: 'رتبة ماسي (مرتين)',
         description: 'الوصول لرتبة ماسي مرتين متتاليتين',
         category: 'الرتب',
         points: 350,
+        coins: 800,
         image: 'images/achievements/rank_diamond_2.png',
         check: (data) => data.rankDiamondCount >= 2
     },
@@ -4172,6 +4665,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'الوصول لرتبة محترف مرة واحدة',
         category: 'الرتب',
         points: 300,
+        coins: 700,
         image: 'images/achievements/rank_pro_1.png',
         check: (data) => data.rankProCount >= 1
     },
@@ -4181,6 +4675,7 @@ const ACHIEVEMENTS_DATA = [
         description: 'الوصول لرتبة أسطوري مرة واحدة',
         category: 'الرتب',
         points: 400,
+        coins: 1000,
         image: 'images/achievements/rank_legendary_1.png',
         check: (data) => data.rankLegendaryCount >= 1
     },
@@ -4190,20 +4685,24 @@ const ACHIEVEMENTS_DATA = [
         description: 'الوصول لرتبة بطل مرة واحدة',
         category: 'الرتب',
         points: 600,
+        coins: 1500,
         image: 'images/achievements/rank_champion_1.png',
         check: (data) => data.rankChampionCount >= 1
     },
 ];
 
 // ============================================================
-// نظام إدارة الإنجازات
+// نظام إدارة الإنجازات المتطور (متوافق مع Firestore)
 // ============================================================
 
 const AchievementManager = {
     _unlockedAchievements: [],
     _data: {},
-    _userId: null,  // ✅ إضافة معرف المستخدم
+    _userId: null,
+    _definitions: [],        // ✅ تعريفات الإنجازات المحملة من Firestore
+    _loaded: false,
 
+    // ===== التهيئة =====
     init() {
         // تحميل الإنجازات المفتوحة من localStorage
         try {
@@ -4225,21 +4724,51 @@ const AchievementManager = {
             this._data = {};
         }
         
-        // ✅ تعيين معرف المستخدم الحالي
+        // تعيين معرف المستخدم الحالي
         const user = AuthService.currentUser;
         if (user && user.uid) {
             this._userId = user.uid;
-            // ✅ محاولة تحميل البيانات من Firebase
             this._loadFromFirebase(user.uid);
         }
         
         // تهيئة البيانات الافتراضية
         this._initDefaultData();
+        
+        // تحميل تعريفات الإنجازات من Firestore
+        this.loadDefinitions();
     },
 
-    /**
-     * ✅ تحميل بيانات الإنجازات من Firebase
-     */
+    // ===== تحميل التعريفات من Firestore =====
+    async loadDefinitions() {
+        try {
+            const snapshot = await db.collection('achievementDefinitions')
+                .where('isActive', '==', true)
+                .get();
+            
+            this._definitions = [];
+            snapshot.forEach(doc => {
+                this._definitions.push({ id: doc.id, ...doc.data() });
+            });
+            
+            this._loaded = true;
+            console.log(`✅ Loaded ${this._definitions.length} achievement definitions from Firestore`);
+            return this._definitions;
+        } catch (e) {
+            console.warn('⚠️ Could not load achievement definitions from Firestore, using fallback:', e);
+            // ✅ استخدام البيانات الثابتة كـ fallback
+            this._definitions = ACHIEVEMENTS_DATA.map(ach => ({
+                ...ach,
+                pointsReward: ach.points || 10,
+                coinsReward: ach.coins || 20,
+                isActive: true,
+                checkLogic: ach.check ? ach.check.toString() : null
+            }));
+            this._loaded = true;
+            return this._definitions;
+        }
+    },
+
+    // ===== تحميل بيانات المستخدم من Firebase =====
     async _loadFromFirebase(userId) {
         if (!userId || !isFirebaseReady) return;
         
@@ -4248,31 +4777,24 @@ const AchievementManager = {
             if (doc.exists) {
                 const data = doc.data();
                 
-                // تحميل الإنجازات المفتوحة
                 if (data.achievements && Array.isArray(data.achievements)) {
                     this._unlockedAchievements = data.achievements;
                     localStorage.setItem('achievements_unlocked', JSON.stringify(this._unlockedAchievements));
                 }
                 
-                // تحميل بيانات التتبع
                 if (data.achievementData) {
                     this._data = data.achievementData;
                     localStorage.setItem('achievement_data', JSON.stringify(this._data));
                 }
                 
-                console.log('✅ Achievements loaded from Firebase:', {
-                    unlocked: this._unlockedAchievements.length,
-                    data: this._data
-                });
+                console.log('✅ Achievements loaded from Firebase');
             }
         } catch (e) {
             console.warn('⚠️ Could not load achievements from Firebase:', e);
         }
     },
 
-    /**
-     * ✅ حفظ بيانات الإنجازات في Firebase
-     */
+    // ===== حفظ بيانات الإنجازات في Firebase =====
     async _saveToFirebase() {
         if (!this._userId || !isFirebaseReady) return;
         
@@ -4282,17 +4804,14 @@ const AchievementManager = {
                 achievementData: this._data,
                 achievementsUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-            console.log('✅ Achievements saved to Firebase');
         } catch (e) {
             console.warn('⚠️ Could not save achievements to Firebase:', e);
-            // محاولة إنشاء المستند إذا لم يكن موجوداً
             try {
                 await db.collection('users').doc(this._userId).set({
                     achievements: this._unlockedAchievements,
                     achievementData: this._data,
                     achievementsUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
-                console.log('✅ Achievements created in Firebase');
             } catch (e2) {
                 console.warn('⚠️ Could not create achievements in Firebase:', e2);
             }
@@ -4304,62 +4823,232 @@ const AchievementManager = {
             localStorage.setItem('achievements_unlocked', JSON.stringify(this._unlockedAchievements));
             localStorage.setItem('achievement_data', JSON.stringify(this._data));
         } catch (e) {}
-        
-        // ✅ حفظ في Firebase أيضاً
         this._saveToFirebase();
     },
 
     _initDefaultData() {
-        if (!this._data.totalWins) this._data.totalWins = 0;
-        if (!this._data.winStreak) this._data.winStreak = 0;
-        if (!this._data.correctStreak) this._data.correctStreak = 0;
-        if (!this._data.totalAnswers) this._data.totalAnswers = 0;
-        if (!this._data.gamesPlayed) this._data.gamesPlayed = 0;
-        if (!this._data.boxesOpened) this._data.boxesOpened = 0;
-        if (!this._data.totalPlayMinutes) this._data.totalPlayMinutes = 0;
-        if (!this._data.sameOpponentStreak) this._data.sameOpponentStreak = 0;
-        if (!this._data.rankSilverCount) this._data.rankSilverCount = 0;
-        if (!this._data.rankGoldCount) this._data.rankGoldCount = 0;
-        if (!this._data.rankPlatinumCount) this._data.rankPlatinumCount = 0;
-        if (!this._data.rankDiamondCount) this._data.rankDiamondCount = 0;
-        if (!this._data.rankProCount) this._data.rankProCount = 0;
-        if (!this._data.rankLegendaryCount) this._data.rankLegendaryCount = 0;
-        if (!this._data.rankChampionCount) this._data.rankChampionCount = 0;
+        const defaults = {
+            totalWins: 0,
+            winStreak: 0,
+            correctStreak: 0,
+            totalAnswers: 0,
+            gamesPlayed: 0,
+            boxesOpened: 0,
+            totalPlayMinutes: 0,
+            sameOpponentStreak: 0,
+            rankSilverCount: 0,
+            rankGoldCount: 0,
+            rankPlatinumCount: 0,
+            rankDiamondCount: 0,
+            rankProCount: 0,
+            rankLegendaryCount: 0,
+            rankChampionCount: 0,
+            rankedWins: 0,
+            rankedStreak: 0,
+            rankedBestStreak: 0,
+            rankedMatches: 0,
+            rankedPerfect: 0,
+            unrankedWins: 0,
+            unrankedMatches: 0,
+            unrankedPerfect: 0,
+            unrankedStreak: 0,
+            trainingCompleted: 0,
+            survivalStreak: 0,
+            speedCorrect: 0,
+            trainingBestScore: 0,
+            trainingSurvivalWins: 0,
+            trainingSpeedWins: 0,
+            roomsJoined: 0,
+            roomsHosted: 0,
+            roomWins: 0,
+            megaRoomsJoined: 0,
+            roomBestScore: 0,
+            avgTime: 0,
+            answerIn1s: 0,
+            allAnswersIn1s: false,
+            gameCorrectStreak: 0,
+            roundChampion: false
+        };
         
-    // ============================================================
-    // ✅ إحصائيات الأطوار الجديدة
-    // ============================================================
-    
-    // الأطوار التصنيفية
-    if (!this._data.rankedWins) this._data.rankedWins = 0;
-    if (!this._data.rankedStreak) this._data.rankedStreak = 0;
-    if (!this._data.rankedBestStreak) this._data.rankedBestStreak = 0;
-    if (!this._data.rankedMatches) this._data.rankedMatches = 0;
-    if (!this._data.rankedPerfect) this._data.rankedPerfect = 0;
-    
-    // الأطوار الودية
-    if (!this._data.unrankedWins) this._data.unrankedWins = 0;
-    if (!this._data.unrankedMatches) this._data.unrankedMatches = 0;
-    if (!this._data.unrankedPerfect) this._data.unrankedPerfect = 0;
-    if (!this._data.unrankedStreak) this._data.unrankedStreak = 0;
-    
-    // أطوار التدريب
-    if (!this._data.trainingCompleted) this._data.trainingCompleted = 0;
-    if (!this._data.survivalStreak) this._data.survivalStreak = 0;
-    if (!this._data.speedCorrect) this._data.speedCorrect = 0;
-    if (!this._data.trainingBestScore) this._data.trainingBestScore = 0;
-    if (!this._data.trainingSurvivalWins) this._data.trainingSurvivalWins = 0;
-    if (!this._data.trainingSpeedWins) this._data.trainingSpeedWins = 0;
-    
-    // الغرف
-    if (!this._data.roomsJoined) this._data.roomsJoined = 0;
-    if (!this._data.roomsHosted) this._data.roomsHosted = 0;
-    if (!this._data.roomWins) this._data.roomWins = 0;
-    if (!this._data.megaRoomsJoined) this._data.megaRoomsJoined = 0;
-    if (!this._data.roomBestScore) this._data.roomBestScore = 0;
+        Object.keys(defaults).forEach(key => {
+            if (this._data[key] === undefined) {
+                this._data[key] = defaults[key];
+            }
+        });
+        
+        this._saveData();
+    },
 
-    this._saveData();
-},
+    // ===== تحديث بيانات التتبع =====
+    updateData(newData) {
+        Object.assign(this._data, newData);
+        this._saveData();
+    },
+
+    // ===== الحصول على جميع الإنجازات (مع حالة الفتح) =====
+    getAllAchievements() {
+        if (!this._loaded) {
+            console.warn('⚠️ Achievements not loaded yet');
+            return [];
+        }
+        
+        const unlockedIds = this._unlockedAchievements || [];
+        return this._definitions.map(def => ({
+            ...def,
+            unlocked: unlockedIds.includes(def.id),
+            points: def.pointsReward || 0,
+            coins: def.coinsReward || 0
+        }));
+    },
+
+    // ===== الحصول على الإنجازات المفتوحة =====
+    getUnlockedAchievements() {
+        return this.getAllAchievements().filter(a => a.unlocked);
+    },
+
+    // ===== الحصول على إحصائيات الإنجازات =====
+    getAchievementStats() {
+        const all = this.getAllAchievements();
+        const unlocked = all.filter(a => a.unlocked);
+        const totalPoints = unlocked.reduce((sum, a) => sum + (a.pointsReward || 0), 0);
+        const totalCoins = unlocked.reduce((sum, a) => sum + (a.coinsReward || 0), 0);
+        
+        return {
+            total: all.length,
+            unlocked: unlocked.length,
+            points: totalPoints,
+            coins: totalCoins
+        };
+    },
+
+    // ===== التحقق من الإنجازات الجديدة =====
+    checkAchievements(gameData) {
+        if (!this._loaded || this._definitions.length === 0) {
+            console.warn('⚠️ No achievement definitions loaded');
+            return [];
+        }
+
+        const user = AuthService.currentUser;
+        if (!user) return [];
+
+        const unlockedIds = this._unlockedAchievements || [];
+        const newAchievements = [];
+
+        // دمج بيانات التتبع مع بيانات المباراة
+        const checkData = { ...this._data, ...gameData };
+
+        for (const def of this._definitions) {
+            // تخطي الإنجازات المفتوحة بالفعل
+            if (unlockedIds.includes(def.id)) continue;
+
+            try {
+                let isUnlocked = false;
+                
+                // ✅ إذا كان هناك checkLogic (نص شرط)
+                if (def.checkLogic) {
+                    try {
+                        const fn = new Function('data', `return !!(function(){ return ${def.checkLogic}; })();`);
+                        isUnlocked = fn(checkData);
+                    } catch (e) {
+                        console.warn(`⚠️ Could not evaluate checkLogic for ${def.id}:`, e);
+                    }
+                }
+                // ✅ إذا كان هناك دالة check (للتوافق مع الإنجازات الثابتة)
+                else if (def.check && typeof def.check === 'function') {
+                    isUnlocked = def.check(checkData);
+                }
+
+                if (isUnlocked) {
+                    newAchievements.push({
+                        id: def.id,
+                        name: def.name || 'إنجاز',
+                        description: def.description || '',
+                        pointsReward: def.pointsReward || 10,
+                        coinsReward: def.coinsReward || 20,
+                        image: def.image || '🏆',
+                        category: def.category || 'عام'
+                    });
+                    
+                    // ✅ إضافة إلى قائمة المفتوحة فوراً (لمنع التكرار)
+                    if (!this._unlockedAchievements.includes(def.id)) {
+                        this._unlockedAchievements.push(def.id);
+                    }
+                }
+            } catch (e) {
+                console.warn(`⚠️ Error checking achievement ${def.id}:`, e);
+            }
+        }
+
+        // ✅ إذا كانت هناك إنجازات جديدة، احفظها
+        if (newAchievements.length > 0) {
+            this._saveData();
+            
+            // ✅ عرض الإشعارات
+            newAchievements.forEach(ach => {
+                showToast(`🏆 إنجاز جديد: ${ach.name}! (+${ach.pointsReward} نقطة, +${ach.coinsReward} نقود)`, 'success', 5000);
+            });
+            
+            // ✅ تشغيل صوت
+            if (typeof SoundSystem !== 'undefined') {
+                SoundSystem.playLevelUp();
+            }
+        }
+
+        return newAchievements;
+    },
+
+    // ===== مزامنة مع المستخدم =====
+    syncWithUser(user) {
+        if (!user || !user.uid) return;
+        this._userId = user.uid;
+        this._loadFromFirebase(user.uid);
+    },
+
+    // ===== حفظ تعريف إنجاز جديد (للمشرفين) =====
+    async saveDefinition(data) {
+        if (!AuthService.checkPermission('admin') && !AuthService.checkPermission('super_admin')) {
+            throw new Error('ليس لديك صلاحية');
+        }
+        
+        try {
+            if (data.id) {
+                await db.collection('achievementDefinitions').doc(data.id).update(data);
+            } else {
+                data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                const docRef = await db.collection('achievementDefinitions').add(data);
+                data.id = docRef.id;
+            }
+            await this.loadDefinitions();
+            return data;
+        } catch (e) {
+            console.error('❌ Error saving achievement definition:', e);
+            throw e;
+        }
+    },
+
+    // ===== حذف تعريف إنجاز (للمشرفين) =====
+    async deleteDefinition(id) {
+        if (!AuthService.checkPermission('admin') && !AuthService.checkPermission('super_admin')) {
+            throw new Error('ليس لديك صلاحية');
+        }
+        
+        try {
+            await db.collection('achievementDefinitions').doc(id).delete();
+            await this.loadDefinitions();
+        } catch (e) {
+            console.error('❌ Error deleting achievement definition:', e);
+            throw e;
+        }
+    },
+
+    // ===== إعادة تعيين بيانات التتبع (للاختبار) =====
+    resetData() {
+        this._unlockedAchievements = [];
+        this._data = {};
+        this._initDefaultData();
+        showToast('🔄 تم إعادة تعيين بيانات الإنجازات', 'info');
+    },
+
 
     /**
      * ✅ مزامنة الإنجازات عند تسجيل الدخول
@@ -4501,6 +5190,7 @@ checkAchievements(gameData) {
         showToast('🔄 تم إعادة تعيين بيانات الإنجازات', 'info');
     }
 };
+
 
 // ============================================================
 // 6. مدير البيانات (DataManager)
@@ -9196,7 +9886,8 @@ _updateProgressUI (completed, total) {
         }, 1000);
     },
 
-// ===== إنهاء المباراة وتجميع الإحصائيات =====
+// داخل CrosswordMatchEngine._endMatch
+
 _endMatch: function() {
     if (!this._isRunning) {
         console.log('⏹️ _endMatch: المباراة منتهية بالفعل');
@@ -9205,13 +9896,12 @@ _endMatch: function() {
 
     console.log('🏁 _endMatch: بدء إنهاء المباراة');
 
-    // إيقاف جميع المؤقتات
     this._stopTimer();
     this._isRunning = false;
     this._isWaitingForNext = false;
     this._endTime = Date.now();
 
-    // حساب الإحصائيات النهائية من النتائج المخزنة
+    // حساب الإحصائيات النهائية
     const totalCorrect = this._results.reduce((sum, r) => sum + (r.correct || 0), 0);
     const totalWrong = this._results.reduce((sum, r) => sum + (r.wrong || 0), 0);
     const totalQuestions = this._results.reduce((sum, r) => sum + (r.total || 0), 0);
@@ -9219,17 +9909,80 @@ _endMatch: function() {
     const totalPoints = this._results.reduce((sum, r) => sum + (r.points || 0), 0);
     const totalCoins = this._results.reduce((sum, r) => sum + (r.coins || 0), 0);
     const totalTime = Math.round((this._endTime - this._startTime) / 1000);
-
     const totalRounds = this._results.length;
-    const completedRounds = this._results.filter(r => r.success).length;
-    const totalCorrectLetters = this._results.reduce((sum, r) => sum + (r.correctLetters || 0), 0);
-    const totalLetters = this._results.reduce((sum, r) => sum + (r.totalLetters || 0), 0);
 
-    console.log('📊 Match results:', {
-        totalCorrect, totalWrong, totalQuestions, accuracy,
-        totalPoints, totalCoins, totalTime,
-        rounds: this._results.length,
-        completedRounds, totalCorrectLetters, totalLetters
+    console.log('📊 Match results:', { totalCorrect, totalWrong, totalQuestions, accuracy, totalPoints, totalCoins, totalTime });
+
+    // ✅ ============================================================
+    // ✅ تحديث نقاط المستخدم ونقوده في قاعدة البيانات
+    // ✅ ============================================================
+    const user = AuthService.currentUser;
+    if (user && totalPoints > 0) {
+        try {
+            // ✅ تحديث totalScore و coins
+            const updates = {
+                totalScore: (user.totalScore || 0) + totalPoints,
+                coins: (user.coins || 0) + totalCoins
+            };
+            
+            // ✅ حفظ في Firestore
+            db.collection('users').doc(user.uid).update(updates)
+                .then(() => {
+                    console.log('✅ User updated:', updates);
+                    
+                    // ✅ تحديث الكائن المحلي
+                    user.totalScore = updates.totalScore;
+                    user.coins = updates.coins;
+                    AuthService._notifyListeners();
+                    
+                    // ✅ تحديث الواجهات
+                    if (typeof App._updateUserUI === 'function') {
+                        App._updateUserUI(user);
+                    }
+                    if (typeof App._updateDashboardUI === 'function') {
+                        App._updateDashboardUI();
+                    }
+                    
+                    showToast(`⭐ +${totalPoints} نقطة • 🪙 +${totalCoins} نقود`, 'success', 3000);
+                })
+                .catch((err) => {
+                    console.warn('⚠️ Could not update user:', err);
+                });
+        } catch (e) {
+            console.warn('⚠️ Error updating user:', e);
+        }
+    }
+
+    // ✅ تحديث الإحصائيات (كما هو موجود)
+    this._saveStats({
+        totalCorrect,
+        totalWrong,
+        totalQuestions,
+        accuracy,
+        totalPoints,
+        totalCoins,
+        totalTime,
+        totalRounds,
+        completedRounds: this._results.filter(r => r.success).length,
+        totalCorrectLetters: this._results.reduce((sum, r) => sum + (r.correctLetters || 0), 0),
+        totalLetters: this._results.reduce((sum, r) => sum + (r.totalLetters || 0), 0),
+        rounds: this._results,
+    });
+
+    // ✅ عرض النتائج المتسلسلة
+    this._showResultsSequence({
+        totalCorrect,
+        totalWrong,
+        totalQuestions,
+        accuracy,
+        totalPoints,
+        totalCoins,
+        totalTime,
+        totalRounds,
+        completedRounds: this._results.filter(r => r.success).length,
+        totalCorrectLetters: this._results.reduce((sum, r) => sum + (r.correctLetters || 0), 0),
+        totalLetters: this._results.reduce((sum, r) => sum + (r.totalLetters || 0), 0),
+        rounds: this._results,
     });
 
     // إزالة حاوية المباراة
@@ -9239,36 +9992,6 @@ _endMatch: function() {
         container.innerHTML = '';
     }
 
-    // عرض رسالة للمستخدم
-    if (totalPoints > 0 || totalCorrect > 0) {
-        showToast(`🏁 انتهت المباراة! ${totalPoints} نقطة • ${totalCoins} عملة • ${accuracy}% دقة`, 'success', 5000);
-    } else {
-        showToast('⏹️ انتهت المباراة دون إجابات صحيحة', 'info', 4000);
-    }
-
-    // تجميع البيانات لعرضها في الشاشات
-    const statsData = {
-        totalCorrect,
-        totalWrong,
-        totalQuestions,
-        accuracy,
-        totalPoints,
-        totalCoins,
-        totalTime,
-        totalRounds,
-        completedRounds,
-        totalCorrectLetters,
-        totalLetters,
-        rounds: this._results,
-    };
-
-    // حفظ الإحصائيات في قاعدة البيانات
-    this._saveStats(statsData);
-
-    // عرض النتائج المتسلسلة
-    this._showResultsSequence(statsData);
-
-    // استدعاء onComplete إن وجد
     if (this._onComplete) {
         this._onComplete();
     }
@@ -12013,75 +12736,105 @@ const App = {
     _friendsRefreshTimeout: null,
 
 async start() {
-    // تهيئة Firebase (للاستخدام الفوري)
-    try {
-        firebase.initializeApp(firebaseConfig);
-        db = firebase.firestore();
-        auth = firebase.auth();
-        isFirebaseReady = true;
-        updateFirebaseStatus(true);
-    } catch (e) {
-        console.error('❌ Firebase error:', e);
-        updateFirebaseStatus(false);
-        showToast('⚠️ فشل الاتصال بـ Firebase، يعمل في وضع غير متصل', 'error');
-    }
-
     // ============================================================
     // 1. عناصر الصفحة
     // ============================================================
-    const splashScreen = document.getElementById('splashScreen');
-    const splashProgress = document.getElementById('splashProgress');
-    const splashStatus = document.getElementById('splashStatus');
-    const splashPercent = document.getElementById('splashPercent');
-
+    const splashScreenNew = document.getElementById('splashScreenNew');  // ✅ الشاشة الجديدة
+    const splashScreen = document.getElementById('splashScreen');        // الشاشة القديمة (مع شريط التقدم)
     const authPage = document.getElementById('authPage');
     const loadingScreen = document.getElementById('loadingScreen');
     const mainContent = document.querySelector('.main-content');
 
-    // إخفاء كل شيء ما عدا شاشة التحقق
-    if (authPage) authPage.style.display = 'none';
-    if (loadingScreen) loadingScreen.style.display = 'none';
-    if (mainContent) mainContent.style.display = 'none';
-    if (splashScreen) splashScreen.style.display = 'flex';
+    // ✅ إخفاء كل شيء ما عدا شاشة البداية الجديدة
+    if (authPage) {
+        authPage.style.display = 'none';
+        authPage.style.opacity = '0';
+    }
+    if (loadingScreen) {
+        loadingScreen.style.display = 'none';
+        loadingScreen.style.opacity = '0';
+    }
+    if (mainContent) {
+        mainContent.style.display = 'none';
+        mainContent.style.opacity = '0';
+    }
+    if (splashScreen) {
+        splashScreen.style.display = 'none';
+        splashScreen.style.opacity = '0';
+    }
+    if (splashScreenNew) {
+        splashScreenNew.style.display = 'flex';
+        splashScreenNew.style.opacity = '1';
+        splashScreenNew.style.transition = 'opacity 0.3s ease';
+    }
 
     // ============================================================
-    // 2. دالة تحديث شريط التقدم
+    // 2. تحميل العناصر العامة في الخلفية (بدون شريط تقدم)
     // ============================================================
-    const updateSplashProgress = (percent, status) => {
-        if (splashProgress) splashProgress.style.width = percent + '%';
-        if (splashPercent) splashPercent.textContent = percent + '%';
-        if (splashStatus) splashStatus.textContent = status;
-    };
+    console.log('🚀 Loading public assets in background...');
 
-    // ============================================================
-    // 3. تهيئة Firebase
-    // ============================================================
-    updateSplashProgress(10, '🔗 الاتصال بقاعدة البيانات...');
-    
+    // ✅ تحميل Firebase (العنصر العام الأول)
     try {
-        firebase.initializeApp(firebaseConfig);
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
         db = firebase.firestore();
         auth = firebase.auth();
         isFirebaseReady = true;
         updateFirebaseStatus(true);
-        updateSplashProgress(30, '✅ تم الاتصال بقاعدة البيانات');
+        console.log('✅ Firebase initialized');
     } catch (e) {
         console.error('❌ Firebase error:', e);
         updateFirebaseStatus(false);
-        updateSplashProgress(30, '⚠️ وضع غير متصل');
     }
 
-    // ============================================================
-    // 4. التحقق من وجود مستخدم مسجل
-    // ============================================================
-    updateSplashProgress(40, '📚 جاري التحميل ...');
+    // ✅ تحميل إعدادات اللعبة العامة
+    try {
+        await this._loadModeSettingsFromFirebase();
+        console.log('✅ Mode settings loaded');
+    } catch (e) {
+        console.warn('⚠️ Could not load mode settings:', e);
+    }
 
+    // ✅ تحميل جوائز المستويات العامة
+    try {
+        await LevelRewardsManager.loadRewards();
+        console.log(`✅ Level rewards loaded: ${LevelRewardsManager._rewards.length}`);
+    } catch (e) {
+        console.warn('⚠️ Could not load level rewards:', e);
+    }
+
+    // ✅ تحميل الإنجازات العامة
+    try {
+        if (typeof AchievementManager !== 'undefined' && AchievementManager.init) {
+            AchievementManager.init();
+            console.log('✅ Achievements initialized');
+        }
+    } catch (e) {
+        console.warn('⚠️ Could not load achievements:', e);
+    }
+
+    // ✅ تحميل بيانات المتجر العامة
+    try {
+        const storeItems = DataManager.data.storeItems || [];
+        if (storeItems.length > 0) {
+            this._renderStore(storeItems);
+            console.log(`✅ Store items loaded: ${storeItems.length}`);
+        }
+    } catch (e) {
+        console.warn('⚠️ Could not load store items:', e);
+    }
+
+    // ✅ تأخير بسيط لضمان ظهور الشاشة
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // ============================================================
+    // 3. التحقق من وجود مستخدم مسجل
+    // ============================================================
     let isLoggedIn = false;
     const savedUid = localStorage.getItem('football_user_uid');
 
     if (savedUid && isFirebaseReady) {
-        updateSplashProgress(55, '📚 جاري التحميل ...');
-        
         try {
             const userDoc = await db.collection('users').doc(savedUid).get();
             if (userDoc.exists) {
@@ -12092,53 +12845,55 @@ async start() {
                     email: data.email,
                     displayName: data.displayName || data.username || data.email,
                     username: data.username || data.displayName || data.email,
+                    fullName: data.fullName || data.displayName || data.username || data.email,
                     role: data.role || 'user',
                     totalScore: data.totalScore || 0,
                     coins: data.coins || 0,
+                    gems: data.gems || 0,
                     achievements: data.achievements || [],
                     inventory: data.inventory || [],
+                    activeItems: data.activeItems || [],
+                    activeItemDetails: data.activeItemDetails || [],
                     bio: data.bio || '',
                     location: data.location || '',
                     avatar: data.avatar || null,
+                    age: data.age || null,
+                    gender: data.gender || null,
+                    country: data.country || null,
+                    countryName: data.countryName || null,
+                    countryFlag: data.countryFlag || null,
+                    profileCompleted: data.profileCompleted || false,
+                    ageGroup: data.ageGroup || null,
                     createdAt: data.createdAt || new Date().toISOString(),
                     adminRole: data.adminRole || null,
                     friends: data.friends || [],
                     blocked: data.blocked || [],
                     rankPoints: data.rankPoints || 0,
-                    stats: data.stats || { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 }
+                    stats: data.stats || { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 },
+                    clan: data.clan || 'غير منضم'
                 };
                 AuthService._notifyListeners();
                 console.log('✅ User restored from localStorage');
-                updateSplashProgress(80, '📚 جاري التحميل ...');
             } else {
-                updateSplashProgress(70, '⚠️ لم يتم العثور على المستخدم');
+                console.warn('⚠️ User not found in Firestore');
             }
         } catch (e) {
             console.warn('⚠️ Could not verify user:', e);
-            isLoggedIn = false;
-            updateSplashProgress(70, '⚠️ خطأ في التحقق من الحساب');
         }
-    } else {
-        updateSplashProgress(60, '📝 لا يوجد حساب مسجل');
     }
 
-    // تأخير قصير لرؤية شريط التقدم (اختياري)
-    await new Promise(resolve => setTimeout(resolve, 400));
-
     // ============================================================
-    // 5. إخفاء شاشة التحقق وعرض الشاشة المناسبة
+    // 4. إخفاء شاشة البداية وعرض الشاشة المناسبة
     // ============================================================
-    updateSplashProgress(100, isLoggedIn ? '📚 جاري التحميل ...' : '🔐 مرحباً بك!');
-
-    // تأخير بسيط قبل الإخفاء
+    // ✅ تأخير بسيط لرؤية الشاشة
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    // إخفاء شاشة التحقق
-    if (splashScreen) {
-        splashScreen.style.opacity = '0';
-        setTimeout(() => {
-            splashScreen.style.display = 'none';
-        }, 500);
+    // ✅ إخفاء شاشة البداية بتأثير سلس
+    if (splashScreenNew) {
+        splashScreenNew.style.transition = 'opacity 0.6s ease';
+        splashScreenNew.style.opacity = '0';
+        await new Promise(resolve => setTimeout(resolve, 600));
+        splashScreenNew.style.display = 'none';
     }
 
     // ===== إذا لم يكن هناك مستخدم، اعرض شاشة الدخول =====
@@ -12147,23 +12902,43 @@ async start() {
         if (authPage) {
             authPage.style.display = 'flex';
             authPage.style.opacity = '1';
+            authPage.style.transition = 'opacity 0.3s ease';
         }
-        if (loadingScreen) loadingScreen.style.display = 'none';
-        if (mainContent) mainContent.style.display = 'none';
+        if (loadingScreen) {
+            loadingScreen.style.display = 'none';
+            loadingScreen.style.opacity = '0';
+        }
+        if (mainContent) {
+            mainContent.style.display = 'none';
+            mainContent.style.opacity = '0';
+        }
         this._setupAuthPage();
         return;
     }
 
-    // ===== إذا كان هناك مستخدم، ابدأ التحميل =====
+    // ===== إذا كان هناك مستخدم، ابدأ تحميل التطبيق =====
     console.log('✅ User found, loading app...');
+    
+    // ✅ إظهار شاشة التحميل مع شريط التقدم
+    if (loadingScreen) {
+        loadingScreen.style.display = 'flex';
+        loadingScreen.style.opacity = '1';
+        loadingScreen.style.transition = 'opacity 0.3s ease';
+    }
     if (authPage) {
         authPage.style.display = 'none';
         authPage.style.opacity = '0';
     }
-    if (loadingScreen) loadingScreen.style.display = 'flex';
-    if (mainContent) mainContent.style.display = 'block';
+    if (mainContent) {
+        mainContent.style.display = 'block';
+        mainContent.style.opacity = '0';
+        mainContent.style.transition = 'opacity 0.3s ease';
+    }
 
-    // تحميل التطبيق
+    // ✅ تأخير بسيط لظهور شاشة التحميل
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // ✅ تحميل التطبيق (البيانات الخاصة بالمستخدم)
     this._loadApp();
 },
 
@@ -12618,20 +13393,26 @@ _onAuthSuccess() {
 
     this._loadApp();
     
-    // ✅ ✅ ✅ تأكد من وجود هذا الكود ✅ ✅ ✅
+    // ✅ ✅ ✅ التحقق من الملف الشخصي مع تأخير كافٍ
     setTimeout(() => {
         const user = AuthService.currentUser;
         console.log('🔍 Checking user profile:', user);
         
-        if (user && !user.profileCompleted) {
-            console.log('📝 User profile not completed, showing setup modal');
-            // تأخير إضافي لضمان تحميل DOM
-            setTimeout(() => {
-                this._showProfileSetupModal();
-            }, 500);
-        } else if (user && user.profileCompleted) {
-            console.log('✅ User profile already completed');
-            this._updateUserCountryDisplay(user);
+        if (user) {
+            // ✅ التحقق من وجود profileCompleted
+            const profileCompleted = user.profileCompleted === true;
+            console.log('📝 Profile completed:', profileCompleted);
+            
+            // ✅ إذا لم يتم إكمال الملف الشخصي، عرض المودال
+            if (!profileCompleted) {
+                console.log('📝 User profile not completed, showing setup modal');
+                setTimeout(() => {
+                    this._showProfileSetupModal();
+                }, 500);
+            } else {
+                console.log('✅ User profile already completed');
+                this._updateUserCountryDisplay(user);
+            }
         } else {
             console.warn('⚠️ No user found after login');
         }
@@ -12824,15 +13605,8 @@ _updateDashboardAvatar: function() {
 
 // في App
 async _loadApp() {
-        // ✅ استعادة صورة الطور من localStorage إذا كانت موجودة
-    const savedIcon = localStorage.getItem('modeIconImage');
-    if (savedIcon) {
-        this._updateModeIconImage(savedIcon);
-    } else if (selectedGameMode) {
-        this._updateModeIconImage(selectedGameMode);
-    }
     // ============================================================
-    // شاشة التحميل وتحديث التقدم - عبارات محفزة
+    // شاشة التحميل - تحميل البيانات الخاصة بالمستخدم فقط
     // ============================================================
     const loadingScreen = document.getElementById('loadingScreen');
     const progressBar = document.getElementById('loadingProgress');
@@ -12846,6 +13620,7 @@ async _loadApp() {
     if (loadingScreen) {
         loadingScreen.style.display = 'flex';
         loadingScreen.style.opacity = '1';
+        loadingScreen.style.transition = 'opacity 0.3s ease';
     }
 
     // ============================================================
@@ -12863,7 +13638,6 @@ async _loadApp() {
     // 2. دالة تحديث التقدم
     // ============================================================
     let lastProgressSound = 0;
-    let currentPercent = 0;
 
     const updateTaskStatus = (taskId, status, icon = '⏳') => {
         const taskEl = document.querySelector(`.loading-task[data-task="${taskId}"]`);
@@ -12882,7 +13656,7 @@ async _loadApp() {
     };
 
     const updateProgress = (percent, status, subStatus = null) => {
-        currentPercent = Math.min(percent, 100);
+        const currentPercent = Math.min(percent, 100);
         if (progressBar) progressBar.style.width = currentPercent + '%';
         if (percentText) percentText.textContent = Math.round(currentPercent) + '%';
         if (statusText) statusText.textContent = status || '';
@@ -12898,134 +13672,100 @@ async _loadApp() {
         }
     };
 
-    // ============================================================
-    // 3. تهيئة Firebase (الخطوة الأولى)
-    // ============================================================
-    updateProgress(5, '⚡ شحن المحركات...', 'جاري الاتصال بسحابة المعرفة');
-    updateTaskStatus('firebase', '🔄 جاري...', '🔗');
-
     try {
-        firebase.initializeApp(firebaseConfig);
-        db = firebase.firestore();
-        auth = firebase.auth();
-        isFirebaseReady = true;
-        updateFirebaseStatus(true);
-        updateProgress(15, '🔗 الاتصال بسحابة المعرفة...', '✅ تم الاتصال بقاعدة البيانات');
-        updateTaskStatus('firebase', '✅ تم', '🟢');
+        await LevelSystem.loadSettings();
+        Object.assign(LEVEL_SETTINGS, LevelSystem._settings);
+        console.log('✅ Level settings loaded:', LEVEL_SETTINGS);
     } catch (e) {
-        console.error('❌ Firebase error:', e);
-        updateFirebaseStatus(false);
-        showToast('⚠️ فشل الاتصال بـ Firebase، يعمل في وضع غير متصل', 'error');
-        updateProgress(15, '⚠️ وضع الطيران بدون اتصال', '⚠️ يعمل دون اتصال');
-        updateTaskStatus('firebase', '⚠️ غير متصل', '🟡');
+        console.warn('⚠️ Could not load level settings:', e);
+        // استخدام القيم الافتراضية
+        Object.assign(LEVEL_SETTINGS, { type: 'exponential', baseXP: 100, multiplier: 2, customFormula: null });
     }
 
-    // تأخير بسيط لإظهار التقدم
-    await new Promise(resolve => setTimeout(resolve, 300));
-
     // ============================================================
-    // 4. تهيئة AuthService
+    // 3. تحميل بيانات المستخدم الخاصة
     // ============================================================
-    updateProgress(20, '📚 جاري التحميل...', 'التحقق من بيانات المستخدم');
-    updateTaskStatus('auth', '🔄 جاري...', '🔍');
+    updateProgress(5, '📚 جاري التحميل...', 'تحميل بيانات المستخدم');
+    updateTaskStatus('userData', '🔄 جاري...', '👤');
 
-    await AuthService.init();
-    
-    updateProgress(20, '📚 جاري التحميل...', 'تحميل إعدادات اللعبة');
-    updateTaskStatus('settings', '🔄 جاري...', '⚙️');
-    
-    await this._loadModeSettingsFromFirebase();
-    updateTaskStatus('settings', '✅ تم', '⚙️');
-    updateProgress(25, '✅ تم تحميل الإعدادات', `الطور: ${selectedGameMode || 'افتراضي'}`);
-    
-    // ✅ تحديث واجهة الطور بعد تحميل الإعدادات
-    this._updateModeUI();
-
+    // ✅ تحديث واجهة المستخدم (الصورة، الاسم، الرتبة، إلخ)
     if (AuthService.currentUser) {
-        await this._loadModeSettingsFromFirebase();
-        updateTaskStatus('auth', '✅ تم', '✅');
-        updateProgress(30, '✅ تم التحقق من المستخدم', `مرحباً ${AuthService.currentUser.username || 'لاعب'}`);
-    // ✅ تحديث العلم
-    setTimeout(() => {
+        this._updateUserUI(AuthService.currentUser);
+        this._updateDashboardAvatar();
+        this._applyUserCustomizations(AuthService.currentUser);
         this._updateUserCountryDisplay(AuthService.currentUser);
-    }, 500);
-} else {
-        updateTaskStatus('auth', '⏳ لا يوجد مستخدم', '👤');
-        updateProgress(30, '📝 لا يوجد حساب مسجل', 'يمكنك تسجيل الدخول أو إنشاء حساب');
+        updateTaskStatus('userData', '✅ تم', '✅');
+        updateProgress(15, '✅ بيانات المستخدم جاهزة', `مرحباً ${AuthService.currentUser.username || 'لاعب'}`);
+    } else {
+        updateTaskStatus('userData', '⏳ لا يوجد مستخدم', '👤');
+        updateProgress(15, '📝 لا يوجد حساب مسجل', 'يمكنك تسجيل الدخول أو إنشاء حساب');
     }
 
     await new Promise(resolve => setTimeout(resolve, 200));
 
     // ============================================================
-    // 5. تحميل البيانات (الخطوة الرئيسية)
+    // 4. بناء واجهة المستخدم (إذا لم تكن مبنية)
     // ============================================================
-    updateProgress(35, '📚 جاري التحميل...', 'جلب الأسئلة والبيانات من الخادم');
-    updateTaskStatus('data', '🔄 جاري...', '📡');
-    this._updateDashboardAvatar();
-
-    try {
-        // تحميل البيانات مع مهلة
-        await Promise.race([
-            DataManager.loadAll(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 15000))
-        ]);
-        DataManager.startListening();
-        updateProgress(55, '✅ تم تحميل البيانات', `تم جلب ${DataManager.data.questions.length || 0} سؤال`);
-        updateTaskStatus('data', '✅ تم', '📊');
-    } catch (e) {
-        console.warn('⚠️ Data loading issue:', e);
-        updateTaskStatus('data', '⚠️ جزئي', '📂');
-        updateProgress(50, '⚠️ تحميل جزئي', 'بعض البيانات قد تكون غير محدثة');
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 200));
-
-    // ============================================================
-    // 6. بناء واجهة المستخدم
-    // ============================================================
-    updateProgress(60, '📚 جاري التحميل...', 'بناء واجهة المستخدم');
+    updateProgress(20, '📚 جاري التحميل...', 'بناء واجهة المستخدم');
     updateTaskStatus('ui', '🔄 جاري...', '🎨');
 
     this._buildLayout();
     this._setupUI();
-    updateProgress(75, '✅ واجهة المستخدم جاهزة', 'تم تجهيز جميع الشاشات');
+    updateProgress(35, '✅ واجهة المستخدم جاهزة', 'تم تجهيز جميع الشاشات');
     updateTaskStatus('ui', '✅ تم', '🖼️');
 
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 150));
 
     // ============================================================
-    // 7. تهيئة محرك اللعبة
+    // 5. تهيئة محرك اللعبة
     // ============================================================
-    updateProgress(80, '📚 جاري التحميل...', 'تهيئة محرك اللعبة');
+    updateProgress(40, '📚 جاري التحميل...', 'تهيئة محرك اللعبة');
     updateTaskStatus('game', '🔄 جاري...', '🎮');
 
     GameEngine.init();
-    updateProgress(88, '✅ الذكاء الاصطناعي نشط', 'محرك اللعبة جاهز للتشغيل');
+    updateProgress(50, '✅ الذكاء الاصطناعي نشط', 'محرك اللعبة جاهز للتشغيل');
     updateTaskStatus('game', '✅ تم', '⚡');
 
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 150));
 
     // ============================================================
-    // 8. تهيئة الإنجازات
+    // 6. تحميل بيانات المستخدم الإضافية (المباريات، الإنجازات المفتوحة)
     // ============================================================
-    updateProgress(90, '📚 جاري التحميل...', 'تحميل الإنجازات والمكافآت');
+    updateProgress(55, '📚 جاري التحميل...', 'تحميل إنجازاتك');
     updateTaskStatus('achievements', '🔄 جاري...', '🏆');
 
-    if (typeof AchievementManager !== 'undefined' && AchievementManager.init) {
-        AchievementManager.init();
-        const unlocked = AchievementManager.getUnlockedAchievements();
-        updateTaskStatus('achievements', `✅ تم (${unlocked.length})`, '🏅');
+    if (AuthService.currentUser) {
+        try {
+            // ✅ مزامنة الإنجازات مع المستخدم
+            if (typeof AchievementManager !== 'undefined' && AchievementManager.syncWithUser) {
+                AchievementManager.syncWithUser(AuthService.currentUser);
+            }
+            
+            // ✅ التحقق من جوائز المستويات غير المطالب بها
+            const unclaimed = await LevelRewardsManager.checkUnclaimedRewards(AuthService.currentUser.uid);
+            if (unclaimed.length > 0) {
+                for (const reward of unclaimed) {
+                    await LevelRewardsManager.applyLevelReward(AuthService.currentUser.uid, reward.level);
+                }
+            }
+            
+            const unlocked = AchievementManager.getUnlockedAchievements();
+            updateTaskStatus('achievements', `✅ تم (${unlocked.length})`, '🏅');
+        } catch (e) {
+            console.warn('⚠️ Achievement sync error:', e);
+            updateTaskStatus('achievements', '⚠️ جزئي', '⏳');
+        }
     } else {
-        updateTaskStatus('achievements', '⚠️ غير متاح', '⏳');
+        updateTaskStatus('achievements', '⏳ لا يوجد مستخدم', '👤');
     }
-    updateProgress(94, '🏅 نظام المكافآت جاهز', 'تم تحميل الإنجازات');
+    updateProgress(65, '🏅 نظام المكافآت جاهز', 'تم تحميل الإنجازات');
 
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 150));
 
     // ============================================================
-    // 9. تحميل المتجر والعناصر
+    // 7. تحميل بيانات المتجر (إذا لم تكن محملة)
     // ============================================================
-    updateProgress(95, '📚 جاري التحميل...', 'تحميل المتجر والعناصر');
+    updateProgress(70, '📚 جاري التحميل...', 'تحميل المتجر');
     updateTaskStatus('store', '🔄 جاري...', '🛒');
 
     const storeItems = DataManager.data.storeItems || [];
@@ -13033,85 +13773,138 @@ async _loadApp() {
         this._renderStore(storeItems);
         updateTaskStatus('store', `✅ تم (${storeItems.length})`, '📦');
     } else {
-        updateTaskStatus('store', '⏳ في انتظار البيانات', '📦');
+        // ✅ محاولة تحميل المتجر من Firestore
+        try {
+            await this._initStoreItems();
+            const updatedItems = DataManager.data.storeItems || [];
+            if (updatedItems.length > 0) {
+                this._renderStore(updatedItems);
+                updateTaskStatus('store', `✅ تم (${updatedItems.length})`, '📦');
+            } else {
+                updateTaskStatus('store', '⏳ في انتظار البيانات', '📦');
+            }
+        } catch (e) {
+            updateTaskStatus('store', '⚠️ غير متاح', '📦');
+        }
     }
-    updateProgress(97, '🛒 المتجر جاهز', `تم تحميل ${storeItems.length} عنصر`);
+    updateProgress(78, '🛒 المتجر جاهز', `تم تحميل ${storeItems.length} عنصر`);
 
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 150));
 
     // ============================================================
-    // 10. تسجيل المستمعين النهائيين
+    // 8. تحميل بيانات الأسئلة (الجزء الأبطأ)
     // ============================================================
-    DataManager.addListener((data) => { this._onDataUpdate(data); });
-AuthService.addListener((user) => { 
-    this._onUserUpdate(user);
-    // ✅ تحديث العلم عند أي تغيير في المستخدم
-    if (user) {
-        this._updateUserCountryDisplay(user);
+    updateProgress(80, '📚 جاري التحميل...', 'جلب الأسئلة والبيانات');
+    updateTaskStatus('questions', '🔄 جاري...', '📡');
+
+    try {
+        // ✅ تحميل البيانات مع مهلة
+        const loadPromise = DataManager.loadAll();
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('timeout')), 10000)
+        );
+        
+        await Promise.race([loadPromise, timeoutPromise]);
+        DataManager.startListening();
+        updateProgress(92, '✅ تم تحميل البيانات', `تم جلب ${DataManager.data.questions.length || 0} سؤال`);
+        updateTaskStatus('questions', '✅ تم', '📊');
+    } catch (e) {
+        console.warn('⚠️ Data loading issue:', e);
+        updateTaskStatus('questions', '⚠️ جزئي', '📂');
+        updateProgress(90, '⚠️ تحميل جزئي', 'بعض البيانات قد تكون غير محدثة');
     }
-});
+
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    // ============================================================
+    // 9. تسجيل المستمعين النهائيين
+    // ============================================================
+    updateProgress(93, '📚 جاري التحميل...', 'تهيئة المستمعين');
+    
+    DataManager.addListener((data) => { 
+        this._onDataUpdate(data); 
+    });
+    
+    AuthService.addListener((user) => { 
+        this._onUserUpdate(user);
+        if (user) {
+            this._updateUserCountryDisplay(user);
+        }
+    });
+    
+    updateProgress(95, '✅ المستمعين جاهزين', '');
+
+    // ============================================================
+    // 10. تهيئة نظام الصوتيات
+    // ============================================================
+    updateProgress(96, '🔊 تهيئة الصوتيات...', '');
+    SoundSystem.init();
+    
+    setTimeout(() => {
+        if (typeof SoundSystem !== 'undefined') {
+            SoundSystem.playGameOpen();
+        }
+    }, 300);
+    updateProgress(97, '🔊 الصوتيات جاهزة', '');
+
     // ============================================================
     // 11. فتح نافذة الدخول إذا لم يكن مستخدم
     // ============================================================
     if (!AuthService.currentUser) {
         setTimeout(() => {
             document.getElementById('loginModal').classList.add('open');
-        }, 400);
-    }
-
-    // ============================================================
-    // 12. تهيئة نظام الصوتيات
-    // ============================================================
-    SoundSystem.init();
-    
-    // ✅ تشغيل صوت فتح اللعبة بعد تهيئة الصوت مباشرة
-    if (typeof SoundSystem !== 'undefined') {
-        setTimeout(() => {
-            SoundSystem.playGameOpen();
         }, 300);
     }
 
     // ============================================================
-    // 13. الأحداث الإضافية (online/offline)
+    // 12. تطبيق التخصيصات النهائية
     // ============================================================
-    window.addEventListener('online', () => {
-        this._isOnline = true;
-        this._updateConnectionStatusUI();
-        if (this.currentSection === 'admin') {
-            this._refreshAdmin();
-        }
-        showToast('🟢 تم استعادة الاتصال بالإنترنت', 'success');
-    });
+    updateProgress(98, '📚 جاري التحميل...', 'تطبيق التخصيصات');
 
-    window.addEventListener('offline', () => {
-        this._isOnline = false;
-        this._updateConnectionStatusUI();
-        showToast('🔴 تم فقدان الاتصال بالإنترنت', 'error');
-    });
+    if (AuthService.currentUser) {
+        setTimeout(() => {
+            console.log('🔄 تطبيق التخصيصات النهائية...');
+            this._applyUserCustomizations(AuthService.currentUser);
+            this._updateDashboardAvatar();
+            this._updateUserUI(AuthService.currentUser);
+            console.log('✅ تم تطبيق التخصيصات');
+        }, 200);
+    }
 
+    // ============================================================
+    // 13. أحداث الاتصال بالإنترنت
+    // ============================================================
 // ============================================================
-// ✅ تطبيق الصورة والتخصيصات بعد اكتمال التحميل
+// مراقبة حالة الاتصال
 // ============================================================
-updateProgress(98, '📚 جاري التحميل...', 'تطبيق التخصيصات');
 
-// انتظار حتى يتم تحميل جميع البيانات وتطبيقها
-if (AuthService.currentUser) {
-    // ✅ تأخير تطبيق الصورة للتأكد من تحميل جميع عناصر DOM
-    setTimeout(() => {
-        console.log('🔄 تطبيق التخصيصات على الصورة الشخصية...');
-        this._applyUserCustomizations(AuthService.currentUser);
-        this._updateDashboardAvatar();
-        this._updateUserUI(AuthService.currentUser);
-        console.log('✅ تم تطبيق التخصيصات على الصورة الشخصية');
-    }, 500);
-}
+window.addEventListener('online', () => {
+    console.log('🟢 العودة للاتصال');
+    // التحقق من جودة الاتصال فوراً
+    setTimeout(checkConnectionQuality, 1000);
+});
 
-// ============================================================
-// 14. إنهاء التحميل - إظهار التطبيق
-// ============================================================
-updateProgress(100, '✅ جاهز!', 'مرحباً بك في معركة العقول 🚀');
+window.addEventListener('offline', () => {
+    console.log('🔴 فقدان الاتصال');
+    const statusEl = document.getElementById('connectionStatus');
+    if (statusEl) {
+        statusEl.className = 'connection-status offline visible';
+        statusEl.style.display = 'flex';
+        document.getElementById('connectionText').textContent = '🔴 غير متصل';
+    }
+});
+
+// عند تحميل الصفحة، ابدأ المراقبة
+document.addEventListener('DOMContentLoaded', () => {
+    startConnectionMonitoring();
+});
+
+    // ============================================================
+    // 14. إنهاء التحميل - إظهار التطبيق
+    // ============================================================
+    updateProgress(100, '✅ جاهز!', 'مرحباً بك في معركة العقول 🚀');
     
-    // تحديث جميع المهام إلى ✅
+    // ✅ تحديث جميع المهام إلى ✅
     document.querySelectorAll('.loading-task').forEach(task => {
         const statusEl = task.querySelector('.task-status');
         const iconEl = task.querySelector('.task-icon');
@@ -13126,38 +13919,36 @@ updateProgress(100, '✅ جاهز!', 'مرحباً بك في معركة العق
         }
     });
 
-    // تحديث الوقت والتاريخ
+    // ✅ تحديث الوقت والتاريخ
     updateFirebaseStatus(isFirebaseReady);
     this._updateLastUpdateTime();
 
-    // تحديث التعزيزات النشطة
+    // ✅ تحديث التعزيزات النشطة
     setTimeout(() => {
         if (typeof this._refreshActiveBoosts === 'function') {
             this._refreshActiveBoosts();
         }
-    }, 500);
+    }, 300);
 
-    // تحديث واجهة الداشبورد
+    // ✅ تحديث واجهة الداشبورد
     this._updateDashboardUI();
 
-if (AuthService.currentUser) {
-    // انتظار تحميل بيانات المتجر أولاً
+    // ✅ إخفاء شاشة التحميل
     setTimeout(() => {
-        this._applyUserCustomizations(AuthService.currentUser);
-        console.log('✅ تم تطبيق التخصيصات على الصورة الشخصية');
-    }, 500);
-}
-
-// ✅ إخفاء شاشة التحميل بعد تأخير قصير لإظهار اكتمال التقدم
-setTimeout(() => {
-    if (loadingScreen) {
-        loadingScreen.style.opacity = '0';
-        setTimeout(() => {
-            loadingScreen.style.display = 'none';
-        }, 500);
-    }
-    showToast('مرحباً بك في معركة العقول المتطورة! 🚀', 'success', 3000);
-}, 600);
+        if (loadingScreen) {
+            loadingScreen.style.transition = 'opacity 0.5s ease';
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+                const mainContent = document.querySelector('.main-content');
+                if (mainContent) {
+                    mainContent.style.opacity = '1';
+                    mainContent.style.transition = 'opacity 0.3s ease';
+                }
+            }, 500);
+        }
+        showToast('مرحباً بك في معركة العقول المتطورة! 🚀', 'success', 3000);
+    }, 400);
 },
 
 
@@ -14487,19 +15278,27 @@ case 'friends':
     }
 },
 
-_showLevelsPage() {
+/**
+ * عرض صفحة المستويات مع جوائز قابلة للاكتساب
+ */
+async _showLevelsPage() {
     const user = AuthService.currentUser;
     if (!user) {
         showToast('يجب تسجيل الدخول أولاً', 'error');
         return;
     }
-    const totalScore = user.totalScore || 0;
-    const container = document.getElementById('levelsPageContainer');
+
+    // ✅ التأكد من وجود الحاوية
+    let container = document.getElementById('levelsPageContainer');
     if (!container) {
         // إنشاء القسم إذا لم يكن موجوداً
         let section = document.getElementById('section-levels');
         if (!section) {
             const main = document.getElementById('sectionsContainer');
+            if (!main) {
+                console.error('❌ sectionsContainer not found');
+                return;
+            }
             section = document.createElement('section');
             section.id = 'section-levels';
             section.className = 'section';
@@ -14511,51 +15310,214 @@ _showLevelsPage() {
             `;
             main.appendChild(section);
         }
-        this._activateSection('levels');
-        setTimeout(() => this._showLevelsPage(), 100);
+        container = document.getElementById('levelsPageContainer');
+        if (!container) {
+            console.error('❌ levelsPageContainer not found after creation');
+            return;
+        }
+    }
+
+    // ✅ عرض رسالة تحميل فورية
+    container.innerHTML = `
+        <div style="text-align:center;padding:3rem 1rem;">
+            <div style="display:inline-block;width:40px;height:40px;border:3px solid var(--glass);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:1rem;"></div>
+            <p style="color:var(--gray);font-size:0.9rem;">جاري تحميل المستويات...</p>
+        </div>
+    `;
+
+    // ✅ تنشيط القسم
+    this._activateSection('levels');
+
+    try {
+        // ✅ تحميل جوائز المستويات من Firestore (إذا لم تكن محملة)
+        if (!LevelRewardsManager._loaded) {
+            await LevelRewardsManager.loadRewards();
+        }
+
+        // ✅ تحديث بيانات المستخدم (للتأكد من وجود claimedLevelRewards)
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+            const data = userDoc.data();
+            if (data.claimedLevelRewards) {
+                user.claimedLevelRewards = data.claimedLevelRewards;
+            }
+            if (data.totalScore !== undefined) {
+                user.totalScore = data.totalScore;
+            }
+            if (data.coins !== undefined) {
+                user.coins = data.coins;
+            }
+        }
+
+        // ✅ بناء الصفحة بعد تحميل البيانات
+        this._buildLevelsPage(container);
+
+    } catch (error) {
+        console.error('❌ Error loading levels page:', error);
+        container.innerHTML = `
+            <div style="text-align:center;padding:2rem;color:var(--secondary);">
+                <i class="fas fa-exclamation-circle" style="font-size:2rem;display:block;margin-bottom:0.5rem;"></i>
+                <p>حدث خطأ في تحميل المستويات</p>
+                <button class="btn btn-primary btn-sm mt-1" onclick="App._showLevelsPage()">
+                    <i class="fas fa-sync"></i> إعادة المحاولة
+                </button>
+            </div>
+        `;
+    }
+},
+
+/**
+ * بناء صفحة المستويات (دالة مساعدة)
+ */
+_buildLevelsPage(container) {
+    const user = AuthService.currentUser;
+    if (!user) {
+        container.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--gray);">يرجى تسجيل الدخول</div>`;
         return;
     }
 
-    const totalLevels = 100;
+    const totalScore = user.totalScore || 0;
     const currentLevel = getLevel(totalScore);
+    const claimedRewards = user.claimedLevelRewards || [];
+    const allRewards = LevelRewardsManager._rewards || [];
+    
+    // ✅ حساب عدد الجوائز المتاحة
+    const availableRewards = allRewards.filter(r => r.level <= currentLevel.level && !claimedRewards.includes(r.level));
+
+    // ✅ إحصائيات المستوى الحالي
+    const progress = getLevelProgress(totalScore);
+    const xpToNext = getXPToNextLevel(totalScore);
+    const totalLevels = 100;
     const currentLevelNumber = currentLevel.level;
 
     let html = `
         <div class="levels-page" style="max-width:100%;margin:0 auto;padding:1rem 0.5rem;">
-            <h2 style="text-align:center;font-size:1.6rem;font-weight:800;margin-bottom:0.3rem;">
-                <i class="fas fa-star" style="color:var(--accent);"></i> 
-                المستويات
-            </h2>
-            <div style="text-align:center;padding:0.3rem;margin-bottom:0.5rem;">
-                <span style="font-size:1rem;font-weight:700;">نقاط المستوى: <span style="color:var(--accent);">${totalScore}</span></span>
-                <span style="display:block;font-size:0.75rem;color:var(--gray);">المستوى الحالي: <strong style="color:var(--accent);">${currentLevelNumber}</strong></span>
-                <span style="display:block;font-size:0.7rem;color:var(--gray);">← اسحب لليمين لعرض جميع المستويات →</span>
+            <!-- رأس الصفحة -->
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
+                <div>
+                    <h2 style="font-size:1.6rem;font-weight:800;">
+                        <i class="fas fa-star" style="color:var(--accent);"></i> 
+                        المستويات
+                    </h2>
+                    <p style="color:var(--gray);font-size:0.85rem;">
+                        المستوى الحالي: <strong style="color:var(--accent);">${currentLevelNumber}</strong>
+                        • ${totalScore} نقطة
+                        ${xpToNext > 0 ? `• ${xpToNext} نقطة للمستوى التالي` : '🏆 المستوى الأقصى!'}
+                    </p>
+                </div>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                    <button class="btn btn-sm btn-outline" onclick="App._refreshLevelsPage()">
+                        <i class="fas fa-sync"></i> تحديث
+                    </button>
+                </div>
             </div>
-            <div style="display:flex;flex-direction:row;align-items:center;width:100%;overflow-x:auto;padding:0.5rem 0.2rem 1.5rem;gap:0.3rem;scroll-snap-type:x mandatory;scrollbar-width:thin;direction:ltr;justify-content:flex-start;">
+
+            <!-- شريط التقدم الرئيسي -->
+            <div style="background:var(--card-bg);border-radius:var(--radius-sm);padding:1rem;margin-bottom:1.5rem;border:1px solid var(--border-color);">
+                <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--gray);margin-bottom:0.3rem;">
+                    <span>المستوى ${currentLevelNumber}</span>
+                    <span>${Math.round(progress.progress)}%</span>
+                    <span>المستوى ${currentLevelNumber + 1}</span>
+                </div>
+                <div style="height:8px;background:var(--glass);border-radius:10px;overflow:hidden;">
+                    <div style="height:100%;width:${Math.min(progress.progress, 100)}%;background:linear-gradient(90deg, var(--primary), var(--accent));border-radius:10px;transition:width 0.8s ease;"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:var(--gray);margin-top:0.2rem;">
+                    <span>${getXPForLevel(currentLevelNumber)}</span>
+                    <span>${getXPForLevel(currentLevelNumber + 1)}</span>
+                </div>
+            </div>
+
+            <!-- ✅ جوائز المستويات المتاحة -->
+            <div style="margin-bottom:1.5rem;">
+                <h3 style="font-size:1.2rem;font-weight:700;margin-bottom:0.5rem;">
+                    <i class="fas fa-gift" style="color:var(--accent);"></i> 
+                    جوائز المستويات
+                    <span style="font-size:0.7rem;color:var(--gray);font-weight:400;">
+                        (${availableRewards.length} متاحة)
+                    </span>
+                </h3>
+                
+                ${allRewards.length === 0 ? `
+                    <div style="text-align:center;padding:1.5rem;color:var(--gray);background:var(--glass);border-radius:var(--radius-sm);">
+                        <i class="fas fa-gift" style="font-size:2rem;display:block;margin-bottom:0.5rem;color:var(--gray-dark);"></i>
+                        لا توجد جوائز للمستويات حالياً
+                    </div>
+                ` : `
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.8rem;">
+                        ${allRewards.map(reward => {
+                            const isClaimed = claimedRewards.includes(reward.level);
+                            const isUnlocked = reward.level <= currentLevelNumber;
+                            const isAvailable = isUnlocked && !isClaimed;
+                            
+                            return `
+                                <div style="background:${isClaimed ? 'var(--glass)' : (isAvailable ? 'var(--card-bg)' : 'var(--glass)')};border:2px solid ${isClaimed ? 'var(--success)' : (isAvailable ? 'var(--accent)' : 'var(--glass-border)')};border-radius:var(--radius-sm);padding:0.8rem 1rem;transition:all 0.3s ease;opacity:${isAvailable ? '1' : '0.6'};">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.3rem;">
+                                        <div style="display:flex;align-items:center;gap:0.5rem;">
+                                            <span style="font-size:1.5rem;">${reward.icon || '🎁'}</span>
+                                            <div>
+                                                <div style="font-weight:700;font-size:0.95rem;">
+                                                    المستوى ${reward.level}
+                                                    ${isClaimed ? '✅' : (isAvailable ? '🟢' : '🔒')}
+                                                </div>
+                                                <div style="font-size:0.7rem;color:var(--gray);">${reward.itemName || 'نقاط ونقود'}</div>
+                                            </div>
+                                        </div>
+                                        <div style="display:flex;gap:0.3rem;align-items:center;">
+                                            ${isClaimed ? `
+                                                <span class="badge badge-success" style="font-size:0.6rem;">✅ مكتسب</span>
+                                            ` : (isAvailable ? `
+                                                <button class="btn btn-primary btn-sm" onclick="App._claimLevelReward(${reward.level})" style="font-size:0.7rem;padding:0.2rem 0.8rem;min-height:30px;">
+                                                    <i class="fas fa-gift"></i> اكتساب
+                                                </button>
+                                            ` : `
+                                                <span class="badge badge-danger" style="font-size:0.6rem;">🔒 مقفل</span>
+                                            `)}
+                                        </div>
+                                    </div>
+                                    <div style="display:flex;gap:0.5rem;font-size:0.7rem;color:var(--gray);margin-top:0.3rem;flex-wrap:wrap;">
+                                        ${reward.pointsReward > 0 ? `<span>⭐ +${reward.pointsReward} نقطة</span>` : ''}
+                                        ${reward.coinsReward > 0 ? `<span>🪙 +${reward.coinsReward} نقود</span>` : ''}
+                                        ${reward.itemName ? `<span>🎁 ${reward.itemName}</span>` : ''}
+                                        ${reward.quantity > 1 ? `<span>×${reward.quantity}</span>` : ''}
+                                    </div>
+                                    ${reward.message ? `<div style="font-size:0.65rem;color:var(--gray-dark);margin-top:0.2rem;">${reward.message}</div>` : ''}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `}
+            </div>
+
+            <!-- عرض جميع المستويات -->
+            <div style="margin-top:1rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                    <h3 style="font-size:1rem;font-weight:700;">
+                        <i class="fas fa-list"></i> جميع المستويات
+                    </h3>
+                    <span style="font-size:0.7rem;color:var(--gray);">← اسحب لليمين لعرض الكل →</span>
+                </div>
+                <div style="display:flex;flex-direction:row;align-items:center;width:100%;overflow-x:auto;padding:0.5rem 0.2rem 1.5rem;gap:0.3rem;scroll-snap-type:x mandatory;scrollbar-width:thin;direction:ltr;justify-content:flex-start;">
     `;
 
+    // ✅ عرض جميع المستويات
     for (let i = 1; i <= totalLevels; i++) {
         const levelNum = i;
-        const levelMin = (levelNum - 1) * 1000;
-        const nextMin = levelNum * 1000;
+        const levelMin = getXPForLevel(i); // ✅ استخدم نفس الدالة
+        const nextMin = getXPForLevel(i + 1);
         const isUnlocked = totalScore >= levelMin;
         const isCompleted = totalScore >= nextMin;
         const isCurrent = isUnlocked && !isCompleted;
+        
+        const hasReward = allRewards.some(r => r.level === levelNum);
+        const isRewardClaimed = claimedRewards.includes(levelNum);
+        const isRewardAvailable = hasReward && isUnlocked && !isRewardClaimed;
 
-        // حساب التقدم لنقطة المنتصف (للشريط بين المستويات)
-        let progress = 0;
-        if (isUnlocked && !isCompleted) {
-            const range = nextMin - levelMin;
-            progress = range > 0 ? ((totalScore - levelMin) / range) * 100 : 100;
-        } else if (isCompleted) {
-            progress = 100;
-        }
-        progress = Math.min(Math.max(progress, 0), 100);
-
-        // حالة المستوى
         let statusText = '';
         let statusColor = '';
         let extraClass = '';
+        let rewardIcon = '';
+        
         if (isCompleted) {
             statusText = '✅';
             statusColor = 'var(--success)';
@@ -14569,11 +15531,22 @@ _showLevelsPage() {
             statusColor = 'var(--gray)';
             extraClass = 'locked';
         }
+        
+        if (isRewardAvailable) {
+            rewardIcon = '🎁';
+        } else if (isRewardClaimed) {
+            rewardIcon = '✅';
+        }
 
-        // يمكن إضافة أيقونة مكافأة هنا (سيتم تفعيلها لاحقاً)
-        const rewardIcon = (levelNum % 10 === 0) ? '🎁' : ''; // كل 10 مستويات جائزة
+        let progress = 0;
+        if (isUnlocked && !isCompleted) {
+            const range = nextMin - levelMin;
+            progress = range > 0 ? ((totalScore - levelMin) / range) * 100 : 100;
+        } else if (isCompleted) {
+            progress = 100;
+        }
+        progress = Math.min(Math.max(progress, 0), 100);
 
-        // بناء بطاقة المستوى
         html += `
             <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;scroll-snap-align:start;min-width:70px;padding:0.2rem 0.1rem;position:relative;">
                 <div style="
@@ -14585,9 +15558,12 @@ _showLevelsPage() {
                     box-shadow:${isCurrent ? '0 0 25px rgba(255,217,61,0.3)' : 'none'};
                     transition:all 0.3s ease;
                     position:relative;
-                ">
+                    cursor:${isRewardAvailable ? 'pointer' : 'default'};
+                "
+                ${isRewardAvailable ? `onclick="App._claimLevelReward(${levelNum})" title="اضغط لاكتساب جائزة المستوى ${levelNum}"` : ''}>
                     ${levelNum}
                     ${rewardIcon ? `<span style="position:absolute;top:-10px;right:-10px;font-size:0.8rem;">${rewardIcon}</span>` : ''}
+                    ${hasReward ? `<span style="position:absolute;bottom:-4px;right:-4px;font-size:0.5rem;color:${isRewardClaimed ? 'var(--success)' : 'var(--accent)'};">🎁</span>` : ''}
                 </div>
                 <div style="text-align:center;margin-top:0.15rem;">
                     <div style="font-weight:700;font-size:0.65rem;color:${isUnlocked ? 'var(--light)' : 'var(--gray)'};">${levelNum}</div>
@@ -14597,9 +15573,8 @@ _showLevelsPage() {
             </div>
         `;
 
-        // شريط التقدم بين المستويات (ما عدا بعد المستوى 100)
         if (i < totalLevels) {
-            const barWidth = 40; // عرض الشريط
+            const barWidth = 40;
             const progressWidth = (progress / 100) * barWidth;
             html += `
                 <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:${barWidth}px;padding:0 0.1rem;">
@@ -14611,8 +15586,147 @@ _showLevelsPage() {
             `;
         }
     }
+
+    html += `
+                </div>
+            </div>
+            
+            <!-- زر العودة -->
+            <div style="text-align:center;margin-top:1.5rem;">
+                <button class="btn btn-outline" onclick="App._activateSection('profile')">
+                    <i class="fas fa-arrow-right"></i> العودة للملف الشخصي
+                </button>
+            </div>
+        </div>
+    `;
+
     container.innerHTML = html;
-    this._activateSection('levels');
+},
+
+/**
+ * تحديث صفحة المستويات (إعادة تحميل)
+ */
+async _refreshLevelsPage() {
+    const user = AuthService.currentUser;
+    if (!user) {
+        showToast('يجب تسجيل الدخول أولاً', 'error');
+        return;
+    }
+
+    const container = document.getElementById('levelsPageContainer');
+    if (!container) {
+        // ✅ إذا لم توجد الحاوية، نفتح الصفحة من البداية
+        this._showLevelsPage();
+        return;
+    }
+
+    // ✅ عرض رسالة تحميل
+    container.innerHTML = `
+        <div style="text-align:center;padding:2rem 1rem;">
+            <div style="display:inline-block;width:32px;height:32px;border:3px solid var(--glass);border-top-color:var(--primary);border-radius:50%;animation:spin 0.6s linear infinite;margin-bottom:0.5rem;"></div>
+            <p style="color:var(--gray);font-size:0.85rem;">جاري تحديث الجوائز...</p>
+        </div>
+    `;
+
+    try {
+        // ✅ إعادة تحميل جوائز المستويات من Firestore
+        await LevelRewardsManager.loadRewards();
+        
+        // ✅ تحديث بيانات المستخدم
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+            const data = userDoc.data();
+            if (data.claimedLevelRewards) {
+                user.claimedLevelRewards = data.claimedLevelRewards;
+            }
+            if (data.totalScore !== undefined) {
+                user.totalScore = data.totalScore;
+            }
+            if (data.coins !== undefined) {
+                user.coins = data.coins;
+            }
+        }
+
+        // ✅ إعادة بناء الصفحة
+        this._buildLevelsPage(container);
+        showToast('✅ تم تحديث الجوائز', 'success', 1500);
+
+    } catch (error) {
+        console.error('❌ Error refreshing levels:', error);
+        container.innerHTML = `
+            <div style="text-align:center;padding:2rem;color:var(--secondary);">
+                <i class="fas fa-exclamation-circle" style="font-size:2rem;display:block;margin-bottom:0.5rem;"></i>
+                <p>فشل تحديث الجوائز</p>
+                <button class="btn btn-primary btn-sm mt-1" onclick="App._refreshLevelsPage()">
+                    <i class="fas fa-sync"></i> إعادة المحاولة
+                </button>
+            </div>
+        `;
+    }
+},
+
+/**
+ * اكتساب جائزة مستوى معين
+ * @param {number} level - رقم المستوى
+ */
+async _claimLevelReward(level) {
+    const user = AuthService.currentUser;
+    if (!user) {
+        showToast('يجب تسجيل الدخول أولاً', 'error');
+        return;
+    }
+
+    // ✅ التحقق من أن المستوى مفتوح
+    const currentLevel = getLevel(user.totalScore || 0).level;
+    if (level > currentLevel) {
+        showToast(`⚠️ المستوى ${level} غير مفتوح بعد!`, 'error');
+        return;
+    }
+
+    // ✅ التحقق من وجود جائزة
+    const reward = LevelRewardsManager.getRewardForLevel(level);
+    if (!reward) {
+        showToast(`⚠️ لا توجد جائزة للمستوى ${level}`, 'error');
+        return;
+    }
+
+    // ✅ التحقق من عدم اكتساب الجائزة مسبقاً
+    const claimedRewards = user.claimedLevelRewards || [];
+    if (claimedRewards.includes(level)) {
+        showToast(`✅ جائزة المستوى ${level} تم اكتسابها مسبقاً`, 'info');
+        return;
+    }
+
+    // ✅ تأكيد الاكتساب
+    if (!confirm(`هل أنت متأكد من اكتساب جائزة المستوى ${level}؟\n${reward.itemName || 'نقاط ونقود'}`)) {
+        return;
+    }
+
+    try {
+        // ✅ تطبيق الجائزة
+        const result = await LevelRewardsManager.applyLevelReward(user.uid, level);
+        
+        if (result) {
+            showToast(`🎉 تم اكتساب جائزة المستوى ${level}!`, 'success', 3000);
+            
+            // ✅ تحديث الواجهات
+            this._updateUserUI(AuthService.currentUser);
+            this._updateDashboardUI();
+            
+            // ✅ إعادة بناء صفحة المستويات (بدلاً من إعادة التحميل الكامل)
+            const container = document.getElementById('levelsPageContainer');
+            if (container) {
+                this._buildLevelsPage(container);
+            } else {
+                this._showLevelsPage();
+            }
+        } else {
+            showToast('❌ فشل اكتساب الجائزة، حاول مرة أخرى', 'error');
+        }
+    } catch (error) {
+        console.error('❌ Error claiming level reward:', error);
+        showToast('❌ خطأ: ' + error.message, 'error');
+    }
 },
 
 // ============================================================
@@ -16539,7 +17653,25 @@ _saveModeSettings() {
 // ============================================================
 
 _showProfileSetupModal() {
+    // ✅ منع ظهور المودال إذا كان مفتوحاً بالفعل
+    if (document.getElementById('profileSetupModal')?.classList.contains('open')) {
+        console.log('ℹ️ Profile setup modal already open');
+        return;
+    }
+    
     console.log('📝 Showing profile setup modal');
+    
+    const user = AuthService.currentUser;
+    if (!user) {
+        console.warn('⚠️ No user to setup profile');
+        return;
+    }
+    
+    // ✅ إذا كان الملف مكتملاً، لا نعرض المودال
+    if (user.profileCompleted === true) {
+        console.log('✅ Profile already completed, skipping modal');
+        return;
+    }
     
     let modal = document.getElementById('profileSetupModal');
     
@@ -16958,9 +18090,6 @@ _handleGenderClick(e) {
     App._updateAvatarPreview(age, gender);
 },
 
-/**
- * حفظ البيانات الشخصية
- */
 _handleSaveProfile(e) {
     e.preventDefault();
     
@@ -16993,6 +18122,7 @@ _handleSaveProfile(e) {
             countryFlag: countryInfo?.flag || '',
             avatar: avatarPath,
             profileCompleted: true,
+            profileSkipped: false,  // ✅ إلغاء علامة التخطي
             ageGroup: isAdult ? 'adult' : 'young'
         };
         
@@ -17008,9 +18138,25 @@ _handleSaveProfile(e) {
                 console.log('✅ Profile data saved successfully');
                 App._closeModal('profileSetupModal');
                 showToast('✅ تم حفظ بياناتك الشخصية بنجاح!', 'success', 3000);
+                
+                // ✅ تحديث الكائن المحلي
+                if (AuthService.currentUser) {
+                    AuthService.currentUser.profileCompleted = true;
+                    AuthService.currentUser.profileSkipped = false;
+                    AuthService.currentUser.age = age;
+                    AuthService.currentUser.gender = gender;
+                    AuthService.currentUser.country = country;
+                    AuthService.currentUser.countryName = countryInfo?.name || '';
+                    AuthService.currentUser.countryFlag = countryInfo?.flag || '';
+                    AuthService.currentUser.avatar = avatarPath;
+                    AuthService.currentUser.ageGroup = isAdult ? 'adult' : 'young';
+                }
+                
                 App._updateUserUI(AuthService.currentUser);
                 App._updateDashboardAvatar();
                 App._applyUserCustomizations(AuthService.currentUser);
+                App._updateUserCountryDisplay(AuthService.currentUser);
+                
                 if (saveBtn) {
                     saveBtn.disabled = false;
                     saveBtn.innerHTML = originalText;
@@ -17034,12 +18180,14 @@ _skipProfileSetup() {
         App._closeModal('profileSetupModal');
         const user = AuthService.currentUser;
         if (user) {
+            // ✅ حفظ أن المستخدم اختار التخطي (لمنع ظهور المودال مرة أخرى)
             AuthService.updateUser({
                 age: 'under_18',
                 gender: 'male',
                 country: 'SA',
                 avatar: DEFAULT_AVATARS['male_young'],
-                profileCompleted: false
+                profileCompleted: false,  // ✅ لا يزال غير مكتمل ولكن تم التخطي
+                profileSkipped: true      // ✅ علامة للتخطي
             }).catch(() => {});
         }
         showToast('ℹ️ يمكنك إكمال بياناتك لاحقاً من الملف الشخصي', 'info', 4000);
@@ -21800,6 +22948,48 @@ _renderAdminQuestionsTab() {
     `;
 },
 
+/**
+ * ربط أحداث إعدادات المستوى
+ */
+_bindLevelSettingsEvents() {
+    const saveBtn = document.getElementById('saveLevelSettingsBtn');
+    const resetBtn = document.getElementById('resetLevelSettingsBtn');
+    const refreshBtn = document.getElementById('refreshLevelSettingsBtn');
+    const typeSelect = document.getElementById('levelSystemType');
+    
+    if (saveBtn) {
+        saveBtn.removeEventListener('click', this._saveLevelSettingsHandler);
+        this._saveLevelSettingsHandler = () => this._saveLevelSettings();
+        saveBtn.addEventListener('click', this._saveLevelSettingsHandler);
+    }
+    
+    if (resetBtn) {
+        resetBtn.removeEventListener('click', this._resetLevelSettingsHandler);
+        this._resetLevelSettingsHandler = () => this._resetLevelSettings();
+        resetBtn.addEventListener('click', this._resetLevelSettingsHandler);
+    }
+    
+    if (refreshBtn) {
+        refreshBtn.removeEventListener('click', this._refreshLevelSettingsHandler);
+        this._refreshLevelSettingsHandler = () => this._refreshLevelSettingsPreview();
+        refreshBtn.addEventListener('click', this._refreshLevelSettingsHandler);
+    }
+    
+    if (typeSelect) {
+        typeSelect.removeEventListener('change', this._levelTypeChangeHandler);
+        this._levelTypeChangeHandler = function() {
+            const customGroup = document.getElementById('customFormulaGroup');
+            if (customGroup) {
+                customGroup.style.display = this.value === 'custom' ? 'block' : 'none';
+            }
+        };
+        typeSelect.addEventListener('change', this._levelTypeChangeHandler);
+    }
+},
+
+/**
+ * عرض تبويب معين في لوحة المشرفين
+ */
 _showAdminTab(tab) {
     console.log(`🔄 Showing admin tab: ${tab}`);
     
@@ -21812,27 +23002,33 @@ _showAdminTab(tab) {
     // ✅ عرض المحتوى حسب التبويب
     let content = '';
     switch(tab) {
-        case 'dashboard': content = this._renderAdminDashboardContent(); break;
-case 'users':
-    content = this._renderAdminUsersContent();
-    container.innerHTML = content;
-    // تأخير بسيط لضمان تحميل العناصر
-    setTimeout(() => {
-        this._renderAdminUsers(1);
-    }, 300);
-    break;
-    case 'questions':
-    content = this._renderAdminQuestionsTab();
-    break;
-        case 'content': content = this._renderAdminContentContent(); break;
-        case 'data': content = this._renderAdminDataContent(); break;
-        case 'logs': content = this._renderAdminLogsContent(); break;
-        case 'settings': content = this._renderAdminSettingsContent(); break;
-        default: content = '<div class="text-gray">قسم غير معروف</div>';
+        case 'dashboard': 
+            content = this._renderAdminDashboardContent(); 
+            break;
+        case 'users':
+            content = this._renderAdminUsersContent();
+            break;
+        case 'questions':
+            content = this._renderAdminQuestionsTab();
+            break;
+        case 'content': 
+            content = this._renderAdminContentContent(); 
+            break;
+        case 'data': 
+            content = this._renderAdminDataContent(); 
+            break;
+        case 'logs': 
+            content = this._renderAdminLogsContent(); 
+            break;
+        case 'settings': 
+            content = this._renderAdminSettingsContent(); 
+            break;
+        default: 
+            content = '<div class="text-gray">قسم غير معروف</div>';
     }
     container.innerHTML = content;
 
-    // ✅ بعد عرض المحتوى، قم بتحميل البيانات (مع تأخير كافٍ)
+    // ✅ بعد عرض المحتوى، قم بربط التبويبات الفرعية
     setTimeout(() => {
         console.log(`⏳ Loading data for tab: ${tab}`);
         try {
@@ -21840,17 +23036,26 @@ case 'users':
                 case 'dashboard':
                     this._updateAdminDashboard();
                     break;
-case 'users':
-    content = this._renderAdminUsersContent();
-    container.innerHTML = content;
-    // تأخير بسيط لضمان تحميل العناصر
-    setTimeout(() => {
-        this._renderAdminUsers(1);
-    }, 300);
-    break;
-                case 'content':
-                    this._renderAdminContentData();
+                case 'users':
+                    this._renderAdminUsers(1);
                     break;
+case 'content':
+    content = this._renderAdminContentContent();
+    container.innerHTML = content;
+    // ✅ ربط التبويبات الفرعية
+    setTimeout(() => {
+        this._bindAdminSubTabs();
+        // ✅ إذا كان التبويب النشط هو settings، قم بتحميل الإعدادات
+        const activeSubtab = document.querySelector('.admin-subtab.active');
+        if (activeSubtab && activeSubtab.dataset.tab === 'settings') {
+            this._renderLevelSettingsManagement();
+            // ✅ ربط الأحداث بعد التحميل
+            setTimeout(() => {
+                this._bindLevelSettingsEvents();
+            }, 100);
+        }
+    }, 100);
+    break;
                 case 'data':
                     this._renderAdminDataStats();
                     break;
@@ -21858,7 +23063,6 @@ case 'users':
                     this._renderAdminLogs();
                     break;
                 case 'settings':
-                    // لا توجد بيانات للتحميل
                     break;
                 default:
                     console.warn('⚠️ Unknown tab:', tab);
@@ -21963,20 +23167,6 @@ _renderAdminUsersContent() {
                 </div>
             </div>
             <div class="pagination" id="adminUsersPagination"></div>
-        </div>
-    `;
-},
-
-_renderAdminContentContent() {
-    return `
-        <div class="card">
-            <div class="card-title"><i class="fas fa-newspaper"></i> إدارة المحتوى</div>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1rem;">
-                <div class="stat-card"><div class="stat-number" id="adminContentPosts">0</div><div class="stat-label">منشورات</div><button class="btn btn-sm btn-outline" onclick="App._adminViewPosts()">عرض</button></div>
-                <div class="stat-card"><div class="stat-number" id="adminContentComments">0</div><div class="stat-label">تعليقات</div><button class="btn btn-sm btn-outline" onclick="App._adminViewComments()">عرض</button></div>
-                <div class="stat-card"><div class="stat-number" id="adminContentReports">0</div><div class="stat-label">تقارير</div><button class="btn btn-sm btn-danger" onclick="App._adminViewReports()">عرض</button></div>
-            </div>
-            <div id="adminContentList"><div class="text-gray">اختر فئة لعرض المحتوى</div></div>
         </div>
     `;
 },
@@ -24258,6 +25448,2237 @@ _toggleCardBackground: function(itemId) {
     }, 300);
 },
 
+/**
+ * عرض محتوى تبويب المحتوى في لوحة المشرفين
+ */
+_renderAdminContentContent() {
+    return `
+        <div class="card">
+            <div class="card-title">
+                <i class="fas fa-trophy" style="color:var(--accent);"></i> 
+                إدارة المحتوى والإنجازات والمقتنيات
+            </div>
+            
+            <!-- تبويبات فرعية -->
+            <div class="admin-subtabs" id="adminSubTabs" style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-bottom:1rem;border-bottom:1px solid var(--glass-border);padding-bottom:0.5rem;">
+                <button class="admin-subtab active" data-tab="achievements" style="padding:0.3rem 0.8rem;border-radius:30px;border:1px solid var(--glass-border);background:var(--primary);color:#fff;font-weight:600;font-size:0.75rem;cursor:pointer;transition:all 0.3s ease;font-family:var(--font);">
+                    🏆 الإنجازات
+                </button>
+                <button class="admin-subtab" data-tab="level-rewards" style="padding:0.3rem 0.8rem;border-radius:30px;border:1px solid var(--glass-border);background:transparent;color:var(--gray);font-weight:600;font-size:0.75rem;cursor:pointer;transition:all 0.3s ease;font-family:var(--font);">
+                    🎁 جوائز المستويات
+                </button>
+                <button class="admin-subtab" data-tab="collectibles" style="padding:0.3rem 0.8rem;border-radius:30px;border:1px solid var(--glass-border);background:transparent;color:var(--gray);font-weight:600;font-size:0.75rem;cursor:pointer;transition:all 0.3s ease;font-family:var(--font);">
+                    🖼️ المقتنيات
+                </button>
+                <button class="admin-subtab" data-tab="settings" style="padding:0.3rem 0.8rem;border-radius:30px;border:1px solid var(--glass-border);background:transparent;color:var(--gray);font-weight:600;font-size:0.75rem;cursor:pointer;transition:all 0.3s ease;font-family:var(--font);">
+                    ⚙️ إعدادات المستوى
+                </button>
+            </div>
+            
+            <!-- محتوى التبويبات -->
+            <div id="adminAchievementsContainer" style="display:block;">
+                ${this._renderAchievementsManagement()}
+            </div>
+            <div id="adminLevelRewardsContainer" style="display:none;">
+                ${this._renderLevelRewardsManagement()}
+            </div>
+            <div id="adminCollectiblesContainer" style="display:none;">
+                ${this._renderCollectiblesManagement()}
+            </div>
+            <div id="adminLevelSettingsContainer" style="display:none;">
+                ${this._renderLevelSettingsManagement()}
+            </div>
+        </div>
+    `;
+},
+
+/**
+ * عرض إدارة الإنجازات مع فلاتر
+ */
+_renderAchievementsManagement() {
+    // ✅ جلب الإنجازات من Firestore
+    let firestoreAchievements = AchievementManager._definitions || [];
+    const firestoreIds = firestoreAchievements.map(a => a.id);
+    
+    // ✅ جلب الإنجازات الثابتة غير الموجودة في Firestore
+    let staticAchievements = [];
+    if (typeof ACHIEVEMENTS_DATA !== 'undefined') {
+        staticAchievements = ACHIEVEMENTS_DATA
+            .filter(a => !firestoreIds.includes(a.id))
+            .map(a => ({
+                ...a,
+                pointsReward: a.points || 10,
+                coinsReward: a.coins || 20,
+                isActive: true,
+                _isStatic: true,
+                id: a.id
+            }));
+    }
+    
+    // ✅ دمج القائمتين (الإنجازات من Firestore أولاً)
+    const allAchievements = [...firestoreAchievements, ...staticAchievements];
+    
+    // ✅ بناء واجهة الفلاتر
+    let html = `
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
+            <h4><i class="fas fa-list"></i> قائمة الإنجازات (${allAchievements.length})</h4>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                <button class="btn btn-primary btn-sm" onclick="App._openAddAchievementModal()">
+                    <i class="fas fa-plus"></i> إضافة إنجاز
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="App._syncAchievementsToFirestore()">
+                    <i class="fas fa-sync"></i> مزامنة الكل
+                </button>
+            </div>
+        </div>
+        
+        <!-- ✅ فلاتر الإنجازات -->
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;padding:0.8rem;background:var(--glass);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+            <div style="display:flex;align-items:center;gap:0.3rem;flex:1;min-width:150px;">
+                <i class="fas fa-search" style="color:var(--gray);"></i>
+                <input type="text" id="achievementSearch" placeholder="بحث عن إنجاز..." style="flex:1;padding:6px 12px;border-radius:8px;background:var(--dark);border:1px solid var(--glass-border);color:var(--light);font-size:0.85rem;">
+            </div>
+            <select id="achievementCategoryFilter" style="padding:6px 12px;border-radius:8px;background:var(--dark);border:1px solid var(--glass-border);color:var(--light);font-size:0.85rem;">
+                <option value="all">كل الفئات</option>
+                <option value="انتصارات">🏆 انتصارات</option>
+                <option value="سلسلة انتصارات">🔥 سلسلة انتصارات</option>
+                <option value="إجابات متتالية">✅ إجابات متتالية</option>
+                <option value="إجابات كلية">📝 إجابات كلية</option>
+                <option value="الرتب">🏅 الرتب</option>
+                <option value="الوقت">⏱️ الوقت</option>
+                <option value="وقت اللعب">🎮 وقت اللعب</option>
+                <option value="صناديق">📦 صناديق</option>
+                <option value="أطوار مصنفة">🏅 أطوار مصنفة</option>
+                <option value="أطوار ودية">🎮 أطوار ودية</option>
+                <option value="أطوار تدريب">📚 أطوار تدريب</option>
+                <option value="الغرف">🏠 الغرف</option>
+                <option value="متنوع">🎯 متنوع</option>
+            </select>
+            <select id="achievementStatusFilter" style="padding:6px 12px;border-radius:8px;background:var(--dark);border:1px solid var(--glass-border);color:var(--light);font-size:0.85rem;">
+                <option value="all">كل الحالات</option>
+                <option value="active">🟢 مفعل</option>
+                <option value="inactive">🔴 غير مفعل</option>
+            </select>
+            <select id="achievementSourceFilter" style="padding:6px 12px;border-radius:8px;background:var(--dark);border:1px solid var(--glass-border);color:var(--light);font-size:0.85rem;">
+                <option value="all">كل المصادر</option>
+                <option value="firestore">☁️ Firestore</option>
+                <option value="static">📦 ثابت</option>
+            </select>
+            <button class="btn btn-sm btn-outline" onclick="App._clearAchievementFilters()">
+                <i class="fas fa-times"></i> مسح
+            </button>
+        </div>
+    `;
+    
+    // ✅ تطبيق الفلاتر
+    const searchQuery = document.getElementById('achievementSearch')?.value?.toLowerCase() || '';
+    const categoryFilter = document.getElementById('achievementCategoryFilter')?.value || 'all';
+    const statusFilter = document.getElementById('achievementStatusFilter')?.value || 'all';
+    const sourceFilter = document.getElementById('achievementSourceFilter')?.value || 'all';
+    
+    let filteredAchievements = allAchievements.filter(ach => {
+        // ✅ فلتر البحث
+        const searchMatch = ach.name?.toLowerCase().includes(searchQuery) || 
+                           ach.description?.toLowerCase().includes(searchQuery) ||
+                           ach.id?.toLowerCase().includes(searchQuery);
+        if (!searchMatch) return false;
+        
+        // ✅ فلتر الفئة
+        if (categoryFilter !== 'all' && ach.category !== categoryFilter) return false;
+        
+        // ✅ فلتر الحالة
+        if (statusFilter === 'active' && ach.isActive !== true) return false;
+        if (statusFilter === 'inactive' && ach.isActive !== false) return false;
+        
+        // ✅ فلتر المصدر
+        if (sourceFilter === 'firestore' && ach._isStatic) return false;
+        if (sourceFilter === 'static' && !ach._isStatic) return false;
+        
+        return true;
+    });
+    
+    // ✅ إذا لم توجد نتائج
+    if (filteredAchievements.length === 0) {
+        html += `
+            <div style="text-align:center;padding:2rem;color:var(--gray);">
+                <i class="fas fa-search" style="font-size:2rem;color:var(--gray-dark);display:block;margin-bottom:0.5rem;"></i>
+                <p>${allAchievements.length === 0 ? 'لا توجد إنجازات. أضف إنجازك الأول!' : 'لا توجد نتائج مطابقة للبحث'}</p>
+                ${allAchievements.length === 0 ? `<button class="btn btn-primary btn-sm mt-1" onclick="App._openAddAchievementModal()"><i class="fas fa-plus"></i> إضافة إنجاز</button>` : ''}
+            </div>
+        `;
+        return html;
+    }
+
+    // ✅ عرض الإنجازات المفلترة
+    html += `
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>الإنجاز</th>
+                        <th>الفئة</th>
+                        <th>نقاط</th>
+                        <th>نقود</th>
+                        <th>المصدر</th>
+                        <th>الحالة</th>
+                        <th>الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    filteredAchievements.forEach((ach, idx) => {
+        const isFirestore = !ach._isStatic;
+        const isActive = ach.isActive !== false;
+        const sourceLabel = isFirestore ? '☁️ Firestore' : '📦 ثابت';
+        const sourceColor = isFirestore ? 'var(--info)' : 'var(--accent)';
+        
+        html += `
+            <tr>
+                <td>${idx + 1}</td>
+                <td>
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <img src="${ach.image || 'images/achievements/default.png'}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none'">
+                        <div>
+                            <div style="font-weight:600;">${ach.name || 'غير معروف'}</div>
+                            <div style="font-size:0.7rem;color:var(--gray);">${ach.description || ''}</div>
+                            ${ach.checkLogic ? `<div style="font-size:0.6rem;color:var(--gray-dark);">شرط: ${ach.checkLogic.substring(0, 30)}${ach.checkLogic.length > 30 ? '...' : ''}</div>` : ''}
+                        </div>
+                    </div>
+                </td>
+                <td><span class="badge badge-sm">${ach.category || 'عام'}</span></td>
+                <td style="font-weight:700;color:var(--accent);">${ach.pointsReward || ach.points || 0}</td>
+                <td style="font-weight:700;color:var(--accent);">${ach.coinsReward || ach.coins || 0}</td>
+                <td><span class="badge badge-sm" style="background:${sourceColor}22;color:${sourceColor};">${sourceLabel}</span></td>
+                <td><span class="badge ${isActive ? 'badge-success' : 'badge-danger'}">${isActive ? '🟢 مفعل' : '🔴 غير مفعل'}</span></td>
+                <td>
+                    <button class="btn btn-xs btn-primary" onclick="App._editAchievement('${ach.id}')"><i class="fas fa-edit"></i></button>
+                    ${isFirestore ? `<button class="btn btn-xs btn-danger" onclick="App._deleteAchievement('${ach.id}')"><i class="fas fa-trash"></i></button>` : 
+                    `<button class="btn btn-xs btn-success" onclick="App._syncSingleAchievement('${ach.id}')"><i class="fas fa-cloud-upload-alt"></i></button>`}
+                </td>
+            </tr>
+        `;
+    });
+
+    html += `
+                </tbody>
+            </table>
+        </div>
+        
+        <div style="margin-top:0.5rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+            <span style="font-size:0.75rem;color:var(--gray);">
+                عرض ${filteredAchievements.length} من ${allAchievements.length} إنجاز
+            </span>
+            <div style="display:flex;gap:0.3rem;">
+                <button class="btn btn-xs btn-outline" onclick="App._renderAchievementsManagement()">
+                    <i class="fas fa-sync"></i> تحديث
+                </button>
+            </div>
+        </div>
+        
+        <div style="margin-top:0.5rem;padding:0.8rem;background:var(--glass);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+            <div style="font-weight:700;font-size:0.85rem;color:var(--gray);">
+                <i class="fas fa-info-circle"></i> 📦 ثابت = من الكود المصدري • ☁️ Firestore = من قاعدة البيانات
+            </div>
+        </div>
+    `;
+
+    // ✅ ربط الأحداث بعد إضافة العناصر إلى DOM
+    setTimeout(() => {
+        this._bindAchievementFilters();
+    }, 50);
+    
+    return html;
+},
+
+/**
+ * ربط أحداث فلاتر الإنجازات
+ */
+_bindAchievementFilters() {
+    const search = document.getElementById('achievementSearch');
+    const category = document.getElementById('achievementCategoryFilter');
+    const status = document.getElementById('achievementStatusFilter');
+    const source = document.getElementById('achievementSourceFilter');
+    
+    const updateFilters = () => {
+        this._renderAchievementsManagement();
+    };
+    
+    if (search) {
+        search.removeEventListener('input', this._achievementSearchHandler);
+        this._achievementSearchHandler = function() {
+            clearTimeout(this._searchTimeout);
+            this._searchTimeout = setTimeout(updateFilters, 300);
+        }.bind(this);
+        search.addEventListener('input', this._achievementSearchHandler);
+    }
+    
+    if (category) {
+        category.removeEventListener('change', updateFilters);
+        category.addEventListener('change', updateFilters);
+    }
+    if (status) {
+        status.removeEventListener('change', updateFilters);
+        status.addEventListener('change', updateFilters);
+    }
+    if (source) {
+        source.removeEventListener('change', updateFilters);
+        source.addEventListener('change', updateFilters);
+    }
+},
+
+/**
+ * مسح فلاتر الإنجازات
+ */
+_clearAchievementFilters() {
+    const search = document.getElementById('achievementSearch');
+    const category = document.getElementById('achievementCategoryFilter');
+    const status = document.getElementById('achievementStatusFilter');
+    const source = document.getElementById('achievementSourceFilter');
+    
+    if (search) search.value = '';
+    if (category) category.value = 'all';
+    if (status) status.value = 'all';
+    if (source) source.value = 'all';
+    
+    this._renderAchievementsManagement();
+},
+
+/**
+ * مزامنة إنجاز واحد إلى Firestore
+ */
+async _syncSingleAchievement(id) {
+    if (!AuthService.checkPermission('admin') && !AuthService.checkPermission('super_admin')) {
+        showToast('ليس لديك صلاحية', 'error');
+        return;
+    }
+    
+    // ✅ البحث في ACHIEVEMENTS_DATA
+    const achievement = ACHIEVEMENTS_DATA.find(a => a.id === id);
+    if (!achievement) {
+        showToast('الإنجاز غير موجود في البيانات الثابتة', 'error');
+        return;
+    }
+    
+    // ✅ التحقق من عدم وجوده بالفعل في Firestore
+    const exists = AchievementManager._definitions.some(a => a.id === id);
+    if (exists) {
+        showToast('⚠️ هذا الإنجاز موجود بالفعل في Firestore', 'info');
+        return;
+    }
+    
+    if (!confirm(`هل أنت متأكد من مزامنة "${achievement.name}" مع Firestore؟`)) {
+        return;
+    }
+    
+    try {
+        let checkLogic = null;
+        if (achievement.check && typeof achievement.check === 'function') {
+            checkLogic = achievement.check.toString()
+                .replace(/^function\s*\([^)]*\)\s*\{/, '')
+                .replace(/\}$/, '').trim();
+        }
+        
+        const data = {
+            id: achievement.id,
+            name: achievement.name,
+            description: achievement.description || '',
+            category: achievement.category || 'عام',
+            pointsReward: achievement.points || 10,
+            coinsReward: achievement.coins || 20,
+            image: achievement.image || 'images/achievements/default.png',
+            checkLogic: checkLogic,
+            isActive: true,
+            rarity: achievement.rarity || 'common',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        await db.collection('achievementDefinitions').doc(achievement.id).set(data, { merge: true });
+        
+        showToast(`✅ تم مزامنة "${achievement.name}" مع Firestore`, 'success');
+        
+        await AchievementManager.loadDefinitions();
+        this._renderAchievementsManagement();
+        
+    } catch (error) {
+        console.error('❌ Error syncing achievement:', error);
+        showToast('❌ فشل المزامنة: ' + error.message, 'error');
+    }
+},
+
+/**
+ * عرض إدارة جوائز المستويات مع فلاتر
+ */
+_renderLevelRewardsManagement() {
+    const rewards = LevelRewardsManager._rewards || [];
+    
+    // ✅ بناء واجهة الفلاتر
+    let html = `
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
+            <h4><i class="fas fa-gift"></i> جوائز المستويات (${rewards.length})</h4>
+            <button class="btn btn-primary btn-sm" onclick="App._openAddLevelRewardModal()">
+                <i class="fas fa-plus"></i> إضافة جائزة
+            </button>
+        </div>
+        
+        <!-- ✅ فلاتر البحث -->
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;padding:0.8rem;background:var(--glass);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+            <div style="display:flex;align-items:center;gap:0.3rem;flex:1;min-width:150px;">
+                <i class="fas fa-search" style="color:var(--gray);"></i>
+                <input type="text" id="levelRewardSearch" placeholder="بحث عن جائزة..." style="flex:1;padding:6px 12px;border-radius:8px;background:var(--dark);border:1px solid var(--glass-border);color:var(--light);font-size:0.85rem;">
+            </div>
+            <select id="levelRewardTypeFilter" style="padding:6px 12px;border-radius:8px;background:var(--dark);border:1px solid var(--glass-border);color:var(--light);font-size:0.85rem;">
+                <option value="all">كل الأنواع</option>
+                <option value="permanent">🖼️ مقتنيات</option>
+                <option value="boost">⚡ تعزيزات</option>
+            </select>
+            <select id="levelRewardStatusFilter" style="padding:6px 12px;border-radius:8px;background:var(--dark);border:1px solid var(--glass-border);color:var(--light);font-size:0.85rem;">
+                <option value="all">كل الحالات</option>
+                <option value="active">🟢 مفعل</option>
+                <option value="inactive">🔴 غير مفعل</option>
+            </select>
+            <button class="btn btn-sm btn-outline" onclick="App._clearLevelRewardFilters()">
+                <i class="fas fa-times"></i> مسح
+            </button>
+        </div>
+    `;
+    
+    // ✅ تطبيق الفلاتر
+    const searchQuery = document.getElementById('levelRewardSearch')?.value?.toLowerCase() || '';
+    const typeFilter = document.getElementById('levelRewardTypeFilter')?.value || 'all';
+    const statusFilter = document.getElementById('levelRewardStatusFilter')?.value || 'all';
+    
+    let filteredRewards = rewards.filter(r => {
+        // ✅ فلتر البحث
+        const searchMatch = r.itemName?.toLowerCase().includes(searchQuery) || 
+                           r.message?.toLowerCase().includes(searchQuery) ||
+                           r.level.toString().includes(searchQuery);
+        if (!searchMatch) return false;
+        
+        // ✅ فلتر النوع
+        if (typeFilter !== 'all' && r.rewardType !== typeFilter) return false;
+        
+        // ✅ فلتر الحالة
+        if (statusFilter === 'active' && r.isActive !== true) return false;
+        if (statusFilter === 'inactive' && r.isActive !== false) return false;
+        
+        return true;
+    });
+    
+    // ✅ ترتيب حسب المستوى
+    filteredRewards.sort((a, b) => a.level - b.level);
+    
+    if (filteredRewards.length === 0) {
+        html += `
+            <div style="text-align:center;padding:2rem;color:var(--gray);">
+                <i class="fas fa-gift" style="font-size:2rem;color:var(--gray-dark);display:block;margin-bottom:0.5rem;"></i>
+                <p>${rewards.length === 0 ? 'لا توجد جوائز. أضف جائزتك الأولى!' : 'لا توجد نتائج مطابقة للبحث'}</p>
+                ${rewards.length === 0 ? `<button class="btn btn-primary btn-sm mt-1" onclick="App._openAddLevelRewardModal()"><i class="fas fa-plus"></i> إضافة جائزة</button>` : ''}
+            </div>
+        `;
+        return html;
+    }
+    
+    // ✅ عرض الجوائز المفلترة
+    html += `
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>المستوى</th>
+                        <th>الجائزة</th>
+                        <th>النوع</th>
+                        <th>العدد</th>
+                        <th>المدة</th>
+                        <th>نقاط</th>
+                        <th>نقود</th>
+                        <th>الحالة</th>
+                        <th>الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    filteredRewards.forEach((r) => {
+        const isBoost = r.rewardType === 'boost';
+        const typeLabel = isBoost ? '⚡ تعزيز' : '🖼️ مقتنى';
+        const statusLabel = r.isActive !== false ? '🟢 مفعل' : '🔴 غير مفعل';
+        const statusClass = r.isActive !== false ? 'badge-success' : 'badge-danger';
+        
+        html += `
+            <tr>
+                <td style="font-weight:700;font-size:1.1rem;">🎯 ${r.level}</td>
+                <td>
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <span style="font-size:1.2rem;">${r.icon || '🎁'}</span>
+                        <div>
+                            <div style="font-weight:600;">${r.itemName || 'نقاط ونقود'}</div>
+                            <div style="font-size:0.65rem;color:var(--gray);">${r.message?.substring(0, 30) || ''}</div>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="badge badge-sm">${typeLabel}</span></td>
+                <td>${isBoost ? (r.quantity || 1) : '—'}</td>
+                <td>${isBoost ? (r.boostDuration || 'حسب التعزيز') : 'دائم'}</td>
+                <td style="font-weight:700;color:var(--accent);">+${r.pointsReward || 0}</td>
+                <td style="font-weight:700;color:var(--accent);">+${r.coinsReward || 0}</td>
+                <td><span class="badge ${statusClass}">${statusLabel}</span></td>
+                <td>
+                    <button class="btn btn-xs btn-primary" onclick="App._editLevelReward('${r.id}')"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-xs btn-danger" onclick="App._deleteLevelReward('${r.id}')"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top:0.5rem;font-size:0.75rem;color:var(--gray);">
+            عرض ${filteredRewards.length} من ${rewards.length} جائزة
+        </div>
+    `;
+    
+    // ✅ ربط الأحداث بعد إضافة العناصر إلى DOM
+    setTimeout(() => {
+        this._bindLevelRewardFilters();
+    }, 50);
+    
+    return html;
+},
+
+/**
+ * ربط أحداث فلاتر جوائز المستويات
+ */
+_bindLevelRewardFilters() {
+    const search = document.getElementById('levelRewardSearch');
+    const typeFilter = document.getElementById('levelRewardTypeFilter');
+    const statusFilter = document.getElementById('levelRewardStatusFilter');
+    
+    const updateFilters = () => {
+        this._renderLevelRewardsManagement();
+    };
+    
+    if (search) {
+        search.removeEventListener('input', this._levelRewardSearchHandler);
+        this._levelRewardSearchHandler = function() {
+            clearTimeout(this._searchTimeout);
+            this._searchTimeout = setTimeout(updateFilters, 300);
+        }.bind(this);
+        search.addEventListener('input', this._levelRewardSearchHandler);
+    }
+    
+    if (typeFilter) {
+        typeFilter.removeEventListener('change', updateFilters);
+        typeFilter.addEventListener('change', updateFilters);
+    }
+    if (statusFilter) {
+        statusFilter.removeEventListener('change', updateFilters);
+        statusFilter.addEventListener('change', updateFilters);
+    }
+},
+
+/**
+ * مسح فلاتر جوائز المستويات
+ */
+_clearLevelRewardFilters() {
+    const search = document.getElementById('levelRewardSearch');
+    const typeFilter = document.getElementById('levelRewardTypeFilter');
+    const statusFilter = document.getElementById('levelRewardStatusFilter');
+    
+    if (search) search.value = '';
+    if (typeFilter) typeFilter.value = 'all';
+    if (statusFilter) statusFilter.value = 'all';
+    
+    this._renderLevelRewardsManagement();
+},
+
+/**
+ * فتح مودال إضافة/تعديل إنجاز
+ */
+_openAddAchievementModal(data = null) {
+    const isEdit = !!data;
+    const isStatic = data?._isStatic === true;  // ✅ معرفة إذا كان من البيانات الثابتة
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay open';
+    modal.innerHTML = `
+        <div class="modal-card" style="max-width:600px;max-height:90vh;overflow-y:auto;">
+            <div class="modal-header">
+                <h3><i class="fas fa-trophy" style="color:var(--accent);"></i> ${isEdit ? 'تعديل' : 'إضافة'} إنجاز</h3>
+                <button class="modal-close-btn" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="achievementForm">
+                <input type="hidden" id="achFormId" value="${data?.id || ''}">
+                <input type="hidden" id="achIsStatic" value="${isStatic ? 'true' : 'false'}">
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>المعرف (ID) *</label>
+                        <input type="text" id="achId" value="${data?.id || ''}" ${isEdit ? 'readonly style="opacity:0.6;"' : ''} required placeholder="例如: first_win" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                        ${isEdit ? '<div style="font-size:0.6rem;color:var(--gray);">المعرف غير قابل للتعديل</div>' : '<div style="font-size:0.6rem;color:var(--gray);">يجب أن يكون فريداً (حروف إنجليزية وأرقام و _ فقط)</div>'}
+                    </div>
+                    <div class="form-group">
+                        <label>الاسم *</label>
+                        <input type="text" id="achName" value="${data?.name || ''}" required placeholder="مثال: أول انتصار" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>الوصف *</label>
+                    <textarea id="achDescription" rows="2" placeholder="وصف الإنجاز..." style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">${data?.description || ''}</textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>الفئة *</label>
+                        <select id="achCategory" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                            <option value="انتصارات" ${data?.category === 'انتصارات' ? 'selected' : ''}>انتصارات</option>
+                            <option value="سلسلة انتصارات" ${data?.category === 'سلسلة انتصارات' ? 'selected' : ''}>سلسلة انتصارات</option>
+                            <option value="إجابات متتالية" ${data?.category === 'إجابات متتالية' ? 'selected' : ''}>إجابات متتالية</option>
+                            <option value="إجابات كلية" ${data?.category === 'إجابات كلية' ? 'selected' : ''}>إجابات كلية</option>
+                            <option value="الرتب" ${data?.category === 'الرتب' ? 'selected' : ''}>الرتب</option>
+                            <option value="الوقت" ${data?.category === 'الوقت' ? 'selected' : ''}>الوقت</option>
+                            <option value="وقت اللعب" ${data?.category === 'وقت اللعب' ? 'selected' : ''}>وقت اللعب</option>
+                            <option value="صناديق" ${data?.category === 'صناديق' ? 'selected' : ''}>صناديق</option>
+                            <option value="متنوع" ${data?.category === 'متنوع' ? 'selected' : ''}>متنوع</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>الندرة</label>
+                        <select id="achRarity" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                            <option value="common" ${data?.rarity === 'common' ? 'selected' : ''}>🟢 عادي</option>
+                            <option value="uncommon" ${data?.rarity === 'uncommon' ? 'selected' : ''}>🟣 غير عادي</option>
+                            <option value="rare" ${data?.rarity === 'rare' ? 'selected' : ''}>🔵 نادر</option>
+                            <option value="epic" ${data?.rarity === 'epic' ? 'selected' : ''}>🟠 أسطوري</option>
+                            <option value="legendary" ${data?.rarity === 'legendary' ? 'selected' : ''}>🟡 خرافي</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>🏆 نقاط المكافأة *</label>
+                        <input type="number" id="achPoints" value="${data?.pointsReward || data?.points || 10}" min="0" required style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                    </div>
+                    <div class="form-group">
+                        <label>🪙 نقود المكافأة *</label>
+                        <input type="number" id="achCoins" value="${data?.coinsReward || data?.coins || 20}" min="0" required style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>🔍 منطق التحقق *</label>
+                    <input type="text" id="achCheckLogic" value="${data?.checkLogic || data?.check?.toString()?.replace(/^function\s*\([^)]*\)\s*\{/, '').replace(/\}$/, '').trim() || 'data.totalWins >= 1'}" placeholder="مثال: data.totalWins >= 1" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);direction:ltr;">
+                    <div style="font-size:0.65rem;color:var(--gray);margin-top:0.2rem;">
+                        💡 استخدم <strong>data</strong> للوصول إلى بيانات اللاعب مثل: data.totalWins, data.winStreak, data.correctStreak
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>🖼️ رابط الصورة</label>
+                    <input type="text" id="achImage" value="${data?.image || 'images/achievements/default.png'}" placeholder="images/achievements/achievement.png" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                </div>
+                
+                <div class="form-group">
+                    <label><input type="checkbox" id="achActive" ${data?.isActive !== false ? 'checked' : ''}> مفعل</label>
+                </div>
+                
+                ${isStatic ? `
+                    <div style="background:rgba(255,217,61,0.1);padding:0.8rem;border-radius:8px;border:1px solid var(--accent);margin:0.5rem 0;">
+                        <div style="font-weight:700;color:var(--accent);">
+                            <i class="fas fa-info-circle"></i> هذا إنجاز من البيانات الثابتة
+                        </div>
+                        <div style="font-size:0.8rem;color:var(--gray);">
+                            سيتم حفظ نسخة جديدة في Firestore عند التحديث. الإنجاز الثابت سيظل موجوداً.
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <div class="modal-footer" style="display:flex;gap:0.5rem;justify-content:center;margin-top:1rem;">
+                    <button type="submit" class="btn btn-primary" style="min-width:120px;justify-content:center;">
+                        <i class="fas fa-save"></i> ${isEdit ? (isStatic ? 'نسخ إلى Firestore' : 'تحديث') : 'إضافة'}
+                    </button>
+                    <button type="button" class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    // ✅ ربط النموذج
+    modal.querySelector('#achievementForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const id = document.getElementById('achId').value.trim();
+        const name = document.getElementById('achName').value.trim();
+        const description = document.getElementById('achDescription').value.trim();
+        const category = document.getElementById('achCategory').value;
+        const rarity = document.getElementById('achRarity').value;
+        const pointsReward = parseInt(document.getElementById('achPoints').value) || 0;
+        const coinsReward = parseInt(document.getElementById('achCoins').value) || 0;
+        const checkLogic = document.getElementById('achCheckLogic').value.trim();
+        const image = document.getElementById('achImage').value.trim() || 'images/achievements/default.png';
+        const isActive = document.getElementById('achActive').checked;
+        const isStatic = document.getElementById('achIsStatic').value === 'true';
+        
+        if (!id || !name || !checkLogic) {
+            showToast('يرجى ملء جميع الحقول المطلوبة', 'error');
+            return;
+        }
+        
+        // ✅ التحقق من صحة المعرف
+        if (!/^[a-zA-Z0-9_]+$/.test(id)) {
+            showToast('المعرف يجب أن يحتوي على حروف إنجليزية وأرقام و _ فقط', 'error');
+            return;
+        }
+        
+        try {
+            const data = {
+                id: id,
+                name: name,
+                description: description,
+                category: category,
+                rarity: rarity,
+                pointsReward: pointsReward,
+                coinsReward: coinsReward,
+                checkLogic: checkLogic,
+                image: image,
+                isActive: isActive
+            };
+            
+            if (isEdit && !isStatic) {
+                // ✅ تحديث إنجاز موجود في Firestore
+                await db.collection('achievementDefinitions').doc(id).update(data);
+                showToast('✅ تم تحديث الإنجاز', 'success');
+            } else {
+                // ✅ إضافة إنجاز جديد (أو نسخ من الثابت)
+                data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                await db.collection('achievementDefinitions').doc(id).set(data, { merge: true });
+                showToast(isStatic ? '✅ تم نسخ الإنجاز إلى Firestore' : '✅ تم إضافة الإنجاز', 'success');
+            }
+            
+            modal.remove();
+            // ✅ إعادة تحميل البيانات
+            await AchievementManager.loadDefinitions();
+            this._renderAchievementsManagement();
+            
+        } catch (error) {
+            console.error('❌ Error saving achievement:', error);
+            showToast('❌ خطأ: ' + error.message, 'error');
+        }
+    });
+},
+
+/**
+ * فتح مودال إضافة/تعديل جائزة مستوى
+ */
+_openAddLevelRewardModal(data = null) {
+    const isEdit = !!data;
+    const storeItems = DataManager.data.storeItems || [];
+    
+    // ✅ تقسيم العناصر حسب النوع
+    const permanentItems = storeItems.filter(item => 
+        item.category === 'frames' || 
+        item.category === 'avatars' || 
+        item.category === 'backgrounds' || 
+        item.category === 'badges' ||
+        item.category === 'themes'
+    );
+    
+    const boostItems = storeItems.filter(item => 
+        item.category === 'boosts' || 
+        item.category === 'room_boosts'
+    );
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay open';
+    modal.innerHTML = `
+        <div class="modal-card" style="max-width:600px;max-height:90vh;overflow-y:auto;">
+            <div class="modal-header">
+                <h3><i class="fas fa-gift" style="color:var(--accent);"></i> ${isEdit ? 'تعديل' : 'إضافة'} جائزة مستوى</h3>
+                <button class="modal-close-btn" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="levelRewardForm">
+                <input type="hidden" id="lrFormId" value="${data?.id || ''}">
+                
+                <div class="form-group">
+                    <label>🎯 رقم المستوى *</label>
+                    <input type="number" id="lrLevel" value="${data?.level || 1}" min="1" required style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                    <div style="font-size:0.65rem;color:var(--gray);">سيتم منح الجائزة تلقائياً عند وصول اللاعب إلى هذا المستوى</div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>🏆 نقاط المكافأة</label>
+                        <input type="number" id="lrPoints" value="${data?.pointsReward || 100}" min="0" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                    </div>
+                    <div class="form-group">
+                        <label>🪙 نقود المكافأة</label>
+                        <input type="number" id="lrCoins" value="${data?.coinsReward || 200}" min="0" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>🎁 نوع الجائزة</label>
+                    <select id="lrRewardType" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                        <option value="permanent" ${data?.rewardType === 'permanent' || !data?.rewardType ? 'selected' : ''}>🖼️ مقتنى دائم (إطار، صورة، خلفية، شارة)</option>
+                        <option value="boost" ${data?.rewardType === 'boost' ? 'selected' : ''}>⚡ تعزيز (مؤقت - جولات/وقت)</option>
+                    </select>
+                </div>
+                
+                <!-- عناصر المقتنيات الدائمة -->
+                <div id="lrPermanentItems" style="${data?.rewardType === 'boost' ? 'display:none;' : 'display:block;'}">
+                    <div class="form-group">
+                        <label>🖼️ اختر مقتنى دائم</label>
+                        <select id="lrItemId" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                            <option value="">-- بدون عنصر --</option>
+                            ${permanentItems.map(item => `
+                                <option value="${item.id}" ${data?.itemId === item.id ? 'selected' : ''}>${item.icon || '📦'} ${item.name} (${item.category})</option>
+                            `).join('')}
+                        </select>
+                        <div style="font-size:0.65rem;color:var(--gray);">سيتم منح هذا العنصر للاعب عند الوصول للمستوى (مرة واحدة)</div>
+                    </div>
+                </div>
+                
+                <!-- عناصر المعززات -->
+                <div id="lrBoostItems" style="${data?.rewardType === 'boost' ? 'display:block;' : 'display:none;'}">
+                    <div class="form-group">
+                        <label>⚡ اختر تعزيز</label>
+                        <select id="lrBoostId" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                            <option value="">-- بدون تعزيز --</option>
+                            ${boostItems.map(item => `
+                                <option value="${item.id}" ${data?.boostId === item.id ? 'selected' : ''}>${item.icon || '⚡'} ${item.name} (${item.effectType || 'تعزيز'})</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>🔢 عدد الجوائز</label>
+                        <input type="number" id="lrQuantity" value="${data?.quantity || 1}" min="1" max="99" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                        <div style="font-size:0.65rem;color:var(--gray);">عدد مرات منح هذا التعزيز عند الوصول للمستوى</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>⏱️ مدة التعزيز (اختياري)</label>
+                        <select id="lrBoostDuration" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                            <option value="">-- حسب التعزيز --</option>
+                            <option value="1h" ${data?.boostDuration === '1h' ? 'selected' : ''}>1 ساعة</option>
+                            <option value="3h" ${data?.boostDuration === '3h' ? 'selected' : ''}>3 ساعات</option>
+                            <option value="6h" ${data?.boostDuration === '6h' ? 'selected' : ''}>6 ساعات</option>
+                            <option value="12h" ${data?.boostDuration === '12h' ? 'selected' : ''}>12 ساعة</option>
+                            <option value="24h" ${data?.boostDuration === '24h' ? 'selected' : ''}>24 ساعة</option>
+                            <option value="3d" ${data?.boostDuration === '3d' ? 'selected' : ''}>3 أيام</option>
+                            <option value="7d" ${data?.boostDuration === '7d' ? 'selected' : ''}>7 أيام</option>
+                            <option value="30d" ${data?.boostDuration === '30d' ? 'selected' : ''}>30 يوم</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>📝 رسالة التهنئة</label>
+                    <input type="text" id="lrMessage" value="${data?.message || '🎉 تهانينا! حصلت على جائزة المستوى!'}" placeholder="رسالة التهنئة..." style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                </div>
+                
+                <div class="form-group">
+                    <label><input type="checkbox" id="lrActive" ${data?.isActive !== false ? 'checked' : ''}> مفعل</label>
+                </div>
+                
+                <div style="background:var(--glass);padding:0.8rem;border-radius:var(--radius-sm);margin:0.5rem 0;border:1px solid var(--border-color);">
+                    <div style="font-weight:700;font-size:0.85rem;color:var(--gray);">
+                        <i class="fas fa-info-circle"></i> ملخص الجائزة
+                    </div>
+                    <div style="font-size:0.8rem;color:var(--light);margin-top:0.2rem;">
+                        <span id="lrSummary">المستوى ${data?.level || 1}: +${data?.pointsReward || 100} نقطة, +${data?.coinsReward || 200} نقود</span>
+                    </div>
+                </div>
+                
+                <div class="modal-footer" style="display:flex;gap:0.5rem;justify-content:center;margin-top:1rem;">
+                    <button type="submit" class="btn btn-primary" style="min-width:120px;justify-content:center;">
+                        <i class="fas fa-save"></i> ${isEdit ? 'تحديث' : 'إضافة'}
+                    </button>
+                    <button type="button" class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    // ✅ تبديل بين أنواع الجوائز
+    modal.querySelector('#lrRewardType').addEventListener('change', function() {
+        const type = this.value;
+        document.getElementById('lrPermanentItems').style.display = type === 'boost' ? 'none' : 'block';
+        document.getElementById('lrBoostItems').style.display = type === 'boost' ? 'block' : 'none';
+        updateSummary();
+    });
+    
+    // ✅ تحديث الملخص
+    function updateSummary() {
+        const level = document.getElementById('lrLevel').value || 1;
+        const points = document.getElementById('lrPoints').value || 0;
+        const coins = document.getElementById('lrCoins').value || 0;
+        const rewardType = document.getElementById('lrRewardType').value;
+        const itemName = rewardType === 'boost' 
+            ? document.getElementById('lrBoostId').selectedOptions[0]?.text || 'تعزيز'
+            : document.getElementById('lrItemId').selectedOptions[0]?.text || 'مقتنى';
+        const quantity = document.getElementById('lrQuantity').value || 1;
+        
+        let summary = `المستوى ${level}: +${points} نقطة, +${coins} نقود`;
+        if (itemName && itemName !== '-- بدون عنصر --' && itemName !== '-- بدون تعزيز --') {
+            summary += `, 🎁 ${itemName}`;
+            if (rewardType === 'boost' && quantity > 1) {
+                summary += ` (×${quantity})`;
+            }
+        }
+        document.getElementById('lrSummary').textContent = summary;
+    }
+    
+    // ✅ ربط الأحداث لتحديث الملخص
+    modal.querySelector('#lrLevel').addEventListener('change', updateSummary);
+    modal.querySelector('#lrPoints').addEventListener('change', updateSummary);
+    modal.querySelector('#lrCoins').addEventListener('change', updateSummary);
+    modal.querySelector('#lrItemId').addEventListener('change', updateSummary);
+    modal.querySelector('#lrBoostId').addEventListener('change', updateSummary);
+    modal.querySelector('#lrQuantity').addEventListener('change', updateSummary);
+    
+    // ✅ ربط النموذج
+    modal.querySelector('#levelRewardForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const id = document.getElementById('lrFormId').value;
+        const level = parseInt(document.getElementById('lrLevel').value) || 1;
+        const pointsReward = parseInt(document.getElementById('lrPoints').value) || 0;
+        const coinsReward = parseInt(document.getElementById('lrCoins').value) || 0;
+        const rewardType = document.getElementById('lrRewardType').value;
+        const message = document.getElementById('lrMessage').value.trim();
+        const isActive = document.getElementById('lrActive').checked;
+        const quantity = parseInt(document.getElementById('lrQuantity').value) || 1;
+        const boostDuration = document.getElementById('lrBoostDuration').value || null;
+        
+        let itemId = null;
+        let itemName = null;
+        let icon = null;
+        let boostId = null;
+        
+        if (rewardType === 'permanent') {
+            itemId = document.getElementById('lrItemId').value || null;
+            if (itemId) {
+                const item = storeItems.find(i => i.id === itemId);
+                if (item) {
+                    itemName = item.name;
+                    icon = item.icon || '📦';
+                }
+            }
+        } else {
+            boostId = document.getElementById('lrBoostId').value || null;
+            if (boostId) {
+                const item = storeItems.find(i => i.id === boostId);
+                if (item) {
+                    itemName = item.name;
+                    icon = item.icon || '⚡';
+                }
+            }
+        }
+        
+        const data = {
+            level,
+            pointsReward,
+            coinsReward,
+            rewardType,
+            itemId,
+            boostId,
+            itemName,
+            icon,
+            quantity,
+            boostDuration,
+            message: message || `🎉 تهانينا! حصلت على جائزة المستوى ${level}!`,
+            isActive
+        };
+        
+        try {
+            if (id) {
+                await db.collection('levelRewards').doc(id).update(data);
+                showToast('✅ تم تحديث جائزة المستوى', 'success');
+            } else {
+                data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                await db.collection('levelRewards').add(data);
+                showToast('✅ تم إضافة جائزة المستوى', 'success');
+            }
+            modal.remove();
+            await LevelRewardsManager.loadRewards();
+            this._renderLevelRewardsManagement();
+        } catch (error) {
+            showToast('❌ خطأ: ' + error.message, 'error');
+        }
+    });
+},
+
+/**
+ * فتح مودال إضافة مقتنى
+ */
+_openAddCollectibleModal(data = null) {
+    const isEdit = !!data;
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay open';
+    modal.innerHTML = `
+        <div class="modal-card" style="max-width:550px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-box" style="color:var(--accent);"></i> ${isEdit ? 'تعديل' : 'إضافة'} مقتنى</h3>
+                <button class="modal-close-btn" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="collectibleForm">
+                <input type="hidden" id="colFormId" value="${data?.id || ''}">
+                
+                <div class="form-group">
+                    <label>الاسم *</label>
+                    <input type="text" id="colName" value="${data?.name || ''}" required placeholder="مثال: إطار ذهبي">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>النوع *</label>
+                        <select id="colCategory">
+                            <option value="avatars" ${data?.category === 'avatars' ? 'selected' : ''}>👤 صور شخصية</option>
+                            <option value="frames" ${data?.category === 'frames' ? 'selected' : ''}>🖼️ إطارات</option>
+                            <option value="backgrounds" ${data?.category === 'backgrounds' ? 'selected' : ''}>🌄 خلفيات</option>
+                            <option value="badges" ${data?.category === 'badges' ? 'selected' : ''}>🏅 شارات</option>
+                            <option value="themes" ${data?.category === 'themes' ? 'selected' : ''}>🎨 سمات</option>
+                            <option value="boosts" ${data?.category === 'boosts' ? 'selected' : ''}>⚡ تعزيزات</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>المصدر *</label>
+                        <select id="colSource">
+                            <option value="store" ${data?.source === 'store' ? 'selected' : ''}>🛒 المتجر</option>
+                            <option value="level" ${data?.source === 'level' ? 'selected' : ''}>🎯 المستوى</option>
+                            <option value="rank" ${data?.source === 'rank' ? 'selected' : ''}>🏅 الرتبة</option>
+                            <option value="battlepass" ${data?.source === 'battlepass' ? 'selected' : ''}>🎟️ الباتل باس</option>
+                            <option value="event" ${data?.source === 'event' ? 'selected' : ''}>🎪 الحدث</option>
+                            <option value="achievement" ${data?.source === 'achievement' ? 'selected' : ''}>🏆 الإنجاز</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group" id="colSourceValueGroup">
+                    <label>قيمة المصدر</label>
+                    <input type="text" id="colSourceValue" value="${data?.sourceValue || ''}" placeholder="مثال: 10 (للمستوى) أو gold (للرتبة)">
+                    <div style="font-size:0.65rem;color:var(--gray);margin-top:0.2rem;">
+                        💡 أدخل رقم المستوى، اسم الرتبة، أو أي معرف للمصدر المحدد
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>السعر</label>
+                        <input type="number" id="colPrice" value="${data?.price || 0}" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>العملة</label>
+                        <select id="colCurrency">
+                            <option value="coins" ${data?.currency === 'coins' ? 'selected' : ''}>🪙 عملات</option>
+                            <option value="gems" ${data?.currency === 'gems' ? 'selected' : ''}>💎 جواهر</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>الندرة</label>
+                    <select id="colRarity">
+                        <option value="common" ${data?.rarity === 'common' ? 'selected' : ''}>عادي</option>
+                        <option value="uncommon" ${data?.rarity === 'uncommon' ? 'selected' : ''}>غير عادي</option>
+                        <option value="rare" ${data?.rarity === 'rare' ? 'selected' : ''}>نادر</option>
+                        <option value="epic" ${data?.rarity === 'epic' ? 'selected' : ''}>أسطوري</option>
+                        <option value="legendary" ${data?.rarity === 'legendary' ? 'selected' : ''}>خرافي</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>رابط الصورة</label>
+                    <input type="text" id="colImage" value="${data?.imagePath || ''}" placeholder="images/store/category/item.png">
+                </div>
+                
+                <div class="form-group">
+                    <label>الأيقونة (رمز تعبيري)</label>
+                    <input type="text" id="colIcon" value="${data?.icon || '📦'}" placeholder="📦">
+                </div>
+                
+                <div class="form-group">
+                    <label><input type="checkbox" id="colActive" ${data?.isActive !== false ? 'checked' : ''}> مفعل</label>
+                </div>
+                
+                <div class="modal-footer" style="display:flex;gap:0.5rem;justify-content:center;margin-top:1rem;">
+                    <button type="submit" class="btn btn-primary" style="min-width:120px;justify-content:center;">
+                        <i class="fas fa-save"></i> ${isEdit ? 'تحديث' : 'إضافة'}
+                    </button>
+                    <button type="button" class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    // ✅ إظهار/إخفاء حقل قيمة المصدر حسب المصدر
+    modal.querySelector('#colSource').addEventListener('change', function() {
+        const group = document.getElementById('colSourceValueGroup');
+        if (this.value === 'store') {
+            group.style.display = 'none';
+        } else {
+            group.style.display = 'block';
+        }
+    });
+    // ✅ تطبيق فوري
+    const sourceSelect = modal.querySelector('#colSource');
+    if (sourceSelect.value === 'store') {
+        document.getElementById('colSourceValueGroup').style.display = 'none';
+    }
+    
+    modal.querySelector('#collectibleForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('colFormId').value;
+        const data = {
+            name: document.getElementById('colName').value.trim(),
+            category: document.getElementById('colCategory').value,
+            source: document.getElementById('colSource').value,
+            sourceValue: document.getElementById('colSourceValue').value.trim() || null,
+            price: parseInt(document.getElementById('colPrice').value) || 0,
+            currency: document.getElementById('colCurrency').value,
+            rarity: document.getElementById('colRarity').value,
+            imagePath: document.getElementById('colImage').value.trim(),
+            icon: document.getElementById('colIcon').value.trim() || '📦',
+            isActive: document.getElementById('colActive').checked,
+            duration: 'permanent'
+        };
+        
+        if (!data.name) {
+            showToast('يرجى إدخال اسم المقتنى', 'error');
+            return;
+        }
+        
+        try {
+            if (id) {
+                await db.collection('storeItems').doc(id).update(data);
+                showToast('✅ تم تحديث المقتنى', 'success');
+            } else {
+                data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                await db.collection('storeItems').add(data);
+                showToast('✅ تم إضافة المقتنى', 'success');
+            }
+            modal.remove();
+            await DataManager.loadAll();
+            this._renderCollectiblesManagement();
+        } catch (error) {
+            showToast('❌ خطأ: ' + error.message, 'error');
+        }
+    });
+},
+
+/**
+ * حذف إنجاز
+ */
+async _deleteAchievement(id) {
+    // ✅ التحقق من وجود الإنجاز في Firestore
+    const existsInFirestore = AchievementManager._definitions.some(a => a.id === id);
+    
+    if (!existsInFirestore) {
+        showToast('⚠️ هذا الإنجاز غير موجود في قاعدة البيانات، لا يمكن حذفه', 'error');
+        return;
+    }
+    
+    if (!confirm(`⚠️ هل أنت متأكد من حذف هذا الإنجاز؟\nسيتم حذفه من Firestore نهائياً.`)) {
+        return;
+    }
+    
+    try {
+        await db.collection('achievementDefinitions').doc(id).delete();
+        showToast('✅ تم حذف الإنجاز', 'success');
+        await AchievementManager.loadDefinitions();
+        this._renderAchievementsManagement();
+    } catch (error) {
+        console.error('❌ Error deleting achievement:', error);
+        showToast('❌ خطأ: ' + error.message, 'error');
+    }
+},
+
+/**
+ * حذف جائزة مستوى
+ */
+async _deleteLevelReward(id) {
+    if (!confirm('هل أنت متأكد من حذف هذه الجائزة؟')) return;
+    try {
+        await db.collection('levelRewards').doc(id).delete();
+        showToast('✅ تم حذف الجائزة', 'success');
+        await LevelRewardsManager.loadRewards();
+        this._renderLevelRewardsManagement();
+    } catch (e) {
+        showToast('❌ خطأ: ' + e.message, 'error');
+    }
+},
+
+/**
+ * حذف مقتنى
+ */
+async _deleteCollectible(id) {
+    if (!confirm('هل أنت متأكد من حذف هذا المقتنى؟')) return;
+    try {
+        await db.collection('storeItems').doc(id).delete();
+        showToast('✅ تم حذف المقتنى', 'success');
+        await DataManager.loadAll();
+        this._renderCollectiblesManagement();
+    } catch (e) {
+        showToast('❌ خطأ: ' + e.message, 'error');
+    }
+},
+
+/**
+ * عرض إعدادات المستوى مع إمكانية التعديل
+ */
+_renderLevelSettingsManagement() {
+    // ✅ تحميل الإعدادات الحالية
+    let settings = LEVEL_SETTINGS;
+    
+    // ✅ محاولة تحميل من LevelSystem إذا كان محملاً
+    if (typeof LevelSystem !== 'undefined' && LevelSystem._loaded) {
+        settings = LevelSystem._settings;
+    } else {
+        // محاولة تحميل من localStorage
+        try {
+            const saved = localStorage.getItem('levelSettings');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed && parsed.type) {
+                    settings = parsed;
+                }
+            }
+        } catch (e) {}
+    }
+    
+    // ✅ التأكد من وجود قيم افتراضية
+    const defaultSettings = {
+        type: settings?.type || 'exponential',
+        baseXP: settings?.baseXP || 100,
+        multiplier: settings?.multiplier || 2,
+        customFormula: settings?.customFormula || null
+    };
+    
+    return `
+        <div style="padding:0.5rem 0;">
+            <h4><i class="fas fa-sliders-h"></i> إعدادات نظام المستويات</h4>
+            <p style="color:var(--gray);font-size:0.85rem;margin-bottom:1rem;">
+                تحكم في طريقة حساب المستويات والنقاط المطلوبة للوصول إلى كل مستوى
+            </p>
+            
+            <div class="form-group">
+                <label>نوع نظام المستويات</label>
+                <select id="levelSystemType" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                    <option value="exponential" ${defaultSettings.type === 'exponential' ? 'selected' : ''}>📈 أسي (مضاعف)</option>
+                    <option value="quadratic" ${defaultSettings.type === 'quadratic' ? 'selected' : ''}>📊 تربيعي</option>
+                    <option value="custom" ${defaultSettings.type === 'custom' ? 'selected' : ''}>✏️ مخصص</option>
+                </select>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>النقاط الأساسية</label>
+                    <input type="number" id="levelBaseXP" value="${defaultSettings.baseXP}" min="10" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                    <div style="font-size:0.65rem;color:var(--gray);">النقاط المطلوبة للمستوى الأول</div>
+                </div>
+                <div class="form-group">
+                    <label>المضاعف</label>
+                    <input type="number" id="levelMultiplier" value="${defaultSettings.multiplier}" min="1" step="0.1" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                    <div style="font-size:0.65rem;color:var(--gray);">يستخدم في النظام الأسي والتربيعي</div>
+                </div>
+            </div>
+            
+            <div class="form-group" id="customFormulaGroup" style="${defaultSettings.type === 'custom' ? 'display:block;' : 'display:none;'}">
+                <label>صيغة مخصصة</label>
+                <input type="text" id="levelCustomFormula" value="${defaultSettings.customFormula || ''}" placeholder="100 * Math.pow(level, 2)" style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);direction:ltr;">
+                <div style="font-size:0.65rem;color:var(--gray);">
+                    💡 استخدم <strong>level</strong> كمتغير للدالة. مثال: <code>100 * Math.pow(level, 2)</code>
+                </div>
+            </div>
+            
+            <!-- معاينة المستويات -->
+            <div style="margin-top:1rem;padding:0.8rem;background:var(--glass);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+                <div style="font-weight:700;font-size:0.85rem;color:var(--gray);margin-bottom:0.5rem;">
+                    <i class="fas fa-eye"></i> معاينة المستويات (حسب الإعدادات الحالية)
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:0.3rem;">
+                    ${[1,2,3,4,5,10,20,50,100].map(level => {
+                        const xp = this._calculateXP(level, defaultSettings);
+                        return `
+                            <div style="background:var(--card-bg);border-radius:6px;padding:0.3rem;text-align:center;border:1px solid var(--border-color);">
+                                <div style="font-weight:700;font-size:0.8rem;">المستوى ${level}</div>
+                                <div style="font-size:0.6rem;color:var(--gray);">${xp} نقطة</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+            
+            <div style="display:flex;gap:0.5rem;margin-top:1rem;flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="App._saveLevelSettings()" id="saveLevelSettingsBtn">
+                    <i class="fas fa-save"></i> حفظ الإعدادات
+                </button>
+                <button class="btn btn-outline" onclick="App._resetLevelSettings()" id="resetLevelSettingsBtn">
+                    <i class="fas fa-undo"></i> استعادة الافتراضي
+                </button>
+                <button class="btn btn-outline" onclick="App._refreshLevelSettingsPreview()" id="refreshLevelSettingsBtn">
+                    <i class="fas fa-sync"></i> تحديث المعاينة
+                </button>
+            </div>
+            
+            <div style="margin-top:0.5rem;padding:0.5rem;background:var(--glass);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+                <div style="font-size:0.7rem;color:var(--gray);">
+                    <i class="fas fa-info-circle"></i> الإعدادات الحالية: 
+                    <strong style="color:var(--light);">${defaultSettings.type}</strong> 
+                    (الأساس: <strong style="color:var(--accent);">${defaultSettings.baseXP}</strong>, 
+                    المضاعف: <strong style="color:var(--accent);">${defaultSettings.multiplier}</strong>)
+                </div>
+            </div>
+        </div>
+    `;
+},
+
+/**
+ * حساب النقاط المطلوبة للمستوى
+ */
+_calculateXP(level, settings) {
+    if (level <= 0) return 0;
+    
+    const type = settings?.type || 'exponential';
+    const baseXP = settings?.baseXP || 100;
+    const multiplier = settings?.multiplier || 2;
+    const customFormula = settings?.customFormula || null;
+    
+    switch (type) {
+        case 'exponential':
+            return Math.floor(baseXP * Math.pow(multiplier, level - 1));
+        case 'quadratic':
+            return Math.floor(baseXP * Math.pow(level, 2));
+        case 'custom':
+            if (customFormula) {
+                try {
+                    const fn = new Function('level', `return ${customFormula}`);
+                    return Math.floor(fn(level));
+                } catch (e) {
+                    return Math.floor(100 * Math.pow(2, level - 1));
+                }
+            }
+            return Math.floor(100 * Math.pow(2, level - 1));
+        default:
+            return Math.floor(100 * Math.pow(2, level - 1));
+    }
+},
+
+/**
+ * تحديث معاينة إعدادات المستوى
+ */
+_refreshLevelSettingsPreview() {
+    // ✅ إعادة تحميل الصفحة مع حفظ القيم الحالية مؤقتاً
+    const typeEl = document.getElementById('levelSystemType');
+    const baseXpEl = document.getElementById('levelBaseXP');
+    const multiplierEl = document.getElementById('levelMultiplier');
+    const customFormulaEl = document.getElementById('levelCustomFormula');
+    
+    // ✅ حفظ القيم الحالية مؤقتاً
+    const tempSettings = {
+        type: typeEl?.value || 'exponential',
+        baseXP: parseInt(baseXpEl?.value) || 100,
+        multiplier: parseFloat(multiplierEl?.value) || 2,
+        customFormula: customFormulaEl?.value || null
+    };
+    
+    // ✅ تحديث المعاينة
+    this._renderLevelSettingsManagement();
+    
+    // ✅ استعادة القيم بعد إعادة التحميل
+    setTimeout(() => {
+        const newTypeEl = document.getElementById('levelSystemType');
+        const newBaseXpEl = document.getElementById('levelBaseXP');
+        const newMultiplierEl = document.getElementById('levelMultiplier');
+        const newCustomFormulaEl = document.getElementById('levelCustomFormula');
+        
+        if (newTypeEl) newTypeEl.value = tempSettings.type;
+        if (newBaseXpEl) newBaseXpEl.value = tempSettings.baseXP;
+        if (newMultiplierEl) newMultiplierEl.value = tempSettings.multiplier;
+        if (newCustomFormulaEl) newCustomFormulaEl.value = tempSettings.customFormula;
+        
+        // ✅ إظهار/إخفاء حقل الصيغة المخصصة
+        const customGroup = document.getElementById('customFormulaGroup');
+        if (customGroup) {
+            customGroup.style.display = tempSettings.type === 'custom' ? 'block' : 'none';
+        }
+    }, 100);
+    
+    showToast('✅ تم تحديث المعاينة', 'success', 1500);
+},
+
+/**
+ * حساب النقاط المطلوبة للمستوى باستخدام الإعدادات المحددة
+ */
+_getXPForLevelWithSettings(level, settings) {
+    if (level <= 0) return 0;
+    
+    switch (settings.type) {
+        case 'exponential':
+            return Math.floor(settings.baseXP * Math.pow(settings.multiplier, level - 1));
+        case 'quadratic':
+            return Math.floor(settings.baseXP * Math.pow(level, 2));
+        case 'custom':
+            if (settings.customFormula) {
+                try {
+                    const fn = new Function('level', `return ${settings.customFormula}`);
+                    return Math.floor(fn(level));
+                } catch (e) {
+                    return Math.floor(100 * Math.pow(2, level - 1));
+                }
+            }
+            return Math.floor(100 * Math.pow(2, level - 1));
+        default:
+            return Math.floor(100 * Math.pow(2, level - 1));
+    }
+},
+
+async _saveLevelSettings() {
+    try {
+        const typeEl = document.getElementById('levelSystemType');
+        const baseXpEl = document.getElementById('levelBaseXP');
+        const multiplierEl = document.getElementById('levelMultiplier');
+        const customFormulaEl = document.getElementById('levelCustomFormula');
+
+        if (!typeEl || !baseXpEl || !multiplierEl) {
+            this._renderLevelSettingsManagement();
+            setTimeout(() => this._saveLevelSettings(), 300);
+            return;
+        }
+
+        const type = typeEl.value || 'exponential';
+        const baseXP = parseInt(baseXpEl.value) || 100;
+        const multiplier = parseFloat(multiplierEl.value) || 2;
+        const customFormula = customFormulaEl?.value?.trim() || null;
+
+        const settings = { type, baseXP, multiplier, customFormula };
+
+        // ✅ 1. تحديث الكائن العام
+        Object.assign(LEVEL_SETTINGS, settings);
+        
+        // ✅ 2. تحديث LevelSystem
+        if (typeof LevelSystem !== 'undefined') {
+            await LevelSystem.saveSettings(settings);
+            // ✅ التأكد من تحديث _settings
+            Object.assign(LevelSystem._settings, settings);
+            LevelSystem._loaded = true;
+        }
+
+        // ✅ 3. حفظ في localStorage (نسخة احتياطية)
+        localStorage.setItem('levelSettings', JSON.stringify(settings));
+        
+        // ✅ 4. حفظ في Firestore (تم بواسطة LevelSystem.saveSettings)
+
+        showToast('✅ تم حفظ إعدادات المستوى', 'success', 3000);
+        
+        // ✅ 5. تحديث المعاينة
+        this._refreshLevelSettingsPreview();
+        
+        // ✅ 6. تحديث جميع حسابات المستوى
+        this._recalculateAllLevels();
+        
+    } catch (error) {
+        console.error('❌ Error saving level settings:', error);
+        showToast('❌ فشل حفظ الإعدادات: ' + error.message, 'error');
+    }
+},
+
+_recalculateAllLevels() {
+    const user = AuthService.currentUser;
+    if (!user) return;
+    
+    // ✅ إعادة حساب المستوى
+    const level = getLevel(user.totalScore || 0);
+    const progress = getLevelProgress(user.totalScore || 0);
+    
+    console.log('🔄 Levels recalculated:', {
+        level: level.level,
+        totalScore: user.totalScore,
+        nextXP: level.nextXP,
+        progress: progress.progress
+    });
+    
+    // ✅ تحديث الواجهات
+    this._updateUserUI(user);
+    this._updateDashboardUI();
+    this._updateLevelProgress(user);
+    
+    // ✅ إذا كانت صفحة المستويات مفتوحة، أعد بنائها
+    if (this.currentSection === 'levels') {
+        this._showLevelsPage();
+    }
+},
+
+/**
+ * تحميل إعدادات المستوى المحفوظة
+ */
+async _loadLevelSettings() {
+    try {
+        // ✅ محاولة التحميل من Firestore
+        if (isFirebaseReady) {
+            const doc = await db.collection('systemSettings').doc('levelSystem').get();
+            if (doc.exists) {
+                const data = doc.data();
+                if (data.settings) {
+                    Object.assign(LEVEL_SETTINGS, data.settings);
+                    if (typeof LevelSystem !== 'undefined') {
+                        Object.assign(LevelSystem._settings, data.settings);
+                        LevelSystem._loaded = true;
+                    }
+                    localStorage.setItem('levelSettings', JSON.stringify(LEVEL_SETTINGS));
+                    console.log('✅ Level settings loaded from Firestore:', LEVEL_SETTINGS);
+                    return;
+                }
+            }
+        }
+        
+        // ✅ محاولة التحميل من localStorage
+        const saved = localStorage.getItem('levelSettings');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            Object.assign(LEVEL_SETTINGS, parsed);
+            if (typeof LevelSystem !== 'undefined') {
+                Object.assign(LevelSystem._settings, parsed);
+                LevelSystem._loaded = true;
+            }
+            console.log('✅ Level settings loaded from localStorage:', LEVEL_SETTINGS);
+        } else {
+            console.log('ℹ️ No saved level settings, using defaults');
+        }
+    } catch (error) {
+        console.warn('⚠️ Could not load level settings:', error);
+    }
+},
+
+/**
+ * استعادة إعدادات المستوى الافتراضية
+ */
+async _resetLevelSettings() {
+    if (!confirm('⚠️ هل أنت متأكد من استعادة الإعدادات الافتراضية؟ سيتم فقدان التغييرات الحالية.')) {
+        return;
+    }
+    
+    try {
+        const defaultSettings = { 
+            type: 'exponential', 
+            baseXP: 100, 
+            multiplier: 2, 
+            customFormula: null 
+        };
+        
+        // ✅ تحديث الكائن المحلي
+        if (typeof LEVEL_SETTINGS !== 'undefined') {
+            LEVEL_SETTINGS.type = defaultSettings.type;
+            LEVEL_SETTINGS.baseXP = defaultSettings.baseXP;
+            LEVEL_SETTINGS.multiplier = defaultSettings.multiplier;
+            LEVEL_SETTINGS.customFormula = defaultSettings.customFormula;
+        }
+        
+        // ✅ حفظ في localStorage
+        localStorage.setItem('levelSettings', JSON.stringify(defaultSettings));
+        
+        // ✅ حفظ في Firestore
+        if (isFirebaseReady) {
+            await db.collection('systemSettings').doc('levelSystem').set({
+                settings: defaultSettings,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            console.log('✅ Level settings reset to defaults in Firestore');
+        }
+        
+        showToast('✅ تم استعادة الإعدادات الافتراضية', 'success', 3000);
+        
+        // ✅ تحديث المعاينة
+        setTimeout(() => {
+            this._renderLevelSettingsManagement();
+        }, 300);
+        
+    } catch (error) {
+        console.error('❌ Error resetting level settings:', error);
+        showToast('❌ فشل استعادة الإعدادات: ' + error.message, 'error');
+    }
+},
+
+/**
+ * تعديل إنجاز
+ */
+_editAchievement(id) {
+    // ✅ البحث في التعريفات المحملة من Firestore أولاً
+    let achievement = AchievementManager._definitions.find(a => a.id === id);
+    
+    // ✅ إذا لم يتم العثور، البحث في ACHIEVEMENTS_DATA الثابتة
+    if (!achievement && typeof ACHIEVEMENTS_DATA !== 'undefined') {
+        const staticAchievement = ACHIEVEMENTS_DATA.find(a => a.id === id);
+        if (staticAchievement) {
+            // ✅ إنشاء كائن مؤقت للتعديل
+            achievement = {
+                ...staticAchievement,
+                id: staticAchievement.id,
+                pointsReward: staticAchievement.points || 10,
+                coinsReward: staticAchievement.coins || 20,
+                isActive: true,
+                _isStatic: true  // ✅ علامة للإشارة إلى أنه من البيانات الثابتة
+            };
+        }
+    }
+    
+    if (!achievement) {
+        showToast('⚠️ الإنجاز غير موجود', 'error');
+        return;
+    }
+    
+    // ✅ فتح مودال التعديل مع البيانات
+    this._openAddAchievementModal(achievement);
+},
+
+/**
+ * مزامنة الإنجازات الثابتة مع Firestore
+ */
+async _syncAchievementsToFirestore() {
+    if (!AuthService.checkPermission('admin') && !AuthService.checkPermission('super_admin')) {
+        showToast('ليس لديك صلاحية', 'error');
+        return;
+    }
+    
+    if (!confirm('هل أنت متأكد من مزامنة جميع الإنجازات مع Firestore؟ سيتم إضافة الإنجازات غير الموجودة فقط.')) {
+        return;
+    }
+    
+    try {
+        showToast('⏳ جاري مزامنة الإنجازات...', 'info');
+        
+        // ✅ جلب الإنجازات الموجودة في Firestore
+        const snapshot = await db.collection('achievementDefinitions').get();
+        const existingIds = [];
+        snapshot.forEach(doc => {
+            existingIds.push(doc.id);
+        });
+        
+        let addedCount = 0;
+        let skippedCount = 0;
+        
+        // ✅ إضافة الإنجازات غير الموجودة
+        for (const ach of ACHIEVEMENTS_DATA) {
+            if (!existingIds.includes(ach.id)) {
+                const data = {
+                    id: ach.id,
+                    name: ach.name,
+                    description: ach.description,
+                    category: ach.category || 'عام',
+                    pointsReward: ach.points || 10,
+                    coinsReward: ach.coins || 20,
+                    image: ach.image || 'images/achievements/default.png',
+                    checkLogic: ach.check ? ach.check.toString() : null,
+                    isActive: true,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                await db.collection('achievementDefinitions').add(data);
+                addedCount++;
+            } else {
+                skippedCount++;
+            }
+        }
+        
+        // ✅ إعادة تحميل التعريفات
+        await AchievementManager.loadDefinitions();
+        
+        showToast(`✅ تمت المزامنة! تم إضافة ${addedCount} إنجاز، تم تخطي ${skippedCount} إنجاز موجود`, 'success', 5000);
+        
+        // ✅ تحديث العرض
+        this._renderAchievementsManagement();
+        
+    } catch (error) {
+        console.error('❌ Error syncing achievements:', error);
+        showToast('❌ فشل المزامنة: ' + error.message, 'error');
+    }
+},
+
+/**
+ * تعديل جائزة مستوى
+ */
+_editLevelReward(id) {
+    const reward = LevelRewardsManager._rewards.find(r => r.id === id);
+    if (!reward) {
+        showToast('الجائزة غير موجودة', 'error');
+        return;
+    }
+    this._openAddLevelRewardModal(reward);
+},
+
+/**
+ * تعديل مقتنى
+ */
+_editCollectible(id) {
+    const item = DataManager.data.storeItems.find(i => i.id === id);
+    if (!item) {
+        showToast('المقتنى غير موجود', 'error');
+        return;
+    }
+    this._openAddCollectibleModal(item);
+},
+
+/**
+ * ربط أحداث التبويبات الفرعية في لوحة المشرفين
+ */
+_setupAdminSubTabs() {
+    // ✅ استخدام MutationObserver للاستماع للتغييرات في DOM
+    const observer = new MutationObserver(() => {
+        this._bindAdminSubTabs();
+    });
+    
+    // ✅ مراقبة التغييرات في container
+    const container = document.getElementById('adminContentContainer');
+    if (container) {
+        observer.observe(container, { childList: true, subtree: true });
+    }
+    
+    // ✅ ربط فوري
+    this._bindAdminSubTabs();
+},
+
+/**
+ * ربط أحداث التبويبات الفرعية (دالة مساعدة)
+ */
+_bindAdminSubTabs() {
+    const tabs = document.querySelectorAll('.admin-subtab');
+    
+    if (tabs.length === 0) {
+        // ✅ إذا لم توجد تبويبات، حاول مرة أخرى بعد قليل
+        setTimeout(() => this._bindAdminSubTabs(), 200);
+        return;
+    }
+    
+    tabs.forEach(tab => {
+        // ✅ إزالة المستمعات القديمة لتجنب التكرار
+        tab.removeEventListener('click', this._handleAdminSubTabClick);
+        // ✅ إضافة المستمع الجديد
+        tab.addEventListener('click', this._handleAdminSubTabClick);
+    });
+},
+
+/**
+ * معالج النقر على التبويبات الفرعية
+ */
+_handleAdminSubTabClick(e) {
+    const tab = e.currentTarget;
+    const tabName = tab.dataset.tab;
+    
+    // ✅ إزالة التحديد من جميع التبويبات
+    document.querySelectorAll('.admin-subtab').forEach(t => {
+        t.classList.remove('active');
+        t.style.background = 'transparent';
+        t.style.color = 'var(--gray)';
+    });
+    
+    // ✅ تحديد التبويب النشط
+    tab.classList.add('active');
+    tab.style.background = 'var(--primary)';
+    tab.style.color = '#fff';
+    
+    // ✅ إظهار/إخفاء المحتوى
+    const containers = {
+        'achievements': 'adminAchievementsContainer',
+        'level-rewards': 'adminLevelRewardsContainer',
+        'collectibles': 'adminCollectiblesContainer',
+        'settings': 'adminLevelSettingsContainer'
+    };
+    
+    Object.entries(containers).forEach(([key, id]) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.style.display = key === tabName ? 'block' : 'none';
+        }
+    });
+    
+    // ✅ تحديث المحتوى عند التبديل
+    if (tabName === 'achievements') {
+        App._renderAchievementsManagement();
+    } else if (tabName === 'level-rewards') {
+        App._renderLevelRewardsManagement();
+    } else if (tabName === 'collectibles') {
+        App._renderCollectiblesManagement();
+    } else if (tabName === 'settings') {
+        App._renderLevelSettingsManagement();
+    }
+},
+
+/**
+ * عرض إدارة المقتنيات مع فلاتر وتبويبات
+ */
+_renderCollectiblesManagement() {
+    const items = DataManager.data.storeItems || [];
+    const categories = {
+        'all': { label: '📦 الكل', icon: '📦' },
+        'avatars': { label: '👤 صور شخصية', icon: '👤' },
+        'frames': { label: '🖼️ إطارات', icon: '🖼️' },
+        'backgrounds': { label: '🌄 خلفيات', icon: '🌄' },
+        'badges': { label: '🏅 شارات', icon: '🏅' },
+        'themes': { label: '🎨 سمات', icon: '🎨' },
+        'boosts': { label: '⚡ تعزيزات', icon: '⚡' }
+    };
+    
+    // ✅ تصفية العناصر (استبعاد التذاكر وصناديق الحظ من العرض الرئيسي)
+    const filteredItems = items.filter(item => 
+        item.category !== 'tickets' && 
+        item.category !== 'loot_boxes' &&
+        item.category !== 'room_boosts'
+    );
+    
+    // ✅ بناء واجهة الفلاتر
+    let html = `
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
+            <h4><i class="fas fa-boxes"></i> المقتنيات (${filteredItems.length})</h4>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                <button class="btn btn-primary btn-sm" onclick="App._openAddCollectibleModal()">
+                    <i class="fas fa-plus"></i> إضافة مقتنى
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="App._renderCollectiblesManagement()">
+                    <i class="fas fa-sync"></i> تحديث
+                </button>
+            </div>
+        </div>
+        
+        <!-- ✅ فلاتر المقتنيات -->
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;padding:0.8rem;background:var(--glass);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+            <div style="display:flex;align-items:center;gap:0.3rem;flex:1;min-width:150px;">
+                <i class="fas fa-search" style="color:var(--gray);"></i>
+                <input type="text" id="collectibleSearch" placeholder="بحث عن مقتنى..." style="flex:1;padding:6px 12px;border-radius:8px;background:var(--dark);border:1px solid var(--glass-border);color:var(--light);font-size:0.85rem;">
+            </div>
+            <select id="collectibleCategoryFilter" style="padding:6px 12px;border-radius:8px;background:var(--dark);border:1px solid var(--glass-border);color:var(--light);font-size:0.85rem;">
+                <option value="all">كل الأنواع</option>
+                ${Object.entries(categories).filter(([key]) => key !== 'all').map(([key, cat]) => `
+                    <option value="${key}">${cat.label}</option>
+                `).join('')}
+            </select>
+            <select id="collectibleSourceFilter" style="padding:6px 12px;border-radius:8px;background:var(--dark);border:1px solid var(--glass-border);color:var(--light);font-size:0.85rem;">
+                <option value="all">كل المصادر</option>
+                <option value="store">🛒 المتجر</option>
+                <option value="level">🎯 المستوى</option>
+                <option value="rank">🏅 الرتبة</option>
+                <option value="battlepass">🎟️ الباتل باس</option>
+                <option value="event">🎪 الحدث</option>
+                <option value="achievement">🏆 الإنجاز</option>
+            </select>
+            <select id="collectibleRarityFilter" style="padding:6px 12px;border-radius:8px;background:var(--dark);border:1px solid var(--glass-border);color:var(--light);font-size:0.85rem;">
+                <option value="all">كل الندرة</option>
+                <option value="common">🟢 عادي</option>
+                <option value="uncommon">🟣 غير عادي</option>
+                <option value="rare">🔵 نادر</option>
+                <option value="epic">🟠 أسطوري</option>
+                <option value="legendary">🟡 خرافي</option>
+            </select>
+            <button class="btn btn-sm btn-outline" onclick="App._clearCollectibleFilters()">
+                <i class="fas fa-times"></i> مسح
+            </button>
+        </div>
+    `;
+    
+    // ✅ تبويبات الفئات الفرعية
+    html += `
+        <div class="collectibles-subtabs" id="collectiblesSubTabs" style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-bottom:1rem;border-bottom:1px solid var(--glass-border);padding-bottom:0.5rem;">
+    `;
+    
+    Object.entries(categories).forEach(([key, cat]) => {
+        const isActive = key === 'all' ? 'active' : '';
+        html += `
+            <button class="collectibles-subtab ${isActive}" data-category="${key}" style="padding:0.3rem 0.8rem;border-radius:30px;border:1px solid var(--glass-border);${isActive ? 'background:var(--primary);color:#fff;' : 'background:transparent;color:var(--gray);'}font-weight:600;font-size:0.75rem;cursor:pointer;transition:all 0.3s ease;font-family:var(--font);">
+                ${cat.label}
+            </button>
+        `;
+    });
+    
+    html += `
+        </div>
+        <div id="collectiblesContentContainer" style="min-height:200px;">
+    `;
+    
+    // ✅ عرض المقتنيات مع تطبيق الفلاتر
+    html += this._applyCollectiblesFilters(filteredItems);
+    
+    html += `
+        </div>
+    `;
+    
+    // ✅ ربط الأحداث بعد إضافة العناصر إلى DOM
+    setTimeout(() => {
+        this._bindCollectiblesFilters();
+        this._bindCollectiblesSubTabs();
+    }, 50);
+    
+    return html;
+},
+
+/**
+ * تطبيق فلاتر المقتنيات وعرض النتائج
+ */
+_applyCollectiblesFilters(filteredItems) {
+    const searchQuery = document.getElementById('collectibleSearch')?.value?.toLowerCase() || '';
+    const categoryFilter = document.getElementById('collectibleCategoryFilter')?.value || 'all';
+    const sourceFilter = document.getElementById('collectibleSourceFilter')?.value || 'all';
+    const rarityFilter = document.getElementById('collectibleRarityFilter')?.value || 'all';
+    
+    let displayItems = filteredItems.filter(item => {
+        // ✅ فلتر البحث
+        const searchMatch = item.name?.toLowerCase().includes(searchQuery) || 
+                           item.id?.toLowerCase().includes(searchQuery);
+        if (!searchMatch) return false;
+        
+        // ✅ فلتر النوع
+        if (categoryFilter !== 'all' && item.category !== categoryFilter) return false;
+        
+        // ✅ فلتر المصدر
+        if (sourceFilter !== 'all' && item.source !== sourceFilter) return false;
+        
+        // ✅ فلتر الندرة
+        if (rarityFilter !== 'all' && item.rarity !== rarityFilter) return false;
+        
+        return true;
+    });
+    
+    if (displayItems.length === 0) {
+        return `
+            <div style="text-align:center;padding:2rem;color:var(--gray);">
+                <i class="fas fa-box-open" style="font-size:2rem;color:var(--gray-dark);display:block;margin-bottom:0.5rem;"></i>
+                <p>${filteredItems.length === 0 ? 'لا توجد مقتنيات. أضف مقتناك الأول!' : 'لا توجد نتائج مطابقة للبحث'}</p>
+                ${filteredItems.length === 0 ? `<button class="btn btn-primary btn-sm mt-1" onclick="App._openAddCollectibleModal()"><i class="fas fa-plus"></i> إضافة مقتنى</button>` : ''}
+            </div>
+        `;
+    }
+    
+    const sources = {
+        store: '🛒 المتجر',
+        level: '🎯 المستوى',
+        rank: '🏅 الرتبة',
+        battlepass: '🎟️ الباتل باس',
+        event: '🎪 الحدث',
+        achievement: '🏆 الإنجاز'
+    };
+    
+    const rarityColors = {
+        common: '#8e8e8e',
+        uncommon: '#2ecc71',
+        rare: '#3498db',
+        epic: '#9b59b6',
+        legendary: '#f1c40f'
+    };
+    
+    let html = `
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>الصورة</th>
+                        <th>الاسم</th>
+                        <th>النوع</th>
+                        <th>المصدر</th>
+                        <th>قيمة المصدر</th>
+                        <th>الندرة</th>
+                        <th>الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    displayItems.forEach((item) => {
+        html += `
+            <tr>
+                <td>
+                    ${item.imagePath ? `<img src="${item.imagePath}" style="width:40px;height:40px;border-radius:8px;object-fit:cover;" onerror="this.style.display='none'">` : 
+                    `<div style="width:40px;height:40px;border-radius:8px;background:var(--glass);display:flex;align-items:center;justify-content:center;font-size:1.5rem;">${item.icon || '📦'}</div>`}
+                </td>
+                <td style="font-weight:600;">${item.name}</td>
+                <td><span class="badge badge-sm">${item.category || 'عام'}</span></td>
+                <td><span class="badge badge-sm" style="background:${item.source === 'store' ? 'var(--success)' : item.source === 'level' ? 'var(--accent)' : item.source === 'rank' ? 'var(--primary)' : 'var(--info)'};">${sources[item.source] || item.source || 'غير محدد'}</span></td>
+                <td>${item.sourceValue || '—'}</td>
+                <td><span class="badge badge-sm" style="color:${rarityColors[item.rarity] || '#8e8e8e'};border-color:${rarityColors[item.rarity] || '#8e8e8e'};">${item.rarity || 'عادي'}</span></td>
+                <td>
+                    <button class="btn btn-xs btn-primary" onclick="App._editCollectible('${item.id}')"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-xs btn-danger" onclick="App._deleteCollectible('${item.id}')"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top:0.5rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+            <span style="font-size:0.75rem;color:var(--gray);">
+                عرض ${displayItems.length} من ${filteredItems.length} مقتنى
+            </span>
+            <div style="display:flex;gap:0.3rem;">
+                <button class="btn btn-xs btn-outline" onclick="App._renderCollectiblesManagement()">
+                    <i class="fas fa-sync"></i> تحديث
+                </button>
+            </div>
+        </div>
+    `;
+    
+    return html;
+},
+
+/**
+ * ربط أحداث فلاتر المقتنيات (مع تحديث فوري)
+ */
+_bindCollectiblesFilters() {
+    const search = document.getElementById('collectibleSearch');
+    const category = document.getElementById('collectibleCategoryFilter');
+    const source = document.getElementById('collectibleSourceFilter');
+    const rarity = document.getElementById('collectibleRarityFilter');
+    
+    // ✅ دالة التحديث الفوري
+    const updateFilters = () => {
+        const items = DataManager.data.storeItems || [];
+        const filteredItems = items.filter(item => 
+            item.category !== 'tickets' && 
+            item.category !== 'loot_boxes' &&
+            item.category !== 'room_boosts'
+        );
+        const container = document.getElementById('collectiblesContentContainer');
+        if (container) {
+            container.innerHTML = this._applyCollectiblesFilters(filteredItems);
+        }
+    };
+    
+    // ✅ ربط حدث البحث (مع تأخير بسيط لتجنب التحميل الزائد)
+    if (search) {
+        search.removeEventListener('input', this._collectibleSearchHandler);
+        this._collectibleSearchHandler = function() {
+            clearTimeout(this._searchTimeout);
+            this._searchTimeout = setTimeout(updateFilters, 300);
+        }.bind(this);
+        search.addEventListener('input', this._collectibleSearchHandler);
+    }
+    
+    // ✅ ربط أحداث التغيير للقوائم المنسدلة
+    if (category) {
+        category.removeEventListener('change', this._collectibleFilterHandler);
+        this._collectibleFilterHandler = updateFilters;
+        category.addEventListener('change', this._collectibleFilterHandler);
+    }
+    if (source) {
+        source.removeEventListener('change', this._collectibleSourceHandler);
+        this._collectibleSourceHandler = updateFilters;
+        source.addEventListener('change', this._collectibleSourceHandler);
+    }
+    if (rarity) {
+        rarity.removeEventListener('change', this._collectibleRarityHandler);
+        this._collectibleRarityHandler = updateFilters;
+        rarity.addEventListener('change', this._collectibleRarityHandler);
+    }
+},
+
+/**
+ * ربط أحداث تبويبات المقتنيات الفرعية
+ */
+_bindCollectiblesSubTabs() {
+    const tabs = document.querySelectorAll('.collectibles-subtab');
+    
+    if (tabs.length === 0) {
+        setTimeout(() => this._bindCollectiblesSubTabs(), 200);
+        return;
+    }
+    
+    tabs.forEach(tab => {
+        // ✅ إزالة المستمعات القديمة
+        tab.removeEventListener('click', this._handleCollectiblesSubTabClick);
+        // ✅ إضافة المستمع الجديد
+        tab.addEventListener('click', this._handleCollectiblesSubTabClick);
+    });
+},
+
+/**
+ * معالج النقر على تبويبات المقتنيات الفرعية
+ */
+_handleCollectiblesSubTabClick(e) {
+    const tab = e.currentTarget;
+    const category = tab.dataset.category;
+    
+    // ✅ إزالة التحديد من جميع التبويبات
+    document.querySelectorAll('.collectibles-subtab').forEach(t => {
+        t.classList.remove('active');
+        t.style.background = 'transparent';
+        t.style.color = 'var(--gray)';
+    });
+    
+    // ✅ تحديد التبويب النشط
+    tab.classList.add('active');
+    tab.style.background = 'var(--primary)';
+    tab.style.color = '#fff';
+    
+    // ✅ عرض المقتنيات حسب الفئة
+    const container = document.getElementById('collectiblesContentContainer');
+    if (container) {
+        const items = DataManager.data.storeItems || [];
+        const filteredItems = items.filter(item => 
+            item.category !== 'tickets' && 
+            item.category !== 'loot_boxes' &&
+            item.category !== 'room_boosts'
+        );
+        
+        // ✅ تطبيق الفلاتر الحالية مع الفئة المحددة
+        const searchQuery = document.getElementById('collectibleSearch')?.value?.toLowerCase() || '';
+        const sourceFilter = document.getElementById('collectibleSourceFilter')?.value || 'all';
+        const rarityFilter = document.getElementById('collectibleRarityFilter')?.value || 'all';
+        
+        let displayItems = filteredItems.filter(item => {
+            // ✅ فلتر الفئة
+            if (category !== 'all' && item.category !== category) return false;
+            
+            // ✅ فلتر البحث
+            const searchMatch = item.name?.toLowerCase().includes(searchQuery) || 
+                               item.id?.toLowerCase().includes(searchQuery);
+            if (!searchMatch) return false;
+            
+            // ✅ فلتر المصدر
+            if (sourceFilter !== 'all' && item.source !== sourceFilter) return false;
+            
+            // ✅ فلتر الندرة
+            if (rarityFilter !== 'all' && item.rarity !== rarityFilter) return false;
+            
+            return true;
+        });
+        
+        container.innerHTML = App._renderCollectiblesByCategory(category, displayItems);
+    }
+},
+
+/**
+ * عرض المقتنيات حسب الفئة
+ */
+_renderCollectiblesByCategory(category, items) {
+    if (items.length === 0) {
+        return `
+            <div style="text-align:center;padding:2rem;color:var(--gray);">
+                <i class="fas fa-box-open" style="font-size:2rem;color:var(--gray-dark);display:block;margin-bottom:0.5rem;"></i>
+                <p>لا توجد مقتنيات في هذه الفئة</p>
+                <button class="btn btn-primary btn-sm mt-1" onclick="App._openAddCollectibleModal()">
+                    <i class="fas fa-plus"></i> إضافة مقتنى
+                </button>
+            </div>
+        `;
+    }
+    
+    const sources = {
+        store: '🛒 المتجر',
+        level: '🎯 المستوى',
+        rank: '🏅 الرتبة',
+        battlepass: '🎟️ الباتل باس',
+        event: '🎪 الحدث',
+        achievement: '🏆 الإنجاز'
+    };
+    
+    const rarityColors = {
+        common: '#8e8e8e',
+        uncommon: '#2ecc71',
+        rare: '#3498db',
+        epic: '#9b59b6',
+        legendary: '#f1c40f'
+    };
+    
+    const categoryLabels = {
+        avatars: '👤 صور شخصية',
+        frames: '🖼️ إطارات',
+        backgrounds: '🌄 خلفيات',
+        badges: '🏅 شارات',
+        themes: '🎨 سمات',
+        boosts: '⚡ تعزيزات'
+    };
+    
+    let html = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;padding:0 0.3rem;">
+            <span style="font-weight:600;font-size:0.85rem;color:var(--gray);">
+                <i class="fas fa-tag"></i> ${category !== 'all' ? (categoryLabels[category] || category) : 'جميع الفئات'} (${items.length})
+            </span>
+            <span style="font-size:0.65rem;color:var(--gray-dark);">
+                <i class="fas fa-info-circle"></i> ${items.filter(i => i.source === 'level').length} من المستوى
+            </span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>الصورة</th>
+                        <th>الاسم</th>
+                        <th>النوع</th>
+                        <th>المصدر</th>
+                        <th>قيمة المصدر</th>
+                        <th>الندرة</th>
+                        <th>الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    items.forEach((item) => {
+        html += `
+            <tr>
+                <td>
+                    ${item.imagePath ? `<img src="${item.imagePath}" style="width:40px;height:40px;border-radius:8px;object-fit:cover;" onerror="this.style.display='none'">` : 
+                    `<div style="width:40px;height:40px;border-radius:8px;background:var(--glass);display:flex;align-items:center;justify-content:center;font-size:1.5rem;">${item.icon || '📦'}</div>`}
+                </td>
+                <td style="font-weight:600;">${item.name}</td>
+                <td><span class="badge badge-sm">${item.category || 'عام'}</span></td>
+                <td><span class="badge badge-sm" style="background:${item.source === 'store' ? 'var(--success)' : item.source === 'level' ? 'var(--accent)' : item.source === 'rank' ? 'var(--primary)' : 'var(--info)'};">${sources[item.source] || item.source || 'غير محدد'}</span></td>
+                <td>${item.sourceValue || '—'}</td>
+                <td><span class="badge badge-sm" style="color:${rarityColors[item.rarity] || '#8e8e8e'};border-color:${rarityColors[item.rarity] || '#8e8e8e'};">${item.rarity || 'عادي'}</span></td>
+                <td>
+                    <button class="btn btn-xs btn-primary" onclick="App._editCollectible('${item.id}')"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-xs btn-danger" onclick="App._deleteCollectible('${item.id}')"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    return html;
+},
+
+/**
+ * مسح فلاتر المقتنيات
+ */
+_clearCollectibleFilters() {
+    const search = document.getElementById('collectibleSearch');
+    const category = document.getElementById('collectibleCategoryFilter');
+    const source = document.getElementById('collectibleSourceFilter');
+    const rarity = document.getElementById('collectibleRarityFilter');
+    
+    if (search) search.value = '';
+    if (category) category.value = 'all';
+    if (source) source.value = 'all';
+    if (rarity) rarity.value = 'all';
+    
+    // ✅ إعادة تعيين التبويب النشط إلى "الكل"
+    document.querySelectorAll('.collectibles-subtab').forEach(t => {
+        t.classList.remove('active');
+        t.style.background = 'transparent';
+        t.style.color = 'var(--gray)';
+    });
+    const allTab = document.querySelector('.collectibles-subtab[data-category="all"]');
+    if (allTab) {
+        allTab.classList.add('active');
+        allTab.style.background = 'var(--primary)';
+        allTab.style.color = '#fff';
+    }
+    
+    // ✅ تحديث فوري
+    this._renderCollectiblesManagement();
+},
+
 _applyUserCustomizations: function(user) {
     if (!user) {
         // إذا لم يكن هناك مستخدم، قم بإزالة التخصيصات
@@ -25115,6 +28536,44 @@ document.getElementById('profileAchievementsBtn')?.addEventListener('click', (e)
     showToast('🏆 جاري تحميل الإنجازات...', 'info', 1000);
 });
 
+// ===== تبويبات إدارة المحتوى في لوحة المشرفين =====
+document.querySelectorAll('.admin-subtab').forEach(tab => {
+    tab.addEventListener('click', function() {
+        document.querySelectorAll('.admin-subtab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        
+        const tabName = this.dataset.tab;
+        const containers = {
+            'achievements': 'adminAchievementsContainer',
+            'level-rewards': 'adminLevelRewardsContainer',
+            'collectibles': 'adminCollectiblesContainer',
+            'settings': 'adminLevelSettingsContainer'
+        };
+        
+        Object.entries(containers).forEach(([key, id]) => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = key === tabName ? 'block' : 'none';
+        });
+        
+        // ✅ تحديث المحتوى عند التبديل
+        if (tabName === 'achievements') {
+            App._renderAchievementsManagement();
+        } else if (tabName === 'level-rewards') {
+            App._renderLevelRewardsManagement();
+        } else if (tabName === 'collectibles') {
+            App._renderCollectiblesManagement();
+        } else if (tabName === 'settings') {
+            App._renderLevelSettingsManagement();
+        }
+    });
+});
+
+// ✅ تحميل البيانات عند بدء التشغيل
+setTimeout(async () => {
+    await AchievementManager.loadDefinitions();
+    await LevelRewardsManager.loadRewards();
+}, 1000);
+
 // ============================================================
 // ربط الأزرار الجديدة في _setupUI
 // ============================================================
@@ -25190,6 +28649,35 @@ document.getElementById('fixSelectedTrueFalseBtn')?.addEventListener('click', fu
 // ===== زر إلغاء العكس =====
 document.getElementById('cancelFixBtn')?.addEventListener('click', function() {
     App._cancelFix();
+});
+
+// ===== أحداث إعدادات المستوى =====
+// ✅ زر حفظ الإعدادات
+document.getElementById('saveLevelSettingsBtn')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    App._saveLevelSettings();
+});
+
+// ✅ زر استعادة الإعدادات الافتراضية
+document.getElementById('resetLevelSettingsBtn')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    App._resetLevelSettings();
+});
+
+// ✅ زر تحديث المعاينة
+document.getElementById('refreshLevelSettingsBtn')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    App._refreshLevelSettingsPreview();
+});
+
+// ✅ تغيير نوع نظام المستويات (إظهار/إخفاء حقل الصيغة المخصصة)
+document.addEventListener('change', function(e) {
+    if (e.target.id === 'levelSystemType') {
+        const customGroup = document.getElementById('customFormulaGroup');
+        if (customGroup) {
+            customGroup.style.display = e.target.value === 'custom' ? 'block' : 'none';
+        }
+    }
 });
 
 // في _setupUI - أضف هذه الأحداث
@@ -26661,7 +30149,6 @@ const avatars = [
     { id: 'avatar_angel', name: 'صورة ملاك', imagePath: 'images/store/avatars/avatar_angel.png', desc: 'صورة ملاك نقي', price: 350, currency: 'coins', rarity: 'epic', effect: 'profile_avatar', value: 'angel' },
     { id: 'avatar_ghost', name: 'صورة شبح', imagePath: 'images/store/avatars/avatar_ghost.png', desc: 'صورة شبح غامض', price: 30, currency: 'gems', rarity: 'rare', effect: 'profile_avatar', value: 'ghost' },
     { id: 'avatar_demon', name: 'صورة عفريت', imagePath: 'images/store/avatars/avatar_demon.png', desc: 'صورة عفريت قوي', price: 40, currency: 'gems', rarity: 'epic', effect: 'profile_avatar', value: 'demon' },
-    { id: 'avatar_god', name: 'صورة إله', imagePath: 'images/store/avatars/avatar_god.png', desc: 'صورة إله قدير', price: 50, currency: 'gems', rarity: 'legendary', effect: 'profile_avatar', value: 'god' }
 ];
 
 avatars.forEach(b => items.push({ 
@@ -26680,7 +30167,6 @@ avatars.forEach(b => items.push({
         { id: 'badge_star', name: 'شارة نجم', imagePath: 'images/store/badges/badge_star.png', desc: 'شارة نجم لامع', price: 80, currency: 'coins', rarity: 'common', effect: 'display_badge', value: '⭐' },
         { id: 'badge_king', name: 'شارة ملك', imagePath: 'images/store/badges/badge_king.png', desc: 'شارة الملك المتوج', price: 300, currency: 'coins', rarity: 'rare', effect: 'display_badge', value: '👑' },
         { id: 'badge_warrior', name: 'شارة محارب', imagePath: 'images/store/badges/badge_warrior.png', desc: 'شارة المحارب الشجاع', price: 150, currency: 'coins', rarity: 'uncommon', effect: 'display_badge', value: '⚔️' },
-        { id: 'badge_god', name: 'شارة إله', imagePath: 'images/store/badges/badge_god.png', desc: 'شارة إلهية أسطورية', price: 50, currency: 'gems', rarity: 'epic', effect: 'display_badge', value: '⚡' },
         { id: 'badge_speed', name: 'شارة سرعة', imagePath: 'images/store/badges/badge_speed.png', desc: 'شارة السرعة الفائقة', price: 180, currency: 'coins', rarity: 'uncommon', effect: 'display_badge', value: '💨' },
         { id: 'badge_smart', name: 'شارة ذكاء', imagePath: 'images/store/badges/badge_smart.png', desc: 'شارة الذكاء الحاد', price: 200, currency: 'coins', rarity: 'rare', effect: 'display_badge', value: '🧠' },
         { id: 'badge_invincible', name: 'شارة لا يُقهر', imagePath: 'images/store/badges/badge_invincible.png', desc: 'شارة الذي لا يُقهر', price: 400, currency: 'coins', rarity: 'epic', effect: 'display_badge', value: '🛡️' },
@@ -29362,6 +32848,23 @@ _onUserUpdate: function(user) {
     this._updateDashboardUI();
 
     if (user) {
+                // ✅ التحقق من الملف الشخصي
+        const profileCompleted = user.profileCompleted === true;
+        const profileSkipped = user.profileSkipped === true;
+        
+        // ✅ إذا لم يتم إكمال الملف ولم يتم التخطي، عرض المودال
+        if (!profileCompleted && !profileSkipped && this.currentSection !== 'profile') {
+            console.log('📝 Profile not completed, showing setup modal');
+            setTimeout(() => {
+                this._showProfileSetupModal();
+            }, 1000);
+        } else if (profileCompleted) {
+            console.log('✅ Profile completed');
+            this._updateUserCountryDisplay(user);
+        } else if (profileSkipped) {
+            console.log('ℹ️ Profile skipped by user');
+        }
+    
         this._applyUserCustomizations(user);
         this._updateDashboardAvatar();
         this._updateUserCountryDisplay(user);
@@ -39695,6 +43198,18 @@ App._setupGameSettingsEvents = function() {
 
     console.log('✅ Game settings events bound');
 };
+
+// داخل _setupUI أو مكان ربط الأحداث
+
+// ✅ زر عرض المستويات
+document.getElementById('dashboardLevelClick')?.addEventListener('click', () => {
+    App._showLevelsPage();
+});
+
+// ✅ زر المستويات في القائمة الجانبية
+document.getElementById('sidebarRanks')?.addEventListener('click', () => {
+    App._showLevelsPage();
+});
 
 // ============================================================
 // ربط زر اللعب المباشر
