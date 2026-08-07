@@ -16513,3 +16513,23 @@ body.light-theme .player-card-avatar .player-avatar-placeholder {
     border-color: var(--accent);
     display: flex !important; /* ✅ إظهار عند اتصال بطيء */
 }
+
+/* تحجيم الشبكات الكبيرة */
+#crosswordGridEditor,
+#crosswordPreview {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.cw-editor-cell {
+    min-height: 30px; /* تصغير الخلايا للشبكات الكبيرة */
+    font-size: 0.8rem;
+}
+
+@media (max-width: 768px) {
+    .cw-editor-cell {
+        min-height: 20px;
+        font-size: 0.6rem;
+        border-width: 1px;
+    }
+}

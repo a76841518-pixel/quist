@@ -9691,8 +9691,7 @@ _startRound() {
     }
 },
 
-    // عرض الجولة في واجهة المباراة
-    _renderCrosswordRound(question) {
+_renderCrosswordRound(question) {
     const container = document.getElementById('crosswordMatchContent');
     if (!container) return;
 
@@ -9701,7 +9700,6 @@ _startRound() {
     const timeLeft = this._timeLeft;
     const totalPoints = this._results.reduce((s, r) => s + (r.points || 0), 0);
 
-    // ✅ حساب عدد الكلمات في هذه الشبكة
     let totalWords = 0;
     try {
         const data = question.crosswordData;
@@ -9724,7 +9722,6 @@ _startRound() {
                 <span class="badge badge-info">📚 ${question.category || 'عام'}</span>
                 <span class="badge" style="background:var(--glass);">⭐ ${totalPoints}</span>
             </div>
-            <!-- ✅ شريط تقدم الكلمات المكتملة -->
             <div style="display:flex;align-items:center;gap:0.5rem;">
                 <span style="font-size:0.7rem;color:var(--gray);">📝 التقدم:</span>
                 <div style="flex:1;height:6px;background:var(--glass);border-radius:10px;overflow:hidden;">
@@ -9732,20 +9729,31 @@ _startRound() {
                 </div>
                 <span id="cwProgressText" style="font-size:0.7rem;color:var(--gray);">0/${totalWords}</span>
             </div>
+            <!-- ✅ أزرار التكبير -->
+            <div style="display:flex;gap:0.3rem;justify-content:center;margin-top:0.2rem;">
+                <button class="btn btn-xs btn-outline" onclick="CrosswordMatchEngine._zoomGrid('out')" style="font-size:0.6rem;padding:0.1rem 0.5rem;">🔍-</button>
+                <span style="font-size:0.6rem;color:var(--gray);" id="cwZoomLevel">100%</span>
+                <button class="btn btn-xs btn-outline" onclick="CrosswordMatchEngine._zoomGrid('in')" style="font-size:0.6rem;padding:0.1rem 0.5rem;">🔍+</button>
+                <button class="btn btn-xs btn-outline" onclick="CrosswordMatchEngine._zoomGrid('reset')" style="font-size:0.6rem;padding:0.1rem 0.5rem;">⟲</button>
+            </div>
         </div>
-        <div id="crosswordGameOptions" style="margin-bottom:1rem;"></div>
-        <div style="display:flex;justify-content:center;gap:0.5rem;flex-wrap:wrap;">
+        <!-- ✅ حاوية الشبكة مع تمرير وتوسيط -->
+        <div id="crosswordScrollContainer" style="overflow:auto;max-height:70vh;display:flex;justify-content:center;align-items:flex-start;touch-action:pan-x pan-y;position:relative;">
+            <div id="crosswordZoomWrapper" style="transform:scale(1);transform-origin:center center;transition:transform 0.2s ease;display:inline-block;">
+                <div id="crosswordGameOptions" style="margin-bottom:0.5rem;display:inline-block;"></div>
+            </div>
+        </div>
+        <div style="display:flex;justify-content:center;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem;">
             <button class="btn btn-success" id="cwMatchVerifyBtn" onclick="CrosswordEngine._checkAll()">✅ تحقق من الحل الكامل</button>
             <button class="btn btn-outline" onclick="CrosswordMatchEngine._skipRound()">⏭ تخطي الجولة</button>
         </div>
         <div id="verifyResultContainer" style="margin-top:0.5rem;min-height:40px;"></div>
     `;
 
-    // عرض الشبكة باستخدام CrosswordEngine
+    this._zoomLevel = 1;
+
     try {
         CrosswordEngine.renderWithEmptyHidden('crosswordGameOptions');
-        
-        // ✅ تحديث التقدم الأولي
         setTimeout(() => {
             this._updateProgressUI(0, totalWords);
         }, 100);
@@ -9758,7 +9766,26 @@ _startRound() {
             </div>
         `;
     }
-    },
+},
+
+// ✅ دالة التكبير
+_zoomGrid(direction) {
+    const wrapper = document.getElementById('crosswordZoomWrapper');
+    const zoomLabel = document.getElementById('cwZoomLevel');
+    if (!wrapper) return;
+
+    let zoom = this._zoomLevel || 1;
+    if (direction === 'in') {
+        zoom = Math.min(zoom + 0.1, 2);
+    } else if (direction === 'out') {
+        zoom = Math.max(zoom - 0.1, 0.5);
+    } else {
+        zoom = 1;
+    }
+    this._zoomLevel = zoom;
+    wrapper.style.transform = `scale(${zoom})`;
+    if (zoomLabel) zoomLabel.textContent = Math.round(zoom * 100) + '%';
+},
 
     // التحقق من الجولة الحالية
     _verifyCurrentRound() {
@@ -11855,6 +11882,7 @@ _openSolveModalFromSelection: function(selectedCells) {
     }
 },
 
+// استبدال دالة _fillSolveModal
 _fillSolveModal: function(word, cells) {
     const modal = document.getElementById('crosswordSolveModal');
     if (!modal) {
@@ -11862,9 +11890,15 @@ _fillSolveModal: function(word, cells) {
         return;
     }
 
-    // عرض الدليل
+    // ✅ عرض الدليل والصورة
     const clueEl = document.getElementById('crosswordClueDisplay');
-    if (clueEl) clueEl.textContent = word.clue || 'لا يوجد دليل';
+    if (clueEl) {
+        let html = word.clue || 'لا يوجد دليل';
+        if (word.image) {
+            html += `<br><img src="${word.image}" style="max-width:200px;max-height:150px;border-radius:8px;margin-top:0.3rem;border:1px solid var(--border-color);" onerror="this.style.display='none'">`;
+        }
+        clueEl.innerHTML = html;
+    }
     
     // عرض عدد الحروف
     const lengthEl = document.getElementById('crosswordWordLength');
@@ -11877,29 +11911,20 @@ _fillSolveModal: function(word, cells) {
 
     // بناء خلايا المودال باستخدام _tempGrid
     this._renderSolveModalCells(cells);
-    
-    // تحديث عرض الحروف من _tempGrid
     this._updateSolveModalLetters();
-    
-    // تعيين الخلية النشطة (أول خلية فارغة في _tempGrid)
     this._setSolveInputFocus();
     
-    // ✅ إضافة مستمع للضغط على Enter في جميع الخلايا
     setTimeout(() => {
         const allInputs = document.querySelectorAll('.crossword-cell-input:not([disabled])');
         allInputs.forEach(input => {
-            // إزالة المستمع القديم لتجنب التكرار
             input.removeEventListener('keydown', this._handleEnterKey);
-            // إضافة المستمع الجديد
             input.addEventListener('keydown', this._handleEnterKey.bind(this));
         });
     }, 100);
     
-    // فتح المودال
     modal.classList.add('open');
     document.body.style.overflow = 'hidden';
     
-    // تركيز أول خلية فارغة بعد فتح المودال
     setTimeout(() => {
         const inputs = document.querySelectorAll('.crossword-cell-input:not([disabled])');
         if (inputs.length > 0) {
@@ -11941,27 +11966,35 @@ _setSolveInputFocus: function() {
     }
 },
 
+// استبدال دالة _renderSolveModalCells
 _renderSolveModalCells: function(cells) {
     const container = document.getElementById('crosswordCurrentLetters');
     if (!container) return;
 
+    // ✅ إضافة عرض الصورة أعلى الخلايا (إذا وجدت)
     let html = '';
+    if (this._selectedWord && this._selectedWord.image) {
+        html += `
+            <div style="text-align:center;margin-bottom:0.5rem;width:100%;">
+                <img src="${this._selectedWord.image}" style="max-width:200px;max-height:120px;border-radius:8px;border:1px solid var(--border-color);" onerror="this.style.display='none'">
+            </div>
+        `;
+    }
+
+    html += `<div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;width:100%;">`;
+    
     cells.forEach((cell, index) => {
-        // ✅ قراءة من _tempGrid (النسخة المؤقتة)
         const userChar = this._tempGrid[cell.row]?.[cell.col] || '';
         const isFilled = userChar !== '';
         const isSelected = (cell.row === this._selectedRow && cell.col === this._selectedCol);
-        
-        // ✅ التحقق مما إذا كانت الخلية جزءاً من كلمة تم التحقق منها رسمياً (ثابتة/متقاطعة)
         const isVerified = this._isCellInVerifiedWord(cell.row, cell.col);
-        const isDisabled = isVerified; // الخلايا المتقاطعة المثبتة تكون معطلة
+        const isDisabled = isVerified;
 
         let bgColor, borderColor, textColor, extraClass = '';
         let cursor = 'pointer';
         let pointerEvents = 'auto';
 
         if (isVerified) {
-            // ✅ خلية متقاطعة مثبتة – أخضر ثابت + معطلة
             bgColor = 'rgba(46, 204, 113, 0.25)';
             borderColor = 'var(--success)';
             textColor = 'var(--success)';
@@ -12069,6 +12102,7 @@ _renderSolveModalCells: function(cells) {
         `;
     });
 
+    html += '</div>';
     container.innerHTML = html;
 },
 
@@ -12092,16 +12126,40 @@ _updateSolveModalLetters: function() {
         }
     }
 
+    // ✅ عرض الصورة إذا كانت موجودة
+    let imageHtml = '';
+    if (this._selectedWord && this._selectedWord.image) {
+        imageHtml = `
+            <div class="solve-image-container" style="text-align:center;margin-bottom:0.5rem;width:100%;">
+                <img src="${this._selectedWord.image}" style="max-width:200px;max-height:120px;border-radius:8px;border:1px solid var(--border-color);" onerror="this.style.display='none'">
+            </div>
+        `;
+    }
+
     // التحقق من وجود خلايا موجودة مسبقاً لتحديثها دون إعادة بناء DOM
     const existingCells = container.querySelectorAll('.crossword-solve-cell');
     
+    // إذا اختلف عدد الخلايا، نعيد بناء كل شيء
     if (existingCells.length !== cells.length) {
+        // ✅ عند إعادة البناء، نضمن عرض الصورة
         this._renderSolveModalCells(cells);
-        // ✅ إعادة ربط مستمع Enter بعد إعادة البناء
         setTimeout(() => {
             this._bindEnterKeyListeners();
         }, 50);
         return;
+    }
+
+    // ✅ تحديث الصورة إذا كانت موجودة، وإزالتها إذا لم تكن
+    let imageContainer = container.querySelector('.solve-image-container');
+    if (imageHtml) {
+        if (!imageContainer) {
+            imageContainer = document.createElement('div');
+            imageContainer.className = 'solve-image-container';
+            container.prepend(imageContainer);
+        }
+        imageContainer.innerHTML = imageHtml;
+    } else if (imageContainer) {
+        imageContainer.remove();
     }
 
     let filledCount = 0;
@@ -14754,17 +14812,19 @@ _buildModals() {
                         <label style="font-weight:600; font-size:0.85rem; color:var(--gray);">
                             <i class="fas fa-plus-circle"></i> إضافة كلمة
                         </label>
-                        <div style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-bottom:0.5rem;">
-                            <input type="text" id="cwWordInput" placeholder="الكلمة" style="flex:1; min-width:80px; padding:6px 10px; border-radius:8px; background:var(--glass); border:1px solid var(--glass-border); color:var(--light);">
-                            <input type="text" id="cwClueInput" placeholder="الدليل" style="flex:2; min-width:120px; padding:6px 10px; border-radius:8px; background:var(--glass); border:1px solid var(--glass-border); color:var(--light);">
-                            <select id="cwDirectionInput" style="padding:6px 10px; border-radius:8px; background:var(--glass); border:1px solid var(--glass-border); color:var(--light);">
-                                <option value="across">← أفقياً (يمين→يسار)</option>
-                                <option value="down">↓ عمودياً (أعلى→أسفل)</option>
-                            </select>
-                            <button class="btn btn-sm btn-primary" id="cwAddWordBtn" style="white-space:nowrap;">
-                                <i class="fas fa-plus"></i> إضافة
-                            </button>
-                        </div>
+<!-- داخل قسم إدارة الكلمات، بعد حقل الدليل -->
+<div style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-bottom:0.5rem;">
+    <input type="text" id="cwWordInput" placeholder="الكلمة" style="flex:1; min-width:80px; padding:6px 10px; border-radius:8px; background:var(--glass); border:1px solid var(--glass-border); color:var(--light);">
+    <input type="text" id="cwClueInput" placeholder="الدليل" style="flex:2; min-width:120px; padding:6px 10px; border-radius:8px; background:var(--glass); border:1px solid var(--glass-border); color:var(--light);">
+    <input type="text" id="cwWordImage" placeholder="رابط الصورة (اختياري)" style="flex:2; min-width:120px; padding:6px 10px; border-radius:8px; background:var(--glass); border:1px solid var(--glass-border); color:var(--light); direction:ltr;">
+    <select id="cwDirectionInput" style="padding:6px 10px; border-radius:8px; background:var(--glass); border:1px solid var(--glass-border); color:var(--light);">
+        <option value="across">← أفقياً (يمين→يسار)</option>
+        <option value="down">↓ عمودياً (أعلى→أسفل)</option>
+    </select>
+    <button class="btn btn-sm btn-primary" id="cwAddWordBtn" style="white-space:nowrap;">
+        <i class="fas fa-plus"></i> إضافة
+    </button>
+</div>
                         <div style="font-size:0.65rem; color:var(--gray-dark);">
                             💡 حدد <strong>أقصى يمين الكلمة</strong> في الشبكة (الحرف الأخير)، ثم اختر الاتجاه الأفقي.
                         </div>
@@ -20204,9 +20264,7 @@ _initCrosswordUI() {
     this._setupCrosswordForm();
 },
 
-/**
- * فتح محرر شبكة جديدة أو تعديل موجودة
- */
+// استبدال دالة _openCrosswordEditor بأكملها
 _openCrosswordEditor(data = null) {
     if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'question') {
         showToast('ليس لديك صلاحية', 'error');
@@ -20221,7 +20279,19 @@ _openCrosswordEditor(data = null) {
     form.reset();
     idInput.value = '';
     
-    this._cwGridSize = parseInt(document.getElementById('cwGridSize').value) || 6;
+    // ✅ تغيير الحد الأقصى لحجم الشبكة إلى 30
+    const sizeSelect = document.getElementById('cwGridSize');
+    // إزالة الخيارات القديمة وإضافة خيارات حتى 30
+    sizeSelect.innerHTML = '';
+    for (let i = 5; i <= 30; i++) {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = `${i}×${i}`;
+        if (i === 6) opt.selected = true;
+        sizeSelect.appendChild(opt);
+    }
+
+    this._cwGridSize = parseInt(sizeSelect.value) || 6;
     this._cwCells = [];
     this._cwWords = [];
     this._cwSelectedRow = -1;
@@ -20232,32 +20302,25 @@ _openCrosswordEditor(data = null) {
         idInput.value = data.id;
         document.getElementById('cwTitle').value = data.question || '';
         document.getElementById('cwCategory').value = data.category || 'general';
-        // ✅ استخدام الرتبة بدلاً من الصعوبة
         document.getElementById('cwRankRequired').value = data.rankRequired || 0;
-        document.getElementById('cwGridSize').value = data.crosswordData?.gridSize || 6;
+        // تعيين الحجم المحفوظ
+        const savedSize = data.crosswordData?.gridSize || 6;
+        sizeSelect.value = savedSize;
+        this._cwGridSize = savedSize;
         document.getElementById('cwTimeLimit').value = data.timeLimit || 120;
         document.getElementById('cwPoints').value = data.points || 50;
 
-        this._cwGridSize = data.crosswordData?.gridSize || 6;
-        
         let grid = data.crosswordData?.grid || [];
         let words = data.crosswordData?.words || [];
-        
         try {
-            if (typeof grid === 'string') {
-                grid = JSON.parse(grid);
-            }
-            if (typeof words === 'string') {
-                words = JSON.parse(words);
-            }
+            if (typeof grid === 'string') grid = JSON.parse(grid);
+            if (typeof words === 'string') words = JSON.parse(words);
         } catch (e) {
             grid = data.crosswordData?.grid || [];
             words = data.crosswordData?.words || [];
         }
-        
         this._cwCells = grid;
         this._cwWords = words;
-        
         if (this._cwCells.length === 0) {
             this._cwCells = Array.from({ length: this._cwGridSize }, () => Array(this._cwGridSize).fill(''));
         }
@@ -20266,10 +20329,9 @@ _openCrosswordEditor(data = null) {
         }
     } else {
         titleEl.textContent = '🆕 شبكة كلمات متقاطعة جديدة';
-        this._cwGridSize = parseInt(document.getElementById('cwGridSize').value) || 6;
+        this._cwGridSize = parseInt(sizeSelect.value) || 6;
         this._cwCells = Array.from({ length: this._cwGridSize }, () => Array(this._cwGridSize).fill(''));
         this._cwWords = [];
-        // ✅ تعيين الرتبة الافتراضية إلى برونزي 1 (0)
         document.getElementById('cwRankRequired').value = 0;
     }
 
@@ -20286,6 +20348,11 @@ _renderCrosswordGridEditor() {
 
     const size = this._cwGridSize;
     container.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+    // للشبكات الكبيرة، نستخدم عرضاً مناسباً
+    const cellSize = size > 15 ? 30 : size > 10 ? 40 : 50;
+    container.style.maxWidth = Math.min(size * cellSize + (size-1)*4, 600) + 'px';
+    container.style.margin = '0 auto';
+    container.style.direction = 'ltr';
 
     // ✅ حساب الخلايا التي تنتمي لكل كلمة (لتمييزها)
     const cellWordCount = {};
@@ -20582,16 +20649,13 @@ _autoDetectWords() {
     this._showDetectedWordsModal(detectedWords);
 },
 
+// استبدال دالة _showDetectedWordsModal
 _showDetectedWordsModal(detectedWords) {
-    // ✅ التحقق من وجود مودال مفتوح بالفعل وإزالته (لتجنب التراكم)
     const existingModal = document.querySelector('.detected-words-modal');
-    if (existingModal) {
-        existingModal.remove();
-    }
+    if (existingModal) existingModal.remove();
 
     const modal = document.createElement('div');
     modal.className = 'modal-overlay open detected-words-modal';
-    // ✅ جعل المودال يظهر فوق مودال الشبكة
     modal.style.zIndex = '1000001';
     
     let wordsHtml = detectedWords.map((w, idx) => {
@@ -20601,11 +20665,12 @@ _showDetectedWordsModal(detectedWords) {
             : `@(${w.row+1}, ${w.col+1})`;
         
         return `
-            <div style="display:flex; align-items:center; gap:0.5rem; padding:0.3rem 0; border-bottom:1px solid var(--glass-border);">
+            <div style="display:flex; align-items:center; gap:0.5rem; padding:0.3rem 0; border-bottom:1px solid var(--glass-border); flex-wrap:wrap;">
                 <span style="font-weight:700; color:var(--accent); min-width:60px;">${w.word}</span>
                 <span style="font-size:0.6rem; color:var(--gray); min-width:80px;">${dirText}</span>
                 <span style="font-size:0.6rem; color:var(--gray-dark);">${posText}</span>
-                <input type="text" id="cwDetectedClue_${idx}" placeholder="أدخل الدليل..." style="flex:1; min-width:100px; padding:4px 8px; border-radius:6px; background:var(--glass); border:1px solid var(--glass-border); color:var(--light); font-size:0.8rem;">
+                <input type="text" id="cwDetectedClue_${idx}" placeholder="الدليل..." style="flex:1; min-width:100px; padding:4px 8px; border-radius:6px; background:var(--glass); border:1px solid var(--glass-border); color:var(--light); font-size:0.8rem;">
+                <input type="text" id="cwDetectedImage_${idx}" placeholder="رابط الصورة (اختياري)" style="flex:1; min-width:100px; padding:4px 8px; border-radius:6px; background:var(--glass); border:1px solid var(--glass-border); color:var(--light); font-size:0.8rem; direction:ltr;">
                 <button class="btn btn-xs btn-success" onclick="App._addDetectedWord(${idx})" style="padding:2px 10px; white-space:nowrap;">
                     <i class="fas fa-check"></i> إضافة
                 </button>
@@ -20614,7 +20679,7 @@ _showDetectedWordsModal(detectedWords) {
     }).join('');
 
     modal.innerHTML = `
-        <div class="modal-card" style="max-width:650px; max-height:80vh; position:relative;">
+        <div class="modal-card" style="max-width:700px; max-height:80vh; position:relative;">
             <div class="modal-header">
                 <h3><i class="fas fa-magic" style="color:var(--accent);"></i> الكلمات المكتشفة (${detectedWords.length})</h3>
                 <button class="modal-close-btn" onclick="App._closeDetectedWordsModal()">
@@ -20623,7 +20688,7 @@ _showDetectedWordsModal(detectedWords) {
             </div>
             <div style="max-height:50vh; overflow-y:auto; padding:0.5rem 0;">
                 <p style="font-size:0.85rem; color:var(--gray); margin-bottom:0.5rem;">
-                    <i class="fas fa-info-circle"></i> أدخل دليلاً لكل كلمة ثم اضغط "إضافة" أو "إضافة الكل"
+                    <i class="fas fa-info-circle"></i> أدخل دليلاً لكل كلمة ويمكنك إضافة رابط صورة (اختياري)
                 </p>
                 ${wordsHtml}
             </div>
@@ -20639,13 +20704,6 @@ _showDetectedWordsModal(detectedWords) {
     `;
     
     document.body.appendChild(modal);
-    
-    // ✅ منع إغلاق المودال عند النقر على الخلفية (لتجنب إغلاق المودال الرئيسي)
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            // لا نفعل شيئاً - نمنع الإغلاق بالضغط على الخلفية
-        }
-    });
 },
 
 /**
@@ -20892,11 +20950,15 @@ _showAchievementsScreen: function(achievements, onComplete) {
     });
 },
 
+// استبدال دالة _addDetectedWord
 _addDetectedWord(index) {
     const clueInput = document.getElementById(`cwDetectedClue_${index}`);
+    const imageInput = document.getElementById(`cwDetectedImage_${index}`);
     if (!clueInput) return;
     
     const clue = clueInput.value.trim();
+    const image = imageInput ? imageInput.value.trim() : null;
+    
     if (!clue) {
         showToast('يرجى إدخال دليل للكلمة', 'error');
         return;
@@ -20917,12 +20979,14 @@ _addDetectedWord(index) {
         return;
     }
 
+    // إضافة الكلمة مع الصورة
     this._cwWords.push({
         word: wordObj.word,
         row: wordObj.row,
         col: wordObj.col,
         direction: wordObj.direction,
-        clue: clue
+        clue: clue,
+        image: image || null
     });
 
     this._renderCrosswordGridEditor();
@@ -20936,32 +21000,22 @@ _addDetectedWord(index) {
         btn.style.opacity = '0.5';
     }
     clueInput.disabled = true;
+    if (imageInput) imageInput.disabled = true;
 
     showToast(`✅ تم إضافة "${wordObj.word}"`, 'success', 1500);
-
-    // ✅ بعد إضافة جميع الكلمات (اختياري: إغلاق المودال بعد إضافة الكل)
-    // نتحقق إذا كانت جميع الكلمات قد أضيفت
-    const allInputs = document.querySelectorAll('[id^="cwDetectedClue_"]');
-    let allAdded = true;
-    allInputs.forEach(input => {
-        if (!input.disabled) allAdded = false;
-    });
-    
-    if (allAdded) {
-        // جميع الكلمات أضيفت، نغلق المودال بعد 1 ثانية
-        setTimeout(() => {
-            this._closeDetectedWordsModal();
-        }, 1000);
-    }
 },
 
+// استبدال دالة _addAllDetectedWords
 _addAllDetectedWords() {
     const clues = document.querySelectorAll('[id^="cwDetectedClue_"]');
+    const images = document.querySelectorAll('[id^="cwDetectedImage_"]');
     let added = 0;
     let missing = 0;
 
     clues.forEach((input, idx) => {
         const clue = input.value.trim();
+        const image = images[idx] ? images[idx].value.trim() : null;
+        
         if (!clue) {
             missing++;
             return;
@@ -20984,7 +21038,8 @@ _addAllDetectedWords() {
             row: wordObj.row,
             col: wordObj.col,
             direction: wordObj.direction,
-            clue: clue
+            clue: clue,
+            image: image || null
         });
         added++;
     });
@@ -20994,25 +21049,22 @@ _addAllDetectedWords() {
         return;
     }
 
-    // تحديث الواجهة
     this._renderCrosswordGridEditor();
     this._renderCrosswordPreview();
     this._updateWordsList();
-
-    // ✅ إغلاق مودال الكلمات المكتشفة فقط (بدون إغلاق مودال الشبكة)
     this._closeDetectedWordsModal();
 
     showToast(`✅ تم إضافة ${added} كلمة جديدة ${missing > 0 ? `(${missing} كلمة بدون دليل تم تخطيها)` : ''}`, 'success', 3000);
 },
 
-// استبدال دالة _renderCrosswordPreview بأكملها
+// استبدال دالة _renderCrosswordPreview
 _renderCrosswordPreview() {
     const container = document.getElementById('crosswordPreview');
     if (!container) return;
 
     const size = this._cwGridSize;
     
-    // ✅ حساب الخلايا التي تحتوي على حروف
+    // حساب الخلايا التي تحتوي على حروف
     const cellsWithLetters = new Set();
     for (const w of this._cwWords) {
         for (let i = 0; i < w.word.length; i++) {
@@ -21030,10 +21082,9 @@ _renderCrosswordPreview() {
         }
     }
 
-    // ✅ حساب الحدود الفعلية للخلايا المملوءة
+    // حساب الحدود الفعلية للخلايا المملوءة
     let minRow = Infinity, maxRow = -Infinity;
     let minCol = Infinity, maxCol = -Infinity;
-    
     for (const key of cellsWithLetters) {
         const [r, c] = key.split(',').map(Number);
         if (r < minRow) minRow = r;
@@ -21052,12 +21103,10 @@ _renderCrosswordPreview() {
     const actualHeight = maxRow - minRow + 1;
     
     container.style.gridTemplateColumns = `repeat(${actualWidth}, 1fr)`;
-    container.style.maxWidth = `${Math.min(actualWidth * 40, 300)}px`;
+    container.style.maxWidth = `${Math.min(actualWidth * 35, 300)}px`;
     container.style.margin = '0 auto';
 
     let html = '';
-    
-    // ✅ عرض الخلايا المملوءة فقط
     for (let r = minRow; r <= maxRow; r++) {
         for (let c = minCol; c <= maxCol; c++) {
             const cellKey = `${r},${c}`;
@@ -21065,32 +21114,23 @@ _renderCrosswordPreview() {
             const isInWord = cellsWithLetters.has(cellKey);
 
             if (!isInWord) {
-                // ✅ خلية فارغة - غير مرئية للحفاظ على التباعد
-                html += `
-                    <div style="
-                        aspect-ratio:1;
-                        visibility:hidden;
-                        min-height:32px;
-                    "></div>
-                `;
+                html += `<div style="aspect-ratio:1;visibility:hidden;min-height:28px;"></div>`;
                 continue;
             }
 
-            // ✅ خلية تحتوي على حرف
             html += `
                 <div style="
                     aspect-ratio:1;
-                    background:${value ? 'var(--card-bg)' : 'var(--glass)'};
+                    background:${value ? 'rgba(108,99,255,0.15)' : 'var(--glass)'};
                     border:1px solid ${value ? 'var(--primary-light)' : 'var(--border-color)'};
                     border-radius:4px;
                     display:flex;
                     align-items:center;
                     justify-content:center;
-                    font-size:0.9rem;
+                    font-size:${size > 15 ? '0.6rem' : size > 10 ? '0.75rem' : '0.9rem'};
                     font-weight:600;
                     color:${value ? 'var(--light)' : 'var(--gray-dark)'};
-                    min-height:32px;
-                    background:${value ? 'rgba(108,99,255,0.15)' : 'var(--glass)'};
+                    min-height:28px;
                 ">
                     ${value || ' '}
                 </div>
@@ -21100,10 +21140,17 @@ _renderCrosswordPreview() {
     
     container.innerHTML = html;
 
-    // تحديث الإحصائيات
-    document.getElementById('cwPreviewStats').textContent = `${this._cwWords.length} كلمة (${cellsWithLetters.size} حرف)`;
+    // عرض الكلمات مع الصور في الملخص
+    const stats = document.getElementById('cwPreviewStats');
+    if (stats) {
+        let summary = `${this._cwWords.length} كلمة`;
+        const imagesCount = this._cwWords.filter(w => w.image).length;
+        if (imagesCount > 0) summary += ` • 🖼️ ${imagesCount} صورة`;
+        stats.textContent = summary;
+    }
 },
 
+// استبدال دالة _updateWordsList
 _updateWordsList() {
     const container = document.getElementById('cwWordsList');
     if (!container) return;
@@ -21115,16 +21162,16 @@ _updateWordsList() {
 
     let html = '';
     this._cwWords.forEach((w, idx) => {
-        // ✅ عرض الاتجاه بشكل صحيح للعربية
         const dirText = w.direction === 'across' ? '← أفقياً (يمين→يسار)' : '↓ عمودياً (أعلى→أسفل)';
-        // عرض الإحداثيات بشكل صحيح
         const posText = w.direction === 'across' 
             ? `@(${w.row+1}, ${w.col+1})` 
             : `@(${w.row+1}, ${w.col+1})`;
+        const imageHtml = w.image ? `<img src="${w.image}" style="width:24px;height:24px;object-fit:cover;border-radius:4px;border:1px solid var(--border-color);" onerror="this.style.display='none'">` : '';
         
         html += `
             <div style="display:flex; justify-content:space-between; align-items:center; padding:0.2rem 0; border-bottom:1px solid var(--glass-border); font-size:0.8rem;">
                 <div style="display:flex; gap:0.3rem; align-items:center; flex-wrap:wrap;">
+                    ${imageHtml}
                     <span style="font-weight:700; color:var(--accent);">${w.word}</span>
                     <span style="font-size:0.6rem; color:var(--gray);">[${dirText}]</span>
                     <span style="font-size:0.7rem; color:var(--gray-dark);">(${w.clue})</span>
@@ -21207,10 +21254,12 @@ _addCWWord() {
     const wordInput = document.getElementById('cwWordInput');
     const clueInput = document.getElementById('cwClueInput');
     const dirInput = document.getElementById('cwDirectionInput');
+    const imageInput = document.getElementById('cwWordImage'); // حقل جديد
 
     const word = wordInput.value.trim();
     const clue = clueInput.value.trim();
     const direction = dirInput.value;
+    const image = imageInput.value.trim() || null;
 
     if (!word || !clue) {
         showToast('يرجى إدخال الكلمة والدليل', 'error');
@@ -21226,16 +21275,13 @@ _addCWWord() {
     const col = this._cwSelectedCol;
     const size = this._cwGridSize;
 
-    // ✅ التحقق من الحدود حسب الاتجاه
+    // التحقق من الحدود ...
     if (direction === 'across') {
-        // الكلمة الأفقية: تبدأ من أقصى اليمين (col) وتتجه يساراً
-        // col - word.length + 1 يجب أن يكون >= 0
         if (col - word.length + 1 < 0) {
             showToast('الكلمة تتجاوز حدود الشبكة (تحتاج إلى مسافة كافية لليسار)', 'error');
             return;
         }
     } else {
-        // الكلمة العمودية: تبدأ من row وتتجه لأسفل
         if (row + word.length > size) {
             showToast('الكلمة تتجاوز حدود الشبكة', 'error');
             return;
@@ -21302,8 +21348,8 @@ _addCWWord() {
         return;
     }
 
-    // إضافة الكلمة
-    this._cwWords.push({ word, clue, row, col, direction });
+    // إضافة الكلمة مع حقل الصورة
+    this._cwWords.push({ word, clue, row, col, direction, image });
 
     // تحديث الواجهة
     this._renderCrosswordGridEditor();
@@ -21312,6 +21358,7 @@ _addCWWord() {
 
     wordInput.value = '';
     clueInput.value = '';
+    if (imageInput) imageInput.value = '';
     wordInput.focus();
 
     showToast(`✅ تم إضافة كلمة "${word}"`, 'success', 2000);
@@ -21711,7 +21758,6 @@ _renderCrosswords() {
         words: document.getElementById('cwStatWords')
     };
 
-    // إذا كانت أي من العناصر غير موجودة، نخرج مع تحذير
     for (const [key, el] of Object.entries(statElements)) {
         if (!el) {
             console.warn(`⚠️ Element cwStat${key.charAt(0).toUpperCase() + key.slice(1)} not found`);
@@ -21730,25 +21776,31 @@ _renderCrosswords() {
         return matchSearch && matchCategory && matchDifficulty;
     });
 
-    // تحديث الإحصائيات فقط إذا كانت العناصر موجودة
-    if (statElements.total) {
-        statElements.total.textContent = filtered.length;
-    }
-    if (statElements.easy) {
-        statElements.easy.textContent = filtered.filter(c => c.difficulty === 'سهل').length;
-    }
-    if (statElements.medium) {
-        statElements.medium.textContent = filtered.filter(c => c.difficulty === 'متوسط').length;
-    }
-    if (statElements.hard) {
-        statElements.hard.textContent = filtered.filter(c => c.difficulty === 'صعب').length;
-    }
-    if (statElements.categories) {
-        statElements.categories.textContent = new Set(filtered.map(c => c.category)).size;
-    }
-    if (statElements.words) {
-        statElements.words.textContent = filtered.reduce((sum, c) => sum + (c.crosswordData?.words?.length || 0), 0);
-    }
+    // تحديث الإحصائيات
+    if (statElements.total) statElements.total.textContent = filtered.length;
+    if (statElements.easy) statElements.easy.textContent = filtered.filter(c => c.difficulty === 'سهل').length;
+    if (statElements.medium) statElements.medium.textContent = filtered.filter(c => c.difficulty === 'متوسط').length;
+    if (statElements.hard) statElements.hard.textContent = filtered.filter(c => c.difficulty === 'صعب').length;
+    if (statElements.categories) statElements.categories.textContent = new Set(filtered.map(c => c.category)).size;
+    
+    // حساب عدد الكلمات الكلي
+    let totalWords = 0;
+    filtered.forEach(cw => {
+        let words = [];
+        try {
+            if (cw.crosswordData?.words) {
+                if (typeof cw.crosswordData.words === 'string') {
+                    words = JSON.parse(cw.crosswordData.words);
+                } else {
+                    words = cw.crosswordData.words || [];
+                }
+            }
+        } catch (e) {
+            words = [];
+        }
+        if (Array.isArray(words)) totalWords += words.length;
+    });
+    if (statElements.words) statElements.words.textContent = totalWords;
 
     if (filtered.length === 0) {
         container.innerHTML = `
@@ -21761,20 +21813,30 @@ _renderCrosswords() {
         return;
     }
 
-    // عرض البطاقات مع الرتبة
     let html = '';
     filtered.forEach(cw => {
-        let wordCount = 0;
+        // استخراج الكلمات بشكل آمن
+        let words = [];
         let gridSize = cw.crosswordData?.gridSize || 0;
-        
         try {
-            const words = cw.crosswordData?.words ? JSON.parse(cw.crosswordData.words) : [];
-            wordCount = words.length;
+            if (cw.crosswordData?.words) {
+                if (typeof cw.crosswordData.words === 'string') {
+                    words = JSON.parse(cw.crosswordData.words);
+                } else {
+                    words = cw.crosswordData.words || [];
+                }
+            }
         } catch (e) {
-            wordCount = cw.crosswordData?.words?.length || 0;
+            words = [];
         }
+        if (!Array.isArray(words)) words = [];
+
+        const wordCount = words.length;
         
-        // ✅ الحصول على اسم الرتبة من النقاط
+        // استخراج الصور من الكلمات (تأكد من أن كل كلمة لها خاصية image)
+        const images = words.filter(w => w && w.image).map(w => w.image);
+        
+        // الحصول على اسم الرتبة
         const rankName = getRankNameByPoints(cw.rankRequired || 0);
         const rank = getRank(cw.rankRequired || 0);
         const rankIcon = rank.icon || '🏅';
@@ -21786,9 +21848,9 @@ _renderCrosswords() {
         html += `
             <div class="card crossword-card" style="padding:1rem;display:flex;flex-direction:column;gap:0.5rem;">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                    <div style="font-weight:700;font-size:1rem;">${cw.question}</div>
+                    <div style="font-weight:700;font-size:1rem;">${cw.question || 'شبكة بدون عنوان'}</div>
                     <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
-                        <span class="badge" style="background:${diffColor};color:#fff;">${diffIcon} ${cw.difficulty}</span>
+                        <span class="badge" style="background:${diffColor};color:#fff;">${diffIcon} ${cw.difficulty || 'متوسط'}</span>
                         <span class="badge" style="background:${rank.color || 'var(--primary)'};color:#fff;">${rankIcon} ${rankName}</span>
                     </div>
                 </div>
@@ -21800,6 +21862,14 @@ _renderCrosswords() {
                     <span>⏱ ${cw.timeLimit || 120}s</span>
                     <span>🏅 ${rankName} (${cw.rankRequired || 0}+)</span>
                 </div>
+                ${images.length > 0 ? `
+                    <div style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-top:0.3rem;">
+                        ${images.slice(0, 3).map(img => `
+                            <img src="${img}" style="width:32px;height:32px;object-fit:cover;border-radius:4px;border:1px solid var(--border-color);" onerror="this.style.display='none'">
+                        `).join('')}
+                        ${images.length > 3 ? `<span style="font-size:0.6rem;color:var(--gray);">+${images.length-3}</span>` : ''}
+                    </div>
+                ` : ''}
                 <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.3rem;">
                     <button class="btn btn-xs btn-outline" onclick="App._previewCrossword('${cw.id}')">
                         <i class="fas fa-eye"></i> معاينة
@@ -37642,7 +37712,6 @@ CrosswordEngine._getCellsAlongPath = function(start, end) {
  * الحصول على جميع خلايا الكلمة التي تحتوي على خلية معينة
  */
 CrosswordEngine._getWordCells = function(row, col) {
-    // ✅ البحث عن الكلمة التي تحتوي على هذه الخلية
     for (const w of this._words) {
         const cells = [];
         let isInWord = false;
@@ -37665,6 +37734,8 @@ CrosswordEngine._getWordCells = function(row, col) {
         }
         
         if (isInWord) {
+            // ✅ إضافة الصورة إلى الكلمة التي سيتم تمريرها للمودال
+            this._selectedWord = { ...w }; // نسخ الكلمة كاملة مع الصورة
             return cells;
         }
     }
