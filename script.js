@@ -52,6 +52,20 @@ function getCountryFlag(code) {
     return country ? country.flag : null;
 }
 
+// في بداية script.js، أضف فئة جديدة للكلمات
+const WORD_CATEGORIES = [
+    { id: 'animals', icon: '🐾', label: 'حيوانات' },
+    { id: 'food', icon: '🍕', label: 'طعام' },
+    { id: 'sports', icon: '⚽', label: 'رياضة' },
+    { id: 'countries', icon: '🌍', label: 'دول' },
+    { id: 'colors', icon: '🎨', label: 'ألوان' },
+    { id: 'professions', icon: '💼', label: 'مهن' },
+    { id: 'nature', icon: '🌿', label: 'طبيعة' },
+    { id: 'technology', icon: '💻', label: 'تقنية' },
+    { id: 'fruits', icon: '🍎', label: 'فواكه' },
+    { id: 'vehicles', icon: '🚗', label: 'مركبات' }
+];
+
 // ============================================================
 // المتغيرات العالمية الجديدة
 // ============================================================
@@ -3135,13 +3149,15 @@ async init() {
     this._updateGameStats();
 },
 
-    async login(email, password) {
-        if (!isFirebaseReady) throw new Error('Firebase not ready');
-        try {
-            const cred = await auth.signInWithEmailAndPassword(email, password);
-            const doc = await db.collection('users').doc(cred.user.uid).get();
-            const data = doc.exists ? doc.data() : {};
-            this.currentUser = {
+async login(email, password) {
+    if (!isFirebaseReady) throw new Error('Firebase not ready');
+    try {
+        const cred = await auth.signInWithEmailAndPassword(email, password);
+        const doc = await db.collection('users').doc(cred.user.uid).get();
+        const data = doc.exists ? doc.data() : {};
+        
+        // ✅ تعيين المستخدم الحالي
+        this.currentUser = {
             uid: cred.user.uid,
             email: cred.user.email,
             displayName: cred.user.displayName || data.displayName || cred.user.email,
@@ -3158,7 +3174,6 @@ async init() {
             bio: data.bio || '',
             location: data.location || '',
             avatar: data.avatar || null,
-            // ✅ حقول العمر والجنس والدولة
             age: data.age || null,
             gender: data.gender || null,
             country: data.country || null,
@@ -3173,20 +3188,39 @@ async init() {
             blocked: data.blocked || [],
             rankPoints: data.rankPoints || 0,
             stats: data.stats || { gamesPlayed: 0, gamesWon: 0, correctAnswers: 0 },
-            clan: data.clan || 'غير منضم'
-            };
-            localStorage.setItem('football_user_uid', cred.user.uid);
-            this._notifyListeners();
-            return this.currentUser;
-        } catch (e) {
-            let message = 'فشل تسجيل الدخول';
-            if (e.code === 'auth/user-not-found') message = 'المستخدم غير موجود';
-            else if (e.code === 'auth/wrong-password') message = 'كلمة المرور غير صحيحة';
-            else if (e.code === 'auth/invalid-email') message = 'البريد الإلكتروني غير صحيح';
-            else message = e.message;
-            throw new Error(message);
+            clan: data.clan || 'غير منضم',
+            claimedLevelRewards: data.claimedLevelRewards || [],
+            achievementData: data.achievementData || {}
+        };
+        
+        localStorage.setItem('football_user_uid', cred.user.uid);
+        
+        // ✅ مزامنة الإنجازات مع المستخدم
+        if (typeof AchievementManager !== 'undefined' && AchievementManager.syncWithUser) {
+            AchievementManager.syncWithUser(this.currentUser);
         }
-    },
+        
+        // ✅ إذا كان App معرفاً، استدعِ مزامنة إضافية (للتأكد من تحميل التعريفات)
+        if (typeof App !== 'undefined' && App._syncAchievementsWithUser) {
+            // نستخدم setTimeout لتأخير المزامنة حتى يتم تحميل App بالكامل
+            setTimeout(() => {
+                App._syncAchievementsWithUser();
+            }, 300);
+        }
+        
+        // ✅ إعلام المستمعين
+        this._notifyListeners();
+        
+        return this.currentUser;
+    } catch (e) {
+        let message = 'فشل تسجيل الدخول';
+        if (e.code === 'auth/user-not-found') message = 'المستخدم غير موجود';
+        else if (e.code === 'auth/wrong-password') message = 'كلمة المرور غير صحيحة';
+        else if (e.code === 'auth/invalid-email') message = 'البريد الإلكتروني غير صحيح';
+        else message = e.message;
+        throw new Error(message);
+    }
+},
 
 async register(email, password, username, fullName) {
     if (!isFirebaseReady) throw new Error('Firebase not ready');
@@ -3319,6 +3353,8 @@ async register(email, password, username, fullName) {
             coins: 100,
             gems: 0,
             achievements: [],
+            claimedLevelRewards: [],
+            achievementData: {},
             inventory: [],
             activeItems: [],
             activeItemDetails: [],
@@ -3356,6 +3392,8 @@ async register(email, password, username, fullName) {
             coins: 100,
             gems: 0,
             achievements: [],
+            claimedLevelRewards: [],
+            achievementData: {},
             inventory: [],
             activeItems: [],
             activeItemDetails: [],
@@ -4702,60 +4740,91 @@ const AchievementManager = {
     _definitions: [],        // ✅ تعريفات الإنجازات المحملة من Firestore
     _loaded: false,
 
-    // ===== التهيئة =====
-    init() {
-        // تحميل الإنجازات المفتوحة من localStorage
-        try {
-            const saved = localStorage.getItem('achievements_unlocked');
-            if (saved) {
-                this._unlockedAchievements = JSON.parse(saved);
-            }
-        } catch (e) {
-            this._unlockedAchievements = [];
+// استبدال دالة init في AchievementManager
+init() {
+    // تحميل الإنجازات المفتوحة من localStorage
+    try {
+        const saved = localStorage.getItem('achievements_unlocked');
+        if (saved) {
+            this._unlockedAchievements = JSON.parse(saved);
         }
-        
-        // تحميل بيانات التتبع
-        try {
-            const savedData = localStorage.getItem('achievement_data');
-            if (savedData) {
-                this._data = JSON.parse(savedData);
-            }
-        } catch (e) {
-            this._data = {};
+    } catch (e) {
+        this._unlockedAchievements = [];
+    }
+    
+    // تحميل بيانات التتبع
+    try {
+        const savedData = localStorage.getItem('achievement_data');
+        if (savedData) {
+            this._data = JSON.parse(savedData);
         }
-        
-        // تعيين معرف المستخدم الحالي
-        const user = AuthService.currentUser;
-        if (user && user.uid) {
-            this._userId = user.uid;
-            this._loadFromFirebase(user.uid);
+    } catch (e) {
+        this._data = {};
+    }
+    
+    // تعيين معرف المستخدم الحالي
+    const user = AuthService.currentUser;
+    if (user && user.uid) {
+        this._userId = user.uid;
+        this._loadFromFirebase(user.uid);
+    }
+    
+    // تهيئة البيانات الافتراضية
+    this._initDefaultData();
+    
+    // ✅ تحميل تعريفات الإنجازات من Firestore (مزامنة)
+    this.loadDefinitions().then(() => {
+        // ✅ بعد تحميل التعريفات، التحقق من إنجازات المستخدم الحالي
+        if (this._userId) {
+            this._syncUserAchievements(this._userId);
         }
-        
-        // تهيئة البيانات الافتراضية
-        this._initDefaultData();
-        
-        // تحميل تعريفات الإنجازات من Firestore
-        this.loadDefinitions();
-    },
+        console.log('✅ Achievements initialized and synced with user');
+    });
+},
 
-    // ===== تحميل التعريفات من Firestore =====
-    async loadDefinitions() {
-        try {
-            const snapshot = await db.collection('achievementDefinitions')
-                .where('isActive', '==', true)
-                .get();
-            
-            this._definitions = [];
-            snapshot.forEach(doc => {
-                this._definitions.push({ id: doc.id, ...doc.data() });
-            });
-            
-            this._loaded = true;
-            console.log(`✅ Loaded ${this._definitions.length} achievement definitions from Firestore`);
-            return this._definitions;
-        } catch (e) {
-            console.warn('⚠️ Could not load achievement definitions from Firestore, using fallback:', e);
-            // ✅ استخدام البيانات الثابتة كـ fallback
+/**
+ * مزامنة إنجازات المستخدم مع التعريفات المحملة
+ */
+async _syncUserAchievements(userId) {
+    if (!userId || !this._loaded) return;
+
+    try {
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) return;
+
+        const userData = userDoc.data();
+        const userAchievements = userData.achievements || [];
+
+        // ✅ تحديث قائمة الإنجازات المفتوحة محلياً
+        this._unlockedAchievements = [...userAchievements];
+        localStorage.setItem('achievements_unlocked', JSON.stringify(this._unachievements));
+
+        // ✅ تحديث بيانات التتبع من المستخدم
+        if (userData.achievementData) {
+            this._data = userData.achievementData;
+            localStorage.setItem('achievement_data', JSON.stringify(this._data));
+        }
+
+        console.log(`✅ Synced ${this._unlockedAchievements.length} achievements for user ${userId}`);
+    } catch (e) {
+        console.warn('⚠️ Could not sync user achievements:', e);
+    }
+},
+
+async loadDefinitions() {
+    try {
+        const snapshot = await db.collection('achievementDefinitions')
+            .where('isActive', '==', true)
+            .get();
+        
+        this._definitions = [];
+        snapshot.forEach(doc => {
+            this._definitions.push({ id: doc.id, ...doc.data() });
+        });
+        
+        // ✅ إذا لم يتم العثور على إنجازات في Firestore، استخدم البيانات الثابتة
+        if (this._definitions.length === 0 && typeof ACHIEVEMENTS_DATA !== 'undefined') {
+            console.log('📦 No achievements in Firestore, using fallback data');
             this._definitions = ACHIEVEMENTS_DATA.map(ach => ({
                 ...ach,
                 pointsReward: ach.points || 10,
@@ -4763,10 +4832,27 @@ const AchievementManager = {
                 isActive: true,
                 checkLogic: ach.check ? ach.check.toString() : null
             }));
-            this._loaded = true;
-            return this._definitions;
         }
-    },
+        
+        this._loaded = true;
+        console.log(`✅ Loaded ${this._definitions.length} achievement definitions`);
+        return this._definitions;
+    } catch (e) {
+        console.warn('⚠️ Could not load achievement definitions from Firestore, using fallback:', e);
+        // ✅ استخدام البيانات الثابتة كـ fallback
+        if (typeof ACHIEVEMENTS_DATA !== 'undefined') {
+            this._definitions = ACHIEVEMENTS_DATA.map(ach => ({
+                ...ach,
+                pointsReward: ach.points || 10,
+                coinsReward: ach.coins || 20,
+                isActive: true,
+                checkLogic: ach.check ? ach.check.toString() : null
+            }));
+        }
+        this._loaded = true;
+        return this._definitions;
+    }
+},
 
     // ===== تحميل بيانات المستخدم من Firebase =====
     async _loadFromFirebase(userId) {
@@ -4921,81 +5007,92 @@ const AchievementManager = {
         };
     },
 
-    // ===== التحقق من الإنجازات الجديدة =====
-    checkAchievements(gameData) {
-        if (!this._loaded || this._definitions.length === 0) {
-            console.warn('⚠️ No achievement definitions loaded');
+checkAchievements(gameData) {
+    if (!this._loaded || this._definitions.length === 0) {
+        console.warn('⚠️ No achievement definitions loaded, using fallback');
+        // ✅ استخدام ACHIEVEMENTS_DATA كـ fallback
+        if (typeof ACHIEVEMENTS_DATA !== 'undefined') {
+            this._definitions = ACHIEVEMENTS_DATA.map(ach => ({
+                ...ach,
+                pointsReward: ach.points || 10,
+                coinsReward: ach.coins || 20,
+                isActive: true,
+                checkLogic: ach.check ? ach.check.toString() : null
+            }));
+            this._loaded = true;
+        } else {
             return [];
         }
+    }
 
-        const user = AuthService.currentUser;
-        if (!user) return [];
+    const user = AuthService.currentUser;
+    if (!user) return [];
 
-        const unlockedIds = this._unlockedAchievements || [];
-        const newAchievements = [];
+    const unlockedIds = this._unlockedAchievements || [];
+    const newAchievements = [];
 
-        // دمج بيانات التتبع مع بيانات المباراة
-        const checkData = { ...this._data, ...gameData };
+    // ✅ دمج بيانات التتبع مع بيانات المباراة
+    const checkData = { ...this._data, ...gameData };
 
-        for (const def of this._definitions) {
-            // تخطي الإنجازات المفتوحة بالفعل
-            if (unlockedIds.includes(def.id)) continue;
+    for (const def of this._definitions) {
+        // تخطي الإنجازات المفتوحة بالفعل
+        if (unlockedIds.includes(def.id)) continue;
 
-            try {
-                let isUnlocked = false;
+        try {
+            let isUnlocked = false;
+            
+            // ✅ إذا كان هناك checkLogic (نص شرط)
+            if (def.checkLogic) {
+                try {
+                    const fn = new Function('data', `return !!(function(){ return ${def.checkLogic}; })();`);
+                    isUnlocked = fn(checkData);
+                } catch (e) {
+                    console.warn(`⚠️ Could not evaluate checkLogic for ${def.id}:`, e);
+                }
+            }
+            // ✅ إذا كان هناك دالة check (للتوافق مع الإنجازات الثابتة)
+            else if (def.check && typeof def.check === 'function') {
+                isUnlocked = def.check(checkData);
+            }
+
+            if (isUnlocked) {
+                newAchievements.push({
+                    id: def.id,
+                    name: def.name || 'إنجاز',
+                    description: def.description || '',
+                    pointsReward: def.pointsReward || 10,
+                    coinsReward: def.coinsReward || 20,
+                    image: def.image || '🏆',
+                    category: def.category || 'عام'
+                });
                 
-                // ✅ إذا كان هناك checkLogic (نص شرط)
-                if (def.checkLogic) {
-                    try {
-                        const fn = new Function('data', `return !!(function(){ return ${def.checkLogic}; })();`);
-                        isUnlocked = fn(checkData);
-                    } catch (e) {
-                        console.warn(`⚠️ Could not evaluate checkLogic for ${def.id}:`, e);
-                    }
+                // ✅ إضافة إلى قائمة المفتوحة فوراً
+                if (!this._unlockedAchievements.includes(def.id)) {
+                    this._unlockedAchievements.push(def.id);
                 }
-                // ✅ إذا كان هناك دالة check (للتوافق مع الإنجازات الثابتة)
-                else if (def.check && typeof def.check === 'function') {
-                    isUnlocked = def.check(checkData);
-                }
-
-                if (isUnlocked) {
-                    newAchievements.push({
-                        id: def.id,
-                        name: def.name || 'إنجاز',
-                        description: def.description || '',
-                        pointsReward: def.pointsReward || 10,
-                        coinsReward: def.coinsReward || 20,
-                        image: def.image || '🏆',
-                        category: def.category || 'عام'
-                    });
-                    
-                    // ✅ إضافة إلى قائمة المفتوحة فوراً (لمنع التكرار)
-                    if (!this._unlockedAchievements.includes(def.id)) {
-                        this._unlockedAchievements.push(def.id);
-                    }
-                }
-            } catch (e) {
-                console.warn(`⚠️ Error checking achievement ${def.id}:`, e);
             }
+        } catch (e) {
+            console.warn(`⚠️ Error checking achievement ${def.id}:`, e);
         }
+    }
 
-        // ✅ إذا كانت هناك إنجازات جديدة، احفظها
-        if (newAchievements.length > 0) {
-            this._saveData();
-            
-            // ✅ عرض الإشعارات
-            newAchievements.forEach(ach => {
-                showToast(`🏆 إنجاز جديد: ${ach.name}! (+${ach.pointsReward} نقطة, +${ach.coinsReward} نقود)`, 'success', 5000);
-            });
-            
-            // ✅ تشغيل صوت
-            if (typeof SoundSystem !== 'undefined') {
-                SoundSystem.playLevelUp();
-            }
+    // ✅ إذا كانت هناك إنجازات جديدة، احفظها
+    if (newAchievements.length > 0) {
+        this._saveData();
+        
+        // ✅ عرض الإشعارات
+        newAchievements.forEach(ach => {
+            showToast(`🏆 إنجاز جديد: ${ach.name}! (+${ach.pointsReward} نقطة, +${ach.coinsReward} نقود)`, 'success', 5000);
+        });
+        
+        // ✅ تشغيل صوت
+        if (typeof SoundSystem !== 'undefined') {
+            SoundSystem.playLevelUp();
         }
+    }
 
-        return newAchievements;
-    },
+    return newAchievements;
+},
 
     // ===== مزامنة مع المستخدم =====
     syncWithUser(user) {
@@ -5105,61 +5202,6 @@ getAchievementStats(user) {
     };
 },
 
-// في AchievementManager
-/**
- * التحقق من الإنجازات الجديدة - الدالة الفعلية
- * @param {object} gameData - بيانات المباراة
- * @returns {array} - قائمة الإنجازات الجديدة
- */
-checkAchievements(gameData) {
-    try {
-                if (!Array.isArray(this._unlockedAchievements)) {
-            this._unlockedAchievements = [];
-        }
-        // دمج بيانات اللعبة مع البيانات المخزنة
-        const checkData = { ...this._data, ...gameData };
-        const newAchievements = [];
-        
-        // ✅ التأكد من وجود ACHIEVEMENTS_DATA
-        if (typeof ACHIEVEMENTS_DATA === 'undefined' || !Array.isArray(ACHIEVEMENTS_DATA)) {
-            console.warn('⚠️ ACHIEVEMENTS_DATA is not defined');
-            return [];
-        }
-        
-        console.log('🔍 Checking achievements with checkData:', checkData);
-        
-        ACHIEVEMENTS_DATA.forEach(ach => {
-            // تخطي الإنجازات المفتوحة بالفعل
-            if (this._unlockedAchievements.includes(ach.id)) return;
-            
-            // التحقق من الشرط
-            try {
-                if (ach.check && typeof ach.check === 'function' && ach.check(checkData)) {
-                    // ✅ إضافة الإنجاز مع جميع البيانات المطلوبة
-                    newAchievements.push({
-                        id: ach.id,
-                        name: ach.name || 'إنجاز',
-                        description: ach.description || '',
-                        points: ach.points || 0,
-                        image: ach.image || '🏆',
-                        category: ach.category || 'عام',
-                        rarity: ach.rarity || 'common'
-                    });
-                    this._unlockedAchievements.push(ach.id);
-                    console.log(`✅ Achievement unlocked: ${ach.name}`);
-                }
-            } catch (e) {
-                console.warn('⚠️ Error checking achievement:', ach.id, e);
-            }
-        });
-        
-        return newAchievements;
-        
-    } catch (e) {
-        console.error('❌ Error in AchievementManager.checkAchievements:', e);
-        return [];
-    }
-},
 
     // إعادة تعيين بيانات التتبع (للاختبار)
     resetData() {
@@ -5201,7 +5243,9 @@ data: {
     leaderboard: [],
     rooms: [],
     storeItems: [],
-    transactions: []
+    transactions: [],
+    wordGuess: [] // ✅ أضف هذا
+
 },
     _listeners: [],
     _unsubscribers: [],
@@ -5224,7 +5268,7 @@ async loadAll() {
             return this.data;
         }
         
-        const collections = ['questions', 'leaderboard', 'rooms', 'storeItems', 'transactions'];
+        const collections = ['questions', 'leaderboard', 'rooms', 'storeItems', 'transactions', 'wordGuess'];
         
         // ✅ زيادة المهلة إلى 15 ثانية
         const timeoutMs = 15000;
@@ -5289,7 +5333,8 @@ startListening() {
         { name: 'leaderboard', key: 'leaderboard' },
         { name: 'rooms', key: 'rooms' },
         { name: 'storeItems', key: 'storeItems' },
-        { name: 'transactions', key: 'transactions' }
+        { name: 'transactions', key: 'transactions' },
+        { name: 'wordGuess', key: 'wordGuess' } // ✅ أضف هذا
     ];
     collections.forEach(({ name, key }) => {
         // ✅ استخدام listen الجديد بدون orderBy
@@ -5383,6 +5428,22 @@ const MODE_DESCRIPTIONS = {
             questionType: 'all'
         }
     },
+    'wordguess_ranked': {
+    id: 'wordguess_ranked',
+    title: 'تخمين الكلمات (مصنف)',
+    desc: 'خمّن الكلمة وتنافس مع الآخرين! كلما خمنت بشكل أسرع زادت نقاط رتبتك.',
+    icon: '🔤🏅',
+    competitive: true,
+    active: false, // ❌ غير مفعل
+    supportsPlayerCount: true,
+    category: 'ranked',
+    settings: {
+        wordCount: 1,
+        timeLimit: 45,
+        difficulty: 'medium',
+        category: 'all'
+    }
+},
     'ranked_crossword': {
         id: 'ranked_crossword',
         title: 'كلمات متقاطعة مصنف',
@@ -5509,6 +5570,22 @@ const MODE_DESCRIPTIONS = {
             questionType: 'all'
         }
     },
+    'wordguess_unranked': {
+    id: 'wordguess_unranked',
+    title: 'تخمين الكلمات (ودي)',
+    desc: 'تحدى أصدقائك في تخمين الكلمات! لا تؤثر على رتبتك.',
+    icon: '🔤🎮',
+    competitive: false,
+    active: false, // ❌ غير مفعل
+    supportsPlayerCount: true,
+    category: 'unranked',
+    settings: {
+        wordCount: 1,
+        timeLimit: 50,
+        difficulty: 'medium',
+        category: 'all'
+    }
+    },
     'unranked_crossword': {
         id: 'unranked_crossword',
         title: 'كلمات متقاطعة ودي',
@@ -5625,7 +5702,25 @@ const MODE_DESCRIPTIONS = {
             gameMode: 'time_attack'
         }
     },
-
+'wordguess_training': {
+    id: 'wordguess_training',
+    title: 'تخمين الكلمات (تدريب)',
+    desc: 'خمّن الكلمة الصحيحة قبل نفاذ المحاولات! كل جولة كلمة جديدة.',
+    icon: '🔤',
+    competitive: false,
+    active: true,
+    supportsPlayerCount: false,
+    category: 'training',
+    isTraining: true,
+    settings: {
+        wordCount: 1,
+        timeLimit: 60,
+        difficulty: 'medium',
+        category: 'all',
+        attempts: 6,
+        rounds: 5  // ✅ عدد الجولات الافتراضي
+    }
+},
 'training_crossword': {
     id: 'training_crossword',
     title: 'كلمات متقاطعة (مباريات)',
@@ -5764,6 +5859,7 @@ const ACTIVE_MODES = [
     'training_survival', 
     'training_speed',
     'training_crossword',
+    'wordguess_training',
     // غرف
     'room_standard', 
     'room_mega'
@@ -10960,6 +11056,1338 @@ _saveStats(data) {
 };
 
 // ============================================================
+// WordGuessEngine – محرك لعبة تخمين الكلمات
+// ============================================================
+const WordGuessEngine = {
+    _settings: null,
+    _mode: null,
+    _word: null,
+    _wordLength: 0,
+    _maxAttempts: 6,
+    _currentAttempt: 0,
+    _guesses: [],
+    _results: [],
+    _hint: '',
+    _clue: '',
+    _category: '',
+    _gameOver: false,
+    _won: false,
+    _startTime: null,
+    _timerInterval: null,
+    _timeLeft: 0,
+    _totalTime: 60,
+    _onComplete: null,
+        _currentStreak: 0,
+    _totalCoins: 0,
+    _totalCorrectLetters: 0,
+    _totalWrongLetters: 0,
+    _perfectRounds: 0,
+    _roundDetails: [], // تخزين تفاصيل كل جولة لعرضها في شاشة التفاصيل
+
+    // ===== بدء اللعبة =====
+start(settings, mode, onComplete) {
+    console.log('🔤 WordGuessEngine.start() - settings:', settings, 'mode:', mode);
+
+    // ✅ دمج الإعدادات مع القيم الافتراضية
+    this._settings = {
+        difficulty: settings.difficulty || 'medium',
+        category: settings.category || 'all',
+        wordLength: parseInt(settings.wordLength) || 0,
+        attempts: parseInt(settings.attempts) || 6,
+        timeLimit: parseInt(settings.timeLimit) || 120,
+        rounds: parseInt(settings.rounds) || 5
+    };
+    
+    this._mode = mode;
+    this._onComplete = onComplete || null;
+    this._totalRounds = this._settings.rounds;
+    this._currentRoundIndex = 0;
+    this._roundsResults = [];
+    this._totalScore = 0;
+    this._totalCoins = 0;
+    this._totalTimeTaken = 0;
+    this._gameEnded = false;
+    this._startTime = Date.now();
+    this._currentStreak = 0;
+    this._perfectRounds = 0;
+    this._totalCorrectLetters = 0;
+    this._totalWrongLetters = 0;
+    this._roundDetails = [];
+
+    // عرض الواجهة
+    this._showUI();
+
+    // بدء الجولة الأولى
+    this._startRound();
+},
+
+_startRound() {
+    this._gameOver = false;
+    this._won = false;
+    this._currentAttempt = 0;
+    this._guesses = [];
+    this._results = [];
+    this._roundStartTime = Date.now();
+
+    // ✅ استخدام الإعدادات المحفوظة
+    this._totalTime = parseInt(this._settings.timeLimit) || 120;
+    if (this._totalTime < 30) this._totalTime = 120;
+    this._timeLeft = this._totalTime;
+
+    // ✅ اختيار كلمة حسب الإعدادات
+    const word = this._selectWord(this._settings);
+    if (!word) {
+        document.getElementById('wgMessage').innerHTML = `
+            <div style="color:var(--secondary);font-size:1rem;padding:0.5rem;">
+                ⚠️ لا توجد كلمات متاحة بهذه الإعدادات!
+                <div style="font-size:0.8rem;color:var(--gray);margin-top:0.3rem;">
+                    <button class="btn btn-primary btn-sm" onclick="App._activateSection('questions')">
+                        <i class="fas fa-arrow-left"></i> الذهاب إلى بنك الأسئلة
+                    </button>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    this._word = word.word.toUpperCase();
+    this._wordLength = this._word.length;
+    this._hint = word.hint || '';
+    this._clue = word.clue || '';
+    this._category = word.category || 'عام';
+    this._maxAttempts = parseInt(word.attempts) || parseInt(this._settings.attempts) || 6;
+    this._roundWord = word;
+
+    // ✅ تحديث حقل الإدخال
+    const input = document.getElementById('wgInput');
+    if (input) {
+        input.maxLength = Math.max(this._wordLength + 2, 8);
+        input.placeholder = `اكتب تخمينك (${this._wordLength} أحرف)...`;
+        input.value = '';
+        input.disabled = false;
+    }
+    document.getElementById('wgSubmitBtn').disabled = false;
+
+    // تحديث واجهة الجولة
+    this._updateRoundInfo();
+    this._renderGrid();
+    this._focusInput();
+
+    // بدء المؤقت
+    this._startTimer();
+
+    showToast(`🔤 جولة ${this._currentRoundIndex + 1}/${this._totalRounds} - خمّن الكلمة (${this._wordLength} أحرف)`, 'info', 2500);
+},
+
+_selectWord(settings) {
+    let allWords = DataManager.data.wordGuess || [];
+    
+    if (allWords.length === 0) {
+        console.warn('⚠️ لا توجد كلمات في قاعدة البيانات، استخدام الكلمات الافتراضية المؤقتة');
+        allWords = this._getFallbackWords();
+    }
+
+    let pool = [...allWords];
+    const category = settings.category || 'all';
+    const difficulty = settings.difficulty || 'medium';
+    const length = parseInt(settings.wordLength) || 0;
+
+    // ✅ تصفية حسب الفئة
+    if (category !== 'all') {
+        pool = pool.filter(w => w.category === category);
+    }
+    
+    // ✅ تصفية حسب الصعوبة
+    if (difficulty !== 'all') {
+        pool = pool.filter(w => w.difficulty === difficulty);
+    }
+    
+    // ✅ تصفية حسب طول الكلمة
+    if (length > 0) {
+        pool = pool.filter(w => w.word.length === length);
+    }
+
+    if (pool.length === 0) {
+        // إذا لم نجد كلمات، نستخدم جميع الكلمات المتاحة
+        pool = allWords;
+    }
+
+    if (pool.length === 0) {
+        return null;
+    }
+
+    // ✅ اختيار عشوائي
+    const randomIndex = Math.floor(Math.random() * pool.length);
+    return pool[randomIndex];
+},
+
+_showUI() {
+    let container = document.getElementById('wordGuessGameContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'wordGuessGameContainer';
+        container.style.cssText = `
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 1050;
+            background: var(--dark);
+            padding: 1rem;
+            overflow-y: auto;
+            display: none;
+        `;
+        document.body.appendChild(container);
+    }
+    container.style.display = 'block';
+
+    const isTraining = this._mode === 'wordguess_training';
+    const modeLabel = isTraining ? '📚 تدريب' : this._mode === 'wordguess_ranked' ? '🏅 مصنف' : '🎮 ودي';
+
+    container.innerHTML = `
+        <div style="max-width:550px;margin:0 auto;">
+            <!-- الرأس -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+                <button class="btn btn-danger btn-sm" onclick="WordGuessEngine._quit()">
+                    <i class="fas fa-times"></i> إنهاء
+                </button>
+                <span style="font-weight:700;color:var(--accent);font-size:1.1rem;">
+                    <i class="fas fa-keyboard"></i> تخمين الكلمات
+                    <span style="font-size:0.7rem;color:var(--gray);">${modeLabel}</span>
+                </span>
+                <span style="font-weight:700;color:var(--accent);" id="wgScore">⭐ 0</span>
+            </div>
+
+            <!-- معلومات اللعبة -->
+            <div id="wgRoundInfo" style="text-align:center;font-size:0.9rem;color:var(--accent);font-weight:700;margin-bottom:0.3rem;">
+                📌 جولة 1/${this._totalRounds} • 0 أحرف • 🎯 6 محاولات
+            </div>
+            <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:0.3rem;padding:0.5rem 0.8rem;background:var(--glass);border-radius:var(--radius-sm);border:1px solid var(--border-color);margin-bottom:0.8rem;">
+                <span style="font-size:0.8rem;color:var(--gray);" id="wgCategoryDisplay">📚 عام</span>
+                <span style="font-size:0.8rem;color:var(--gray);" id="wgLengthDisplay">🔤 0 أحرف</span>
+                <span style="font-size:0.8rem;color:var(--gray);" id="wgAttemptsDisplay">🎯 المحاولات: 0/6</span>
+                <span style="font-size:0.8rem;color:var(--gray);" id="wgTimerDisplay">⏱ 120s</span>
+            </div>
+
+            <!-- التلميح -->
+            <div id="wgHintDisplay" style="display:none;padding:0.3rem 0.8rem;background:rgba(255,217,61,0.05);border-radius:8px;border:1px solid var(--accent);margin-bottom:0.8rem;text-align:center;font-size:0.85rem;color:var(--gray);">
+                💡 
+            </div>
+
+            <!-- شبكة التخمين -->
+            <div id="wgGrid" style="display:flex;flex-direction:column;gap:0.4rem;margin-bottom:0.8rem;align-items:center;">
+            </div>
+
+            <!-- منطقة الإدخال -->
+            <div id="wgInputArea" style="display:flex;gap:0.5rem;justify-content:center;margin-bottom:0.8rem;">
+                <input type="text" id="wgInput" placeholder="اكتب تخمينك..." 
+                       style="flex:1;max-width:300px;padding:10px 16px;border-radius:12px;background:var(--glass);border:2px solid var(--glass-border);color:var(--light);font-size:1.1rem;text-align:center;text-transform:uppercase;direction:ltr;"
+                       maxlength="8"
+                       autocomplete="off" spellcheck="false">
+                <button class="btn btn-primary" id="wgSubmitBtn">
+                    <i class="fas fa-arrow-left"></i> تخمين
+                </button>
+            </div>
+
+            <!-- رسالة النتيجة -->
+            <div id="wgMessage" style="text-align:center;min-height:60px;font-size:1.1rem;font-weight:700;"></div>
+
+            <!-- أزرار الإجراءات -->
+            <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;margin-top:0.5rem;">
+                <button class="btn btn-success" id="wgNewGameBtn" style="display:none;">
+                    <i class="fas fa-redo"></i> لعبة جديدة
+                </button>
+                <button class="btn btn-outline" id="wgHomeBtn" style="display:none;" onclick="WordGuessEngine._quit()">
+                    <i class="fas fa-home"></i> الرئيسية
+                </button>
+            </div>
+        </div>
+    `;
+
+    // ربط الأحداث
+    this._bindEvents();
+},
+
+_renderGrid() {
+    const container = document.getElementById('wgGrid');
+    if (!container) return;
+
+    let html = '';
+    const totalRows = this._maxAttempts;
+
+    for (let row = 0; row < totalRows; row++) {
+        const guess = this._guesses[row] || [];
+        const result = this._results[row] || [];
+        const isCurrentRow = row === this._currentAttempt;
+        const isPastRow = row < this._currentAttempt;
+
+        html += `<div style="display:flex;gap:0.4rem;justify-content:center;">`;
+
+        // تحديد إذا كان هذا الصف قد تم التخمين له (لديه نتيجة)
+        const hasResult = result.length > 0;
+
+        for (let col = 0; col < this._wordLength; col++) {
+            let letter = (guess[col] || '').toUpperCase();
+            let bgColor = 'var(--glass)';
+            let borderColor = 'var(--glass-border)';
+            let textColor = 'var(--gray)';
+            let animation = '';
+
+            if (isPastRow) {
+                // ✅ الصفوف السابقة: ألوان نهائية من result
+                const status = result[col] || 'absent';
+                if (status === 'correct') {
+                    bgColor = '#2ecc71';
+                    borderColor = '#2ecc71';
+                    textColor = '#fff';
+                } else if (status === 'present') {
+                    bgColor = '#f1c40f';
+                    borderColor = '#f1c40f';
+                    textColor = '#1a1a2e';
+                } else {
+                    bgColor = 'var(--gray-dark)';
+                    borderColor = 'var(--gray-dark)';
+                    textColor = '#fff';
+                }
+                animation = 'animation:fadeUp 0.2s ease;';
+            } else if (isCurrentRow) {
+                if (hasResult) {
+                    // ✅ تم التخمين لهذا الصف: عرض بالألوان مثل الصفوف السابقة
+                    const status = result[col] || 'absent';
+                    if (status === 'correct') {
+                        bgColor = '#2ecc71';
+                        borderColor = '#2ecc71';
+                        textColor = '#fff';
+                    } else if (status === 'present') {
+                        bgColor = '#f1c40f';
+                        borderColor = '#f1c40f';
+                        textColor = '#1a1a2e';
+                    } else {
+                        bgColor = 'var(--gray-dark)';
+                        borderColor = 'var(--gray-dark)';
+                        textColor = '#fff';
+                    }
+                    animation = 'animation:fadeUp 0.2s ease;';
+                } else {
+                    // ✅ الصف الحالي لم يتم التخمين له بعد: إطار ذهبي وخلايا فارغة
+                    borderColor = 'var(--accent)';
+                    bgColor = 'var(--glass)';
+                    textColor = 'var(--gray)';
+                    letter = ''; // لا نعرض أي حروف
+                }
+            }
+
+            html += `
+                <div style="
+                    width:52px;height:52px;
+                    background:${bgColor};
+                    border:2px solid ${borderColor};
+                    border-radius:8px;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:1.5rem;
+                    font-weight:800;
+                    color:${textColor};
+                    transition:all 0.3s ease;
+                    ${animation}
+                ">
+                    ${letter}
+                </div>
+            `;
+        }
+
+        html += `</div>`;
+    }
+
+    container.innerHTML = html;
+},
+
+_submitGuess() {
+    if (this._gameOver) return;
+
+    const input = document.getElementById('wgInput');
+    if (!input) return;
+
+    const guess = input.value.trim().toUpperCase();
+    if (!guess) {
+        showToast('⚠️ يرجى كتابة تخمين', 'error');
+        return;
+    }
+
+    if (guess.length !== this._wordLength) {
+        showToast(`⚠️ الكلمة يجب أن تكون ${this._wordLength} أحرف`, 'error');
+        return;
+    }
+
+    // تخزين التخمين
+    this._guesses[this._currentAttempt] = guess.split('');
+
+    // تقييم التخمين
+    const result = this._evaluateGuess(guess);
+    this._results[this._currentAttempt] = result;
+
+    this._renderGrid();
+    this._updateInfo();
+
+    const isWin = result.every(s => s === 'correct');
+    if (isWin) {
+        this._endRound(true);
+        return;
+    }
+
+    this._currentAttempt++;
+    if (this._currentAttempt >= this._maxAttempts) {
+        this._endRound(false);
+        return;
+    }
+
+    input.value = '';
+    input.focus();
+},
+
+    // ===== تقييم التخمين =====
+    _evaluateGuess(guess) {
+        const word = this._word;
+        const result = [];
+        const wordChars = word.split('');
+        const guessChars = guess.split('');
+
+        // أولاً: تحديد الحروف الصحيحة في المكان الصحيح
+        const used = Array(word.length).fill(false);
+        for (let i = 0; i < word.length; i++) {
+            if (guessChars[i] === wordChars[i]) {
+                result[i] = 'correct';
+                used[i] = true;
+            } else {
+                result[i] = 'absent';
+            }
+        }
+
+        // ثانياً: تحديد الحروف الصحيحة في مكان خاطئ
+        for (let i = 0; i < word.length; i++) {
+            if (result[i] === 'correct') continue;
+            for (let j = 0; j < word.length; j++) {
+                if (!used[j] && guessChars[i] === wordChars[j]) {
+                    result[i] = 'present';
+                    used[j] = true;
+                    break;
+                }
+            }
+        }
+
+        return result;
+    },
+
+_endRound(won) {
+    if (this._gameOver) return;
+    this._gameOver = true;
+    this._won = won;
+
+    // ✅ حساب متغيرات الجولة
+    const attemptsUsed = won ? this._currentAttempt + 1 : this._maxAttempts;
+    const timeTaken = Math.round((Date.now() - this._roundStartTime) / 1000);
+    const timeLeft = Math.max(0, this._totalTime - timeTaken);
+
+    // ✅ ===== 1. حساب نقاط الخبرة (XP) =====
+    // أساسي: كلما قلت المحاولات زادت النقاط
+    let baseXP = Math.max(10, (this._maxAttempts - attemptsUsed + 1) * 10);
+    if (!won) baseXP = 0;
+
+    // مكافأة الوقت: نقطة لكل 5 ثوانٍ متبقية (حد أقصى 30 نقطة)
+    let timeBonusXP = Math.min(Math.floor(timeLeft / 5) * 2, 30);
+
+    // مكافأة الكمال: تخمين من أول محاولة
+    let perfectBonusXP = (won && attemptsUsed === 1) ? 50 : 0;
+
+    // ✅ مضاعف السلسلة (زيادة 5% لكل فوز متتالي، حد أقصى 50%)
+    let streakMultiplier = 1;
+    if (won) {
+        this._currentStreak = (this._currentStreak || 0) + 1;
+        streakMultiplier = 1 + Math.min(this._currentStreak * 0.05, 0.5);
+    } else {
+        this._currentStreak = 0;
+        streakMultiplier = 0.5; // عقوبة الخسارة (نصف النقاط)
+    }
+
+    // المجموع النهائي للنقاط
+    let totalXP = Math.round((baseXP + timeBonusXP + perfectBonusXP) * streakMultiplier);
+    if (!won) totalXP = Math.max(0, Math.round(baseXP * 0.2)); // نقاط تشجيعية قليلة حتى في الخسارة
+
+    // ✅ ===== 2. حساب العملات (Coins) =====
+    // أساسي: عملة لكل 5 نقاط خبرة أساسية
+    let baseCoins = Math.max(2, Math.floor(baseXP / 5));
+
+    // مكافأة الوقت: عملة لكل 10 ثوانٍ متبقية
+    let timeBonusCoins = Math.floor(timeLeft / 10);
+
+    // مكافأة الكمال: 20 عملة إضافية
+    let perfectBonusCoins = (won && attemptsUsed === 1) ? 20 : 0;
+
+    // مكافأة السلسلة: عملة إضافية لكل فوز متتالي (حد أقصى 10)
+    let streakBonusCoins = Math.min(this._currentStreak * 2, 10);
+
+    // المجموع النهائي للعملات
+    let totalCoinsEarned = baseCoins + timeBonusCoins + perfectBonusCoins + streakBonusCoins;
+    if (!won) totalCoinsEarned = Math.max(1, Math.floor(baseCoins / 2));
+
+    // ✅ ===== 3. حساب دقة الحروف =====
+    const wordChars = this._word.split('');
+    let correctLetters = 0;
+    let wrongLetters = 0;
+    let totalLettersAttempted = 0;
+
+    for (let i = 0; i < this._guesses.length; i++) {
+        const guess = this._guesses[i] || [];
+        const result = this._results[i] || [];
+        for (let j = 0; j < guess.length; j++) {
+            if (result[j] === 'correct') correctLetters++;
+            else if (result[j] === 'present') correctLetters++; // الحرف موجود ولكن في مكان خاطئ نعتبره صحيح جزئياً
+            else if (result[j] === 'absent') wrongLetters++;
+            totalLettersAttempted++;
+        }
+    }
+    // نضيف الحروف الصحيحة في المكان الصحيح من الكلمة الأصلية (للدقة الكلية)
+    const totalLettersInWord = wordChars.length;
+    const letterAccuracy = totalLettersAttempted > 0 ? Math.round((correctLetters / totalLettersAttempted) * 100) : 0;
+
+    this._totalCorrectLetters += correctLetters;
+    this._totalWrongLetters += wrongLetters;
+    if (won && attemptsUsed === 1) this._perfectRounds++;
+
+    // ✅ ===== 4. تخزين تفاصيل الجولة =====
+    const roundResult = {
+        round: this._currentRoundIndex + 1,
+        word: this._word,
+        won: won,
+        attempts: attemptsUsed,
+        maxAttempts: this._maxAttempts,
+        timeTaken: timeTaken,
+        timeLeft: timeLeft,
+        wordLength: this._wordLength,
+        category: this._category,
+        guessHistory: [...this._guesses],
+        resultHistory: [...this._results],
+        // تفاصيل المكافآت
+        xp: {
+            base: baseXP,
+            timeBonus: timeBonusXP,
+            perfectBonus: perfectBonusXP,
+            streakMultiplier: streakMultiplier,
+            total: totalXP
+        },
+        coins: {
+            base: baseCoins,
+            timeBonus: timeBonusCoins,
+            perfectBonus: perfectBonusCoins,
+            streakBonus: streakBonusCoins,
+            total: totalCoinsEarned
+        },
+        accuracy: letterAccuracy,
+        correctLetters: correctLetters,
+        wrongLetters: wrongLetters,
+        streak: this._currentStreak
+    };
+
+    this._roundDetails.push(roundResult);
+    this._totalScore += totalXP;
+    this._totalCoins += totalCoinsEarned;
+    this._totalTimeTaken += timeTaken;
+
+    // تحديث واجهة النتيجة
+    this._renderGrid();
+    this._updateInfo();
+
+    // ✅ عرض رسالة النتيجة مع تفاصيل المكافآت
+    const messageEl = document.getElementById('wgMessage');
+    if (won) {
+        messageEl.innerHTML = `
+            <div style="color:var(--success);font-size:1.1rem;animation:fadeUp 0.3s ease;">
+                🎉 صحيح! الكلمة: <strong>${this._word}</strong>
+                <div style="display:flex;justify-content:center;gap:1rem;flex-wrap:wrap;margin-top:0.3rem;font-size:0.85rem;">
+                    <span style="color:var(--accent);">⭐ +${totalXP} نقطة</span>
+                    <span style="color:var(--accent);">🪙 +${totalCoinsEarned} عملة</span>
+                    <span style="color:var(--gray);">📝 ${attemptsUsed}/${this._maxAttempts}</span>
+                    ${this._currentStreak >= 3 ? `<span style="color:var(--accent);">🔥 سلسلة ${this._currentStreak}</span>` : ''}
+                </div>
+                ${attemptsUsed === 1 ? '<div style="font-size:0.8rem;color:#FFD93D;">💯 تخمين مثالي!</div>' : ''}
+            </div>
+        `;
+        if (typeof SoundSystem !== 'undefined') SoundSystem.playCorrect();
+    } else {
+        messageEl.innerHTML = `
+            <div style="color:var(--secondary);font-size:1.1rem;">
+                ❌ انتهت المحاولات! الكلمة: <strong>${this._word}</strong>
+                <div style="display:flex;justify-content:center;gap:1rem;font-size:0.8rem;margin-top:0.3rem;">
+                    <span style="color:var(--gray);">⭐ +${totalXP} نقطة تشجيعية</span>
+                    <span style="color:var(--gray);">🪙 +${totalCoinsEarned} عملة</span>
+                </div>
+            </div>
+        `;
+        if (typeof SoundSystem !== 'undefined') SoundSystem.playWrong();
+    }
+
+    // تعطيل الإدخال
+    document.getElementById('wgSubmitBtn').disabled = true;
+    document.getElementById('wgInput').disabled = true;
+
+    // ✅ الانتقال للجولة التالية بعد 2.5 ثانية
+    setTimeout(() => {
+        this._currentRoundIndex++;
+        if (this._currentRoundIndex < this._totalRounds) {
+            // جولة جديدة
+            document.getElementById('wgMessage').innerHTML = '';
+            document.getElementById('wgSubmitBtn').disabled = false;
+            document.getElementById('wgInput').disabled = false;
+            document.getElementById('wgInput').value = '';
+            this._startRound();
+        } else {
+            // انتهى جميع الجولات
+            this._endGame();
+        }
+    }, 2500);
+},
+
+    // ===== الخسارة =====
+    _loseGame() {
+        this._gameOver = true;
+        this._won = false;
+
+        document.getElementById('wgMessage').innerHTML = `
+            <div style="color:var(--secondary);font-size:1.3rem;">
+                ❌ للأسف، انتهت المحاولات!
+                <div style="font-size:1rem;color:var(--accent);">الكلمة الصحيحة: <strong>${this._word}</strong></div>
+                <div style="font-size:0.8rem;color:var(--gray);">حاول مرة أخرى!</div>
+            </div>
+        `;
+
+        // إظهار أزرار الإجراءات
+        document.getElementById('wgNewGameBtn').style.display = 'inline-flex';
+        document.getElementById('wgHomeBtn').style.display = 'inline-flex';
+        document.getElementById('wgSubmitBtn').disabled = true;
+        document.getElementById('wgInput').disabled = true;
+
+        // تشغيل صوت الخسارة
+        if (typeof SoundSystem !== 'undefined') {
+            SoundSystem.playWrong();
+        }
+
+        // تحديث الإحصائيات
+        this._updateStats(false, this._maxAttempts, 0);
+    },
+
+    // ===== تحديث الإحصائيات =====
+    _updateStats(won, attempts, points) {
+        const user = AuthService.currentUser;
+        if (!user) return;
+
+        const stats = user.stats || {};
+        const wordGuessStats = stats.wordGuess || {
+            played: 0,
+            won: 0,
+            totalAttempts: 0,
+            bestAttempts: 999,
+            totalPoints: 0,
+            streak: 0,
+            bestStreak: 0
+        };
+
+        wordGuessStats.played = (wordGuessStats.played || 0) + 1;
+        if (won) {
+            wordGuessStats.won = (wordGuessStats.won || 0) + 1;
+            wordGuessStats.streak = (wordGuessStats.streak || 0) + 1;
+            if (wordGuessStats.streak > wordGuessStats.bestStreak) {
+                wordGuessStats.bestStreak = wordGuessStats.streak;
+            }
+        } else {
+            wordGuessStats.streak = 0;
+        }
+        wordGuessStats.totalAttempts = (wordGuessStats.totalAttempts || 0) + attempts;
+        wordGuessStats.totalPoints = (wordGuessStats.totalPoints || 0) + points;
+        if (attempts < wordGuessStats.bestAttempts) {
+            wordGuessStats.bestAttempts = attempts;
+        }
+
+        // حفظ الإحصائيات
+        AuthService.updateUser({ stats: { ...stats, wordGuess: wordGuessStats } }).catch(() => {});
+    },
+
+    // ===== تحديث المعلومات =====
+    _updateInfo() {
+        const attemptsEl = document.getElementById('wgAttemptsDisplay');
+        if (attemptsEl) {
+            attemptsEl.textContent = `🎯 المحاولات: ${this._currentAttempt}/${this._maxAttempts}`;
+        }
+    },
+
+    // ===== المؤقت =====
+    _startTimer() {
+        if (this._timerInterval) {
+            clearInterval(this._timerInterval);
+            this._timerInterval = null;
+        }
+
+        this._timerInterval = setInterval(() => {
+            this._timeLeft--;
+            const timerEl = document.getElementById('wgTimerDisplay');
+            if (timerEl) {
+                timerEl.textContent = `⏱ ${this._timeLeft}s`;
+                if (this._timeLeft <= 10) {
+                    timerEl.style.color = 'var(--secondary)';
+                }
+            }
+
+            if (this._timeLeft <= 0) {
+                clearInterval(this._timerInterval);
+                this._timerInterval = null;
+                if (!this._gameOver) {
+                    this._loseGame();
+                    showToast('⏰ انتهى الوقت!', 'error');
+                }
+            }
+        }, 1000);
+    },
+
+    // ===== التركيز على الإدخال =====
+    _focusInput() {
+        setTimeout(() => {
+            const input = document.getElementById('wgInput');
+            if (input && !input.disabled) {
+                input.focus();
+                input.select();
+            }
+        }, 300);
+    },
+
+_bindEvents() {
+    const submitBtn = document.getElementById('wgSubmitBtn');
+    const input = document.getElementById('wgInput');
+    const newGameBtn = document.getElementById('wgNewGameBtn');
+
+    if (submitBtn) {
+        const newBtn = submitBtn.cloneNode(true);
+        submitBtn.parentNode.replaceChild(newBtn, submitBtn);
+        newBtn.addEventListener('click', () => {
+            this._submitGuess();
+        });
+    }
+
+    if (input) {
+        const newInput = input.cloneNode(true);
+        input.parentNode.replaceChild(newInput, input);
+        
+        // ✅ فقط نسمح بكتابة الحروف في الحقل، ولا نحدث الشبكة
+        newInput.addEventListener('input', () => {
+            const value = newInput.value.toUpperCase().replace(/\s/g, '');
+            newInput.value = value;
+            // لا نقوم بتحديث الشبكة هنا
+        });
+        
+        newInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this._submitGuess();
+            }
+        });
+    }
+
+    if (newGameBtn) {
+        const newBtn = newGameBtn.cloneNode(true);
+        newGameBtn.parentNode.replaceChild(newBtn, newGameBtn);
+        newBtn.addEventListener('click', () => {
+            this._resetGame();
+        });
+    }
+},
+
+_resetGame() {
+    // إزالة شاشات النهاية
+    ['wordGuessLevelScreen', 'wordGuessStatsScreen', 'wordGuessDetailedScreen'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+    });
+
+    // إعادة تعيين اللعبة
+    this._currentRoundIndex = 0;
+    this._roundsResults = [];
+    this._totalScore = 0;
+    this._totalTimeTaken = 0;
+    this._gameEnded = false;
+
+    document.getElementById('wgMessage').innerHTML = '';
+    document.getElementById('wgNewGameBtn').style.display = 'none';
+    document.getElementById('wgHomeBtn').style.display = 'none';
+    document.getElementById('wgSubmitBtn').disabled = false;
+    document.getElementById('wgInput').disabled = false;
+    document.getElementById('wgInput').value = '';
+
+    this._startRound();
+},
+
+_updateRoundInfo() {
+    const infoEl = document.getElementById('wgRoundInfo');
+    if (infoEl) {
+        infoEl.textContent = `📌 جولة ${this._currentRoundIndex + 1}/${this._totalRounds} • ${this._wordLength} أحرف • 🎯 ${this._maxAttempts} محاولات`;
+    }
+
+    const categoryEl = document.getElementById('wgCategoryDisplay');
+    if (categoryEl) categoryEl.textContent = `📚 ${this._category || 'عام'}`;
+
+    const lengthEl = document.getElementById('wgLengthDisplay');
+    if (lengthEl) lengthEl.textContent = `🔤 ${this._wordLength} أحرف`;
+
+    const timerEl = document.getElementById('wgTimerDisplay');
+    if (timerEl) {
+        timerEl.textContent = `⏱ ${this._timeLeft}s`;
+    }
+
+    const hintEl = document.getElementById('wgHintDisplay');
+    if (hintEl) {
+        if (this._hint || this._clue) {
+            hintEl.style.display = 'block';
+            hintEl.innerHTML = `💡 ${this._hint || this._clue}`;
+        } else {
+            hintEl.style.display = 'none';
+        }
+    }
+},
+
+_quit() {
+    if (this._timerInterval) {
+        clearInterval(this._timerInterval);
+        this._timerInterval = null;
+    }
+
+    // إزالة جميع شاشات النهاية
+    ['wordGuessLevelScreen', 'wordGuessStatsScreen', 'wordGuessDetailedScreen'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+    });
+
+    const container = document.getElementById('wordGuessGameContainer');
+    if (container) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+    }
+
+    document.querySelectorAll('.section').forEach(el => el.style.display = '');
+    App._activateSection('dashboard');
+    if (this._onComplete) this._onComplete();
+},
+
+_endGame() {
+    this._gameEnded = true;
+    if (this._timerInterval) {
+        clearInterval(this._timerInterval);
+        this._timerInterval = null;
+    }
+
+    // حساب الإحصائيات النهائية
+    const totalRounds = this._roundDetails.length;
+    const wonRounds = this._roundDetails.filter(r => r.won).length;
+    const winRate = totalRounds > 0 ? Math.round((wonRounds / totalRounds) * 100) : 0;
+    const avgAttempts = totalRounds > 0 ? (this._roundDetails.reduce((s, r) => s + r.attempts, 0) / totalRounds) : 0;
+    const totalPoints = this._totalScore;
+    const totalCoins = this._totalCoins;
+    const totalTime = this._totalTimeTaken;
+
+    this._gameResults = {
+        totalRounds,
+        wonRounds,
+        winRate,
+        avgAttempts: avgAttempts.toFixed(1),
+        totalPoints,
+        totalCoins,
+        totalTime,
+        rounds: this._roundDetails
+    };
+
+    // تحديث إحصائيات المستخدم
+    this._updateUserStats(wonRounds, totalRounds, totalPoints, avgAttempts);
+
+    // ✅ تحديث رصيد المستخدم (نقاط وعملات)
+    const user = AuthService.currentUser;
+    if (user) {
+        AuthService.updateUser({
+            totalScore: (user.totalScore || 0) + totalPoints,
+            coins: (user.coins || 0) + totalCoins
+        }).catch(() => {});
+    }
+
+    // عرض الشاشات المتسلسلة
+    this._showEndScreens();
+},
+
+_updateUserStats(wonRounds, totalRounds, totalPoints, avgAttempts) {
+    const user = AuthService.currentUser;
+    if (!user) return;
+
+    const stats = user.stats || {};
+    const wgStats = stats.wordGuess || {
+        played: 0,
+        won: 0,
+        rounds: 0,
+        wonRounds: 0,
+        lostRounds: 0,
+        totalAttempts: 0,
+        bestAttempts: 999,
+        totalPoints: 0,
+        totalCoins: 0,
+        streak: 0,
+        bestStreak: 0,
+        perfectRounds: 0,
+        totalCorrectLetters: 0,
+        totalWrongLetters: 0,
+        avgAttempts: 0,
+        accuracy: 0,
+        totalRounds: 0
+    };
+
+    // ✅ تحديث الإحصائيات
+    wgStats.played = (wgStats.played || 0) + 1;
+    wgStats.totalRounds = (wgStats.totalRounds || 0) + totalRounds;
+    wgStats.wonRounds = (wgStats.wonRounds || 0) + wonRounds;
+    wgStats.lostRounds = (wgStats.lostRounds || 0) + (totalRounds - wonRounds);
+    wgStats.totalPoints = (wgStats.totalPoints || 0) + totalPoints;
+    wgStats.totalCoins = (wgStats.totalCoins || 0) + this._totalCoins;
+    wgStats.totalAttempts = (wgStats.totalAttempts || 0) + Math.round(totalRounds * avgAttempts);
+    wgStats.perfectRounds = (wgStats.perfectRounds || 0) + this._perfectRounds;
+    wgStats.totalCorrectLetters = (wgStats.totalCorrectLetters || 0) + this._totalCorrectLetters;
+    wgStats.totalWrongLetters = (wgStats.totalWrongLetters || 0) + this._totalWrongLetters;
+
+    // ✅ أفضل محاولات
+    const bestInGame = Math.min(...this._roundDetails.map(r => r.attempts));
+    if (bestInGame < wgStats.bestAttempts) {
+        wgStats.bestAttempts = bestInGame;
+    }
+
+    // ✅ السلسلة
+    if (wonRounds === totalRounds && totalRounds > 0) {
+        wgStats.streak = (wgStats.streak || 0) + 1;
+        if (wgStats.streak > wgStats.bestStreak) {
+            wgStats.bestStreak = wgStats.streak;
+        }
+    } else {
+        wgStats.streak = 0;
+    }
+
+    // ✅ متوسط المحاولات
+    const totalAttempts = wgStats.totalAttempts || 0;
+    const totalRoundsPlayed = wgStats.totalRounds || 1;
+    wgStats.avgAttempts = totalRoundsPlayed > 0 ? (totalAttempts / totalRoundsPlayed).toFixed(1) : 0;
+
+    // ✅ الدقة الكلية
+    const totalCorrect = wgStats.totalCorrectLetters || 0;
+    const totalWrong = wgStats.totalWrongLetters || 0;
+    const totalLetters = totalCorrect + totalWrong;
+    wgStats.accuracy = totalLetters > 0 ? Math.round((totalCorrect / totalLetters) * 100) : 0;
+
+    // ✅ حفظ الإحصائيات
+    AuthService.updateUser({ stats: { ...stats, wordGuess: wgStats } }).catch(() => {});
+},
+
+_showEndScreens() {
+    const user = AuthService.currentUser;
+    const oldTotal = user?.totalScore || 0;
+    const newTotal = oldTotal + this._gameResults.totalPoints;
+    const oldLevel = getLevel(oldTotal);
+    const newLevel = getLevel(newTotal);
+    const levelsGained = newLevel.level - oldLevel.level;
+
+    // عرض شاشة المستوى
+    this._showLevelScreen({
+        pointsEarned: this._gameResults.totalPoints,
+        oldTotal: oldTotal,
+        newTotal: newTotal,
+        oldLevel: oldLevel,
+        newLevel: newLevel,
+        levelsGained: levelsGained,
+        onComplete: () => {
+            // الانتقال لشاشة الإحصائيات
+            this._showStatsScreen();
+        }
+    });
+},
+
+_showLevelScreen(data) {
+    const oldScreen = document.getElementById('wordGuessLevelScreen');
+    if (oldScreen) oldScreen.remove();
+
+    const screen = document.createElement('div');
+    screen.id = 'wordGuessLevelScreen';
+    screen.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 10001;
+        background: #0f0e17;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        animation: fadeUp 0.5s ease;
+    `;
+
+    const { pointsEarned, oldTotal, newTotal, oldLevel, newLevel, levelsGained, onComplete } = data;
+    const oldProgress = getLevelProgress(oldTotal);
+    const newProgress = getLevelProgress(newTotal);
+    const oldPercent = Math.min(oldProgress.progress, 100);
+    const newPercent = Math.min(newProgress.progress, 100);
+
+    screen.innerHTML = `
+        <div style="text-align:center; max-width:500px; width:100%;">
+            <div style="font-size:4rem; margin-bottom:0.5rem;">${levelsGained > 0 ? '🚀' : '⭐'}</div>
+            <h2 style="font-size:2rem; font-weight:900; color:#FFD93D; margin-bottom:0.3rem;">
+                ${levelsGained > 0 ? `المستوى ${newLevel.level}!` : `المستوى ${newLevel.level}`}
+            </h2>
+            <p style="color:#a7a9be; margin-bottom:1rem;">
+                ${levelsGained > 0 ? `🎉 تم تخطي ${levelsGained} مستوى!` : 'تقدم رائع!'}
+            </p>
+            <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:1rem; margin-bottom:1rem;">
+                <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#a7a9be;">
+                    <span>المستوى ${oldLevel.level}</span>
+                    <span>${newTotal} نقطة</span>
+                    <span>المستوى ${newLevel.level}</span>
+                </div>
+                <div style="height:12px; background:rgba(255,255,255,0.06); border-radius:10px; overflow:hidden; position:relative;">
+                    <div id="levelProgressFillResult" style="
+                        height:100%; 
+                        width:${oldPercent}%; 
+                        background:linear-gradient(90deg, #6C63FF, #FFD93D); 
+                        border-radius:10px; 
+                        transition:width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+                    "></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#a7a9be; margin-top:0.2rem;">
+                    <span>+${pointsEarned} نقطة</span>
+                    <span>${newPercent}%</span>
+                </div>
+            </div>
+            <button id="levelContinueBtn" style="
+                display:inline-flex; align-items:center; justify-content:center; gap:8px;
+                padding:12px 32px; border-radius:40px; font-weight:700; font-size:1rem;
+                background:#6C63FF; color:#fff; border:none; cursor:pointer;
+                min-width:160px; box-shadow:0 4px 20px rgba(108,99,255,0.3);
+                transition:all 0.3s ease;
+            ">
+                <i class="fas fa-arrow-right"></i> متابعة
+            </button>
+        </div>
+    `;
+
+    document.body.appendChild(screen);
+
+    // تحريك شريط التقدم
+    setTimeout(() => {
+        const fill = document.getElementById('levelProgressFillResult');
+        if (fill) {
+            fill.style.width = `${oldPercent}%`;
+            setTimeout(() => {
+                fill.style.width = `${newPercent}%`;
+                if (levelsGained > 0) {
+                    fill.style.background = 'linear-gradient(90deg, #FFD93D, #2ecc71, #FFD93D)';
+                    fill.style.backgroundSize = '200% 100%';
+                    fill.style.animation = 'shimmer 1.5s infinite';
+                }
+            }, 300);
+        }
+    }, 100);
+
+    document.getElementById('levelContinueBtn')?.addEventListener('click', function() {
+        screen.remove();
+        if (typeof onComplete === 'function') onComplete();
+    });
+},
+
+_showStatsScreen() {
+    const oldScreen = document.getElementById('wordGuessStatsScreen');
+    if (oldScreen) oldScreen.remove();
+
+    const screen = document.createElement('div');
+    screen.id = 'wordGuessStatsScreen';
+    screen.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 10002;
+        background: #0f0e17;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 1rem;
+        animation: fadeUp 0.5s ease;
+        overflow-y: auto;
+    `;
+
+    const r = this._gameResults;
+    const totalCoinsEarned = this._totalCoins;
+    const perfectRounds = this._perfectRounds;
+    const avgTime = r.totalRounds > 0 ? Math.round(r.totalTime / r.totalRounds) : 0;
+
+    // ✅ حساب الدقة الإجمالية
+    const totalCorrect = this._roundDetails.reduce((s, rd) => s + rd.correctLetters, 0);
+    const totalWrong = this._roundDetails.reduce((s, rd) => s + rd.wrongLetters, 0);
+    const totalLetters = totalCorrect + totalWrong;
+    const accuracy = totalLetters > 0 ? Math.round((totalCorrect / totalLetters) * 100) : 0;
+
+    screen.innerHTML = `
+        <div style="text-align:center; max-width:550px; width:100%;">
+            <div style="font-size:3.5rem; margin-bottom:0.3rem;">📊</div>
+            <h2 style="font-size:1.8rem; font-weight:900; color:#FFD93D; margin-bottom:0.3rem;">
+                إحصائيات المباراة
+            </h2>
+            <p style="color:#a7a9be; margin-bottom:1rem; font-size:0.95rem;">
+                ${r.totalRounds} جولة • ${r.wonRounds} فوز • ${r.winRate}% نجاح
+                ${r.totalRounds === r.wonRounds && r.totalRounds > 0 ? ' 🏆 كامل!' : ''}
+            </p>
+
+            <!-- ✅ الإحصائيات الرئيسية (موسعة) -->
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:0.4rem; margin-bottom:1rem;">
+                <div style="background:rgba(255,255,255,0.06); border-radius:12px; padding:0.5rem;">
+                    <div style="font-size:1.4rem; font-weight:900; color:#FFD93D;">${r.totalPoints}</div>
+                    <div style="font-size:0.6rem; color:#a7a9be;">⭐ نقاط</div>
+                </div>
+                <div style="background:rgba(255,217,61,0.06); border-radius:12px; padding:0.5rem;">
+                    <div style="font-size:1.4rem; font-weight:900; color:#FFD93D;">${totalCoinsEarned}</div>
+                    <div style="font-size:0.6rem; color:#a7a9be;">🪙 عملات</div>
+                </div>
+                <div style="background:rgba(46,204,113,0.06); border-radius:12px; padding:0.5rem;">
+                    <div style="font-size:1.4rem; font-weight:900; color:#2ecc71;">${r.winRate}%</div>
+                    <div style="font-size:0.6rem; color:#a7a9be;">🎯 نسبة الفوز</div>
+                </div>
+                <div style="background:rgba(52,152,219,0.06); border-radius:12px; padding:0.5rem;">
+                    <div style="font-size:1.4rem; font-weight:900; color:#4fc3f7;">${r.avgAttempts}</div>
+                    <div style="font-size:0.6rem; color:#a7a9be;">📝 متوسط المحاولات</div>
+                </div>
+            </div>
+
+            <!-- ✅ إحصائيات إضافية -->
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.4rem; margin-bottom:1rem;">
+                <div style="background:rgba(255,255,255,0.04); border-radius:8px; padding:0.4rem;">
+                    <div style="font-size:0.6rem; color:#a7a9be;">💯 مثالية</div>
+                    <div style="font-weight:700; font-size:1rem; color:#FFD93D;">${perfectRounds}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.04); border-radius:8px; padding:0.4rem;">
+                    <div style="font-size:0.6rem; color:#a7a9be;">🎯 الدقة</div>
+                    <div style="font-weight:700; font-size:1rem; color:#2ecc71;">${accuracy}%</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.04); border-radius:8px; padding:0.4rem;">
+                    <div style="font-size:0.6rem; color:#a7a9be;">🔥 السلسلة</div>
+                    <div style="font-weight:700; font-size:1rem; color:#FFD93D;">${this._currentStreak}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.04); border-radius:8px; padding:0.4rem;">
+                    <div style="font-size:0.6rem; color:#a7a9be;">✅ صحيح</div>
+                    <div style="font-weight:700; font-size:1rem; color:#2ecc71;">${r.wonRounds}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.04); border-radius:8px; padding:0.4rem;">
+                    <div style="font-size:0.6rem; color:#a7a9be;">❌ خاطئ</div>
+                    <div style="font-weight:700; font-size:1rem; color:#FF6B6B;">${r.totalRounds - r.wonRounds}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.04); border-radius:8px; padding:0.4rem;">
+                    <div style="font-size:0.6rem; color:#a7a9be;">⏱ متوسط الوقت</div>
+                    <div style="font-weight:700; font-size:1rem; color:#4fc3f7;">${avgTime}s</div>
+                </div>
+            </div>
+
+            <!-- الأزرار -->
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; justify-content:center;">
+                <button id="statsShowDetailsBtn" style="
+                    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+                    padding:10px 24px; border-radius:40px; font-weight:600; font-size:0.9rem;
+                    background:#6C63FF; color:#fff; border:none; cursor:pointer; min-width:120px;
+                    box-shadow:0 4px 20px rgba(108,99,255,0.3);
+                ">
+                    <i class="fas fa-eye"></i> عرض التفاصيل
+                </button>
+                <button id="statsFinishBtn" style="
+                    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+                    padding:10px 24px; border-radius:40px; font-weight:600; font-size:0.9rem;
+                    background:#2ecc71; color:#fff; border:none; cursor:pointer; min-width:120px;
+                    box-shadow:0 4px 20px rgba(46,204,113,0.3);
+                ">
+                    <i class="fas fa-check"></i> إنهاء
+                </button>
+                <button id="statsReplayBtn" style="
+                    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+                    padding:10px 24px; border-radius:40px; font-weight:600; font-size:0.9rem;
+                    background:#f39c12; color:#fff; border:none; cursor:pointer; min-width:120px;
+                    box-shadow:0 4px 20px rgba(243,156,18,0.3);
+                ">
+                    <i class="fas fa-redo"></i> إعادة اللعب
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(screen);
+
+    // ربط الأزرار
+    document.getElementById('statsShowDetailsBtn')?.addEventListener('click', () => {
+        screen.remove();
+        this._showDetailedStatsScreen();
+    });
+
+    document.getElementById('statsFinishBtn')?.addEventListener('click', () => {
+        screen.remove();
+        this._quit();
+    });
+
+    document.getElementById('statsReplayBtn')?.addEventListener('click', () => {
+        screen.remove();
+        this._resetGame();
+    });
+},
+
+_showDetailedStatsScreen() {
+    const oldScreen = document.getElementById('wordGuessDetailedScreen');
+    if (oldScreen) oldScreen.remove();
+
+    const screen = document.createElement('div');
+    screen.id = 'wordGuessDetailedScreen';
+    screen.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 10003;
+        background: #0f0e17;
+        display: flex;
+        flex-direction: column;
+        padding: 1.5rem 1rem;
+        animation: fadeUp 0.5s ease;
+        overflow-y: auto;
+    `;
+
+    const r = this._gameResults;
+
+    // ✅ بناء تفاصيل الجولات مع عرض المكافآت
+    let roundsHtml = this._roundDetails.map((round, idx) => {
+        const statusIcon = round.won ? '✅' : '❌';
+        const statusColor = round.won ? 'var(--success)' : 'var(--secondary)';
+        
+        // عرض التخمينات مع الألوان
+        let guessDisplay = round.guessHistory.map((g, gi) => {
+            const result = round.resultHistory[gi] || [];
+            let letters = g.map((l, li) => {
+                const status = result[li] || 'absent';
+                const colors = {
+                    correct: '#2ecc71',
+                    present: '#f1c40f',
+                    absent: 'var(--gray-dark)'
+                };
+                return `<span style="display:inline-block;width:28px;height:28px;background:${colors[status]};color:#fff;border-radius:4px;text-align:center;font-weight:700;font-size:0.7rem;line-height:28px;margin:1px;">${l}</span>`;
+            }).join('');
+            return `<div style="display:flex;gap:2px;margin:2px 0;">${letters}</div>`;
+        }).join('');
+
+        // ✅ عرض تفاصيل المكافآت لكل جولة
+        const xp = round.xp || {};
+        const coins = round.coins || {};
+        const xpDetails = `أساسي ${xp.base || 0} + وقت ${xp.timeBonus || 0} + كمال ${xp.perfectBonus || 0} × مضاعف ${(xp.streakMultiplier || 1).toFixed(1)}`;
+        const coinDetails = `أساسي ${coins.base || 0} + وقت ${coins.timeBonus || 0} + كمال ${coins.perfectBonus || 0} + سلسلة ${coins.streakBonus || 0}`;
+
+        return `
+            <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:0.6rem;margin-bottom:0.6rem;border-right:3px solid ${statusColor};">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.3rem;">
+                    <span style="font-weight:700;font-size:0.9rem;">جولة ${idx + 1}</span>
+                    <span style="color:${statusColor};">${statusIcon} ${round.won ? 'صحيحة' : 'خاطئة'}</span>
+                    <span style="font-size:0.7rem;color:var(--gray);">📝 ${round.attempts}/${round.maxAttempts}</span>
+                    <span style="font-size:0.7rem;color:var(--accent);">⭐ ${round.xp?.total || 0}</span>
+                    <span style="font-size:0.7rem;color:var(--accent);">🪙 ${round.coins?.total || 0}</span>
+                    <span style="font-size:0.7rem;color:var(--gray);">⏱ ${round.timeTaken}s</span>
+                    ${round.streak >= 3 ? `<span style="font-size:0.6rem;color:var(--accent);">🔥${round.streak}</span>` : ''}
+                </div>
+                <div style="font-size:0.8rem;color:var(--accent);font-weight:700;direction:ltr;margin:0.2rem 0;">
+                    ${round.word}
+                </div>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;font-size:0.65rem;color:var(--gray);">
+                    <span>📚 ${round.category || 'عام'}</span>
+                    <span>🎯 دقة ${round.accuracy || 0}%</span>
+                    <span>✅ ${round.correctLetters || 0} حرف صحيح</span>
+                    <span>❌ ${round.wrongLetters || 0} حرف خاطئ</span>
+                </div>
+                <div style="margin-top:0.2rem;">
+                    ${guessDisplay}
+                </div>
+                <div style="margin-top:0.2rem;padding:0.2rem 0.5rem;background:rgba(255,255,255,0.03);border-radius:4px;font-size:0.6rem;color:var(--gray-dark);display:flex;flex-wrap:wrap;gap:0.3rem;">
+                    <span>⭐ ${xpDetails}</span>
+                    <span>|</span>
+                    <span>🪙 ${coinDetails}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    screen.innerHTML = `
+        <div style="max-width:700px;margin:0 auto;width:100%;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
+                <h2 style="font-size:1.6rem;font-weight:900;color:#FFD93D;">
+                    <i class="fas fa-list" style="color:var(--accent);"></i> تفاصيل المباراة
+                </h2>
+                <button class="btn btn-sm btn-outline" onclick="document.getElementById('wordGuessDetailedScreen').remove(); WordGuessEngine._showStatsScreen();">
+                    <i class="fas fa-arrow-right"></i> العودة للإحصائيات
+                </button>
+            </div>
+
+            <!-- الملخص السريع -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:0.4rem;margin-bottom:1rem;">
+                <div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;">
+                    <div style="font-size:0.6rem;color:var(--gray);">الجولات</div>
+                    <div style="font-weight:700;font-size:1rem;">${r.totalRounds}</div>
+                </div>
+                <div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;">
+                    <div style="font-size:0.6rem;color:var(--gray);">✅ فوز</div>
+                    <div style="font-weight:700;font-size:1rem;color:#2ecc71;">${r.wonRounds}</div>
+                </div>
+                <div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;">
+                    <div style="font-size:0.6rem;color:var(--gray);">❌ خسارة</div>
+                    <div style="font-weight:700;font-size:1rem;color:#FF6B6B;">${r.totalRounds - r.wonRounds}</div>
+                </div>
+                <div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;">
+                    <div style="font-size:0.6rem;color:var(--gray);">⭐ نقاط</div>
+                    <div style="font-weight:700;font-size:1rem;color:#FFD93D;">${r.totalPoints}</div>
+                </div>
+                <div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;">
+                    <div style="font-size:0.6rem;color:var(--gray);">🪙 عملات</div>
+                    <div style="font-weight:700;font-size:1rem;color:#FFD93D;">${this._totalCoins}</div>
+                </div>
+                <div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;">
+                    <div style="font-size:0.6rem;color:var(--gray);">🔥 السلسلة</div>
+                    <div style="font-weight:700;font-size:1rem;color:#FFD93D;">${this._currentStreak}</div>
+                </div>
+                <div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;">
+                    <div style="font-size:0.6rem;color:var(--gray);">⏱ الوقت</div>
+                    <div style="font-weight:700;font-size:1rem;color:#4fc3f7;">${r.totalTime}s</div>
+                </div>
+                <div style="background:var(--glass);border-radius:8px;padding:0.4rem;text-align:center;">
+                    <div style="font-size:0.6rem;color:var(--gray);">💯 مثالية</div>
+                    <div style="font-weight:700;font-size:1rem;color:#FFD93D;">${this._perfectRounds}</div>
+                </div>
+            </div>
+
+            <!-- الجولات -->
+            <div style="margin-top:0.5rem;">
+                <h4 style="font-size:1rem;font-weight:700;color:var(--gray);margin-bottom:0.5rem;">📋 الجولات (${r.totalRounds})</h4>
+                <div style="max-height:55vh;overflow-y:auto;padding:0.2rem 0.1rem;">
+                    ${roundsHtml}
+                </div>
+            </div>
+
+            <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;margin-top:1rem;padding-top:0.5rem;border-top:1px solid var(--glass-border);">
+                <button class="btn btn-outline" onclick="document.getElementById('wordGuessDetailedScreen').remove(); WordGuessEngine._showStatsScreen();">
+                    <i class="fas fa-arrow-right"></i> العودة للإحصائيات
+                </button>
+                <button class="btn btn-success" onclick="document.getElementById('wordGuessDetailedScreen').remove(); WordGuessEngine._resetGame();">
+                    <i class="fas fa-redo"></i> إعادة اللعب
+                </button>
+                <button class="btn btn-primary" onclick="document.getElementById('wordGuessDetailedScreen').remove(); WordGuessEngine._quit();">
+                    <i class="fas fa-home"></i> الرئيسية
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(screen);
+},
+};
+
+// ============================================================
 // CrosswordEngine – محرك الكلمات المتقاطعة (نسخة مصححة)
 // ============================================================
 const CrosswordEngine = {
@@ -12957,6 +14385,7 @@ const App = {
     _isLoadingFriends: false,
     _friendsUnsubscribe: null,
     _friendsRefreshTimeout: null,
+    _wordGuessImportCancelled: false,
 
 async start() {
     // ============================================================
@@ -14185,6 +15614,7 @@ document.addEventListener('DOMContentLoaded', () => {
 _buildSections() {
     const container = document.getElementById('sectionsContainer');
     container.innerHTML = `
+        <div id="wordGuessGameContainer" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:1050;background:var(--dark);padding:1rem;overflow-y:auto;"></div>
         <section id="section-dashboard" class="section active">${this._renderDashboard()}</section>
         
         <section id="section-notifications" class="section">
@@ -14378,6 +15808,93 @@ _buildModals() {
             </div>
         </div>
 
+<!-- ============================================================
+     مودال إدارة كلمات التخمين
+     ============================================================ -->
+<div class="modal-overlay" id="wordGuessModal">
+    <div class="modal-card" style="max-width:550px;max-height:90vh;overflow-y:auto;padding:1.2rem 1.5rem;">
+        <div class="modal-header">
+            <h3 id="wordGuessModalTitle"><i class="fas fa-keyboard" style="color:var(--accent);"></i> إضافة كلمة جديدة</h3>
+            <button class="modal-close-btn" onclick="App._closeModal('wordGuessModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <form id="wordGuessForm" style="padding:0.2rem 0 0.8rem;">
+            <input type="hidden" id="wgFormId">
+
+            <div class="form-group">
+                <label>🔤 الكلمة *</label>
+                <input type="text" id="wgWord" placeholder="أدخل الكلمة (مثال: كتاب)" required 
+                       style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);font-size:1.1rem;text-align:center;text-transform:uppercase;direction:ltr;">
+                <div style="font-size:0.65rem;color:var(--gray);margin-top:0.2rem;">
+                    💡 يجب أن تكون الكلمة بين 4 و 7 أحرف (حروف عربية أو إنجليزية)
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>📚 التصنيف *</label>
+                    <select id="wgCategory" required style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                        ${WORD_CATEGORIES.map(cat => 
+                            `<option value="${cat.id}">${cat.icon} ${cat.label}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>🎯 المستوى *</label>
+                    <select id="wgDifficulty" required style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                        <option value="easy">🟢 سهل</option>
+                        <option value="medium" selected>🟡 متوسط</option>
+                        <option value="hard">🔴 صعب</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>🔢 عدد المحاولات *</label>
+                    <select id="wgAttempts" required style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                        <option value="5">5 محاولات</option>
+                        <option value="6" selected>6 محاولات</option>
+                        <option value="7">7 محاولات</option>
+                        <option value="8">8 محاولات</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>💡 التلميح (اختياري)</label>
+                    <input type="text" id="wgHint" placeholder="تلميح للكلمة..." 
+                           style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>📝 دليل إضافي (اختياري)</label>
+                <input type="text" id="wgClue" placeholder="دليل يساعد في تخمين الكلمة..." 
+                       style="width:100%;padding:8px 12px;border-radius:8px;background:var(--glass);border:1px solid var(--glass-border);color:var(--light);">
+            </div>
+
+            <div style="background:var(--glass);padding:0.8rem;border-radius:var(--radius-sm);margin:0.5rem 0;border:1px solid var(--border-color);">
+                <div style="font-weight:700;font-size:0.85rem;color:var(--gray);">
+                    <i class="fas fa-info-circle"></i> ملخص الكلمة
+                </div>
+                <div style="font-size:0.8rem;color:var(--light);margin-top:0.2rem;">
+                    <span id="wgSummary">الطول: 0 أحرف • المحاولات: 6</span>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:0.5rem;justify-content:center;margin-top:1rem;flex-wrap:wrap;">
+                <button type="submit" class="btn btn-primary" style="min-width:120px;justify-content:center;">
+                    <i class="fas fa-save"></i> حفظ الكلمة
+                </button>
+                <button type="button" class="btn btn-outline" onclick="App._closeModal('wordGuessModal')">
+                    <i class="fas fa-times"></i> إلغاء
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="modal-overlay" id="matchSettingsModal">
     <div class="modal-card" style="max-width:800px; padding: 1.2rem 1.5rem;">
         <div class="modal-header">
@@ -14442,6 +15959,19 @@ _buildModals() {
                                 <span class="mode-status-dot"></span>
                             </div>
                         </div>
+
+            <!-- طور تخمين الكلمات (مصنف) - غير مفعل -->
+            <div class="mode-card-horizontal" data-mode="wordguess_ranked" data-competitive="true" style="opacity:0.6; cursor:not-allowed;">
+                <div class="mode-icon">🔤🏅</div>
+                <div class="mode-info">
+                    <div class="mode-title">تخمين الكلمات (مصنف)</div>
+                    <div class="mode-desc">خمّن الكلمة وتنافس مع الآخرين!</div>
+                </div>
+                <div class="mode-badges">
+                    <span class="badge badge-primary">🏅 تصنيفي</span>
+                    <span class="badge badge-danger">🔒 قريباً</span>
+                </div>
+            </div>
 
                         <!-- 3. كلمات متقاطعة مصنف -->
                         <div class="mode-card-horizontal" data-mode="ranked_crossword" data-competitive="true" style="opacity:0.6; cursor:not-allowed;">
@@ -14553,6 +16083,19 @@ _buildModals() {
                             </div>
                         </div>
 
+            <!-- طور تخمين الكلمات (ودي) - غير مفعل -->
+            <div class="mode-card-horizontal" data-mode="wordguess_unranked" data-competitive="false" style="opacity:0.6; cursor:not-allowed;">
+                <div class="mode-icon">🔤🎮</div>
+                <div class="mode-info">
+                    <div class="mode-title">تخمين الكلمات (ودي)</div>
+                    <div class="mode-desc">تحدى أصدقائك في تخمين الكلمات!</div>
+                </div>
+                <div class="mode-badges">
+                    <span class="badge badge-success">🎮 ودي</span>
+                    <span class="badge badge-danger">🔒 قريباً</span>
+                </div>
+            </div>
+
                         <!-- 3. كلمات متقاطعة ودي -->
                         <div class="mode-card-horizontal" data-mode="unranked_crossword" data-competitive="false" style="opacity:0.6; cursor:not-allowed;">
                             <div class="mode-icon">🔤</div>
@@ -14648,6 +16191,18 @@ _buildModals() {
                                 <span class="mode-status-dot"></span>
                             </div>
                         </div>
+                                    <!-- ✅ طور تخمين الكلمات (تدريب) -->
+            <div class="mode-card-horizontal" data-mode="wordguess_training" data-competitive="false">
+                <div class="mode-icon">🔤</div>
+                <div class="mode-info">
+                    <div class="mode-title">تخمين الكلمات</div>
+                    <div class="mode-desc">خمّن الكلمة الصحيحة قبل نفاذ المحاولات!</div>
+                </div>
+                <div class="mode-badges">
+                    <span class="badge badge-info">📚 تدريب</span>
+                    <span class="mode-status-dot"></span>
+                </div>
+            </div>
 <!-- كلمات متقاطعة (مفعل الآن) -->
 <div class="mode-card-horizontal" data-mode="training_crossword" data-competitive="false">
     <div class="mode-info">
@@ -17353,6 +18908,81 @@ _updateModeSpecificSettings(mode) {
             `;
         }
         
+else if (mode.startsWith('wordguess')) {
+    title = '🔤 إعدادات تخمين الكلمات';
+    const isRanked = mode === 'wordguess_ranked';
+    const isTraining = mode === 'wordguess_training';
+    const modeType = isRanked ? '🏅 مصنف' : isTraining ? '📚 تدريب' : '🎮 ودي';
+    
+    // ✅ استخدام settings النظيفة (بدون بادئة)
+    const savedSettings = this._getModeSettings(mode);
+    const mergedSettings = { ...modeInfo.settings, ...savedSettings };
+    
+    html = `
+        <div class="form-group" style="margin-bottom:0.5rem;">
+            <label style="font-size:0.75rem;">🎯 المستوى</label>
+            <select id="modeSpecificDifficulty" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                <option value="easy" ${mergedSettings.difficulty === 'easy' ? 'selected' : ''}>🟢 سهل</option>
+                <option value="medium" ${mergedSettings.difficulty === 'medium' ? 'selected' : ''}>🟡 متوسط</option>
+                <option value="hard" ${mergedSettings.difficulty === 'hard' ? 'selected' : ''}>🔴 صعب</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0.5rem;">
+            <label style="font-size:0.75rem;">📚 التصنيف</label>
+            <select id="modeSpecificCategory" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                <option value="all" ${mergedSettings.category === 'all' ? 'selected' : ''}>📚 كل التصنيفات</option>
+                ${WORD_CATEGORIES.map(cat => 
+                    `<option value="${cat.id}" ${mergedSettings.category === cat.id ? 'selected' : ''}>${cat.icon} ${cat.label}</option>`
+                ).join('')}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0.5rem;">
+            <label style="font-size:0.75rem;">🔤 طول الكلمة</label>
+            <select id="modeSpecificWordLength" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                <option value="0" ${mergedSettings.wordLength == 0 ? 'selected' : ''}>📏 الكل</option>
+                <option value="4" ${mergedSettings.wordLength == 4 ? 'selected' : ''}>4 أحرف</option>
+                <option value="5" ${mergedSettings.wordLength == 5 ? 'selected' : ''}>5 أحرف</option>
+                <option value="6" ${mergedSettings.wordLength == 6 ? 'selected' : ''}>6 أحرف</option>
+                <option value="7" ${mergedSettings.wordLength == 7 ? 'selected' : ''}>7 أحرف</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0.5rem;">
+            <label style="font-size:0.75rem;">🎯 عدد المحاولات</label>
+            <select id="modeSpecificAttempts" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                <option value="5" ${mergedSettings.attempts == 5 ? 'selected' : ''}>5 محاولات</option>
+                <option value="6" ${mergedSettings.attempts == 6 ? 'selected' : ''}>6 محاولات</option>
+                <option value="7" ${mergedSettings.attempts == 7 ? 'selected' : ''}>7 محاولات</option>
+                <option value="8" ${mergedSettings.attempts == 8 ? 'selected' : ''}>8 محاولات</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0.5rem;">
+            <label style="font-size:0.75rem;">⏱ وقت الجولة (ثانية)</label>
+            <select id="modeSpecificTimeLimit" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                <option value="30" ${mergedSettings.timeLimit == 30 ? 'selected' : ''}>30 ثانية</option>
+                <option value="60" ${mergedSettings.timeLimit == 60 ? 'selected' : ''}>60 ثانية</option>
+                <option value="90" ${mergedSettings.timeLimit == 90 ? 'selected' : ''}>90 ثانية</option>
+                <option value="120" ${mergedSettings.timeLimit == 120 || !mergedSettings.timeLimit ? 'selected' : ''}>120 ثانية</option>
+                <option value="180" ${mergedSettings.timeLimit == 180 ? 'selected' : ''}>180 ثانية</option>
+                <option value="0" ${mergedSettings.timeLimit == 0 ? 'selected' : ''}>♾️ غير محدود</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0.5rem;">
+            <label style="font-size:0.75rem;">🔢 عدد الجولات</label>
+            <select id="modeSpecificRounds" class="game-select" style="font-size:0.8rem; padding:4px 10px; width:100%;">
+                <option value="3" ${mergedSettings.rounds == 3 ? 'selected' : ''}>3 جولات</option>
+                <option value="5" ${mergedSettings.rounds == 5 ? 'selected' : ''}>5 جولات</option>
+                <option value="10" ${mergedSettings.rounds == 10 ? 'selected' : ''}>10 جولات</option>
+                <option value="20" ${mergedSettings.rounds == 20 ? 'selected' : ''}>20 جولة</option>
+            </select>
+        </div>
+        <div style="padding:0.3rem 0.5rem; background:rgba(255,217,61,0.05); border-radius:6px; border:1px solid var(--accent); margin-top:0.3rem;">
+            <div style="font-size:0.7rem; color:var(--gray); text-align:center;">
+                ${modeType} • ${isTraining ? '✅ مفعل' : '🔒 قريباً'}
+            </div>
+        </div>
+    `;
+}
+
     else if (mode === 'training_crossword') {
     title = '🔤 إعدادات مباراة الكلمات المتقاطعة';
     const savedSettings = this._getModeSettings(mode);
@@ -17571,18 +19201,14 @@ _updateModeSpecificSettings(mode) {
     if (titleEl) titleEl.textContent = title;
     container.innerHTML = html;
 
-    // ربط أحداث التغيير لحفظ الإعدادات تلقائياً
-    container.querySelectorAll('select').forEach(select => {
-        // إزالة المستمعات القديمة (لتجنب التكرار)
-        const newSelect = select.cloneNode(true);
-        select.parentNode.replaceChild(newSelect, select);
-        
-        newSelect.addEventListener('change', function(e) {
-            console.log('🔄 Setting changed:', this.id, '=', this.value);
-            // حفظ الإعدادات الخاصة بالطور الحالي
-            App._saveModeSpecificSettings(mode);
-        });
+container.querySelectorAll('select').forEach(select => {
+    const newSelect = select.cloneNode(true);
+    select.parentNode.replaceChild(newSelect, select);
+    newSelect.addEventListener('change', function(e) {
+        console.log('🔄 Setting changed:', this.id, '=', this.value);
+        App._saveModeSpecificSettings(mode);
     });
+});
     
     console.log('✅ Mode specific settings rendered for:', mode);
 },
@@ -17601,49 +19227,42 @@ _getModeSettings(mode) {
         const cached = this._modeSettingsCache[mode];
         if (cached.specific) {
             settings = { ...cached.specific };
-            console.log('📊 Settings from Firebase cache:', settings);
-            return settings;
         } else if (typeof cached === 'object') {
             settings = { ...cached };
-            console.log('📊 Settings from Firebase cache (direct):', settings);
-            return settings;
         }
     }
     
     // ✅ محاولة جلب من localStorage
-    try {
-        const saved = localStorage.getItem(`modeSettings_${mode}`);
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            if (parsed.specific && parsed.specific[mode]) {
-                settings = { ...parsed.specific[mode] };
-                console.log('📊 Settings from localStorage:', settings);
-                return settings;
-            } else if (typeof parsed === 'object') {
-                settings = { ...parsed };
-                console.log('📊 Settings from localStorage (direct):', settings);
-                return settings;
+    if (Object.keys(settings).length === 0) {
+        try {
+            const saved = localStorage.getItem(`modeSettings_${mode}`);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed.specific && parsed.specific[mode]) {
+                    settings = { ...parsed.specific[mode] };
+                } else if (typeof parsed === 'object') {
+                    settings = { ...parsed };
+                }
             }
+        } catch (e) {
+            console.warn('⚠️ Error loading mode settings from localStorage:', e);
         }
-    } catch (e) {
-        console.warn('⚠️ Error loading mode settings from localStorage:', e);
     }
     
-    // ✅ محاولة جلب من localStorage القديم (بدون specific)
-    try {
-        const saved = localStorage.getItem(`modeSettings_${mode}`);
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            if (parsed.difficulty || parsed.category || parsed.questionType) {
-                settings = { ...parsed };
-                console.log('📊 Settings from localStorage (legacy):', settings);
-                return settings;
-            }
+    // ✅ تنظيف المفاتيح: إزالة بادئة 'modeSpecific' إن وجدت
+    const cleanSettings = {};
+    for (const [key, value] of Object.entries(settings)) {
+        if (key.startsWith('modeSpecific')) {
+            // إزالة 'modeSpecific' وتحويل الحرف الأول إلى صغير
+            const newKey = key.replace('modeSpecific', '').toLowerCase();
+            cleanSettings[newKey] = value;
+        } else {
+            cleanSettings[key] = value;
         }
-    } catch (e) {}
+    }
     
-    console.log('📊 No settings found, returning empty:', settings);
-    return settings;
+    console.log('📊 Clean settings:', cleanSettings);
+    return cleanSettings;
 },
 
 _debugModeSettings() {
@@ -17682,18 +19301,23 @@ _saveModeSpecificSettings(mode) {
     
     const specific = {};
     
-    // ✅ قائمة بجميع المعرفات الممكنة للإعدادات (شاملة الكلمات المتقاطعة)
+    // ✅ قائمة بجميع المعرفات الممكنة للإعدادات
     const settingIds = [
+        // عامة
         'modeSpecificDifficulty',
         'modeSpecificCategory', 
         'modeSpecificQuestionType',
         'modeSpecificCount',
         'modeSpecificTimeLimit',
-        // ✅ إعدادات الكلمات المتقاطعة
+        // كلمات متقاطعة
         'modeSpecificCrosswordLevel',
         'modeSpecificCrosswordTime',
         'modeSpecificCrosswordCategory',
         'modeSpecificCrosswordRounds',
+        // ✅ تخمين الكلمات
+        'modeSpecificWordLength',
+        'modeSpecificAttempts',
+        'modeSpecificRounds'
     ];
     
     // جمع القيم من كل عنصر
@@ -17705,13 +19329,10 @@ _saveModeSpecificSettings(mode) {
         }
     });
     
-    // إذا كانت الإعدادات فارغة، لا نحفظ
     if (Object.keys(specific).length === 0) {
         console.warn('⚠️ No specific settings found to save');
         return;
     }
-    
-    console.log('📦 Collected settings:', specific);
     
     // ✅ حفظ في Firebase والكاش المحلي
     this._saveModeSettingsToFirebase(mode, specific);
@@ -17736,7 +19357,8 @@ _saveModeSpecificSettings(mode) {
         'training_crossword': 'الكلمات المتقاطعة',
         'training_classic': 'التدريب الكلاسيكي',
         'training_survival': 'تحدي الصمود',
-        'training_speed': 'تحدي السرعة'
+        'training_speed': 'تحدي السرعة',
+        'wordguess_training': 'تخمين الكلمات (تدريب)',
     };
     const name = modeNames[mode] || mode;
     
@@ -17750,7 +19372,10 @@ _saveModeSpecificSettings(mode) {
             'modeSpecificCrosswordLevel': 'مستوى الشبكات',
             'modeSpecificCrosswordTime': 'الوقت',
             'modeSpecificCrosswordCategory': 'التصنيف',
-            'modeSpecificCrosswordRounds': 'عدد الجولات'
+            'modeSpecificCrosswordRounds': 'عدد الجولات',
+            'modeSpecificWordLength': 'طول الكلمة',
+            'modeSpecificAttempts': 'المحاولات',
+            'modeSpecificRounds': 'عدد الجولات'
         };
         const label = labels[key] || key;
         return `${label}: ${value}`;
@@ -18962,6 +20587,19 @@ _renderQuestionsSection() {
                 ">
                     <i class="fas fa-th"></i> الكلمات المتقاطعة
                 </button>
+<button class="questions-tab-btn" data-tab="wordguess" style="
+    padding:0.4rem 1.2rem;
+    border-radius:8px;
+    border:none;
+    background:transparent;
+    color:var(--gray);
+    font-weight:700;
+    font-size:0.85rem;
+    cursor:pointer;
+    transition:all 0.3s ease;
+">
+    <i class="fas fa-keyboard"></i> تخمين الكلمات
+</button>
             </div>
 
             <!-- ===== محتوى تبويب الأسئلة العادية ===== -->
@@ -19152,8 +20790,107 @@ _renderQuestionsSection() {
                 </div>
             </div>
 
-            <!-- إدخال مخفي للاستيراد -->
-            <input type="file" id="importQuestionsFile" accept=".json,.csv" style="display:none;">
+            <!-- ===== محتوى تبويب تخمين الكلمات ===== -->
+            <div id="questionsWordGuessTab" class="questions-tab-content" style="display:none;">
+                <!-- الإحصائيات -->
+                <div class="questions-stats-grid mb-2" id="wordGuessStats">
+                    <div class="stat-card" style="border-left:4px solid var(--primary);">
+                        <div class="stat-number" id="wgStatTotal">0</div>
+                        <div class="stat-label">📊 إجمالي الكلمات</div>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid var(--success);">
+                        <div class="stat-number" id="wgStatEasy">0</div>
+                        <div class="stat-label">🟢 سهلة</div>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid var(--accent);">
+                        <div class="stat-number" id="wgStatMedium">0</div>
+                        <div class="stat-label">🟡 متوسطة</div>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid var(--secondary);">
+                        <div class="stat-number" id="wgStatHard">0</div>
+                        <div class="stat-label">🔴 صعبة</div>
+                    </div>
+                    <div class="stat-card" style="border-left:4px solid var(--info);">
+                        <div class="stat-number" id="wgStatLetters">0</div>
+                        <div class="stat-label">🔤 أحرف متوسطة</div>
+                    </div>
+                </div>
+
+                <!-- ✅ شريط أدوات تخمين الكلمات مع زر الاستيراد -->
+                <div class="questions-toolbar mb-2">
+                    <div class="search-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="searchWordGuess" placeholder="ابحث عن كلمة..." class="search-input">
+                    </div>
+                    <div class="filters-wrapper">
+                        <select id="filterWgCategory" class="filter-select">
+                            <option value="">كل التصنيفات</option>
+                            ${WORD_CATEGORIES.map(cat => 
+                                `<option value="${cat.id}">${cat.icon} ${cat.label}</option>`
+                            ).join('')}
+                        </select>
+                        <select id="filterWgDifficulty" class="filter-select">
+                            <option value="">كل المستويات</option>
+                            <option value="easy">🟢 سهل</option>
+                            <option value="medium">🟡 متوسط</option>
+                            <option value="hard">🔴 صعب</option>
+                        </select>
+                        <select id="filterWgLength" class="filter-select">
+                            <option value="">كل الأحرف</option>
+                            <option value="4">4 أحرف</option>
+                            <option value="5">5 أحرف</option>
+                            <option value="6">6 أحرف</option>
+                            <option value="7">7 أحرف</option>
+                        </select>
+                    </div>
+                    <!-- ✅ شريط الأزرار الخاص بتخمين الكلمات -->
+                    <div class="actions-wrapper" style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+                        <button class="btn btn-primary" id="openAddWordGuess">
+                            <i class="fas fa-plus"></i> كلمة جديدة
+                        </button>
+                        <button class="btn btn-outline" id="refreshWordGuessBtn">
+                            <i class="fas fa-sync"></i> تحديث
+                        </button>
+                        <!-- ✅ زر الاستيراد هنا -->
+                        <button class="btn btn-success" id="importWordGuessBtn">
+                            <i class="fas fa-file-import"></i> استيراد كلمات
+                        </button>
+                    </div>
+                </div>
+
+                <!-- عرض الكلمات -->
+                <div id="wordGuessContainer">
+                    <div class="wordguess-grid" id="wordGuessGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;">
+                        <div class="text-gray text-center" style="padding:3rem;grid-column:1/-1;">
+                            <i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i>
+                            <p>جاري تحميل الكلمات...</p>
+                        </div>
+                    </div>
+                    <div class="pagination" id="wordGuessPagination"></div>
+                </div>
+
+                <!-- ✅ حاوية شريط تقدم الاستيراد -->
+                <div id="wordGuessImportProgress" style="display:none;margin-top:0.5rem;padding:0.8rem;background:var(--glass);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+                    <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--gray);">
+                        <span id="wgImportStatus">⏳ جاري الاستيراد...</span>
+                        <span id="wgImportProgressText">0%</span>
+                    </div>
+                    <div style="height:8px;background:var(--dark);border-radius:10px;overflow:hidden;margin-top:0.3rem;">
+                        <div id="wgImportProgressFill" style="height:100%;width:0%;background:linear-gradient(90deg, var(--primary), var(--accent));border-radius:10px;transition:width 0.3s ease;"></div>
+                    </div>
+                    <div style="display:flex;gap:0.5rem;font-size:0.65rem;color:var(--gray);margin-top:0.3rem;flex-wrap:wrap;">
+                        <span>✅ تم: <span id="wgImportAdded">0</span></span>
+                        <span>⏳ المتبقي: <span id="wgImportRemaining">0</span></span>
+                        <span>⚠️ تم تخطي: <span id="wgImportSkipped">0</span></span>
+                        <span>❌ أخطاء: <span id="wgImportErrors">0</span></span>
+                    </div>
+                    <div style="margin-top:0.3rem;display:flex;gap:0.3rem;flex-wrap:wrap;">
+                        <button class="btn btn-sm btn-danger" id="wgImportCancelBtn" style="display:none;font-size:0.65rem;padding:0.2rem 0.8rem;">
+                            <i class="fas fa-times"></i> إلغاء
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     `;
 },
@@ -20378,31 +22115,63 @@ _updateProfileChart(user) {
  * تهيئة واجهة الكلمات المتقاطعة
  */
 _initCrosswordUI() {
-    // ربط التبويبات
-    document.querySelectorAll('.questions-tab-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const tab = this.dataset.tab;
-            document.querySelectorAll('.questions-tab-btn').forEach(b => {
-                b.classList.remove('active');
-                b.style.background = 'transparent';
-                b.style.color = 'var(--gray)';
-            });
-            this.classList.add('active');
-            this.style.background = 'var(--primary)';
-            this.style.color = '#fff';
 
-            document.querySelectorAll('.questions-tab-content').forEach(el => {
-                el.style.display = 'none';
-            });
-            if (tab === 'normal') {
-                document.getElementById('questionsNormalTab').style.display = 'block';
-                App._renderQuestionsAdvanced();
-            } else {
-                document.getElementById('questionsCrosswordTab').style.display = 'block';
-                App._renderCrosswords();
-            }
+// داخل _initCrosswordUI، أضف معالجة التبويب الثالث
+document.querySelectorAll('.questions-tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const tab = this.dataset.tab;
+        document.querySelectorAll('.questions-tab-btn').forEach(b => {
+            b.classList.remove('active');
+            b.style.background = 'transparent';
+            b.style.color = 'var(--gray)';
         });
+        this.classList.add('active');
+        this.style.background = 'var(--primary)';
+        this.style.color = '#fff';
+
+        document.querySelectorAll('.questions-tab-content').forEach(el => {
+            el.style.display = 'none';
+        });
+        if (tab === 'normal') {
+            document.getElementById('questionsNormalTab').style.display = 'block';
+            App._renderQuestionsAdvanced();
+        } else if (tab === 'crossword') {
+            document.getElementById('questionsCrosswordTab').style.display = 'block';
+            App._renderCrosswords();
+        } else if (tab === 'wordguess') {
+            document.getElementById('questionsWordGuessTab').style.display = 'block';
+            App._renderWordGuess();
+        }
     });
+});
+
+// ربط أحداث الكلمات
+document.getElementById('openAddWordGuess')?.addEventListener('click', () => {
+    App._openWordGuessModal();
+});
+
+document.getElementById('refreshWordGuessBtn')?.addEventListener('click', () => {
+    App._renderWordGuess();
+});
+
+document.getElementById('searchWordGuess')?.addEventListener('input', debounce(() => {
+    App._renderWordGuess();
+}, 300));
+
+document.getElementById('filterWgCategory')?.addEventListener('change', () => {
+    App._renderWordGuess();
+});
+document.getElementById('filterWgDifficulty')?.addEventListener('change', () => {
+    App._renderWordGuess();
+});
+document.getElementById('filterWgLength')?.addEventListener('change', () => {
+    App._renderWordGuess();
+});
+
+// ربط نموذج الكلمات
+document.getElementById('wordGuessForm')?.addEventListener('submit', (e) => {
+    App._saveWordGuess(e);
+});
 
     // زر إضافة شبكة جديدة
     document.getElementById('openAddCrossword')?.addEventListener('click', () => {
@@ -24772,6 +26541,707 @@ async _fetchAdminUsers() {
     }
 },
 
+// ============================================================
+// دوال إدارة كلمات التخمين في بنك الأسئلة
+// ============================================================
+
+/**
+ * عرض جميع كلمات التخمين
+ */
+_renderWordGuess() {
+    const container = document.getElementById('wordGuessGrid');
+    if (!container) return;
+
+    const words = DataManager.data.wordGuess || [];
+
+    // ============================================================
+    // 1. تحديث الإحصائيات
+    // ============================================================
+    const statElements = {
+        total: document.getElementById('wgStatTotal'),
+        easy: document.getElementById('wgStatEasy'),
+        medium: document.getElementById('wgStatMedium'),
+        hard: document.getElementById('wgStatHard'),
+        letters: document.getElementById('wgStatLetters')
+    };
+
+    const easyCount = words.filter(w => w.difficulty === 'easy').length;
+    const mediumCount = words.filter(w => w.difficulty === 'medium').length;
+    const hardCount = words.filter(w => w.difficulty === 'hard').length;
+    const totalWords = words.length;
+    const avgLetters = totalWords > 0 ? Math.round(words.reduce((s, w) => s + w.word.length, 0) / totalWords) : 0;
+
+    if (statElements.total) statElements.total.textContent = totalWords;
+    if (statElements.easy) statElements.easy.textContent = easyCount;
+    if (statElements.medium) statElements.medium.textContent = mediumCount;
+    if (statElements.hard) statElements.hard.textContent = hardCount;
+    if (statElements.letters) statElements.letters.textContent = avgLetters;
+
+    // ============================================================
+    // 2. تطبيق البحث والفلترة
+    // ============================================================
+    const search = document.getElementById('searchWordGuess')?.value?.toLowerCase() || '';
+    const category = document.getElementById('filterWgCategory')?.value || '';
+    const difficulty = document.getElementById('filterWgDifficulty')?.value || '';
+    const length = document.getElementById('filterWgLength')?.value || '';
+
+    let filtered = words.filter(w => {
+        const matchSearch = w.word?.toLowerCase().includes(search) || false;
+        const matchCategory = category ? w.category === category : true;
+        const matchDifficulty = difficulty ? w.difficulty === difficulty : true;
+        const matchLength = length ? w.word.length === parseInt(length) : true;
+        return matchSearch && matchCategory && matchDifficulty && matchLength;
+    });
+
+    // ============================================================
+    // 3. تحديث شريط الأدوات (إضافة زر الاستيراد بشكل ثابت)
+    // ============================================================
+    const toolbar = document.querySelector('.questions-toolbar .actions-wrapper');
+    if (toolbar) {
+        // التأكد من وجود زر الاستيراد
+        let importBtn = toolbar.querySelector('#importWordGuessBtn');
+        if (!importBtn) {
+            importBtn = document.createElement('button');
+            importBtn.id = 'importWordGuessBtn';
+            importBtn.className = 'btn btn-success btn-sm';
+            importBtn.innerHTML = '<i class="fas fa-file-import"></i> استيراد كلمات';
+            importBtn.style.cssText = 'font-size:0.75rem;padding:4px 14px;min-height:32px;border-radius:30px;';
+            importBtn.title = 'استيراد كلمات من ملف JSON';
+            toolbar.appendChild(importBtn);
+        }
+        
+        // ✅ إزالة المستمعات القديمة وإضافة المستمع الجديد
+        const newImportBtn = importBtn.cloneNode(true);
+        importBtn.parentNode.replaceChild(newImportBtn, importBtn);
+        newImportBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('📥 زر الاستيراد تم الضغط عليه');
+            App._importWordGuess();
+        });
+
+        // التأكد من وجود زر التحديث
+        let refreshBtn = toolbar.querySelector('#refreshWordGuessBtn');
+        if (!refreshBtn) {
+            refreshBtn = document.createElement('button');
+            refreshBtn.id = 'refreshWordGuessBtn';
+            refreshBtn.className = 'btn btn-outline btn-sm';
+            refreshBtn.innerHTML = '<i class="fas fa-sync"></i> تحديث';
+            refreshBtn.style.cssText = 'font-size:0.75rem;padding:4px 14px;min-height:32px;border-radius:30px;';
+            toolbar.appendChild(refreshBtn);
+        }
+        const newRefreshBtn = refreshBtn.cloneNode(true);
+        refreshBtn.parentNode.replaceChild(newRefreshBtn, refreshBtn);
+        newRefreshBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            App._renderWordGuess();
+        });
+    }
+
+    // ============================================================
+    // 4. حاوية شريط تقدم الاستيراد
+    // ============================================================
+    let progressContainer = document.getElementById('wordGuessImportProgress');
+    if (!progressContainer) {
+        const containerEl = document.getElementById('wordGuessContainer');
+        if (containerEl) {
+            progressContainer = document.createElement('div');
+            progressContainer.id = 'wordGuessImportProgress';
+            progressContainer.style.cssText = 'display:none;margin-top:0.5rem;padding:0.8rem 1rem;background:var(--glass);border-radius:var(--radius-sm);border:1px solid var(--border-color);';
+            progressContainer.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;color:var(--gray);flex-wrap:wrap;gap:0.3rem;">
+                    <span id="wgImportStatus">⏳ جاري الاستيراد...</span>
+                    <span id="wgImportProgressText" style="font-weight:700;color:var(--accent);">0%</span>
+                </div>
+                <div style="height:8px;background:var(--dark);border-radius:10px;overflow:hidden;margin-top:0.3rem;">
+                    <div id="wgImportProgressFill" style="height:100%;width:0%;background:linear-gradient(90deg, var(--primary), var(--accent));border-radius:10px;transition:width 0.3s ease;"></div>
+                </div>
+                <div style="display:flex;gap:0.8rem;font-size:0.65rem;color:var(--gray);margin-top:0.3rem;flex-wrap:wrap;">
+                    <span>✅ تم: <strong id="wgImportAdded" style="color:var(--success);">0</strong></span>
+                    <span>⏳ المتبقي: <strong id="wgImportRemaining">0</strong></span>
+                    <span>⚠️ تم تخطي: <strong id="wgImportSkipped" style="color:var(--accent);">0</strong></span>
+                    <span>❌ أخطاء: <strong id="wgImportErrors" style="color:var(--secondary);">0</strong></span>
+                </div>
+                <div style="margin-top:0.3rem;">
+                    <button class="btn btn-sm btn-danger" id="wgImportCancelBtn" style="display:none;font-size:0.6rem;padding:0.15rem 0.8rem;border-radius:30px;">
+                        <i class="fas fa-times"></i> إلغاء
+                    </button>
+                </div>
+            `;
+            containerEl.appendChild(progressContainer);
+        }
+    }
+
+    // ============================================================
+    // 5. عرض حالة عدم وجود كلمات
+    // ============================================================
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state" style="grid-column:1/-1;text-align:center;padding:2.5rem 1rem;">
+                <i class="fas fa-keyboard" style="font-size:3rem;color:var(--gray-dark);display:block;margin-bottom:0.5rem;"></i>
+                <h3 style="font-size:1.2rem;font-weight:700;color:var(--light);">${words.length === 0 ? 'لا توجد كلمات' : 'لا توجد نتائج مطابقة'}</h3>
+                <p class="text-gray" style="font-size:0.9rem;">
+                    ${words.length === 0 ? 'أضف كلمتك الأولى باستخدام زر "كلمة جديدة" أو استورد كلمات من ملف JSON' : 'جرّب تغيير فلاتر البحث لعرض المزيد من النتائج'}
+                </p>
+                <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;margin-top:0.8rem;">
+                    <button class="btn btn-primary btn-sm" onclick="App._openWordGuessModal()" style="border-radius:30px;padding:0.3rem 1.2rem;">
+                        <i class="fas fa-plus"></i> كلمة جديدة
+                    </button>
+                    <button class="btn btn-success btn-sm" onclick="App._importWordGuess()" style="border-radius:30px;padding:0.3rem 1.2rem;">
+                        <i class="fas fa-file-import"></i> استيراد كلمات
+                    </button>
+                    ${words.length > 0 ? `
+                        <button class="btn btn-outline btn-sm" onclick="App._resetWordGuessFilters()" style="border-radius:30px;padding:0.3rem 1.2rem;">
+                            <i class="fas fa-undo"></i> إعادة تعيين الفلاتر
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    // ============================================================
+    // 6. عرض الكلمات
+    // ============================================================
+    const canEdit = AuthService.checkPermission('editor') || AuthService.currentUser?.adminRole === 'question';
+    const diffColors = { easy: 'var(--success)', medium: 'var(--accent)', hard: 'var(--secondary)' };
+    const diffLabels = { easy: '🟢 سهل', medium: '🟡 متوسط', hard: '🔴 صعب' };
+    const diffIcons = { easy: '🟢', medium: '🟡', hard: '🔴' };
+
+    let html = '';
+    filtered.forEach((w, index) => {
+        const word = w.word || '';
+        const wordLength = word.length;
+        const categoryInfo = WORD_CATEGORIES.find(c => c.id === w.category);
+        const categoryLabel = categoryInfo ? `${categoryInfo.icon} ${categoryInfo.label}` : w.category || 'عام';
+        const isEven = index % 2 === 0;
+
+        html += `
+            <div class="card wordguess-card" style="padding:0.8rem 1rem;display:flex;flex-direction:column;gap:0.4rem;background:${isEven ? 'var(--card-bg)' : 'var(--glass)'};border:1px solid var(--border-color);border-radius:var(--radius-sm);transition:all 0.2s ease;">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.3rem;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <span style="font-weight:800;font-size:1.2rem;color:var(--accent);direction:ltr;">${word}</span>
+                        <span style="font-size:0.65rem;color:var(--gray);background:var(--dark);padding:0.05rem 0.5rem;border-radius:30px;">${wordLength} حروف</span>
+                    </div>
+                    <div style="display:flex;gap:0.3rem;flex-wrap:wrap;">
+                        <span class="badge" style="background:${diffColors[w.difficulty] || 'var(--gray)'};color:#fff;font-size:0.6rem;padding:0.1rem 0.6rem;">
+                            ${diffIcons[w.difficulty] || '📊'} ${diffLabels[w.difficulty] || w.difficulty}
+                        </span>
+                        <span class="badge" style="background:var(--glass);color:var(--gray);font-size:0.6rem;padding:0.1rem 0.6rem;border:1px solid var(--glass-border);">
+                            🎯 ${w.attempts || 6}
+                        </span>
+                    </div>
+                </div>
+                <div style="display:flex;gap:0.5rem;font-size:0.75rem;color:var(--gray);flex-wrap:wrap;">
+                    <span>📚 ${categoryLabel}</span>
+                    ${w.hint ? `<span>💡 ${w.hint}</span>` : ''}
+                    ${w.clue ? `<span>📝 ${w.clue}</span>` : ''}
+                </div>
+                <div style="display:flex;gap:0.3rem;flex-wrap:wrap;margin-top:0.2rem;padding-top:0.2rem;border-top:1px solid var(--glass-border);">
+                    <button class="btn btn-xs btn-outline" onclick="App._previewWordGuess('${w.id}')" style="font-size:0.55rem;padding:0.1rem 0.5rem;border-radius:30px;">
+                        <i class="fas fa-eye"></i> معاينة
+                    </button>
+                    ${canEdit ? `
+                        <button class="btn btn-xs btn-primary" onclick="App._editWordGuess('${w.id}')" style="font-size:0.55rem;padding:0.1rem 0.5rem;border-radius:30px;">
+                            <i class="fas fa-edit"></i> تعديل
+                        </button>
+                        <button class="btn btn-xs btn-danger" onclick="App._deleteWordGuess('${w.id}')" style="font-size:0.55rem;padding:0.1rem 0.5rem;border-radius:30px;">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+
+    // ============================================================
+    // 7. تحديث عداد النتائج
+    // ============================================================
+    const resultsBadge = document.getElementById('wgResultsCount');
+    if (resultsBadge) {
+        resultsBadge.textContent = `(${filtered.length} كلمة)`;
+    }
+},
+
+/**
+ * إعادة تعيين فلاتر البحث في تبويب تخمين الكلمات
+ */
+_resetWordGuessFilters() {
+    const search = document.getElementById('searchWordGuess');
+    const category = document.getElementById('filterWgCategory');
+    const difficulty = document.getElementById('filterWgDifficulty');
+    const length = document.getElementById('filterWgLength');
+
+    if (search) search.value = '';
+    if (category) category.value = '';
+    if (difficulty) difficulty.value = '';
+    if (length) length.value = '';
+
+    this._renderWordGuess();
+    showToast('✅ تم إعادة تعيين الفلاتر', 'success', 1500);
+},
+
+/**
+ * استيراد كلمات التخمين من ملف JSON مع شريط تقدم
+ */
+_importWordGuess() {
+    console.log('📥 _importWordGuess() called');
+    
+    // ✅ إنشاء input file مخفي
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+
+    // ✅ ربط حدث التغيير
+    input.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        console.log('📄 File selected:', file?.name);
+        
+        if (!file) {
+            console.log('⚠️ No file selected');
+            return;
+        }
+
+        // ✅ إظهار شريط التقدم
+        this._showWordGuessImportProgress(true);
+
+        try {
+            const text = await file.text();
+            const data = JSON.parse(text);
+
+            // التحقق من صحة التنسيق
+            if (!data.words || !Array.isArray(data.words)) {
+                showToast('❌ تنسيق الملف غير صحيح. يجب أن يحتوي على مصفوفة words', 'error');
+                this._showWordGuessImportProgress(false);
+                return;
+            }
+
+            const total = data.words.length;
+            if (total === 0) {
+                showToast('⚠️ الملف لا يحتوي على كلمات', 'info');
+                this._showWordGuessImportProgress(false);
+                return;
+            }
+
+            // تأكيد الاستيراد
+            if (!confirm(`⚠️ هل أنت متأكد من استيراد ${total} كلمة؟\nسيتم إضافة الكلمات الجديدة فقط (غير الموجودة مسبقاً).`)) {
+                this._showWordGuessImportProgress(false);
+                return;
+            }
+
+            // ✅ تحديث شريط التقدم
+            this._updateWordGuessImportProgress({
+                status: '⏳ جاري الاستيراد...',
+                progress: 0,
+                added: 0,
+                remaining: total,
+                skipped: 0,
+                errors: 0,
+                total: total
+            });
+
+            // ✅ إظهار زر الإلغاء
+            const cancelBtn = document.getElementById('wgImportCancelBtn');
+            if (cancelBtn) {
+                cancelBtn.style.display = 'inline-flex';
+                cancelBtn.onclick = () => {
+                    this._wordGuessImportCancelled = true;
+                    showToast('⏹️ تم إلغاء الاستيراد', 'info');
+                };
+            }
+
+            let addedCount = 0;
+            let skippedCount = 0;
+            let errorCount = 0;
+
+            // جلب الكلمات الموجودة مسبقاً
+            const existingWords = DataManager.data.wordGuess || [];
+            const existingSet = new Set(existingWords.map(w => w.word.toUpperCase()));
+
+            // ✅ معالجة الكلمات على دفعات
+            const batchSize = 10;
+            let processed = 0;
+            let cancelled = false;
+
+            const processBatch = async (startIndex) => {
+                if (this._wordGuessImportCancelled) {
+                    cancelled = true;
+                    return;
+                }
+
+                const endIndex = Math.min(startIndex + batchSize, total);
+                const batch = data.words.slice(startIndex, endIndex);
+
+                for (const w of batch) {
+                    if (this._wordGuessImportCancelled) {
+                        cancelled = true;
+                        break;
+                    }
+
+                    try {
+                        if (!w.word || w.word.trim() === '') {
+                            skippedCount++;
+                            continue;
+                        }
+
+                        const wordUpper = w.word.trim().toUpperCase();
+
+                        // تخطي الكلمات الموجودة
+                        if (existingSet.has(wordUpper)) {
+                            skippedCount++;
+                            continue;
+                        }
+
+                        // بناء بيانات الكلمة
+                        const wordData = {
+                            word: wordUpper,
+                            category: w.category || 'general',
+                            difficulty: w.difficulty || 'medium',
+                            attempts: parseInt(w.attempts) || 6,
+                            hint: w.hint || '',
+                            clue: w.clue || '',
+                            createdAt: new Date().toISOString()
+                        };
+
+                        // إضافة إلى Firestore
+                        await DataManager.add('wordGuess', wordData);
+                        addedCount++;
+                        existingSet.add(wordUpper);
+
+                    } catch (err) {
+                        console.warn('⚠️ خطأ في إضافة كلمة:', w.word, err);
+                        errorCount++;
+                    }
+
+                    processed++;
+
+                    // ✅ تحديث شريط التقدم بعد كل كلمة
+                    const progress = Math.round((processed / total) * 100);
+                    this._updateWordGuessImportProgress({
+                        status: `⏳ جاري الاستيراد... ${processed}/${total}`,
+                        progress: progress,
+                        added: addedCount,
+                        remaining: total - processed,
+                        skipped: skippedCount,
+                        errors: errorCount,
+                        total: total
+                    });
+
+                    // تأخير بسيط لتحديث الواجهة
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+
+                // إذا لم ننتهِ ولم يتم الإلغاء، نعالج الدفعة التالية
+                if (processed < total && !cancelled) {
+                    await processBatch(endIndex);
+                }
+            };
+
+            // بدء المعالجة
+            await processBatch(0);
+
+            // ✅ إخفاء زر الإلغاء
+            if (cancelBtn) {
+                cancelBtn.style.display = 'none';
+            }
+
+            // إعادة تحميل البيانات وعرضها
+            await DataManager.loadAll();
+            this._renderWordGuess();
+
+            // ✅ تحديث شريط التقدم إلى 100%
+            if (cancelled) {
+                this._updateWordGuessImportProgress({
+                    status: '⏹️ تم الإلغاء',
+                    progress: 100,
+                    added: addedCount,
+                    remaining: total - processed,
+                    skipped: skippedCount,
+                    errors: errorCount,
+                    total: total,
+                    isCancelled: true
+                });
+                showToast(`⏹️ تم إلغاء الاستيراد. تم استيراد ${addedCount} كلمة`, 'info', 3000);
+            } else {
+                this._updateWordGuessImportProgress({
+                    status: '✅ اكتمل الاستيراد!',
+                    progress: 100,
+                    added: addedCount,
+                    remaining: 0,
+                    skipped: skippedCount,
+                    errors: errorCount,
+                    total: total,
+                    isComplete: true
+                });
+                showToast(`✅ تم استيراد ${addedCount} كلمة جديدة، تم تخطي ${skippedCount} كلمة، ${errorCount} خطأ`, 'success', 5000);
+            }
+
+            // ✅ إخفاء شريط التقدم بعد 3 ثوانٍ
+            setTimeout(() => {
+                this._showWordGuessImportProgress(false);
+            }, 3000);
+
+        } catch (error) {
+            console.error('❌ خطأ في الاستيراد:', error);
+            showToast('❌ فشل الاستيراد: ' + error.message, 'error');
+            this._showWordGuessImportProgress(false);
+        }
+
+        // تنظيف
+        input.remove();
+        this._wordGuessImportCancelled = false;
+    });
+
+    // ✅ فتح نافذة اختيار الملف (تأكد من أنها تعمل)
+    console.log('📂 Opening file picker...');
+    input.click();
+},
+
+/**
+ * إظهار/إخفاء شريط تقدم استيراد الكلمات
+ */
+_showWordGuessImportProgress(show) {
+    const container = document.getElementById('wordGuessImportProgress');
+    if (container) {
+        container.style.display = show ? 'block' : 'none';
+    }
+},
+
+/**
+ * تحديث شريط تقدم استيراد الكلمات
+ */
+_updateWordGuessImportProgress(data) {
+    const fill = document.getElementById('wgImportProgressFill');
+    const text = document.getElementById('wgImportProgressText');
+    const status = document.getElementById('wgImportStatus');
+    const added = document.getElementById('wgImportAdded');
+    const remaining = document.getElementById('wgImportRemaining');
+    const skipped = document.getElementById('wgImportSkipped');
+    const errors = document.getElementById('wgImportErrors');
+
+    if (fill) fill.style.width = Math.min(data.progress, 100) + '%';
+    if (text) text.textContent = Math.min(data.progress, 100) + '%';
+    if (status) {
+        if (data.isComplete) {
+            status.textContent = '✅ اكتمل الاستيراد!';
+            status.style.color = 'var(--success)';
+        } else if (data.isCancelled) {
+            status.textContent = '⏹️ تم إلغاء الاستيراد';
+            status.style.color = 'var(--secondary)';
+        } else {
+            status.textContent = data.status || `⏳ جاري الاستيراد... ${data.progress}%`;
+            status.style.color = 'var(--gray)';
+        }
+    }
+    if (added) added.textContent = data.added || 0;
+    if (remaining) remaining.textContent = data.remaining || 0;
+    if (skipped) skipped.textContent = data.skipped || 0;
+    if (errors) errors.textContent = data.errors || 0;
+
+    // تغيير لون شريط التقدم عند الاكتمال أو الإلغاء
+    if (fill) {
+        if (data.isComplete) {
+            fill.style.background = 'linear-gradient(90deg, var(--success), var(--accent))';
+        } else if (data.isCancelled) {
+            fill.style.background = 'linear-gradient(90deg, var(--secondary), var(--accent))';
+        } else {
+            fill.style.background = 'linear-gradient(90deg, var(--primary), var(--accent))';
+        }
+    }
+},
+
+/**
+ * معاينة كلمة
+ */
+_previewWordGuess(id) {
+    const words = DataManager.data.wordGuess || [];
+    const word = words.find(w => w.id === id);
+    if (!word) {
+        showToast('الكلمة غير موجودة', 'error');
+        return;
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay open';
+    modal.innerHTML = `
+        <div class="modal-card" style="max-width:400px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-keyboard" style="color:var(--accent);"></i> معاينة الكلمة</h3>
+                <button class="modal-close-btn" onclick="this.closest('.modal-overlay').remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div style="text-align:center;padding:1rem;">
+                <div style="font-size:2.5rem;font-weight:900;color:var(--accent);direction:ltr;letter-spacing:4px;">
+                    ${word.word}
+                </div>
+                <div style="margin-top:0.5rem;display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap;">
+                    <span class="badge" style="background:${word.difficulty === 'easy' ? 'var(--success)' : word.difficulty === 'medium' ? 'var(--accent)' : 'var(--secondary)'};color:#fff;">
+                        ${word.difficulty === 'easy' ? '🟢 سهل' : word.difficulty === 'medium' ? '🟡 متوسط' : '🔴 صعب'}
+                    </span>
+                    <span class="badge badge-info">📚 ${word.category}</span>
+                    <span class="badge">🔤 ${word.word.length} أحرف</span>
+                    <span class="badge">🎯 ${word.attempts || 6} محاولات</span>
+                </div>
+                ${word.hint ? `<div style="margin-top:0.5rem;color:var(--gray);">💡 ${word.hint}</div>` : ''}
+                ${word.clue ? `<div style="color:var(--gray);font-size:0.85rem;">📝 ${word.clue}</div>` : ''}
+                <div style="margin-top:1rem;display:flex;justify-content:center;">
+                    <button class="btn btn-success" onclick="this.closest('.modal-overlay').remove(); WordGuessEngine.start({word: '${word.word}', category: '${word.category}', difficulty: '${word.difficulty}', attempts: ${word.attempts || 6}}, 'wordguess_training');">
+                        <i class="fas fa-play"></i> تجربة اللعبة
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+},
+
+/**
+ * فتح مودال إضافة/تعديل كلمة
+ */
+_openWordGuessModal(data = null) {
+    if (!AuthService.checkPermission('editor') && !AuthService.currentUser?.adminRole === 'question') {
+        showToast('ليس لديك صلاحية', 'error');
+        return;
+    }
+
+    const modal = document.getElementById('wordGuessModal');
+    const form = document.getElementById('wordGuessForm');
+    const titleEl = document.getElementById('wordGuessModalTitle');
+    const idInput = document.getElementById('wgFormId');
+
+    form.reset();
+    idInput.value = '';
+
+    if (data) {
+        titleEl.textContent = '✏️ تعديل كلمة';
+        idInput.value = data.id;
+        document.getElementById('wgWord').value = data.word || '';
+        document.getElementById('wgCategory').value = data.category || 'animals';
+        document.getElementById('wgDifficulty').value = data.difficulty || 'medium';
+        document.getElementById('wgAttempts').value = data.attempts || 6;
+        document.getElementById('wgHint').value = data.hint || '';
+        document.getElementById('wgClue').value = data.clue || '';
+        this._updateWordGuessSummary();
+    } else {
+        titleEl.textContent = '🆕 إضافة كلمة جديدة';
+        document.getElementById('wgWord').value = '';
+        document.getElementById('wgCategory').value = 'animals';
+        document.getElementById('wgDifficulty').value = 'medium';
+        document.getElementById('wgAttempts').value = 6;
+        document.getElementById('wgHint').value = '';
+        document.getElementById('wgClue').value = '';
+        this._updateWordGuessSummary();
+    }
+
+    // ربط الأحداث
+    document.getElementById('wgWord').addEventListener('input', () => this._updateWordGuessSummary());
+    document.getElementById('wgAttempts').addEventListener('change', () => this._updateWordGuessSummary());
+
+    App._openModal('wordGuessModal');
+},
+
+/**
+ * تحديث ملخص الكلمة
+ */
+_updateWordGuessSummary() {
+    const word = document.getElementById('wgWord').value.trim();
+    const attempts = document.getElementById('wgAttempts').value || 6;
+    const summaryEl = document.getElementById('wgSummary');
+    if (summaryEl) {
+        summaryEl.textContent = `الطول: ${word.length} أحرف • المحاولات: ${attempts}`;
+    }
+},
+
+/**
+ * حفظ كلمة التخمين
+ */
+async _saveWordGuess(e) {
+    e.preventDefault();
+
+    const id = document.getElementById('wgFormId').value;
+    const word = document.getElementById('wgWord').value.trim().toUpperCase();
+    const category = document.getElementById('wgCategory').value;
+    const difficulty = document.getElementById('wgDifficulty').value;
+    const attempts = parseInt(document.getElementById('wgAttempts').value) || 6;
+    const hint = document.getElementById('wgHint').value.trim();
+    const clue = document.getElementById('wgClue').value.trim();
+
+    if (!word || word.length < 3 || word.length > 8) {
+        showToast('⚠️ الكلمة يجب أن تكون بين 3 و 8 أحرف', 'error');
+        return;
+    }
+
+    // التحقق من عدم وجود كلمة مكررة
+    const words = DataManager.data.wordGuess || [];
+    const exists = words.some(w => w.word === word && w.id !== id);
+    if (exists) {
+        showToast('⚠️ هذه الكلمة موجودة بالفعل', 'error');
+        return;
+    }
+
+    const data = {
+        word: word,
+        category: category,
+        difficulty: difficulty,
+        attempts: attempts,
+        hint: hint || null,
+        clue: clue || null,
+        updatedAt: new Date().toISOString()
+    };
+
+    try {
+        if (id) {
+            await DataManager.update('wordGuess', id, data);
+            showToast('✅ تم تحديث الكلمة', 'success');
+        } else {
+            await DataManager.add('wordGuess', data);
+            showToast('✅ تم إضافة الكلمة', 'success');
+        }
+        App._closeModal('wordGuessModal');
+        // ✅ إعادة تحميل البيانات من Firestore لتحديث القائمة
+        await DataManager.loadAll();
+        App._renderWordGuess();
+        App._refreshAllData();
+    } catch (err) {
+        console.error('Error saving word guess:', err);
+        showToast('❌ خطأ: ' + err.message, 'error');
+    }
+},
+/**
+ * تعديل كلمة
+ */
+_editWordGuess(id) {
+    const words = DataManager.data.wordGuess || [];
+    const word = words.find(w => w.id === id);
+    if (!word) {
+        showToast('الكلمة غير موجودة', 'error');
+        return;
+    }
+    this._openWordGuessModal(word);
+},
+
+/**
+ * حذف كلمة
+ */
+async _deleteWordGuess(id) {
+    if (!confirm('هل أنت متأكد من حذف هذه الكلمة؟')) return;
+    try {
+        await DataManager.delete('wordGuess', id);
+        showToast('✅ تم حذف الكلمة', 'success');
+        this._renderWordGuess();
+        this._refreshAllData();
+    } catch (err) {
+        showToast('❌ خطأ: ' + err.message, 'error');
+    }
+},
+
 /**
  * عرض رسالة تسجيل الدخول
  */
@@ -25757,15 +28227,17 @@ _renderAchievementsManagement() {
     let html = `
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
             <h4><i class="fas fa-list"></i> قائمة الإنجازات (${allAchievements.length})</h4>
-            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-                <button class="btn btn-primary btn-sm" onclick="App._openAddAchievementModal()">
-                    <i class="fas fa-plus"></i> إضافة إنجاز
-                </button>
-                <button class="btn btn-outline btn-sm" onclick="App._syncAchievementsToFirestore()">
-                    <i class="fas fa-sync"></i> مزامنة الكل
-                </button>
-            </div>
-        </div>
+<div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+    <button class="btn btn-primary btn-sm" onclick="App._openAddAchievementModal()">
+        <i class="fas fa-plus"></i> إضافة إنجاز
+    </button>
+    <button class="btn btn-success btn-sm" onclick="App._importAchievements()">
+        <i class="fas fa-file-import"></i> استيراد إنجازات
+    </button>
+    <button class="btn btn-outline btn-sm" onclick="App._syncAchievementsToFirestore()">
+        <i class="fas fa-sync"></i> مزامنة الكل
+    </button>
+</div>
         
         <!-- ✅ فلاتر الإنجازات -->
         <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;padding:0.8rem;background:var(--glass);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
@@ -28188,6 +30660,25 @@ _getBadgeIcon(badgeId) {
     return icons[badgeId] || '🏅';
 },
 
+/**
+ * فتح تبويب تخمين الكلمات في بنك الأسئلة
+ */
+_openWordGuessTab() {
+    this._activateSection('questions');
+    setTimeout(() => {
+        const tab = document.querySelector('.questions-tab-btn[data-tab="wordguess"]');
+        if (tab) {
+            tab.click();
+        } else {
+            // إذا لم يتم العثور على التبويب، ننتظر قليلاً ونحاول مرة أخرى
+            setTimeout(() => {
+                const tab2 = document.querySelector('.questions-tab-btn[data-tab="wordguess"]');
+                if (tab2) tab2.click();
+            }, 300);
+        }
+    }, 200);
+},
+
 // ============================================================
 // تفعيل القسم المحدد
 // ============================================================
@@ -28195,22 +30686,39 @@ _getBadgeIcon(badgeId) {
 _activateSection(id) {
     this.currentSection = id;
     
+    // ✅ إضافة معالجة خاصة لتبويب questions
+    if (id === 'questions') {
+        // إظهار قسم الأسئلة وإخفاء الباقي
+        document.querySelectorAll('.section').forEach(el => {
+            el.classList.toggle('active', el.id === `section-${id}`);
+        });
+        
+        // إظهار/إخفاء زر العودة
+        const backBtns = document.querySelectorAll('.back-to-home');
+        backBtns.forEach(btn => btn.style.display = 'inline-flex');
+        
+        // ✅ عرض تبويب الأسئلة العادية افتراضياً
+        setTimeout(() => {
+            const normalTab = document.querySelector('.questions-tab-btn[data-tab="normal"]');
+            if (normalTab) {
+                normalTab.click();
+            }
+            this._renderQuestionsAdvanced();
+        }, 100);
+        return;
+    }
+    
+    // ===== معالجة باقي الأقسام =====
     document.querySelectorAll('.section').forEach(el => {
         el.classList.toggle('active', el.id === `section-${id}`);
     });
 
-    // ===== إظهار/إخفاء زر العودة =====
+    // إظهار/إخفاء زر العودة
     const backBtns = document.querySelectorAll('.back-to-home');
     if (id === 'dashboard') {
         backBtns.forEach(btn => btn.style.display = 'none');
     } else {
         backBtns.forEach(btn => btn.style.display = 'inline-flex');
-        document.querySelectorAll('.section').forEach(el => {
-            const backBtn = el.querySelector('.back-to-home');
-            if (backBtn) {
-                backBtn.style.display = el.classList.contains('active') ? 'inline-flex' : 'none';
-            }
-        });
     }
 
     // ===== معالجة الأقسام الخاصة =====
@@ -28231,10 +30739,6 @@ _activateSection(id) {
         waitForContainer();
         return;
     }
-
-    // ===== قسم التحليلات =====
-    // ✅ تم إزالة التحويل إلى صفحة الإحصائيات المنفصلة
-    // الإحصائيات تعرض ضمن الملف الشخصي
 
     if (id === 'multiplayer') {
         this._refreshMultiplayerGames();
@@ -28265,8 +30769,10 @@ _activateSection(id) {
     }
     if (id === 'game') {
         this._updateGameSettingsDisplay();
-        document.getElementById('gameStartScreen').style.display = 'block';
-        document.getElementById('gamePlayScreen').style.display = 'none';
+        const startScreen = document.getElementById('gameStartScreen');
+        if (startScreen) startScreen.style.display = 'block';
+        const playScreen = document.getElementById('gamePlayScreen');
+        if (playScreen) playScreen.style.display = 'none';
     }
     if (id === 'profile') {
         const user = AuthService.currentUser;
@@ -28274,6 +30780,18 @@ _activateSection(id) {
             this._updateProfileTabContent(user);
         }
     }
+    if (id === 'achievements') {
+        this._renderAchievements();
+    }
+    if (id === 'settings') {
+        // تحديث إعدادات المستخدم
+        const user = AuthService.currentUser;
+        if (user) {
+            const settingsUser = document.getElementById('settingsCurrentUser');
+            if (settingsUser) settingsUser.textContent = user.displayName || user.username || 'مستخدم';
+        }
+    }
+    
     // ✅ بعد تغيير القسم، أعد تطبيق التخصيصات
     if (id === 'friends' || id === 'profile' || id === 'dashboard') {
         setTimeout(() => {
@@ -28593,8 +31111,37 @@ document.getElementById('searchQuestion')?.addEventListener('input', debounce(()
     App._renderQuestionsAdvanced();
 }, 300));
 
-document.getElementById('importQuestionsBtn')?.addEventListener('click', () => {
-    document.getElementById('importQuestionsFile').click();
+// في _setupUI أو مكان ربط الأحداث، ابحث عن هذا الكود واستبدله:
+
+// ===== زر استيراد الأسئلة العادية =====
+document.getElementById('importQuestionsBtn')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('📥 زر استيراد الأسئلة العادية تم الضغط عليه');
+    
+    const fileInput = document.getElementById('importQuestionsFile');
+    if (!fileInput) {
+        console.error('❌ importQuestionsFile not found, creating one...');
+        // إنشاء الإدخال إذا لم يكن موجوداً
+        const newInput = document.createElement('input');
+        newInput.type = 'file';
+        newInput.id = 'importQuestionsFile';
+        newInput.accept = '.json,.csv';
+        newInput.style.display = 'none';
+        document.body.appendChild(newInput);
+        newInput.click();
+        
+        // ربط الحدث بعد الإنشاء
+        newInput.addEventListener('change', function(e) {
+            if (e.target.files[0]) {
+                App._importQuestions(e.target.files[0]);
+            }
+            e.target.value = '';
+        });
+        return;
+    }
+    
+    fileInput.click();
 });
 
 document.getElementById('importQuestionsFile')?.addEventListener('change', (e) => {
@@ -29019,21 +31566,38 @@ document.getElementById('emptyAddQuestion')?.addEventListener('click', () => {
     document.getElementById('openAddQuestion').click();
 });
 
-// استيراد
-document.getElementById('importQuestionsBtn')?.addEventListener('click', () => {
-    document.getElementById('importQuestionsFile').click();
-});
-document.getElementById('importQuestionsFile')?.addEventListener('change', (e) => {
-    if (e.target.files[0]) {
-        App._importQuestions(e.target.files[0]);
-    }
-    e.target.value = '';
-});
-
 // تصدير
 document.getElementById('exportQuestionsBtn')?.addEventListener('click', () => {
     App._exportQuestions();
 });
+
+// ===== زر استيراد تخمين الكلمات =====
+document.getElementById('importWordGuessBtn')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('📥 زر استيراد تخمين الكلمات تم الضغط عليه');
+    
+    // استدعاء دالة الاستيراد مباشرة
+    App._importWordGuess();
+});
+
+// ===== بديل: إذا لم يعمل الزر، استخدم حدث النقر المباشر =====
+// هذا ينفذ عند تحميل الصفحة للتأكد من ربط الزر
+setTimeout(() => {
+    const importBtn = document.getElementById('importWordGuessBtn');
+    if (importBtn) {
+        // إزالة أي مستمعات قديمة
+        const newBtn = importBtn.cloneNode(true);
+        importBtn.parentNode.replaceChild(newBtn, importBtn);
+        
+        newBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('📥 زر استيراد التخمين (مباشر)');
+            App._importWordGuess();
+        });
+    }
+}, 1000);
 
 // عند فتح مودال السؤال، تأكد من تحديث النوع
 document.getElementById('openAddQuestion')?.addEventListener('click', () => {
@@ -29450,6 +32014,101 @@ document.getElementById('questionForm')?.addEventListener('submit', async (e) =>
             }
         });
     },
+
+/**
+ * استيراد إنجازات من ملف JSON
+ */
+_importAchievements() {
+    // إنشاء input file مخفي
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+
+    input.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            const text = await file.text();
+            const data = JSON.parse(text);
+
+            // التحقق من صحة التنسيق
+            if (!data.achievements || !Array.isArray(data.achievements)) {
+                showToast('❌ تنسيق الملف غير صحيح. يجب أن يحتوي على مصفوفة achievements', 'error');
+                return;
+            }
+
+            // تأكيد الاستيراد
+            const count = data.achievements.length;
+            if (!confirm(`⚠️ هل أنت متأكد من استيراد ${count} إنجاز؟\nسيتم إضافة الإنجازات الجديدة فقط (غير الموجودة مسبقاً).`)) {
+                return;
+            }
+
+            showToast(`⏳ جاري استيراد ${count} إنجاز...`, 'info');
+
+            let addedCount = 0;
+            let skippedCount = 0;
+
+            // جلب الإنجازات الموجودة مسبقاً
+            const snapshot = await db.collection('achievementDefinitions').get();
+            const existingIds = new Set();
+            snapshot.forEach(doc => existingIds.add(doc.id));
+
+            // استيراد كل إنجاز
+            for (const ach of data.achievements) {
+                // التحقق من وجود المعرف
+                if (!ach.id) {
+                    console.warn('⚠️ إنجاز بدون معرف، تم تخطيه:', ach);
+                    skippedCount++;
+                    continue;
+                }
+
+                // تخطي الإنجازات الموجودة
+                if (existingIds.has(ach.id)) {
+                    skippedCount++;
+                    continue;
+                }
+
+                // بناء بيانات الإنجاز
+                const achievementData = {
+                    id: ach.id,
+                    name: ach.name || 'إنجاز',
+                    description: ach.description || '',
+                    category: ach.category || 'عام',
+                    pointsReward: parseInt(ach.pointsReward) || parseInt(ach.points) || 10,
+                    coinsReward: parseInt(ach.coinsReward) || parseInt(ach.coins) || 20,
+                    image: ach.image || 'images/achievements/default.png',
+                    checkLogic: ach.checkLogic || null,
+                    isActive: ach.isActive !== false,
+                    rarity: ach.rarity || 'common',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                // إضافة إلى Firestore
+                await db.collection('achievementDefinitions').doc(ach.id).set(achievementData);
+                addedCount++;
+            }
+
+            // إعادة تحميل الإنجازات
+            await AchievementManager.loadDefinitions();
+            this._renderAchievementsManagement();
+
+            showToast(`✅ تم استيراد ${addedCount} إنجاز جديد، تم تخطي ${skippedCount} إنجاز موجود`, 'success', 5000);
+
+        } catch (error) {
+            console.error('❌ خطأ في الاستيراد:', error);
+            showToast('❌ فشل الاستيراد: ' + error.message, 'error');
+        }
+
+        // تنظيف
+        input.remove();
+    });
+
+    // فتح نافذة اختيار الملف
+    input.click();
+},
 
 _setupAuthHandlers() {
     console.log('🔐 Setting up auth handlers...');
@@ -30624,11 +33283,41 @@ _setupProfileHandlers: function() {
     };
 },
 
+async _syncAchievementsWithUser() {
+    const user = AuthService.currentUser;
+    if (!user) return;
+
+    try {
+        // ✅ تحميل تعريفات الإنجازات من Firestore
+        await AchievementManager.loadDefinitions();
+        
+        // ✅ مزامنة الإنجازات المفتوحة مع المستخدم
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+            const data = userDoc.data();
+            const userAchievements = data.achievements || [];
+            
+            // ✅ تحديث AchievementManager
+            AchievementManager._unlockedAchievements = userAchievements;
+            localStorage.setItem('achievements_unlocked', JSON.stringify(userAchievements));
+            
+            if (data.achievementData) {
+                AchievementManager._data = data.achievementData;
+                localStorage.setItem('achievement_data', JSON.stringify(data.achievementData));
+            }
+            
+            console.log(`✅ Synced ${userAchievements.length} achievements for user`);
+        }
+    } catch (e) {
+        console.warn('⚠️ Could not sync achievements:', e);
+    }
+},
+
 // ============================================================
 // عرض الإنجازات في تبويب الملف الشخصي
 // ============================================================
 
-_renderProfileAchievements: function() {
+_renderProfileAchievements: async function() {
     const container = document.getElementById('profileAchievementsGrid');
     if (!container) return;
     
@@ -30638,7 +33327,23 @@ _renderProfileAchievements: function() {
         return;
     }
     
-    // استخدام AchievementManager
+    // ✅ عرض رسالة تحميل
+    container.innerHTML = `
+        <div style="text-align:center;padding:2rem;color:var(--gray);">
+            <i class="fas fa-spinner fa-spin" style="font-size:1.5rem;display:block;margin-bottom:0.5rem;"></i>
+            جاري تحميل الإنجازات...
+        </div>
+    `;
+    
+    // ✅ تحميل تعريفات الإنجازات من Firestore (إذا لم تكن محملة)
+    if (!AchievementManager._loaded) {
+        await AchievementManager.loadDefinitions();
+    }
+    
+    // ✅ تحديث قائمة الإنجازات المفتوحة من المستخدم
+    await AchievementManager._syncUserAchievements(user.uid);
+    
+    // ✅ الحصول على جميع الإنجازات (بما فيها المستوردة)
     const allAchievements = AchievementManager.getAllAchievements();
     const unlocked = allAchievements.filter(a => a.unlocked);
     
@@ -30651,25 +33356,248 @@ _renderProfileAchievements: function() {
     if (badge) badge.textContent = unlocked.length;
     
     if (allAchievements.length === 0) {
-        container.innerHTML = '<div class="text-gray">لا توجد إنجازات</div>';
+        container.innerHTML = `
+            <div style="text-align:center;padding:2rem;color:var(--gray);">
+                <i class="fas fa-trophy" style="font-size:2rem;color:var(--gray-dark);display:block;margin-bottom:0.5rem;"></i>
+                <p>لا توجد إنجازات حالياً</p>
+                <button class="btn btn-sm btn-primary mt-1" onclick="App._renderProfileAchievements()">
+                    <i class="fas fa-sync"></i> تحديث
+                </button>
+            </div>
+        `;
         return;
     }
     
-    // تصنيف الإنجازات حسب الفئة
+    // ✅ حساب الإحصائيات
+    const totalAchievements = allAchievements.length;
+    const unlockedCount = unlocked.length;
+    const totalPoints = unlocked.reduce((sum, a) => sum + (a.pointsReward || a.points || 0), 0);
+    const totalCoins = unlocked.reduce((sum, a) => sum + (a.coinsReward || a.coins || 0), 0);
+    const progressPercent = totalAchievements > 0 ? Math.round((unlockedCount / totalAchievements) * 100) : 0;
+    
+    // استخراج الفئات الفريدة
     const categories = {};
     allAchievements.forEach(ach => {
         const cat = ach.category || 'عام';
         if (!categories[cat]) categories[cat] = [];
         categories[cat].push(ach);
     });
+    const categoryNames = Object.keys(categories).sort((a, b) => a.localeCompare(b));
     
-    // ترتيب الفئات حسب الاسم
-    const sortedCategories = Object.keys(categories).sort((a, b) => a.localeCompare(b));
+    // ✅ حالة الفلتر الحالي
+    if (!this._achievementFilter) {
+        this._achievementFilter = {
+            category: 'all',
+            status: 'all'
+        };
+    }
     
-    let html = '';
-    sortedCategories.forEach(cat => {
-        const items = categories[cat];
-        const unlockedCount = items.filter(a => a.unlocked).length;
+    // ✅ بناء HTML
+    let html = `
+        <!-- شريط التقدم والإحصائيات -->
+        <div style="
+            background: var(--glass);
+            border-radius: var(--radius-sm);
+            padding: 0.8rem 1rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+        ">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <span style="font-size:1.2rem;">🏆</span>
+                    <span style="font-weight:700;font-size:0.9rem;color:var(--light);">الإنجازات</span>
+                    <span class="badge badge-primary" style="font-size:0.7rem;">${unlockedCount}/${totalAchievements}</span>
+                </div>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                    <span style="font-size:0.75rem;color:var(--gray);">⭐ ${totalPoints} نقطة</span>
+                    <span style="font-size:0.75rem;color:var(--gray);">🪙 ${totalCoins} عملة</span>
+                    <span style="font-size:0.75rem;color:var(--gray);">📊 ${progressPercent}%</span>
+                    <button class="btn btn-xs btn-outline" onclick="App._renderProfileAchievements()" style="font-size:0.6rem;padding:0.1rem 0.5rem;">
+                        <i class="fas fa-sync"></i>
+                    </button>
+                </div>
+            </div>
+            <!-- شريط التقدم -->
+            <div style="margin-top:0.3rem;">
+                <div style="height:6px;background:var(--dark);border-radius:10px;overflow:hidden;">
+                    <div style="height:100%;width:${progressPercent}%;background:linear-gradient(90deg, var(--primary), var(--accent));border-radius:10px;transition:width 0.5s ease;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- تبويبات الفئات (صف واحد مع تمرير أفقي) -->
+        <div class="achievement-tabs-wrapper" style="
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.3rem 0.2rem 0.6rem;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            border-bottom: 1px solid var(--glass-border);
+            margin-bottom: 0.5rem;
+            flex-wrap: nowrap;
+        ">
+            <button class="achievement-tab ${this._achievementFilter.category === 'all' ? 'active' : ''}" 
+                    data-category="all"
+                    style="
+                        padding: 0.3rem 0.8rem;
+                        border-radius: 30px;
+                        border: 1px solid ${this._achievementFilter.category === 'all' ? 'var(--primary)' : 'var(--glass-border)'};
+                        background: ${this._achievementFilter.category === 'all' ? 'var(--primary)' : 'transparent'};
+                        color: ${this._achievementFilter.category === 'all' ? '#fff' : 'var(--gray)'};
+                        font-weight: 600;
+                        font-size: 0.7rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                        flex-shrink: 0;
+                        white-space: nowrap;
+                    "
+                    onclick="App._filterAchievements('category', 'all')">
+                📦 الكل (${totalAchievements})
+            </button>
+            ${categoryNames.map(cat => {
+                const count = categories[cat].length;
+                const unlockedCountCat = categories[cat].filter(a => a.unlocked).length;
+                const isActive = this._achievementFilter.category === cat;
+                return `
+                    <button class="achievement-tab ${isActive ? 'active' : ''}" 
+                            data-category="${cat}"
+                            style="
+                                padding: 0.3rem 0.8rem;
+                                border-radius: 30px;
+                                border: 1px solid ${isActive ? 'var(--primary)' : 'var(--glass-border)'};
+                                background: ${isActive ? 'var(--primary)' : 'transparent'};
+                                color: ${isActive ? '#fff' : 'var(--gray)'};
+                                font-weight: 600;
+                                font-size: 0.7rem;
+                                cursor: pointer;
+                                transition: all 0.3s ease;
+                                font-family: var(--font);
+                                flex-shrink: 0;
+                                white-space: nowrap;
+                            "
+                            onclick="App._filterAchievements('category', '${cat}')">
+                        ${cat} (${unlockedCountCat}/${count})
+                    </button>
+                `;
+            }).join('')}
+        </div>
+        
+        <!-- فلاتر الحالة (صف واحد مع تمرير أفقي) -->
+        <div class="achievement-filters-wrapper" style="
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.2rem 0.2rem 0.5rem;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            margin-bottom: 0.5rem;
+            flex-wrap: nowrap;
+        ">
+            <span style="font-size:0.65rem;color:var(--gray);flex-shrink:0;margin-left:0.3rem;">🔍 الحالة:</span>
+            <button class="achievement-filter-btn ${this._achievementFilter.status === 'all' ? 'active' : ''}" 
+                    data-status="all"
+                    style="
+                        padding: 0.2rem 0.7rem;
+                        border-radius: 30px;
+                        border: 1px solid ${this._achievementFilter.status === 'all' ? 'var(--primary)' : 'var(--glass-border)'};
+                        background: ${this._achievementFilter.status === 'all' ? 'var(--primary)' : 'transparent'};
+                        color: ${this._achievementFilter.status === 'all' ? '#fff' : 'var(--gray)'};
+                        font-weight: 600;
+                        font-size: 0.65rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                        flex-shrink: 0;
+                        white-space: nowrap;
+                    "
+                    onclick="App._filterAchievements('status', 'all')">
+                الكل
+            </button>
+            <button class="achievement-filter-btn ${this._achievementFilter.status === 'unlocked' ? 'active' : ''}" 
+                    data-status="unlocked"
+                    style="
+                        padding: 0.2rem 0.7rem;
+                        border-radius: 30px;
+                        border: 1px solid ${this._achievementFilter.status === 'unlocked' ? 'var(--primary)' : 'var(--glass-border)'};
+                        background: ${this._achievementFilter.status === 'unlocked' ? 'var(--primary)' : 'transparent'};
+                        color: ${this._achievementFilter.status === 'unlocked' ? '#fff' : 'var(--gray)'};
+                        font-weight: 600;
+                        font-size: 0.65rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                        flex-shrink: 0;
+                        white-space: nowrap;
+                    "
+                    onclick="App._filterAchievements('status', 'unlocked')">
+                ✅ مكتمل (${unlockedCount})
+            </button>
+            <button class="achievement-filter-btn ${this._achievementFilter.status === 'locked' ? 'active' : ''}" 
+                    data-status="locked"
+                    style="
+                        padding: 0.2rem 0.7rem;
+                        border-radius: 30px;
+                        border: 1px solid ${this._achievementFilter.status === 'locked' ? 'var(--primary)' : 'var(--glass-border)'};
+                        background: ${this._achievementFilter.status === 'locked' ? 'var(--primary)' : 'transparent'};
+                        color: ${this._achievementFilter.status === 'locked' ? '#fff' : 'var(--gray)'};
+                        font-weight: 600;
+                        font-size: 0.65rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-family: var(--font);
+                        flex-shrink: 0;
+                        white-space: nowrap;
+                    "
+                    onclick="App._filterAchievements('status', 'locked')">
+                🔒 غير مكتمل (${totalAchievements - unlockedCount})
+            </button>
+        </div>
+    `;
+    
+    // تطبيق الفلاتر
+    let filteredAchievements = [...allAchievements];
+    
+    if (this._achievementFilter.category !== 'all') {
+        filteredAchievements = filteredAchievements.filter(a => a.category === this._achievementFilter.category);
+    }
+    
+    if (this._achievementFilter.status === 'unlocked') {
+        filteredAchievements = filteredAchievements.filter(a => a.unlocked);
+    } else if (this._achievementFilter.status === 'locked') {
+        filteredAchievements = filteredAchievements.filter(a => !a.unlocked);
+    }
+    
+    // تصنيف الإنجازات المفلترة
+    const filteredCategories = {};
+    filteredAchievements.forEach(ach => {
+        const cat = ach.category || 'عام';
+        if (!filteredCategories[cat]) filteredCategories[cat] = [];
+        filteredCategories[cat].push(ach);
+    });
+    const sortedFilteredCategories = Object.keys(filteredCategories).sort((a, b) => a.localeCompare(b));
+    
+    if (filteredAchievements.length === 0) {
+        html += `
+            <div class="empty-state" style="text-align:center;padding:2rem;">
+                <i class="fas fa-search" style="font-size:2rem;color:var(--gray-dark);display:block;margin-bottom:0.5rem;"></i>
+                <p style="color:var(--gray);font-size:0.9rem;">لا توجد إنجازات تطابق الفلتر المحدد</p>
+                <button class="btn btn-sm btn-outline mt-1" onclick="App._resetAchievementFilters()">
+                    <i class="fas fa-undo"></i> إعادة تعيين الفلاتر
+                </button>
+            </div>
+        `;
+        container.innerHTML = html;
+        return;
+    }
+    
+    // عرض الأقسام القابلة للطي
+    sortedFilteredCategories.forEach(cat => {
+        const items = filteredCategories[cat];
+        const unlockedCountCat = items.filter(a => a.unlocked).length;
         const totalCount = items.length;
         const sectionId = 'achievement_section_' + cat.replace(/\s/g, '_') + '_' + Date.now().toString(36);
         
@@ -30704,7 +33632,7 @@ _renderProfileAchievements: function() {
                         <span class="status-badge" style="font-size:0.6rem;color:var(--gray);background:var(--glass);padding:0.05rem 0.5rem;border-radius:30px;border:1px solid var(--glass-border);">مغلق</span>
                     </div>
                     <span style="font-size:0.7rem;color:var(--gray);">
-                        ${unlockedCount}/${totalCount} مكتمل
+                        ${unlockedCountCat}/${totalCount} مكتمل
                     </span>
                 </div>
                 
@@ -30729,7 +33657,7 @@ _renderProfileAchievements: function() {
                     </div>
                     <div style="font-weight:700; font-size:0.75rem; color: ${isUnlocked ? 'var(--light)' : 'var(--gray)'};">${ach.name}</div>
                     <div style="font-size:0.55rem; color:var(--gray);">${ach.description}</div>
-                    <div style="font-size:0.65rem; color:var(--accent);">+${ach.points} نقطة</div>
+                    <div style="font-size:0.65rem; color:var(--accent);">+${ach.pointsReward || ach.points || 0} نقطة</div>
                     ${isUnlocked ? '<div style="color:var(--success);font-size:0.55rem;">✅ مكتمل</div>' : '<div style="color:var(--gray);font-size:0.55rem;">🔒 مغلق</div>'}
                 </div>
             `;
@@ -30743,6 +33671,73 @@ _renderProfileAchievements: function() {
     });
     
     container.innerHTML = html;
+},
+
+// دالة مساعدة للفلترة
+_filterAchievements: function(type, value) {
+    if (!this._achievementFilter) {
+        this._achievementFilter = {
+            category: 'all',
+            status: 'all'
+        };
+    }
+    
+    if (type === 'category') {
+        this._achievementFilter.category = value;
+    } else if (type === 'status') {
+        this._achievementFilter.status = value;
+    }
+    
+    // إعادة عرض الإنجازات مع الفلتر الجديد
+    this._renderProfileAchievements();
+},
+
+/**
+ * ربط أحداث فلاتر الإنجازات في الملف الشخصي
+ */
+_bindAchievementFilters: function() {
+    const filterChips = document.querySelectorAll('.filter-chip');
+    if (!filterChips.length) return;
+    
+    filterChips.forEach(chip => {
+        chip.removeEventListener('click', this._handleAchievementFilterClick);
+        chip.addEventListener('click', this._handleAchievementFilterClick);
+    });
+},
+
+/**
+ * معالج النقر على فلتر الإنجازات
+ */
+_handleAchievementFilterClick: function(e) {
+    const chip = e.currentTarget;
+    const filter = chip.dataset.filter;
+    
+    // ✅ تحديث حالة الأزرار
+    document.querySelectorAll('.filter-chip').forEach(c => {
+        c.classList.remove('active');
+        c.style.background = 'transparent';
+        c.style.color = 'var(--gray)';
+        c.style.borderColor = 'var(--glass-border)';
+    });
+    chip.classList.add('active');
+    chip.style.background = 'var(--primary)';
+    chip.style.color = '#fff';
+    chip.style.borderColor = 'var(--primary)';
+    
+    // ✅ تطبيق الفلتر على الأقسام
+    const sections = document.querySelectorAll('.achievement-section-wrapper');
+    sections.forEach(section => {
+        const header = section.querySelector('.achievement-section-header');
+        if (!header) return;
+        const categoryText = header.querySelector('span:nth-child(2)')?.textContent?.trim() || '';
+        const categoryKey = categoryText.replace(/\s/g, '_');
+        
+        if (filter === 'all' || categoryKey === filter) {
+            section.style.display = 'block';
+        } else {
+            section.style.display = 'none';
+        }
+    });
 },
 
 // ============================================================
@@ -35716,6 +38711,34 @@ if (mode === 'training_crossword') {
     CrosswordMatchEngine.start(cleanSettings, () => {
         console.log('✅ مباراة الكلمات المتقاطعة انتهت');
     });
+    return;
+}
+
+if (mode.startsWith('wordguess')) {
+    const modeInfo = MODE_DESCRIPTIONS[mode];
+    
+    // ✅ تحميل الإعدادات المحفوظة (الآن تعيد كائن بمفاتيح نظيفة)
+    const savedSettings = this._getModeSettings(mode);
+    
+    // ✅ دمج الإعدادات: الافتراضية + المحفوظة
+    const settings = {
+        difficulty: savedSettings.difficulty || modeInfo.settings.difficulty || 'medium',
+        category: savedSettings.category || modeInfo.settings.category || 'all',
+        wordLength: parseInt(savedSettings.wordLength) || parseInt(modeInfo.settings.wordLength) || 0,
+        attempts: parseInt(savedSettings.attempts) || parseInt(modeInfo.settings.attempts) || 6,
+        timeLimit: parseInt(savedSettings.timeLimit) || parseInt(modeInfo.settings.timeLimit) || 120,
+        rounds: parseInt(savedSettings.rounds) || parseInt(modeInfo.settings.rounds) || 5
+    };
+    
+    console.log('🎮 بدء تخمين الكلمات بالإعدادات:', settings);
+    showToast(`🔤 بدء ${modeInfo.title}...`, 'success', 2000);
+    
+    // ✅ إخفاء الأقسام وإظهار حاوية اللعبة
+    document.querySelectorAll('.section').forEach(el => el.style.display = 'none');
+    const container = document.getElementById('wordGuessGameContainer');
+    if (container) container.style.display = 'block';
+    
+    WordGuessEngine.start(settings, mode);
     return;
 }
 
