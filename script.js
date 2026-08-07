@@ -9729,7 +9729,7 @@ _renderCrosswordRound(question) {
                 </div>
                 <span id="cwProgressText" style="font-size:0.7rem;color:var(--gray);">0/${totalWords}</span>
             </div>
-            <!-- ✅ أزرار التكبير -->
+            <!-- أزرار التكبير (دعم إضافي) -->
             <div style="display:flex;gap:0.3rem;justify-content:center;margin-top:0.2rem;">
                 <button class="btn btn-xs btn-outline" onclick="CrosswordMatchEngine._zoomGrid('out')" style="font-size:0.6rem;padding:0.1rem 0.5rem;">🔍-</button>
                 <span style="font-size:0.6rem;color:var(--gray);" id="cwZoomLevel">100%</span>
@@ -9738,9 +9738,28 @@ _renderCrosswordRound(question) {
             </div>
         </div>
         <!-- ✅ حاوية الشبكة مع تمرير وتوسيط -->
-        <div id="crosswordScrollContainer" style="overflow:auto;max-height:70vh;display:flex;justify-content:center;align-items:flex-start;touch-action:pan-x pan-y;position:relative;">
-            <div id="crosswordZoomWrapper" style="transform:scale(1);transform-origin:center center;transition:transform 0.2s ease;display:inline-block;">
-                <div id="crosswordGameOptions" style="margin-bottom:0.5rem;display:inline-block;"></div>
+        <div id="crosswordScrollContainer" style="
+            overflow:hidden;
+            width:100%;
+            height:65vh;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            touch-action:none;
+            position:relative;
+            background:var(--glass);
+            border-radius:var(--radius-sm);
+            border:1px solid var(--border-color);
+        ">
+            <div id="crosswordZoomWrapper" style="
+                transform: translate(0px, 0px) scale(1);
+                transform-origin: center center;
+                transition: none;
+                display:inline-block;
+                touch-action:none;
+                will-change:transform;
+            ">
+                <div id="crosswordGameOptions" style="display:inline-block;touch-action:none;"></div>
             </div>
         </div>
         <div style="display:flex;justify-content:center;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem;">
@@ -9750,12 +9769,24 @@ _renderCrosswordRound(question) {
         <div id="verifyResultContainer" style="margin-top:0.5rem;min-height:40px;"></div>
     `;
 
+    // ✅ تهيئة متغيرات التكبير والتحريك
     this._zoomLevel = 1;
+    this._translateX = 0;
+    this._translateY = 0;
+    this._isDragging = false;
+    this._touchStartX = 0;
+    this._touchStartY = 0;
+    this._touchDist = 0;
+    this._lastTouchX = 0;
+    this._lastTouchY = 0;
 
+    // عرض الشبكة
     try {
         CrosswordEngine.renderWithEmptyHidden('crosswordGameOptions');
         setTimeout(() => {
             this._updateProgressUI(0, totalWords);
+            // ✅ بعد عرض الشبكة، نضبط حجم الحاوية حسب الشبكة
+            this._fitGridToContainer();
         }, 100);
     } catch (e) {
         console.error('❌ Error rendering crossword:', e);
@@ -9766,25 +9797,159 @@ _renderCrosswordRound(question) {
             </div>
         `;
     }
+
+    // ✅ ربط أحداث اللمس
+    this._initTouchEvents();
 },
 
-// ✅ دالة التكبير
-_zoomGrid(direction) {
+// ✅ دالة لضبط الشبكة في الحاوية
+_fitGridToContainer() {
+    const scrollContainer = document.getElementById('crosswordScrollContainer');
+    const wrapper = document.getElementById('crosswordZoomWrapper');
+    const grid = document.getElementById('crosswordGameOptions');
+    if (!scrollContainer || !wrapper || !grid) return;
+
+    // حساب حجم الشبكة الفعلي
+    const gridRect = grid.getBoundingClientRect();
+    const containerRect = scrollContainer.getBoundingClientRect();
+    
+    // هامش أمان 20px
+    const padding = 20;
+    const containerWidth = containerRect.width - padding;
+    const containerHeight = containerRect.height - padding;
+    const gridWidth = gridRect.width;
+    const gridHeight = gridRect.height;
+
+    if (gridWidth > 0 && gridHeight > 0) {
+        // حساب نسبة التكبير المناسبة لتلائم الشبكة في الحاوية
+        const scaleX = containerWidth / gridWidth;
+        const scaleY = containerHeight / gridHeight;
+        let fitScale = Math.min(scaleX, scaleY, 1.2); // حد أقصى 1.2 (لا نكبرها أكثر من اللازم)
+        fitScale = Math.max(fitScale, 0.3); // حد أدنى 0.3
+        
+        // تعيين التكبير المبدئي
+        this._zoomLevel = fitScale;
+        this._translateX = 0;
+        this._translateY = 0;
+        this._updateTransform();
+    }
+},
+
+// ✅ دالة تحديث التحويلات (تكبير + تحريك)
+_updateTransform() {
     const wrapper = document.getElementById('crosswordZoomWrapper');
     const zoomLabel = document.getElementById('cwZoomLevel');
     if (!wrapper) return;
+    
+    wrapper.style.transform = `translate(${this._translateX}px, ${this._translateY}px) scale(${this._zoomLevel})`;
+    if (zoomLabel) zoomLabel.textContent = Math.round(this._zoomLevel * 100) + '%';
+},
 
-    let zoom = this._zoomLevel || 1;
+// ✅ دالة التكبير بالأزرار
+_zoomGrid(direction) {
     if (direction === 'in') {
-        zoom = Math.min(zoom + 0.1, 2);
+        this._zoomLevel = Math.min(this._zoomLevel + 0.1, 3);
     } else if (direction === 'out') {
-        zoom = Math.max(zoom - 0.1, 0.5);
+        this._zoomLevel = Math.max(this._zoomLevel - 0.1, 0.3);
     } else {
-        zoom = 1;
+        this._zoomLevel = 1;
+        this._translateX = 0;
+        this._translateY = 0;
     }
-    this._zoomLevel = zoom;
-    wrapper.style.transform = `scale(${zoom})`;
-    if (zoomLabel) zoomLabel.textContent = Math.round(zoom * 100) + '%';
+    this._updateTransform();
+},
+
+// ✅ تهيئة أحداث اللمس
+_initTouchEvents() {
+    const scrollContainer = document.getElementById('crosswordScrollContainer');
+    if (!scrollContainer) return;
+
+    // إزالة المستمعات القديمة لتجنب التكرار
+    scrollContainer.removeEventListener('touchstart', this._handleTouchStart);
+    scrollContainer.removeEventListener('touchmove', this._handleTouchMove);
+    scrollContainer.removeEventListener('touchend', this._handleTouchEnd);
+    scrollContainer.removeEventListener('touchcancel', this._handleTouchEnd);
+
+    // إضافة المستمعات الجديدة
+    scrollContainer.addEventListener('touchstart', this._handleTouchStart.bind(this), { passive: false });
+    scrollContainer.addEventListener('touchmove', this._handleTouchMove.bind(this), { passive: false });
+    scrollContainer.addEventListener('touchend', this._handleTouchEnd.bind(this), { passive: false });
+    scrollContainer.addEventListener('touchcancel', this._handleTouchEnd.bind(this), { passive: false });
+},
+
+// ✅ معالج بدء اللمس
+_handleTouchStart(e) {
+    const touches = e.touches;
+    if (touches.length === 1) {
+        // لمسة واحدة: بدء السحب
+        this._isDragging = true;
+        this._touchStartX = touches[0].clientX;
+        this._touchStartY = touches[0].clientY;
+        this._lastTouchX = this._touchStartX;
+        this._lastTouchY = this._touchStartY;
+    } else if (touches.length === 2) {
+        // لمسة مزدوجة: بدء التكبير
+        this._isDragging = false;
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        this._touchDist = Math.sqrt(dx * dx + dy * dy);
+        this._touchStartX = (touches[0].clientX + touches[1].clientX) / 2;
+        this._touchStartY = (touches[0].clientY + touches[1].clientY) / 2;
+    }
+    e.preventDefault();
+},
+
+// ✅ معالج تحريك اللمس
+_handleTouchMove(e) {
+    const touches = e.touches;
+    if (touches.length === 1 && this._isDragging) {
+        // السحب بإصبع واحد
+        const dx = touches[0].clientX - this._lastTouchX;
+        const dy = touches[0].clientY - this._lastTouchY;
+        this._translateX += dx;
+        this._translateY += dy;
+        this._lastTouchX = touches[0].clientX;
+        this._lastTouchY = touches[0].clientY;
+        this._updateTransform();
+        e.preventDefault();
+    } else if (touches.length === 2) {
+        // التكبير بإصبعين
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        const newDist = Math.sqrt(dx * dx + dy * dy);
+        if (this._touchDist > 0) {
+            const scale = newDist / this._touchDist;
+            let newZoom = this._zoomLevel * scale;
+            // حدود التكبير
+            newZoom = Math.min(Math.max(newZoom, 0.3), 3);
+            
+            // حساب مركز التكبير
+            const centerX = (touches[0].clientX + touches[1].clientX) / 2;
+            const centerY = (touches[0].clientY + touches[1].clientY) / 2;
+            const wrapper = document.getElementById('crosswordZoomWrapper');
+            if (wrapper) {
+                const rect = wrapper.getBoundingClientRect();
+                const wrapCenterX = rect.left + rect.width / 2;
+                const wrapCenterY = rect.top + rect.height / 2;
+                const deltaX = (centerX - wrapCenterX) * (1 - scale);
+                const deltaY = (centerY - wrapCenterY) * (1 - scale);
+                this._translateX += deltaX;
+                this._translateY += deltaY;
+            }
+            
+            this._zoomLevel = newZoom;
+            this._touchDist = newDist;
+            this._updateTransform();
+        }
+        e.preventDefault();
+    }
+},
+
+// ✅ معالج نهاية اللمس
+_handleTouchEnd(e) {
+    this._isDragging = false;
+    this._touchDist = 0;
+    e.preventDefault();
 },
 
     // التحقق من الجولة الحالية
